@@ -5,7 +5,29 @@ type BaseProperties = {
 	properties: Record<string, string>;
 };
 
-export type BlockProps = ListProps | TextProps | ImageProps | TableProps | LinkProps;
+export type BlockProps =
+	| BreakProps
+	| DivProps
+	| ListProps
+	| TextProps
+	| ImageProps
+	| TableProps
+	| LinkProps;
+
+export type DivProps = {
+	type: 'div';
+	data: DivData;
+	id: string;
+};
+
+export type DivData = BaseProperties & {
+	children: BlockProps[];
+};
+
+export type BreakProps = {
+	type: 'br';
+	id: string;
+};
 
 export type ListProps = {
 	type: 'ul' | 'ol';
@@ -25,7 +47,7 @@ export type ListItemProps = {
 } & ({ data: BlockProps } | { content: string });
 
 export type TextProps = {
-	type: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'pre' | 'code';
+	type: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'pre' | 'code' | 'var';
 	data: TextData;
 	id: string;
 };
