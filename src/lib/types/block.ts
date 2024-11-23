@@ -1,10 +1,12 @@
-export type Word = {
-	word: string;
+// TODO: Fill this out
+export type BlockProperty = string;
+
+export type BlockData = {
+	content: string | null;
+	children: BlockProps[];
+	classes: string[];
+	properties: Record<string, string>;
 };
-export type BlockDatum = {
-	words: Word[];
-};
-export type BlockData = BlockDatum[];
 
 export type BlockType =
 	| 'p'
@@ -30,7 +32,9 @@ export type BlockType =
 	| 'tr'
 	| 'th'
 	| 'td';
+
 export type BlockProps = {
 	type: BlockType;
 	data: BlockData;
+	id: string;
 };
