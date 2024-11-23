@@ -1,3 +1,6 @@
+/**
+ * The node of the rope data structure
+ */
 type RopeNode = {
 	left: RopeNode | null;
 	right: RopeNode | null;
@@ -6,6 +9,11 @@ type RopeNode = {
 	height: number; // Used to balance the tree
 };
 
+/**
+ * A rope contains a sequence of characters and is optimized for
+ * quick insertions/deletions at random points inside of the text.
+ * It is implemented as a binary tree that balances itself.
+ */
 class Rope {
 	private root: RopeNode | null;
 
@@ -23,19 +31,23 @@ class Rope {
 		};
 	}
 
+	/**
+	 * Insert text at a specific position in the rope and then rebalance it.
+	 */
 	public insert(position: number, text: string): Rope {
 		this.root = this.insertNode(this.root, position, text);
 		return this;
 	}
 
-	// Split the rope at a specific position
+	// Split the rope at a specific position into two ropes.
 	public split(position: number): [RopeNode | null, RopeNode | null] {
 		return this.splitNode(this.root, position);
 	}
 
-	// Delete a range of text
-	public delete(start: number, end: number): void {
+	// Delete a range of text then rebalance the rope.
+	public delete(start: number, end: number): Rope {
 		this.root = this.deleteRange(this.root, start, end);
+		return this;
 	}
 
 	private insertNode(node: RopeNode | null, position: number, text: string): RopeNode {
@@ -59,6 +71,12 @@ class Rope {
 		return this.balance(node);
 	}
 
+	/**
+	 * Splits a given RopeNode at the specified position into two separate nodes. It returns
+	 * a tuple containing two RopeNodes. The first element is the left part of the split node,
+	 * and the second element is the right part of the split node. If the input node is null, both elements
+	 * of the tuple will be null.
+	 */
 	private splitNode(node: RopeNode | null, position: number): [RopeNode | null, RopeNode | null] {
 		if (!node) {
 			return [null, null];
@@ -96,6 +114,13 @@ class Rope {
 		return this.createLeafNode(this.flatten(left) + this.flatten(right));
 	}
 
+	/**
+	 * Separates the rope into three parts:
+	 * 1. The left part (prior to the start index)
+	 * 2. The middle part (from the start to the end index)
+	 * 3. The right part (after the end index)
+	 * Returns the left and right parts with the middle ommitted.
+	 */
 	private deleteRange(node: RopeNode | null, start: number, end: number): RopeNode | null {
 		if (!node) return null;
 
@@ -114,7 +139,7 @@ class Rope {
 
 	/**
 	 * Flatten the rope tree into a single string by recursively
-	 * concatenating the left to the right node.
+	 * concatenating the text in the left node to the right node.
 	 */
 	private flatten(node: RopeNode | null): string {
 		if (!node) return '';
