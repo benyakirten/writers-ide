@@ -1,81 +1,91 @@
 export type BlockProperty = string;
 
-type BaseProperties = {
+export type BaseBlockData = {
 	classes: string[];
 	properties: Record<string, string>;
+	id: string;
+	content: string;
+	isNew?: boolean;
 };
 
-export type BlockProps =
-	| BreakProps
-	| DivProps
-	| ListProps
-	| TextProps
-	| ImageProps
-	| TableProps
-	| LinkProps;
+export type Blocks = BlockData[];
+export type BlockData =
+	| BreakData
+	| DivData
+	| ListData
+	| TextData
+	| ParagraphData
+	| ImageData
+	| TableData
+	| LinkData;
 
-export type DivProps = {
+export type BlockProps = {
+	index: number;
+	block: BlockData;
+	updateBlockContent: (index: number, content: string) => void;
+	addBlock: () => void;
+	removeNewStatus: (index: number) => void;
+};
+
+export type DivData = BaseBlockData & {
 	type: 'div';
 	data: DivData;
-	id: string;
-};
-
-export type DivData = BaseProperties & {
 	children: BlockProps[];
 };
 
-export type BreakProps = {
+export type DivProps = DivData & {
+	// updateBlockContent: (index: number, content: string) => void;
+};
+
+export type BreakData = BaseBlockData & {
 	type: 'br';
-	id: string;
 };
 
-export type ListProps = {
+export type BreakProps = BreakData;
+
+export type ListData = BaseBlockData & {
 	type: 'ul' | 'ol';
-	data: BlockProps[];
-	id: string;
+	data: Blocks;
 };
 
-export type ListData = {
-	children: ListItemProps[];
-	classes: string[];
-	properties: Record<string, string>;
-};
+export type ListProps = ListData;
 
-export type ListItemProps = {
-	type: 'li';
-	id: string;
-} & ({ data: BlockProps } | { content: string });
-
-export type TextProps = {
-	type: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'pre' | 'code' | 'var';
-	data: TextData;
-	id: string;
-};
-
-export type TextData = BaseProperties & {
+export type TextData = BaseBlockData & {
+	type: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'pre' | 'code' | 'var';
 	content: string;
 };
+export type TextProps = TextData & {
+	// updateBlockContent: (content: string) => void;
+};
 
-export type ImageProps = {
+export type ParagraphData = BaseBlockData &
+	Omit<TextProps, 'type'> & {
+		type: 'p';
+		children: TextProps[];
+	};
+
+export type ParagraphProps = ParagraphData & {
+	updateBlockContent: (content: string) => void;
+	addBlock: () => void;
+	removeNewStatus: () => void;
+};
+
+export type ImageData = BaseBlockData & {
 	type: 'img';
-	data: ImageData;
-	id: string;
+	data: {
+		url: string;
+		alt: string;
+	};
 };
 
-export type ImageData = BaseProperties & {
-	url: string;
-	alt: string;
-};
+export type ImageProps = ImageData;
 
-export type TableProps = {
+export type TableData = BaseBlockData & {
 	type: 'table';
-	data: TableData;
-	id: string;
-};
-
-export type TableData = BaseProperties & {
-	content: string | null;
-	children: TablePartData[];
+	data: {
+		content: string | null;
+		children: TablePartData[];
+	};
 };
 
 export type TablePartData = {
@@ -85,33 +95,30 @@ export type TablePartData = {
 	properties: Record<string, string>;
 };
 
-export type TableRowProps = {
+export type TableRowProps = BaseBlockData & {
 	type: 'tr';
 	data: TableRowData;
-	id: string;
 };
 
-export type TableRowData = BaseProperties & {
+export type TableRowData = {
 	children: TableCellProps[];
 };
 
-export type TableCellProps = {
+export type TableCellProps = BaseBlockData & {
 	type: 'th' | 'td';
 	data: TableCellData;
-	id: string;
 };
 
-export type TableCellData = BaseProperties & {
+export type TableCellData = {
 	content: string;
 };
 
-export type LinkProps = {
+export type LinkData = BaseBlockData & {
 	type: 'a';
-	data: LinkData;
-	id: string;
+	data: {
+		content: string;
+		href: string;
+	};
 };
 
-export type LinkData = BaseProperties & {
-	content: string;
-	href: string;
-};
+export type LinkProps = LinkData;
