@@ -1,8 +1,10 @@
 <script lang="ts">
 	import type { ParagraphProps } from '$lib/types/block.js';
+	import { onMount } from 'svelte';
 
 	let { content, classes, type, updateBlockContent, addBlock, id }: ParagraphProps = $props();
 
+	let el: HTMLElement;
 	const updateContent = (e: Event) => {
 		if (e.target instanceof HTMLParagraphElement) {
 			updateBlockContent(e.target.textContent ?? '');
@@ -15,6 +17,7 @@
 				e.preventDefault();
 				const selection = window.getSelection();
 				let newContent = '';
+
 				if (selection) {
 					const position = selection.getRangeAt(0).startOffset;
 					// Text node should be this element
@@ -30,12 +33,33 @@
 					}
 
 					updateBlockContent(before);
+					// TODO: Figure out how to clean this up
+					el.textContent = before;
 				}
 
 				addBlock(newContent);
 				break;
+			case 'ArrowDown':
+				e.preventDefault();
+				const nextBlock = el.nextElementSibling;
+				// @ts-ignore
+				nextBlock?.focus?.();
+				break;
+			case 'ArrowUp':
+				e.preventDefault();
+				if (!(e.target instanceof HTMLElement)) {
+					break;
+				}
+				const prevBlock = el.previousElementSibling;
+				// @ts-ignore
+				prevBlock?.focus?.();
+				break;
 		}
 	};
+
+	onMount(() => {
+		el = document.getElementById(id)!;
+	});
 </script>
 
 <svelte:element
