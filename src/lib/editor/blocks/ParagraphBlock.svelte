@@ -1,37 +1,53 @@
 <script lang="ts">
-    import type { ParagraphProps } from "$lib/types/block.js";
-	import { onMount } from "svelte";
-    
-    let { content, classes, type, isNew, updateBlockContent, addBlock, removeNewStatus, id }: ParagraphProps = $props();
+	import type { ParagraphProps } from '$lib/types/block.js';
 
-    const updateContent = (e: Event) => {
-        if (e.target instanceof HTMLParagraphElement) {
-            updateBlockContent(e.target.textContent ?? "");
-        }
-    }
+	let { content, classes, type, updateBlockContent, addBlock, id }: ParagraphProps = $props();
 
-    const handleKeydown = (e: KeyboardEvent) => {
-        switch (e.key) {
-            case "Enter":
-                addBlock();
-                e.preventDefault();
-                break;
-        }
-    }
+	const updateContent = (e: Event) => {
+		if (e.target instanceof HTMLParagraphElement) {
+			updateBlockContent(e.target.textContent ?? '');
+		}
+	};
 
-    onMount(() => {
-        if (isNew) {
-            const element = document.querySelector(`#${id}`);
-            if (element instanceof HTMLElement) {
-                element.focus();
-                removeNewStatus();
-            }
-        }
-    })
+	const handleKeydown = (e: KeyboardEvent) => {
+		switch (e.key) {
+			case 'Enter':
+				e.preventDefault();
+				const selection = window.getSelection();
+				let newContent = '';
+				if (selection) {
+					const position = selection.getRangeAt(0).startOffset;
+					// Text node should be this element
+					// Try to split it into two parts - before and after the cursor
+					// If there's any text, we delete the after, otherwise we
+					// move the contents to the new line.
+					const text = selection.anchorNode?.textContent ?? '';
+					const before = text.slice(0, position);
+					const after = text.slice(position);
+
+					if (selection.toString().length === 0) {
+						newContent = after;
+					}
+
+					updateBlockContent(before);
+				}
+
+				addBlock(newContent);
+				break;
+		}
+	};
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<svelte:element tabindex={0} this={type} class={classes.join(" ")} id={id} onkeydown={handleKeydown} onblur={updateContent} contenteditable="true">
-    {content}
-    <!-- TODO: Children -->
+<svelte:element
+	this={type}
+	tabindex={0}
+	class={classes.join(' ')}
+	{id}
+	role="textbox"
+	onkeydown={handleKeydown}
+	onblur={updateContent}
+	contenteditable="true"
+>
+	{content}
+	<!-- TODO: Children -->
 </svelte:element>

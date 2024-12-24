@@ -5,7 +5,6 @@ export type BaseBlockData = {
 	properties: Record<string, string>;
 	id: string;
 	content: string;
-	isNew?: boolean;
 };
 
 export type Blocks = BlockData[];
@@ -23,8 +22,7 @@ export type BlockProps = {
 	index: number;
 	block: BlockData;
 	updateBlockContent: (index: number, content: string) => void;
-	addBlock: () => void;
-	removeNewStatus: (index: number) => void;
+	addBlock: (content: string) => void;
 };
 
 export type DivData = BaseBlockData & {
@@ -66,8 +64,7 @@ export type ParagraphData = BaseBlockData &
 
 export type ParagraphProps = ParagraphData & {
 	updateBlockContent: (content: string) => void;
-	addBlock: () => void;
-	removeNewStatus: () => void;
+	addBlock: (content: string) => void;
 };
 
 export type ImageData = BaseBlockData & {
