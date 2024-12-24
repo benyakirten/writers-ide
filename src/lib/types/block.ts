@@ -7,16 +7,11 @@ export type BaseBlockData = {
 	content: string;
 };
 
+export type InlineData = TextData | LinkData | ImageData;
+
+// TODO: Add block types with special properties such as rest of page.
 export type Blocks = BlockData[];
-export type BlockData =
-	| BreakData
-	| DivData
-	| ListData
-	| TextData
-	| ParagraphData
-	| ImageData
-	| TableData
-	| LinkData;
+export type BlockData = DivData | ListData | ParagraphData | TableData | HeadingData;
 
 export type BlockProps = {
 	index: number;
@@ -27,19 +22,18 @@ export type BlockProps = {
 
 export type DivData = BaseBlockData & {
 	type: 'div';
-	data: DivData;
-	children: BlockProps[];
+	children: Blocks[];
+};
+
+export type SectionData = BaseBlockData & {
+	type: 'section';
+	heading: HeadingData;
+	children: Blocks;
 };
 
 export type DivProps = DivData & {
 	// updateBlockContent: (index: number, content: string) => void;
 };
-
-export type BreakData = BaseBlockData & {
-	type: 'br';
-};
-
-export type BreakProps = BreakData;
 
 export type ListData = BaseBlockData & {
 	type: 'ul' | 'ol';
@@ -49,22 +43,28 @@ export type ListData = BaseBlockData & {
 export type ListProps = ListData;
 
 export type TextData = BaseBlockData & {
-	type: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'pre' | 'code' | 'var';
-	content: string;
+	text: 'span' | 'pre' | 'code' | 'var';
 };
 export type TextProps = TextData & {
 	// updateBlockContent: (content: string) => void;
 };
 
-export type ParagraphData = BaseBlockData &
-	Omit<TextProps, 'type'> & {
-		type: 'p';
-		children: TextProps[];
-	};
+export type ParagraphData = BaseBlockData & {
+	content: string;
+	type: 'p';
+	children: InlineData[];
+};
 
 export type ParagraphProps = ParagraphData & {
 	updateBlockContent: (content: string) => void;
 	addBlock: (content: string) => void;
+	index: number;
+};
+
+export type HeadingData = BaseBlockData & {
+	type: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+	content: string;
+	children: TextData[];
 };
 
 export type ImageData = BaseBlockData & {
