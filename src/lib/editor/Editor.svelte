@@ -2,7 +2,7 @@
 	import type { Blocks, ParagraphData } from '$lib/types/block.js';
 	import { tick } from 'svelte';
 	import Block from './blocks/Block.svelte';
-	import { CaretLinePosition, getCaretLinePosition, getCaretPosition } from './utils.js';
+	import { isCaretAtBottomOfElement, isCaretAtTopOfElement } from './utils.js';
 
 	let cursorPosition = $state(0);
 	let el: HTMLElement;
@@ -45,19 +45,16 @@
 				addBlock(newContent);
 				break;
 			case 'ArrowDown':
-				e.preventDefault();
-				moveToNextBlock(targetEl, selection, index);
+				moveToNextBlock(e, targetEl, selection, index);
 				break;
 			case 'ArrowUp':
-				e.preventDefault();
-				moveToPrevBlock(targetEl, selection, index);
+				moveToPrevBlock(e, targetEl, selection, index);
 				break;
 		}
 	}
 
-	function moveToNextBlock(el: HTMLElement, selection: Selection, index: number) {
-		const { isMultiLine, position } = getCaretLinePosition(el, selection);
-		if (isMultiLine && position !== CaretLinePosition.Last) {
+	function moveToNextBlock(e: KeyboardEvent, el: HTMLElement, selection: Selection, index: number) {
+		if (!isCaretAtBottomOfElement(el, selection)) {
 			return;
 		}
 
@@ -66,21 +63,22 @@
 			return;
 		}
 
+		e.preventDefault();
 		const nextBlock = document.getElementById(nextBlockId);
 		nextBlock?.focus();
 	}
 
-	function moveToPrevBlock(el: HTMLElement, selection: Selection, index: number) {
-		const { isMultiLine, position } = getCaretLinePosition(el, selection);
-		if (isMultiLine && position !== CaretLinePosition.First) {
+	function moveToPrevBlock(e: KeyboardEvent, el: HTMLElement, selection: Selection, index: number) {
+		if (!isCaretAtTopOfElement(el, selection)) {
 			return;
 		}
 
-		const prevBlockId = data.at(index - 1)?.id;
+		const prevBlockId = data[index - 1]?.id;
 		if (!prevBlockId) {
 			return;
 		}
 
+		e.preventDefault();
 		const prevBlock = document.getElementById(prevBlockId);
 		prevBlock?.focus();
 	}
@@ -89,8 +87,24 @@
 		{
 			classes: [],
 			properties: {},
-			id: 'myp',
-			content: 'Hello, world!',
+			id: 'myp1',
+			content: 'Hello, world! I want to write a very long message that will span multiple lines.',
+			type: 'p',
+			children: []
+		},
+		{
+			classes: [],
+			properties: {},
+			id: 'myp2',
+			content: 'This is another long message that spans multiple lines..',
+			type: 'p',
+			children: []
+		},
+		{
+			classes: [],
+			properties: {},
+			id: 'myp3',
+			content: 'Short message!.',
 			type: 'p',
 			children: []
 		}
@@ -130,11 +144,14 @@
 			margin: 0;
 		}
 		[data-editor] {
+			padding: 1rem;
+			word-wrap: break-word;
+
 			* {
 				box-sizing: border-box;
 				padding: 0;
 				margin: 0;
-				width: 20ch;
+				max-width: 20ch;
 				padding-bottom: 1ch;
 			}
 			*:focus {

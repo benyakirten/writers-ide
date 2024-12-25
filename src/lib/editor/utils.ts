@@ -16,39 +16,67 @@ export function parseElementIndex(el: HTMLElement): number[] | null {
 	return indices;
 }
 
-export enum CaretLinePosition {
-	First,
-	Last,
-	Middle
-}
-
-const CARET_LINE_TOLERANCE_PX = 5;
-export function getCaretLinePosition(
-	el: HTMLElement,
-	selection: Selection
-): { isMultiLine: boolean; position: CaretLinePosition } {
-	const range = selection.getRangeAt(0);
-	const selectionRect = range.getBoundingClientRect();
-
+export function isCaretAtTopOfElement(el: HTMLElement, selection: Selection): boolean {
+	const selectionRect = selection.getRangeAt(0).getBoundingClientRect();
 	const elRect = el.getBoundingClientRect();
 
 	const computedStyle = getComputedStyle(el);
 	const paddingTop = parseFloat(computedStyle.paddingTop);
-	const paddingBottom = parseFloat(computedStyle.paddingBottom);
-	const lineHeight =
-		parseFloat(computedStyle.lineHeight) || parseFloat(computedStyle.fontSize) * 1.2;
 
-	const effectiveBottom = elRect.bottom - paddingBottom;
 	const effectiveTop = elRect.top + paddingTop;
 
-	const isMultiLine = elRect.height - paddingTop - paddingBottom > lineHeight;
-	let caretPosition = CaretLinePosition.Middle;
+	return Math.abs(selectionRect.top - effectiveTop) < getLineHeight(computedStyle);
+}
 
-	if (Math.abs(selectionRect.bottom - effectiveBottom) < CARET_LINE_TOLERANCE_PX) {
-		caretPosition = CaretLinePosition.Last;
-	} else if (Math.abs(selectionRect.top - effectiveTop) < CARET_LINE_TOLERANCE_PX) {
-		caretPosition = CaretLinePosition.First;
+export function isCaretAtBottomOfElement(el: HTMLElement, selection: Selection): boolean {
+	const selectionRect = getBottomSelectionRect(selection);
+	const elRect = el.getBoundingClientRect();
+
+	const computedStyle = getComputedStyle(el);
+	const paddingBottom = parseFloat(computedStyle.paddingBottom);
+
+	const effectiveBottom = elRect.bottom - paddingBottom;
+
+	return Math.abs(selectionRect.bottom - effectiveBottom) < getLineHeight(computedStyle);
+}
+
+const NORMAL_LINE_HEIGHT = 1.2;
+export function getLineHeight(computedStyle: CSSStyleDeclaration): number {
+	const lineHeight = parseFloat(computedStyle.lineHeight);
+	if (isNaN(lineHeight)) {
+		const fontSize = parseFloat(computedStyle.fontSize);
+		return fontSize / NORMAL_LINE_HEIGHT;
+	}
+	return lineHeight;
+}
+
+/**
+ * If the user is using Firefox, there is a quirk when the caret is at the start
+ * of the line of an element with multiple lines. It will return the caret position
+ * as the end of the previous line. Therefore, we append a span with a content of
+ * of a zero-width space to the end of the range and use its bounding client rect.
+ *
+ * This also applies if the range is collapsed.
+ */
+function getBottomSelectionRect(selection: Selection): DOMRect {
+	const range = selection.getRangeAt(0);
+
+	if (navigator.userAgent.toLowerCase().includes('firefox')) {
+		const zeroWidthSpace = document.createElement('span');
+		zeroWidthSpace.style.opacity = '0';
+		zeroWidthSpace.textContent = ' ';
+
+		range.insertNode(zeroWidthSpace);
+		const selectionRect = zeroWidthSpace.getBoundingClientRect();
+		zeroWidthSpace.remove();
+
+		return selectionRect;
 	}
 
-	return { isMultiLine, position: caretPosition };
+	const selectionRect = range.getBoundingClientRect();
+	return selectionRect;
+}
+
+export function isBrowserFirefox(): boolean {
+	return navigator.userAgent.toLowerCase().includes('firefox');
 }
