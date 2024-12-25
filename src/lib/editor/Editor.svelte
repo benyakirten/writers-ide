@@ -2,8 +2,14 @@
 	import type { Blocks, ParagraphData } from '$lib/types/block.js';
 	import { tick } from 'svelte';
 	import Block from './blocks/Block.svelte';
-	import { isCaretAtBottomOfElement, isCaretAtTopOfElement } from './utils.js';
+	import {
+		getCaretHorizontalPosition,
+		isCaretAtBottomOfElement,
+		isCaretAtTopOfElement,
+		moveCaretToPositionFromLeft
+	} from './cursor.js';
 
+	// TODO: Move this into a separate store.
 	let cursorPosition = $state(0);
 	let el: HTMLElement;
 
@@ -45,42 +51,86 @@
 				addBlock(newContent);
 				break;
 			case 'ArrowDown':
-				moveToNextBlock(e, targetEl, selection, index);
+				cursorPosition = Math.max(cursorPosition, getCaretHorizontalPosition());
+				const nextBlock = moveToNextBlock(e, targetEl, selection, index);
+				if (!nextBlock) {
+					return;
+				}
+
+				moveCaretToPositionFromLeft(selection, nextBlock, cursorPosition);
 				break;
 			case 'ArrowUp':
-				moveToPrevBlock(e, targetEl, selection, index);
+				cursorPosition = Math.max(cursorPosition, getCaretHorizontalPosition());
+				const prevBlock = moveToPrevBlock(e, targetEl, selection, index);
+
+				if (!prevBlock) {
+					return;
+				}
+
+				// TODO: Move the cursor to the correct position from the right
+				break;
+			// TODO: Store the cursor position in the state on left or right move
+			case 'ArrowLeft':
+				cursorPosition = getCaretHorizontalPosition();
+				break;
+			case 'ArrowRight':
+				cursorPosition = getCaretHorizontalPosition();
 				break;
 		}
 	}
 
-	function moveToNextBlock(e: KeyboardEvent, el: HTMLElement, selection: Selection, index: number) {
-		if (!isCaretAtBottomOfElement(el, selection)) {
-			return;
+	function moveToNextBlock(
+		e: KeyboardEvent,
+		el: HTMLElement,
+		selection: Selection,
+		index: number
+	): HTMLElement | null {
+		if (!isCaretAtBottomOfElement(el, selection.getRangeAt(0))) {
+			return null;
 		}
 
 		const nextBlockId = data.at(index + 1)?.id;
 		if (!nextBlockId) {
-			return;
+			return null;
 		}
 
 		e.preventDefault();
 		const nextBlock = document.getElementById(nextBlockId);
-		nextBlock?.focus();
+
+		if (!nextBlock) {
+			return null;
+		}
+
+		nextBlock.focus();
+		return nextBlock;
 	}
 
-	function moveToPrevBlock(e: KeyboardEvent, el: HTMLElement, selection: Selection, index: number) {
-		if (!isCaretAtTopOfElement(el, selection)) {
-			return;
+	function moveToPrevBlock(
+		e: KeyboardEvent,
+		el: HTMLElement,
+		selection: Selection,
+		index: number
+	): HTMLElement | null {
+		if (!isCaretAtTopOfElement(el, selection.getRangeAt(0))) {
+			return null;
 		}
 
 		const prevBlockId = data[index - 1]?.id;
 		if (!prevBlockId) {
-			return;
+			return null;
 		}
 
 		e.preventDefault();
 		const prevBlock = document.getElementById(prevBlockId);
-		prevBlock?.focus();
+
+		if (!prevBlock) {
+			return null;
+		}
+
+		prevBlock.focus();
+		moveCursorToEnd(prevBlock);
+
+		return prevBlock;
 	}
 
 	let data: Blocks = $state([
@@ -124,15 +174,40 @@
 			children: []
 		};
 		data.push(newBlock);
+		cursorPosition = 0;
 
 		await tick();
 		const el = document.getElementById(newBlock.id);
 		el?.focus();
 	}
+
+	function moveCursorToEnd(editableElement: HTMLElement) {
+		const selection = window.getSelection();
+		if (!selection) {
+			return;
+		}
+
+		const range = document.createRange();
+
+		// Set the range to the end of the content
+		range.selectNodeContents(editableElement);
+		range.collapse(false);
+
+		// Clear any existing selection and add the new range
+		selection.removeAllRanges();
+		selection.addRange(range);
+	}
+
+	function handleClick(e: PointerEvent) {
+		if (!(e.target instanceof HTMLElement)) {
+			return;
+		}
+		cursorPosition = e.clientX;
+	}
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div data-editor bind:this={el} onkeydown={handleKeydown}>
+<div data-editor bind:this={el} onkeydown={handleKeydown} onpointerdown={handleClick}>
 	{#each data as block, idx (block.id)}
 		<Block {block} index={idx} {updateBlockContent} {addBlock} />
 	{/each}
