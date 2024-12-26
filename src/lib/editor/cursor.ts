@@ -212,3 +212,20 @@ export function traverseFromEndOfLine(node: Node, position: number): Range | nul
 export function closerToLeft(val: number, left: number, right: number): boolean {
 	return Math.abs(val - left) < Math.abs(val - right);
 }
+
+export function moveCursorToEnd(el: HTMLElement) {
+	const selection = window.getSelection();
+	if (!selection) {
+		return;
+	}
+
+	const range = document.createRange();
+
+	// Set the range to the end of the content
+	range.selectNodeContents(el);
+	range.collapse(false);
+
+	// Clear any existing selection and add the new range
+	selection.removeAllRanges();
+	selection.addRange(range);
+}

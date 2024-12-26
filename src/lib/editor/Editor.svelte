@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Blocks, ParagraphData } from '$lib/types/block.js';
+	import type { EditorProps, ParagraphData } from '$lib/types/block.js';
 	import { tick } from 'svelte';
 	import Block from './blocks/Block.svelte';
 	import {
@@ -7,10 +7,12 @@
 		isCaretAtBottomOfElement,
 		isCaretAtTopOfElement,
 		moveCaretToPositionFromLeft,
-		moveCaretToPositionFromRight
+		moveCaretToPositionFromRight,
+		moveCursorToEnd
 	} from './cursor.js';
 
-	// TODO: Move this into a separate store.
+	let { blocks = $bindable() }: EditorProps = $props();
+
 	let cursorPosition = $state(0);
 	let el: HTMLElement;
 
@@ -34,10 +36,6 @@
 				let newContent = '';
 
 				if (selection) {
-					// Text node should be this element
-					// Try to split it into two parts - before and after the cursor
-					// If there's any text, we delete the after, otherwise we
-					// move the contents to the new line.
 					const position = selection.getRangeAt(0).startOffset;
 					const text = targetEl.textContent ?? '';
 					const before = text.slice(0, position);
@@ -46,14 +44,17 @@
 						newContent = after;
 					}
 					updateBlockContent(index, before);
-					// TODO: Figure out why the text content isn't rerendering when we update the block content.
 					targetEl.textContent = before;
 				}
-				addBlock(newContent);
+				addBlock(index, newContent);
 				break;
 			case 'ArrowDown':
 				cursorPosition = Math.max(cursorPosition, getCaretHorizontalPosition());
-				const nextBlock = moveToNextBlock(e, targetEl, selection, index);
+				if (!isCaretAtBottomOfElement(targetEl, selection.getRangeAt(0))) {
+					return;
+				}
+
+				const nextBlock = moveToNextBlock(e, index);
 				if (!nextBlock) {
 					return;
 				}
@@ -62,15 +63,17 @@
 				break;
 			case 'ArrowUp':
 				cursorPosition = Math.max(cursorPosition, getCaretHorizontalPosition());
-				const prevBlock = moveToPrevBlock(e, targetEl, selection, index);
+				if (!isCaretAtTopOfElement(targetEl, selection.getRangeAt(0))) {
+					return null;
+				}
 
+				const prevBlock = moveToPrevBlock(e, index);
 				if (!prevBlock) {
 					return;
 				}
 
 				moveCaretToPositionFromRight(selection, prevBlock, cursorPosition);
 				break;
-			// TODO: Store the cursor position in the state on left or right move
 			case 'ArrowLeft':
 				cursorPosition = getCaretHorizontalPosition();
 				break;
@@ -80,17 +83,8 @@
 		}
 	}
 
-	function moveToNextBlock(
-		e: KeyboardEvent,
-		el: HTMLElement,
-		selection: Selection,
-		index: number
-	): HTMLElement | null {
-		if (!isCaretAtBottomOfElement(el, selection.getRangeAt(0))) {
-			return null;
-		}
-
-		const nextBlockId = data.at(index + 1)?.id;
+	function moveToNextBlock(e: KeyboardEvent, index: number): HTMLElement | null {
+		const nextBlockId = blocks.at(index + 1)?.id;
 		if (!nextBlockId) {
 			return null;
 		}
@@ -106,17 +100,8 @@
 		return nextBlock;
 	}
 
-	function moveToPrevBlock(
-		e: KeyboardEvent,
-		el: HTMLElement,
-		selection: Selection,
-		index: number
-	): HTMLElement | null {
-		if (!isCaretAtTopOfElement(el, selection.getRangeAt(0))) {
-			return null;
-		}
-
-		const prevBlockId = data[index - 1]?.id;
+	function moveToPrevBlock(e: KeyboardEvent, index: number): HTMLElement | null {
+		const prevBlockId = blocks[index - 1]?.id;
 		if (!prevBlockId) {
 			return null;
 		}
@@ -134,38 +119,11 @@
 		return prevBlock;
 	}
 
-	let data: Blocks = $state([
-		{
-			classes: [],
-			properties: {},
-			id: 'myp1',
-			content: 'Hello, world! I want to write a very long message that will span multiple lines.',
-			type: 'p',
-			children: []
-		},
-		{
-			classes: [],
-			properties: {},
-			id: 'myp2',
-			content: 'This is another long message that spans multiple lines..',
-			type: 'p',
-			children: []
-		},
-		{
-			classes: [],
-			properties: {},
-			id: 'myp3',
-			content: 'Short message!.',
-			type: 'p',
-			children: []
-		}
-	]);
-
 	function updateBlockContent(index: number, content: string) {
-		data[index].content = content;
+		blocks[index].content = content;
 	}
 
-	async function addBlock(text: string) {
+	async function addBlock(index: number, text: string) {
 		const newBlock: ParagraphData = {
 			type: 'p',
 			content: text,
@@ -174,7 +132,7 @@
 			properties: {},
 			children: []
 		};
-		data.push(newBlock);
+		blocks.splice(index + 1, 0, newBlock);
 		cursorPosition = 0;
 
 		await tick();
@@ -182,24 +140,7 @@
 		el?.focus();
 	}
 
-	function moveCursorToEnd(editableElement: HTMLElement) {
-		const selection = window.getSelection();
-		if (!selection) {
-			return;
-		}
-
-		const range = document.createRange();
-
-		// Set the range to the end of the content
-		range.selectNodeContents(editableElement);
-		range.collapse(false);
-
-		// Clear any existing selection and add the new range
-		selection.removeAllRanges();
-		selection.addRange(range);
-	}
-
-	function handleClick(e: PointerEvent) {
+	function handlePointerDown(e: PointerEvent) {
 		if (!(e.target instanceof HTMLElement)) {
 			return;
 		}
@@ -208,9 +149,9 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div data-editor bind:this={el} onkeydown={handleKeydown} onpointerdown={handleClick}>
-	{#each data as block, idx (block.id)}
-		<Block {block} index={idx} {updateBlockContent} {addBlock} />
+<div data-editor bind:this={el} onkeydown={handleKeydown} onpointerdown={handlePointerDown}>
+	{#each blocks as block, idx (block.id)}
+		<Block {block} index={idx} {updateBlockContent} />
 	{/each}
 </div>
 
