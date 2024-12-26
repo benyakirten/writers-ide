@@ -173,26 +173,31 @@ export function moveCaretToPositionFromLeft(
 export function moveCaretToPositionFromRight(
 	selection: Selection,
 	el: HTMLElement,
-	position: number
+	position: number,
+	startOffset: number
 ): void {
-	const range = traverseFromEndOfLine(el, position);
+	const range = traverseFromEndOfLine(el, position, startOffset);
 	if (!range) {
 		return;
 	}
 
+	range.collapse(true);
 	selection.removeAllRanges();
 	selection.addRange(range);
 }
 
-export function traverseFromEndOfLine(node: Node, position: number): Range | null {
+export function traverseFromEndOfLine(
+	node: Node,
+	position: number,
+	startOffset: number
+): Range | null {
 	if (node.nodeType === Node.TEXT_NODE) {
 		const range = document.createRange();
 
 		let prevOffset = 0;
-		const textContent = node.textContent ?? '';
-		range.setStart(node, textContent.length - 1);
+		range.setStart(node, startOffset);
 
-		for (let i = textContent.length - 1; i >= 0; i--) {
+		for (let i = startOffset - 1; i >= 0; i--) {
 			const newRange = document.createRange();
 			newRange.setStart(node, i);
 
@@ -211,7 +216,7 @@ export function traverseFromEndOfLine(node: Node, position: number): Range | nul
 	} else {
 		for (let i = node.childNodes.length - 1; i >= 0; i--) {
 			const child = node.childNodes[i];
-			const range = traverseFromEndOfLine(child, position);
+			const range = traverseFromEndOfLine(child, position, startOffset);
 			if (range) {
 				return range;
 			}
@@ -244,15 +249,6 @@ export function moveCursorToEnd(el: HTMLElement) {
 	// Clear any existing selection and add the new range
 	selection.removeAllRanges();
 	selection.addRange(range);
-}
-
-export function moveCursorUpOneLine(range: Range) {
-	const currentBottom = range.getBoundingClientRect().bottom;
-	let nextBottom = currentBottom;
-	while (nextBottom >= currentBottom) {
-		range.setStartBefore(range.startContainer);
-		nextBottom = range.getBoundingClientRect().bottom;
-	}
 }
 
 export function moveCursorDownOneLine(el: HTMLElement, selection: Selection): Range | null {
@@ -297,6 +293,54 @@ export function traverseDownOneLine(node: Node, startOffset: number, top: number
 	return null;
 }
 
+export function moveCursorUpOneLine(el: HTMLElement, selection: Selection): Range | null {
+	const range = selection.getRangeAt(0);
+	const currentTop = range.getBoundingClientRect().top;
+	const nextRange = traverseUpOneLine(el, range.startOffset, currentTop);
+	if (!nextRange) {
+		return null;
+	}
+
+	range.collapse(true);
+	selection.removeAllRanges();
+	selection.addRange(nextRange);
+
+	return nextRange;
+}
+
 export function traverseUpOneLine(node: Node, startOffset: number, top: number): Range | null {
-	//
+	if (node.nodeType === Node.TEXT_NODE) {
+		const range = document.createRange();
+
+		for (let i = startOffset - 1; i >= 0; i--) {
+			range.setStart(node, i);
+
+			const rect = range.getBoundingClientRect();
+			if (!rect) {
+				continue;
+			}
+
+			if (rect.top < top) {
+				range.setStart(node, i + 1);
+				range.setEnd(node, i + 1);
+				return range;
+			}
+		}
+	}
+
+	for (let i = node.childNodes.length - 1; i >= 0; i--) {
+		const child = node.childNodes[i];
+		const range = traverseUpOneLine(child, startOffset, top);
+		if (range) {
+			return range;
+		}
+	}
+
+	return null;
+}
+
+export function moveCursorToStart(node: Node, selection: Selection) {
+	const range = selection.getRangeAt(0);
+	range.setStart(node, 0);
+	range.collapse(true);
 }

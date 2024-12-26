@@ -9,7 +9,9 @@
 		moveCaretToPositionFromLeft,
 		moveCaretToPositionFromRight,
 		moveCursorDownOneLine,
-		moveCursorToEnd
+		moveCursorToEnd,
+		moveCursorToStart,
+		moveCursorUpOneLine
 	} from './cursor.js';
 
 	let { blocks = $bindable() }: EditorProps = $props();
@@ -71,17 +73,29 @@
 
 				break;
 			case 'ArrowUp':
+				e.preventDefault();
 				cursorPosition = Math.max(cursorPosition, getCaretHorizontalPosition());
 				if (!isCaretAtTopOfElement(targetEl, range)) {
-					return;
-				}
+					range = moveCursorUpOneLine(targetEl, selection);
+					if (!range) {
+						return;
+					}
+					moveCaretToPositionFromRight(selection, targetEl, cursorPosition, range.endOffset);
+				} else if (index === 0) {
+					moveCursorToStart(targetEl, selection);
+				} else {
+					const prevBlock = moveToPrevBlock(index);
+					if (!prevBlock) {
+						return;
+					}
 
-				const prevBlock = moveToPrevBlock(index);
-				if (!prevBlock) {
-					return;
+					moveCaretToPositionFromRight(
+						selection,
+						prevBlock,
+						cursorPosition,
+						prevBlock.textContent?.length ?? 0
+					);
 				}
-
-				moveCaretToPositionFromRight(selection, prevBlock, cursorPosition);
 				break;
 			case 'ArrowLeft':
 				cursorPosition = getCaretHorizontalPosition();
