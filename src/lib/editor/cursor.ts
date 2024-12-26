@@ -95,13 +95,17 @@ export function getCaretHorizontalPosition(): number {
 	return rect ? rect.left : 0;
 }
 
-export function traverseFromStartOfLine(node: Node, position: number): Range | null {
+export function traverseFromStartOfLine(
+	node: Node,
+	position: number,
+	startOffset: number
+): Range | null {
 	const range = document.createRange();
 	let prevOffset = 0;
 	range.setStart(node, 0);
 	if (node.nodeType === Node.TEXT_NODE) {
 		const textNode = node.textContent ?? '';
-		for (let i = 0; i < textNode.length; i++) {
+		for (let i = startOffset; i < textNode.length; i++) {
 			const newRange = document.createRange();
 			newRange.setStart(node, i);
 			newRange.collapse(true);
@@ -109,6 +113,10 @@ export function traverseFromStartOfLine(node: Node, position: number): Range | n
 			const rect = newRange.getBoundingClientRect();
 			if (!rect) {
 				continue;
+			}
+
+			if (rect.left <= prevOffset) {
+				return range;
 			}
 
 			if (rect.left >= position) {
@@ -128,10 +136,12 @@ export function traverseFromStartOfLine(node: Node, position: number): Range | n
 			prevOffset = rect.left;
 			range.setStart(node, i);
 		}
+
+		startOffset += textNode.length;
 	}
 
 	for (const child of node.childNodes) {
-		const childRange = traverseFromStartOfLine(child, position);
+		const childRange = traverseFromStartOfLine(child, position, startOffset);
 		if (childRange) {
 			return childRange;
 		}
@@ -143,9 +153,10 @@ export function traverseFromStartOfLine(node: Node, position: number): Range | n
 export function moveCaretToPositionFromLeft(
 	selection: Selection,
 	el: HTMLElement,
-	position: number
+	position: number,
+	startOffset: number
 ): void {
-	const range = traverseFromStartOfLine(el, position);
+	const range = traverseFromStartOfLine(el, position, startOffset);
 	if (!range) {
 		return;
 	}
@@ -228,4 +239,55 @@ export function moveCursorToEnd(el: HTMLElement) {
 	// Clear any existing selection and add the new range
 	selection.removeAllRanges();
 	selection.addRange(range);
+}
+
+export function moveCursorUpOneLine(range: Range) {
+	const currentBottom = range.getBoundingClientRect().bottom;
+	let nextBottom = currentBottom;
+	while (nextBottom >= currentBottom) {
+		range.setStartBefore(range.startContainer);
+		nextBottom = range.getBoundingClientRect().bottom;
+	}
+}
+
+export function moveCursorDownOneLine(el: HTMLElement, selection: Selection): Range | null {
+	const range = selection.getRangeAt(0);
+	const currentTop = range.getBoundingClientRect().top;
+	const nextRange = traverseDownOneLine(el, range.startOffset, currentTop);
+	if (!nextRange) {
+		return null;
+	}
+
+	selection.removeAllRanges();
+	selection.addRange(nextRange);
+
+	return nextRange;
+}
+
+export function traverseDownOneLine(node: Node, startOffset: number, top: number): Range | null {
+	if (node.nodeType === Node.TEXT_NODE) {
+		const range = document.createRange();
+		const textNode = node.textContent ?? '';
+		for (let i = 0; i < textNode.length; i++) {
+			range.setStart(node, i);
+
+			const rect = range.getBoundingClientRect();
+			if (!rect) {
+				continue;
+			}
+
+			if (rect.top > top) {
+				return range;
+			}
+		}
+	}
+
+	for (const child of node.childNodes) {
+		const childRange = traverseDownOneLine(child, startOffset, top);
+		if (childRange) {
+			return childRange;
+		}
+	}
+
+	return null;
 }

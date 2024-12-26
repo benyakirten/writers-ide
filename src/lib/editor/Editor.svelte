@@ -8,6 +8,7 @@
 		isCaretAtTopOfElement,
 		moveCaretToPositionFromLeft,
 		moveCaretToPositionFromRight,
+		moveCursorDownOneLine,
 		moveCursorToEnd
 	} from './cursor.js';
 
@@ -29,6 +30,7 @@
 		if (index < 0 || isNaN(index)) {
 			return;
 		}
+		let range: Range | null = selection.getRangeAt(0);
 
 		switch (e.key) {
 			case 'Enter':
@@ -49,8 +51,14 @@
 				addBlock(index, newContent);
 				break;
 			case 'ArrowDown':
+				e.preventDefault();
 				cursorPosition = Math.max(cursorPosition, getCaretHorizontalPosition());
-				if (!isCaretAtBottomOfElement(targetEl, selection.getRangeAt(0))) {
+				if (!isCaretAtBottomOfElement(targetEl, range)) {
+					range = moveCursorDownOneLine(targetEl, selection);
+					if (!range) {
+						return;
+					}
+					moveCaretToPositionFromLeft(selection, targetEl, cursorPosition, range.startOffset);
 					return;
 				}
 
@@ -59,12 +67,12 @@
 					return;
 				}
 
-				moveCaretToPositionFromLeft(selection, nextBlock, cursorPosition);
+				moveCaretToPositionFromLeft(selection, nextBlock, cursorPosition, 0);
 				break;
 			case 'ArrowUp':
 				cursorPosition = Math.max(cursorPosition, getCaretHorizontalPosition());
-				if (!isCaretAtTopOfElement(targetEl, selection.getRangeAt(0))) {
-					return null;
+				if (!isCaretAtTopOfElement(targetEl, range)) {
+					return;
 				}
 
 				const prevBlock = moveToPrevBlock(e, index);
@@ -89,7 +97,6 @@
 			return null;
 		}
 
-		e.preventDefault();
 		const nextBlock = document.getElementById(nextBlockId);
 
 		if (!nextBlock) {
@@ -106,7 +113,6 @@
 			return null;
 		}
 
-		e.preventDefault();
 		const prevBlock = document.getElementById(prevBlockId);
 
 		if (!prevBlock) {
