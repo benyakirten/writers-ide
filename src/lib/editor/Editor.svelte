@@ -62,7 +62,7 @@
 				} else if (index === blocks.length - 1) {
 					moveCursorToEnd(targetEl);
 				} else {
-					const nextBlock = moveToNextBlock(e, index);
+					const nextBlock = moveToNextBlock(index);
 					if (!nextBlock) {
 						return;
 					}
@@ -76,7 +76,7 @@
 					return;
 				}
 
-				const prevBlock = moveToPrevBlock(e, index);
+				const prevBlock = moveToPrevBlock(index);
 				if (!prevBlock) {
 					return;
 				}
@@ -92,7 +92,7 @@
 		}
 	}
 
-	function moveToNextBlock(e: KeyboardEvent, index: number): HTMLElement | null {
+	function moveToNextBlock(index: number): HTMLElement | null {
 		const nextBlockId = blocks.at(index + 1)?.id;
 		if (!nextBlockId) {
 			return null;
@@ -108,7 +108,7 @@
 		return nextBlock;
 	}
 
-	function moveToPrevBlock(e: KeyboardEvent, index: number): HTMLElement | null {
+	function moveToPrevBlock(index: number): HTMLElement | null {
 		const prevBlockId = blocks[index - 1]?.id;
 		if (!prevBlockId) {
 			return null;

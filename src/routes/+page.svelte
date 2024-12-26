@@ -15,7 +15,7 @@
 			classes: [],
 			properties: {},
 			id: 'myp2',
-			content: 'This is another long message that spans multiple lines..',
+			content: 'Hello, world! I want to write a very long message that will span multiple lines.',
 			type: 'p',
 			children: []
 		},
@@ -23,6 +23,14 @@
 			classes: [],
 			properties: {},
 			id: 'myp3',
+			content: 'This is another long message that spans multiple lines..',
+			type: 'p',
+			children: []
+		},
+		{
+			classes: [],
+			properties: {},
+			id: 'myp4',
 			content: 'Short message!.',
 			type: 'p',
 			children: []

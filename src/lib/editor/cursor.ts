@@ -114,6 +114,12 @@ export function traverseFromStartOfLine(
 				continue;
 			}
 
+			if (i === textNode.length - 1) {
+				newRange.setStart(node, i + 1);
+				newRange.collapse(true);
+				return newRange;
+			}
+
 			if (rect.left < prevOffset) {
 				return range;
 			}
@@ -289,4 +295,8 @@ export function traverseDownOneLine(node: Node, startOffset: number, top: number
 	}
 
 	return null;
+}
+
+export function traverseUpOneLine(node: Node, startOffset: number, top: number): Range | null {
+	//
 }
