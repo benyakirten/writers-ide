@@ -87,8 +87,6 @@ export function getCaretHorizontalPosition(): number {
 	}
 
 	const range = selection.getRangeAt(0).cloneRange();
-	// Collapse to the right side point.
-	// TODO: Determine if this is unnecessary.
 	range.collapse(false);
 
 	const rect = range.getBoundingClientRect();
@@ -103,6 +101,7 @@ export function traverseFromStartOfLine(
 	const range = document.createRange();
 	let prevOffset = 0;
 	range.setStart(node, 0);
+
 	if (node.nodeType === Node.TEXT_NODE) {
 		const textNode = node.textContent ?? '';
 		for (let i = startOffset; i < textNode.length; i++) {
@@ -115,7 +114,7 @@ export function traverseFromStartOfLine(
 				continue;
 			}
 
-			if (rect.left <= prevOffset) {
+			if (rect.left < prevOffset) {
 				return range;
 			}
 
@@ -156,11 +155,14 @@ export function moveCaretToPositionFromLeft(
 	position: number,
 	startOffset: number
 ): void {
+	console.log('HERE');
 	const range = traverseFromStartOfLine(el, position, startOffset);
+	console.log(range);
 	if (!range) {
 		return;
 	}
 
+	console.log('HERE 2');
 	selection.removeAllRanges();
 	selection.addRange(range);
 }

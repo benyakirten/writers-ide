@@ -59,15 +59,16 @@
 						return;
 					}
 					moveCaretToPositionFromLeft(selection, targetEl, cursorPosition, range.startOffset);
-					return;
+				} else if (index === blocks.length - 1) {
+					moveCursorToEnd(targetEl);
+				} else {
+					const nextBlock = moveToNextBlock(e, index);
+					if (!nextBlock) {
+						return;
+					}
+					moveCaretToPositionFromLeft(selection, nextBlock, cursorPosition, 0);
 				}
 
-				const nextBlock = moveToNextBlock(e, index);
-				if (!nextBlock) {
-					return;
-				}
-
-				moveCaretToPositionFromLeft(selection, nextBlock, cursorPosition, 0);
 				break;
 			case 'ArrowUp':
 				cursorPosition = Math.max(cursorPosition, getCaretHorizontalPosition());
