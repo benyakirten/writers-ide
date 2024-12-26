@@ -155,14 +155,11 @@ export function moveCaretToPositionFromLeft(
 	position: number,
 	startOffset: number
 ): void {
-	console.log('HERE');
 	const range = traverseFromStartOfLine(el, position, startOffset);
-	console.log(range);
 	if (!range) {
 		return;
 	}
 
-	console.log('HERE 2');
 	selection.removeAllRanges();
 	selection.addRange(range);
 }

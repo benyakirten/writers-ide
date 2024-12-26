@@ -28,8 +28,6 @@
 			children: []
 		}
 	]);
-
-	// TODO: Figure out handling data up and down.
 </script>
 
 <Editor bind:blocks />
