@@ -95,7 +95,7 @@ export function getCaretHorizontalPosition(): number {
 	return rect ? rect.left : 0;
 }
 
-export function traverseFromLeft(node: Node, position: number): Range | null {
+export function traverseFromStartOfLine(node: Node, position: number): Range | null {
 	const range = document.createRange();
 	let prevOffset = 0;
 	range.setStart(node, 0);
@@ -131,7 +131,7 @@ export function traverseFromLeft(node: Node, position: number): Range | null {
 	}
 
 	for (const child of node.childNodes) {
-		const childRange = traverseFromLeft(child, position);
+		const childRange = traverseFromStartOfLine(child, position);
 		if (childRange) {
 			return childRange;
 		}
@@ -145,7 +145,7 @@ export function moveCaretToPositionFromLeft(
 	el: HTMLElement,
 	position: number
 ): void {
-	const range = traverseFromLeft(el, position);
+	const range = traverseFromStartOfLine(el, position);
 	if (!range) {
 		return;
 	}
@@ -159,7 +159,50 @@ export function moveCaretToPositionFromRight(
 	el: HTMLElement,
 	position: number
 ): void {
-	// TODO
+	const range = traverseFromEndOfLine(el, position);
+	if (!range) {
+		return;
+	}
+
+	selection.removeAllRanges();
+	selection.addRange(range);
+}
+
+export function traverseFromEndOfLine(node: Node, position: number): Range | null {
+	if (node.nodeType === Node.TEXT_NODE) {
+		const range = document.createRange();
+
+		let prevOffset = 0;
+		const textContent = node.textContent ?? '';
+		range.setStart(node, textContent.length - 1);
+
+		for (let i = textContent.length - 1; i >= 0; i--) {
+			const newRange = document.createRange();
+			newRange.setStart(node, i);
+
+			const rect = newRange.getBoundingClientRect();
+			if (!rect) {
+				continue;
+			}
+
+			if (rect.left <= position) {
+				return closerToLeft(position, prevOffset, rect.left) ? range : newRange;
+			}
+
+			prevOffset = rect.left;
+			range.setStart(node, i);
+		}
+	} else {
+		for (let i = node.childNodes.length - 1; i >= 0; i--) {
+			const child = node.childNodes[i];
+			const range = traverseFromEndOfLine(child, position);
+			if (range) {
+				return range;
+			}
+		}
+	}
+
+	return null;
 }
 
 /**

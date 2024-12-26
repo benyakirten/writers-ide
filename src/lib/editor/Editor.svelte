@@ -6,7 +6,8 @@
 		getCaretHorizontalPosition,
 		isCaretAtBottomOfElement,
 		isCaretAtTopOfElement,
-		moveCaretToPositionFromLeft
+		moveCaretToPositionFromLeft,
+		moveCaretToPositionFromRight
 	} from './cursor.js';
 
 	// TODO: Move this into a separate store.
@@ -67,7 +68,7 @@
 					return;
 				}
 
-				// TODO: Move the cursor to the correct position from the right
+				moveCaretToPositionFromRight(selection, prevBlock, cursorPosition);
 				break;
 			// TODO: Store the cursor position in the state on left or right move
 			case 'ArrowLeft':
