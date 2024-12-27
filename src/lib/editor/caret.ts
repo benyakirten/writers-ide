@@ -1,4 +1,5 @@
 import type { Blocks } from '$lib/types/block.js';
+import { nextAnimationFrame } from './utils.js';
 
 export function getCaretPosition(): number {
 	return window.getSelection()?.getRangeAt(0).startOffset ?? 0;
@@ -249,7 +250,6 @@ export function moveCaretToEnd(el: HTMLElement) {
 	range.setStart(el, el.childNodes.length);
 	range.collapse(false);
 
-	// Clear any existing selection and add the new range
 	selection.removeAllRanges();
 	selection.addRange(range);
 }
@@ -342,7 +342,7 @@ export function traverseUpOneLine(node: Node, startOffset: number, top: number):
 	return null;
 }
 
-export function moveCaretToStart(blocks: Blocks) {
+export async function moveCaretToStart(blocks: Blocks) {
 	const firstBlock = blocks.at(0);
 	const selection = window.getSelection();
 	const firstEl = firstBlock ? document.getElementById(firstBlock.id) : null;
@@ -364,9 +364,8 @@ export function moveCaretToStart(blocks: Blocks) {
 	const rangeRect = range.getBoundingClientRect();
 	const elRect = firstEl.getBoundingClientRect();
 	if (rangeRect.top < elRect.top) {
-		requestAnimationFrame(() => {
-			moveCaretDownOneLine(firstEl, selection);
-		});
+		await nextAnimationFrame();
+		moveCaretDownOneLine(firstEl, selection);
 	}
 }
 
