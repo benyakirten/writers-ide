@@ -2,7 +2,7 @@ import type { Blocks } from '$lib/types/block.js';
 import { nextAnimationFrame } from './utils.js';
 
 export function getCaretPosition(): number {
-	return window.getSelection()?.getRangeAt(0).startOffset ?? 0;
+	return window.getSelection()?.getRangeAt(0).endOffset ?? 0;
 }
 
 export function parseElementIndex(el: HTMLElement): number[] | null {
@@ -249,7 +249,7 @@ export async function moveCaretToEnd(el: HTMLElement) {
 
 	// Set the range to the end of the content
 	range.selectNodeContents(el);
-	range.setStart(el, el.childNodes.length);
+	range.setEnd(el, el.childNodes.length);
 	range.collapse(false);
 
 	selection.removeAllRanges();

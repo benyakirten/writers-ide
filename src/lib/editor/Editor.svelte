@@ -74,7 +74,7 @@
 					moveCaretToPositionFromLeft(selection, targetEl, caretPosition, range.startOffset);
 				} else if (index === blocks.length - 1) {
 					moveCaretToEnd(targetEl);
-					caretPosition = getCaretHorizontalPosition();
+					recalibrateCaretPosition();
 				} else {
 					const nextBlock = moveToNextBlock(index, blocks);
 					if (!nextBlock) {
@@ -95,7 +95,7 @@
 					moveCaretToPositionFromRight(selection, targetEl, caretPosition, range.endOffset);
 				} else if (index === 0) {
 					moveCaretToStart(blocks);
-					caretPosition = 0;
+					recalibrateCaretPosition();
 				} else {
 					const prevBlock = moveToPrevBlock(index, blocks);
 					if (!prevBlock) {
@@ -115,16 +115,14 @@
 					e.preventDefault();
 					moveToPrevBlock(index, blocks);
 				}
-				await nextAnimationFrame();
-				caretPosition = getCaretHorizontalPosition();
+				recalibrateCaretPosition();
 				break;
 			case 'ArrowRight':
-				await nextAnimationFrame();
 				if (caretIsAtEndOfEl(targetEl, selection) && index !== blocks.length - 1) {
 					e.preventDefault();
 					moveToNextBlock(index, blocks);
 				}
-				caretPosition = getCaretHorizontalPosition();
+				recalibrateCaretPosition();
 				break;
 		}
 	}
@@ -150,16 +148,20 @@
 		el?.focus();
 	}
 
-	function handlePointerDown(e: PointerEvent) {
-		if (!(e.target instanceof HTMLElement)) {
-			return;
-		}
-		caretPosition = e.clientX;
+	async function recalibrateCaretPosition() {
+		await nextAnimationFrame();
+		caretPosition = getCaretHorizontalPosition();
 	}
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div data-editor bind:this={el} onkeydown={handleKeydown} onpointerdown={handlePointerDown}>
+<div
+	data-editor
+	bind:this={el}
+	onkeydown={handleKeydown}
+	onpointerup={recalibrateCaretPosition}
+	onselectionchange={recalibrateCaretPosition}
+>
 	{#each blocks as block, idx (block.id)}
 		<Block {block} index={idx} {updateBlockContent} />
 	{/each}
