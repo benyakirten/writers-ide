@@ -10,7 +10,7 @@
 	import type { BlockProps } from '$lib/types/block.js';
 	import ParagraphBlock from './ParagraphBlock.svelte';
 
-	let { index, block, updateBlockContent, addBlock }: BlockProps = $props();
+	let { index, block, updateBlockContent }: BlockProps = $props();
 </script>
 
 {#if block.type === 'p'}
@@ -18,7 +18,6 @@
 		{...block}
 		updateBlockContent={(content) => updateBlockContent(index, content)}
 		{index}
-		{addBlock}
 	/>
 {/if}
 

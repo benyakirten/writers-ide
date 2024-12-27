@@ -1,3 +1,7 @@
+export type EditorProps = {
+	blocks: Blocks;
+};
+
 export type BlockProperty = string;
 
 export type BaseBlockData = {
@@ -17,7 +21,6 @@ export type BlockProps = {
 	index: number;
 	block: BlockData;
 	updateBlockContent: (index: number, content: string) => void;
-	addBlock: (content: string) => void;
 };
 
 export type DivData = BaseBlockData & {
@@ -57,7 +60,6 @@ export type ParagraphData = BaseBlockData & {
 
 export type ParagraphProps = ParagraphData & {
 	updateBlockContent: (content: string) => void;
-	addBlock: (content: string) => void;
 	index: number;
 };
 
