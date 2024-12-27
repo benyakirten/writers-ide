@@ -26,6 +26,11 @@
 	$effect(() => console.log('CARET POSITION', caretPosition));
 
 	async function handleKeydown(e: KeyboardEvent) {
+		if (e.metaKey) {
+			// TODO
+			return;
+		}
+
 		const targetEl = e.target;
 		const selection = window.getSelection();
 		if (!selection || !(targetEl instanceof HTMLElement)) {
@@ -106,6 +111,10 @@
 				}
 				break;
 			case 'ArrowLeft':
+				if (selection.anchorOffset === 0 && index !== 0) {
+					e.preventDefault();
+					moveToPrevBlock(index, blocks);
+				}
 				await nextAnimationFrame();
 				caretPosition = getCaretHorizontalPosition();
 				break;
