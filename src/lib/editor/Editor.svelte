@@ -13,13 +13,16 @@
 		moveCaretToStart,
 		moveCaretUpOneLine,
 		moveToNextBlock,
-		moveToPrevBlock
+		moveToPrevBlock,
+		caretIsAtEndOfEl
 	} from './caret.js';
 
 	let { blocks = $bindable() }: EditorProps = $props();
 
 	let caretPosition = $state(0);
 	let el: HTMLElement;
+
+	$effect(() => console.log('CARET POSITION', caretPosition));
 
 	function handleKeydown(e: KeyboardEvent) {
 		const targetEl = e.target;
@@ -105,6 +108,9 @@
 				caretPosition = getCaretHorizontalPosition();
 				break;
 			case 'ArrowRight':
+				if (caretIsAtEndOfEl(targetEl, selection) && index !== blocks.length - 1) {
+					moveToNextBlock(index, blocks);
+				}
 				caretPosition = getCaretHorizontalPosition();
 				break;
 		}

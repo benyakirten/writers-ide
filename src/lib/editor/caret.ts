@@ -138,7 +138,9 @@ export function traverseFromStartOfLine(
 				// We could do this with either always returning the previous range
 				// or the current range (the default), but it feels more natural
 				// to do the somewhat elaborate comparison.
-				return closerToLeft(position, prevOffset, rect.left) ? range : newRange;
+				return startOffset === 0 || closerToLeft(position, prevOffset, rect.left)
+					? range
+					: newRange;
 			}
 
 			prevOffset = rect.left;
@@ -237,7 +239,7 @@ export function closerToLeft(val: number, left: number, right: number): boolean 
 	return Math.abs(val - left) < Math.abs(val - right);
 }
 
-export function moveCaretToEnd(el: HTMLElement) {
+export async function moveCaretToEnd(el: HTMLElement) {
 	const selection = window.getSelection();
 	if (!selection) {
 		return;
@@ -257,7 +259,7 @@ export function moveCaretToEnd(el: HTMLElement) {
 export function moveCaretDownOneLine(el: HTMLElement, selection: Selection): Range | null {
 	const range = selection.getRangeAt(0);
 	const currentTop = range.getBoundingClientRect().top;
-	const nextRange = traverseDownOneLine(el, currentTop, range.startOffset);
+	const nextRange = traverseDownOneLine(el, currentTop);
 	if (!nextRange) {
 		return null;
 	}
@@ -268,7 +270,7 @@ export function moveCaretDownOneLine(el: HTMLElement, selection: Selection): Ran
 	return nextRange;
 }
 
-export function traverseDownOneLine(node: Node, top: number, startOffset: number): Range | null {
+export function traverseDownOneLine(node: Node, top: number): Range | null {
 	if (node.nodeType === Node.TEXT_NODE) {
 		const range = document.createRange();
 		const textNode = node.textContent ?? '';
@@ -287,7 +289,7 @@ export function traverseDownOneLine(node: Node, top: number, startOffset: number
 	}
 
 	for (const child of node.childNodes) {
-		const childRange = traverseDownOneLine(child, top, startOffset);
+		const childRange = traverseDownOneLine(child, top);
 		if (childRange) {
 			return childRange;
 		}
@@ -298,8 +300,10 @@ export function traverseDownOneLine(node: Node, top: number, startOffset: number
 
 export function moveCaretUpOneLine(el: HTMLElement, selection: Selection): Range | null {
 	const range = selection.getRangeAt(0);
-	const currentTop = range.getBoundingClientRect().top;
-	const nextRange = traverseUpOneLine(el, currentTop, range.startOffset);
+
+	const currentY = range.getBoundingClientRect().y;
+	const nextRange = traverseUpOneLine(el, currentY, range.startOffset);
+
 	if (!nextRange) {
 		return null;
 	}
@@ -311,7 +315,7 @@ export function moveCaretUpOneLine(el: HTMLElement, selection: Selection): Range
 	return nextRange;
 }
 
-export function traverseUpOneLine(node: Node, top: number, startOffset: number): Range | null {
+export function traverseUpOneLine(node: Node, y: number, startOffset: number): Range | null {
 	if (node.nodeType === Node.TEXT_NODE) {
 		const range = document.createRange();
 
@@ -323,7 +327,7 @@ export function traverseUpOneLine(node: Node, top: number, startOffset: number):
 				continue;
 			}
 
-			if (rect.top < top) {
+			if (rect.y < y) {
 				range.setStart(node, i + 1);
 				range.setEnd(node, i + 1);
 				return range;
@@ -333,7 +337,7 @@ export function traverseUpOneLine(node: Node, top: number, startOffset: number):
 
 	for (let i = node.childNodes.length - 1; i >= 0; i--) {
 		const child = node.childNodes[i];
-		const range = traverseUpOneLine(child, top, startOffset);
+		const range = traverseUpOneLine(child, y, startOffset);
 		if (range) {
 			return range;
 		}
@@ -362,8 +366,12 @@ export async function moveCaretToStart(blocks: Blocks) {
 	// to make the selection move the caret to the top of the element.
 	// TODO: Figure out how to fix this.
 	const rangeRect = range.getBoundingClientRect();
-	const elRect = firstEl.getBoundingClientRect();
-	if (rangeRect.top < elRect.top) {
+	if (
+		rangeRect.top === 0 &&
+		rangeRect.left === 0 &&
+		rangeRect.right === 0 &&
+		rangeRect.bottom === 0
+	) {
 		await nextAnimationFrame();
 		moveCaretDownOneLine(firstEl, selection);
 	}
@@ -401,4 +409,29 @@ export function moveToPrevBlock(index: number, blocks: Blocks): HTMLElement | nu
 	moveCaretToEnd(prevBlock);
 
 	return prevBlock;
+}
+
+export function caretIsAtEndOfEl(el: HTMLElement, selection: Selection) {
+	if (selection.rangeCount === 0) {
+		return false;
+	}
+
+	const range = selection.getRangeAt(0);
+	const { endContainer, endOffset } = range;
+	if (!el.contains(endContainer)) {
+		return false;
+	}
+
+	if (endContainer.nodeType === Node.TEXT_NODE) {
+		return endOffset === endContainer.textContent?.length;
+	}
+
+	const lastChild = el.lastChild;
+	return (
+		endContainer === el &&
+		endOffset === el.childNodes.length &&
+		lastChild &&
+		lastChild.nodeType === Node.TEXT_NODE &&
+		lastChild.textContent?.length === 0
+	);
 }
