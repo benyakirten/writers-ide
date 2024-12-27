@@ -202,7 +202,7 @@ export function traverseFromEndOfLine(
 		let prevOffset = 0;
 		range.setStart(node, startOffset);
 
-		for (let i = startOffset - 1; i >= 0; i--) {
+		for (let i = startOffset; i >= 0; i--) {
 			const newRange = document.createRange();
 			newRange.setStart(node, i);
 
