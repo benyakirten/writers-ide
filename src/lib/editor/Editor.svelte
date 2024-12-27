@@ -16,6 +16,7 @@
 		moveToPrevBlock,
 		caretIsAtEndOfEl
 	} from './caret.js';
+	import { nextAnimationFrame } from './utils.js';
 
 	let { blocks = $bindable() }: EditorProps = $props();
 
@@ -24,7 +25,7 @@
 
 	$effect(() => console.log('CARET POSITION', caretPosition));
 
-	function handleKeydown(e: KeyboardEvent) {
+	async function handleKeydown(e: KeyboardEvent) {
 		const targetEl = e.target;
 		const selection = window.getSelection();
 		if (!selection || !(targetEl instanceof HTMLElement)) {
@@ -105,10 +106,13 @@
 				}
 				break;
 			case 'ArrowLeft':
+				await nextAnimationFrame();
 				caretPosition = getCaretHorizontalPosition();
 				break;
 			case 'ArrowRight':
+				await nextAnimationFrame();
 				if (caretIsAtEndOfEl(targetEl, selection) && index !== blocks.length - 1) {
+					e.preventDefault();
 					moveToNextBlock(index, blocks);
 				}
 				caretPosition = getCaretHorizontalPosition();
