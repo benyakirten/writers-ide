@@ -57,11 +57,7 @@
 			case 'ArrowDown':
 				e.preventDefault();
 				caretPosition = Math.max(caretPosition, getCaretHorizontalPosition());
-				console.log(range, range.getBoundingClientRect());
 				if (!caretIsAtBottomOfElement(targetEl, range)) {
-					if (index === 0 && range.startOffset === 0 && range.getBoundingClientRect().top === 0) {
-						// Error is happening in this case
-					}
 					range = moveCaretDownOneLine(targetEl, selection);
 					if (!range) {
 						return;
@@ -90,7 +86,7 @@
 					}
 					moveCaretToPositionFromRight(selection, targetEl, caretPosition, range.endOffset);
 				} else if (index === 0) {
-					moveCaretToStart(targetEl, selection);
+					moveCaretToStart(blocks);
 					caretPosition = 0;
 				} else {
 					const prevBlock = moveToPrevBlock(index, blocks);

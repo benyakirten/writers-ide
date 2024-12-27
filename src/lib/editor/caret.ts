@@ -342,13 +342,32 @@ export function traverseUpOneLine(node: Node, startOffset: number, top: number):
 	return null;
 }
 
-export function moveCaretToStart(node: Node, selection: Selection) {
+export function moveCaretToStart(blocks: Blocks) {
+	const firstBlock = blocks.at(0);
+	const selection = window.getSelection();
+	const firstEl = firstBlock ? document.getElementById(firstBlock.id) : null;
+	if (!firstEl || !selection) {
+		return;
+	}
+
 	const range = selection.getRangeAt(0);
-	range.setStart(node, 0);
-	range.setEnd(node, 0);
+	range.setStart(firstEl, 0);
+	range.setEnd(firstEl, 0);
 
 	selection.removeAllRanges();
 	selection.addRange(range);
+
+	// If there's padding at the top of the elemnt, the bounding client rect will
+	// be at 0,0, but we want it to be at the top of the element. This is a workaround
+	// to make the selection move the caret to the top of the element.
+	// TODO: Figure out how to fix this.
+	const rangeRect = range.getBoundingClientRect();
+	const elRect = firstEl.getBoundingClientRect();
+	if (rangeRect.top < elRect.top) {
+		requestAnimationFrame(() => {
+			moveCaretDownOneLine(firstEl, selection);
+		});
+	}
 }
 
 export function moveToNextBlock(index: number, blocks: Blocks): HTMLElement | null {
