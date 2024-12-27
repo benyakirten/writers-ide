@@ -257,7 +257,7 @@ export function moveCaretToEnd(el: HTMLElement) {
 export function moveCaretDownOneLine(el: HTMLElement, selection: Selection): Range | null {
 	const range = selection.getRangeAt(0);
 	const currentTop = range.getBoundingClientRect().top;
-	const nextRange = traverseDownOneLine(el, range.startOffset, currentTop);
+	const nextRange = traverseDownOneLine(el, currentTop, range.startOffset);
 	if (!nextRange) {
 		return null;
 	}
@@ -268,7 +268,7 @@ export function moveCaretDownOneLine(el: HTMLElement, selection: Selection): Ran
 	return nextRange;
 }
 
-export function traverseDownOneLine(node: Node, startOffset: number, top: number): Range | null {
+export function traverseDownOneLine(node: Node, top: number, startOffset: number): Range | null {
 	if (node.nodeType === Node.TEXT_NODE) {
 		const range = document.createRange();
 		const textNode = node.textContent ?? '';
@@ -287,7 +287,7 @@ export function traverseDownOneLine(node: Node, startOffset: number, top: number
 	}
 
 	for (const child of node.childNodes) {
-		const childRange = traverseDownOneLine(child, startOffset, top);
+		const childRange = traverseDownOneLine(child, top, startOffset);
 		if (childRange) {
 			return childRange;
 		}
@@ -299,7 +299,7 @@ export function traverseDownOneLine(node: Node, startOffset: number, top: number
 export function moveCaretUpOneLine(el: HTMLElement, selection: Selection): Range | null {
 	const range = selection.getRangeAt(0);
 	const currentTop = range.getBoundingClientRect().top;
-	const nextRange = traverseUpOneLine(el, range.startOffset, currentTop);
+	const nextRange = traverseUpOneLine(el, currentTop, range.startOffset);
 	if (!nextRange) {
 		return null;
 	}
@@ -311,7 +311,7 @@ export function moveCaretUpOneLine(el: HTMLElement, selection: Selection): Range
 	return nextRange;
 }
 
-export function traverseUpOneLine(node: Node, startOffset: number, top: number): Range | null {
+export function traverseUpOneLine(node: Node, top: number, startOffset: number): Range | null {
 	if (node.nodeType === Node.TEXT_NODE) {
 		const range = document.createRange();
 
@@ -333,7 +333,7 @@ export function traverseUpOneLine(node: Node, startOffset: number, top: number):
 
 	for (let i = node.childNodes.length - 1; i >= 0; i--) {
 		const child = node.childNodes[i];
-		const range = traverseUpOneLine(child, startOffset, top);
+		const range = traverseUpOneLine(child, top, startOffset);
 		if (range) {
 			return range;
 		}

@@ -78,9 +78,7 @@
 			case 'ArrowUp':
 				e.preventDefault();
 				caretPosition = Math.max(caretPosition, getCaretHorizontalPosition());
-				// console.log(range.getBoundingClientRect());
 				if (!caretIsAtTopOfElement(targetEl, range)) {
-					// Error is happening when caret is at end of line in this case.
 					range = moveCaretUpOneLine(targetEl, selection);
 					if (!range) {
 						return;
