@@ -8,8 +8,6 @@
 		caretIsAtTopOfElement,
 		moveCaretToPositionFromLeft,
 		moveCaretToPositionFromRight,
-		moveCaretDownOneLine,
-		moveCaretToEnd,
 		moveCaretToStart,
 		moveCaretUpOneLine,
 		moveToNextBlock,
@@ -62,18 +60,9 @@
 				addBlock(index, newContent);
 				break;
 			case 'ArrowDown':
-				e.preventDefault();
 				caretPosition = Math.max(caretPosition, getCaretHorizontalPosition());
-				if (!caretIsAtBottomOfElement(targetEl, range) && index !== blocks.length - 1) {
-					range = moveCaretDownOneLine(targetEl, selection);
-					if (!range) {
-						return;
-					}
-					moveCaretToPositionFromLeft(selection, targetEl, caretPosition, range.startOffset);
-				} else if (index === blocks.length - 1) {
-					moveCaretToEnd(targetEl);
-					recalibrateCaretPosition();
-				} else {
+				if (caretIsAtBottomOfElement(targetEl, range) && index !== blocks.length - 1) {
+					e.preventDefault();
 					const nextBlock = moveToNextBlock(index, blocks);
 					if (!nextBlock) {
 						return;
@@ -81,6 +70,7 @@
 					moveCaretToPositionFromLeft(selection, nextBlock, caretPosition, 0);
 				}
 
+				recalibrateCaretPosition();
 				break;
 			case 'ArrowUp':
 				e.preventDefault();
