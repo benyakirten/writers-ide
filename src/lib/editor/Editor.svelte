@@ -23,8 +23,6 @@
 	let caretPosition = $state(0);
 	let el: HTMLElement;
 
-	$effect(() => console.log('CARET POSITION', caretPosition));
-
 	async function handleKeydown(e: KeyboardEvent) {
 		if (e.metaKey) {
 			// TODO
@@ -66,7 +64,7 @@
 			case 'ArrowDown':
 				e.preventDefault();
 				caretPosition = Math.max(caretPosition, getCaretHorizontalPosition());
-				if (!caretIsAtBottomOfElement(targetEl, range)) {
+				if (!caretIsAtBottomOfElement(targetEl, range) && index !== blocks.length - 1) {
 					range = moveCaretDownOneLine(targetEl, selection);
 					if (!range) {
 						return;

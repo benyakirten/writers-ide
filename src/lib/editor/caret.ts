@@ -247,10 +247,8 @@ export async function moveCaretToEnd(el: HTMLElement) {
 
 	const range = document.createRange();
 
-	// Set the range to the end of the content
-	range.selectNodeContents(el);
-	range.setEnd(el, el.childNodes.length);
-	range.collapse(false);
+	range.setStart(el, el.childNodes.length);
+	range.collapse(true);
 
 	selection.removeAllRanges();
 	selection.addRange(range);
