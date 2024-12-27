@@ -31,7 +31,7 @@
 			classes: [],
 			properties: {},
 			id: 'myp4',
-			content: 'Short message!.',
+			content: 'This is another long message that spans multiple lines..',
 			type: 'p',
 			children: []
 		}

@@ -4,19 +4,21 @@
 	import Block from './blocks/Block.svelte';
 	import {
 		getCaretHorizontalPosition,
-		isCaretAtBottomOfElement,
-		isCaretAtTopOfElement,
+		caretIsAtBottomOfElement,
+		caretIsAtTopOfElement,
 		moveCaretToPositionFromLeft,
 		moveCaretToPositionFromRight,
-		moveCursorDownOneLine,
-		moveCursorToEnd,
-		moveCursorToStart,
-		moveCursorUpOneLine
-	} from './cursor.js';
+		moveCaretDownOneLine,
+		moveCaretToEnd,
+		moveCaretToStart,
+		moveCaretUpOneLine,
+		moveToNextBlock,
+		moveToPrevBlock
+	} from './caret.js';
 
 	let { blocks = $bindable() }: EditorProps = $props();
 
-	let cursorPosition = $state(0);
+	let caretPosition = $state(0);
 	let el: HTMLElement;
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -54,37 +56,44 @@
 				break;
 			case 'ArrowDown':
 				e.preventDefault();
-				cursorPosition = Math.max(cursorPosition, getCaretHorizontalPosition());
-				if (!isCaretAtBottomOfElement(targetEl, range)) {
-					range = moveCursorDownOneLine(targetEl, selection);
+				caretPosition = Math.max(caretPosition, getCaretHorizontalPosition());
+				console.log(range, range.getBoundingClientRect());
+				if (!caretIsAtBottomOfElement(targetEl, range)) {
+					if (index === 0 && range.startOffset === 0 && range.getBoundingClientRect().top === 0) {
+						// Error is happening in this case
+					}
+					range = moveCaretDownOneLine(targetEl, selection);
 					if (!range) {
 						return;
 					}
-					moveCaretToPositionFromLeft(selection, targetEl, cursorPosition, range.startOffset);
+					moveCaretToPositionFromLeft(selection, targetEl, caretPosition, range.startOffset);
 				} else if (index === blocks.length - 1) {
-					moveCursorToEnd(targetEl);
+					moveCaretToEnd(targetEl);
+					caretPosition = getCaretHorizontalPosition();
 				} else {
-					const nextBlock = moveToNextBlock(index);
+					const nextBlock = moveToNextBlock(index, blocks);
 					if (!nextBlock) {
 						return;
 					}
-					moveCaretToPositionFromLeft(selection, nextBlock, cursorPosition, 0);
+					moveCaretToPositionFromLeft(selection, nextBlock, caretPosition, 0);
 				}
 
 				break;
 			case 'ArrowUp':
 				e.preventDefault();
-				cursorPosition = Math.max(cursorPosition, getCaretHorizontalPosition());
-				if (!isCaretAtTopOfElement(targetEl, range)) {
-					range = moveCursorUpOneLine(targetEl, selection);
+				caretPosition = Math.max(caretPosition, getCaretHorizontalPosition());
+				if (!caretIsAtTopOfElement(targetEl, range)) {
+					// Error is happening when caret is at end of line in this case.
+					range = moveCaretUpOneLine(targetEl, selection);
 					if (!range) {
 						return;
 					}
-					moveCaretToPositionFromRight(selection, targetEl, cursorPosition, range.endOffset);
+					moveCaretToPositionFromRight(selection, targetEl, caretPosition, range.endOffset);
 				} else if (index === 0) {
-					moveCursorToStart(targetEl, selection);
+					moveCaretToStart(targetEl, selection);
+					caretPosition = 0;
 				} else {
-					const prevBlock = moveToPrevBlock(index);
+					const prevBlock = moveToPrevBlock(index, blocks);
 					if (!prevBlock) {
 						return;
 					}
@@ -92,52 +101,18 @@
 					moveCaretToPositionFromRight(
 						selection,
 						prevBlock,
-						cursorPosition,
+						caretPosition,
 						prevBlock.textContent?.length ?? 0
 					);
 				}
 				break;
 			case 'ArrowLeft':
-				cursorPosition = getCaretHorizontalPosition();
+				caretPosition = getCaretHorizontalPosition();
 				break;
 			case 'ArrowRight':
-				cursorPosition = getCaretHorizontalPosition();
+				caretPosition = getCaretHorizontalPosition();
 				break;
 		}
-	}
-
-	function moveToNextBlock(index: number): HTMLElement | null {
-		const nextBlockId = blocks.at(index + 1)?.id;
-		if (!nextBlockId) {
-			return null;
-		}
-
-		const nextBlock = document.getElementById(nextBlockId);
-
-		if (!nextBlock) {
-			return null;
-		}
-
-		nextBlock.focus();
-		return nextBlock;
-	}
-
-	function moveToPrevBlock(index: number): HTMLElement | null {
-		const prevBlockId = blocks[index - 1]?.id;
-		if (!prevBlockId) {
-			return null;
-		}
-
-		const prevBlock = document.getElementById(prevBlockId);
-
-		if (!prevBlock) {
-			return null;
-		}
-
-		prevBlock.focus();
-		moveCursorToEnd(prevBlock);
-
-		return prevBlock;
 	}
 
 	function updateBlockContent(index: number, content: string) {
@@ -154,7 +129,7 @@
 			children: []
 		};
 		blocks.splice(index + 1, 0, newBlock);
-		cursorPosition = 0;
+		caretPosition = 0;
 
 		await tick();
 		const el = document.getElementById(newBlock.id);
@@ -165,7 +140,7 @@
 		if (!(e.target instanceof HTMLElement)) {
 			return;
 		}
-		cursorPosition = e.clientX;
+		caretPosition = e.clientX;
 	}
 </script>
 
@@ -185,6 +160,9 @@
 			padding: 1rem;
 			word-wrap: break-word;
 
+			[contenteditable] {
+				cursor: text;
+			}
 			* {
 				box-sizing: border-box;
 				padding: 0;

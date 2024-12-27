@@ -1,3 +1,5 @@
+import type { Blocks } from '$lib/types/block.js';
+
 export function getCaretPosition(): number {
 	return window.getSelection()?.getRangeAt(0).startOffset ?? 0;
 }
@@ -16,7 +18,7 @@ export function parseElementIndex(el: HTMLElement): number[] | null {
 	return indices;
 }
 
-export function isCaretAtTopOfElement(el: HTMLElement, range: Range): boolean {
+export function caretIsAtTopOfElement(el: HTMLElement, range: Range): boolean {
 	const selectionRect = range.getBoundingClientRect();
 	const elRect = el.getBoundingClientRect();
 
@@ -28,7 +30,7 @@ export function isCaretAtTopOfElement(el: HTMLElement, range: Range): boolean {
 	return Math.abs(selectionRect.top - effectiveTop) < getLineHeight(computedStyle);
 }
 
-export function isCaretAtBottomOfElement(el: HTMLElement, range: Range): boolean {
+export function caretIsAtBottomOfElement(el: HTMLElement, range: Range): boolean {
 	const selectionRect = getBottomSelectionRect(range);
 	const elRect = el.getBoundingClientRect();
 
@@ -234,7 +236,7 @@ export function closerToLeft(val: number, left: number, right: number): boolean 
 	return Math.abs(val - left) < Math.abs(val - right);
 }
 
-export function moveCursorToEnd(el: HTMLElement) {
+export function moveCaretToEnd(el: HTMLElement) {
 	const selection = window.getSelection();
 	if (!selection) {
 		return;
@@ -244,6 +246,7 @@ export function moveCursorToEnd(el: HTMLElement) {
 
 	// Set the range to the end of the content
 	range.selectNodeContents(el);
+	range.setStart(el, el.childNodes.length);
 	range.collapse(false);
 
 	// Clear any existing selection and add the new range
@@ -251,7 +254,7 @@ export function moveCursorToEnd(el: HTMLElement) {
 	selection.addRange(range);
 }
 
-export function moveCursorDownOneLine(el: HTMLElement, selection: Selection): Range | null {
+export function moveCaretDownOneLine(el: HTMLElement, selection: Selection): Range | null {
 	const range = selection.getRangeAt(0);
 	const currentTop = range.getBoundingClientRect().top;
 	const nextRange = traverseDownOneLine(el, range.startOffset, currentTop);
@@ -293,7 +296,7 @@ export function traverseDownOneLine(node: Node, startOffset: number, top: number
 	return null;
 }
 
-export function moveCursorUpOneLine(el: HTMLElement, selection: Selection): Range | null {
+export function moveCaretUpOneLine(el: HTMLElement, selection: Selection): Range | null {
 	const range = selection.getRangeAt(0);
 	const currentTop = range.getBoundingClientRect().top;
 	const nextRange = traverseUpOneLine(el, range.startOffset, currentTop);
@@ -339,8 +342,45 @@ export function traverseUpOneLine(node: Node, startOffset: number, top: number):
 	return null;
 }
 
-export function moveCursorToStart(node: Node, selection: Selection) {
+export function moveCaretToStart(node: Node, selection: Selection) {
 	const range = selection.getRangeAt(0);
 	range.setStart(node, 0);
-	range.collapse(true);
+	range.setEnd(node, 0);
+
+	selection.removeAllRanges();
+	selection.addRange(range);
+}
+
+export function moveToNextBlock(index: number, blocks: Blocks): HTMLElement | null {
+	const nextBlockId = blocks.at(index + 1)?.id;
+	if (!nextBlockId) {
+		return null;
+	}
+
+	const nextBlock = document.getElementById(nextBlockId);
+
+	if (!nextBlock) {
+		return null;
+	}
+
+	nextBlock.focus();
+	return nextBlock;
+}
+
+export function moveToPrevBlock(index: number, blocks: Blocks): HTMLElement | null {
+	const prevBlockId = blocks[index - 1]?.id;
+	if (!prevBlockId) {
+		return null;
+	}
+
+	const prevBlock = document.getElementById(prevBlockId);
+
+	if (!prevBlock) {
+		return null;
+	}
+
+	prevBlock.focus();
+	moveCaretToEnd(prevBlock);
+
+	return prevBlock;
 }
