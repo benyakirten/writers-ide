@@ -7,12 +7,16 @@ export function getCaretPosition(): number {
 
 export function parseElementIndex(el: HTMLElement): number[] | null {
 	const index = el.getAttribute('data-index');
-	if (!index) return null;
+	if (!index) {
+		return null;
+	}
 
 	const indices: number[] = [];
 	for (const possibleIndex of index.split('.')) {
 		const parsedIndex = parseInt(possibleIndex);
-		if (isNaN(parsedIndex)) return null;
+		if (isNaN(parsedIndex)) {
+			return null;
+		}
 		indices.push(parsedIndex);
 	}
 
