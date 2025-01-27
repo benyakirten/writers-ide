@@ -7,7 +7,7 @@
 	import { baseKeymap } from 'prosemirror-commands';
 
 	import { schema } from './schema.js';
-	import { isSelectionAllBold, isSelectionAllItalics } from './selection.js';
+	import { toggleBold, toggleItalics } from './toggles.js';
 	let el: HTMLElement;
 	let state: EditorState;
 	let view: EditorView;
@@ -19,42 +19,6 @@
 	function handleTransaction(view: EditorView, transaction: Transaction) {
 		let newState = view.state.apply(transaction);
 		view.updateState(newState);
-	}
-
-	function toggleBold(): boolean {
-		const { tr } = view.state;
-		const { from, to } = tr.selection;
-		if (from === to) {
-			return false;
-		}
-
-		if (isSelectionAllBold(tr)) {
-			tr.removeMark(from, to, schema.marks.strong);
-			view.dispatch(tr);
-			return true;
-		}
-
-		tr.addMark(from, to, schema.marks.strong.create());
-		view.dispatch(tr);
-		return true;
-	}
-
-	function toggleItalics(): boolean {
-		const { tr } = view.state;
-		const { from, to } = tr.selection;
-		if (from === to) {
-			return false;
-		}
-
-		if (isSelectionAllItalics(tr)) {
-			tr.removeMark(from, to, schema.marks.em);
-			view.dispatch(tr);
-			return true;
-		}
-
-		tr.addMark(from, to, schema.marks.em.create());
-		view.dispatch(tr);
-		return true;
 	}
 
 	onMount(() => {
