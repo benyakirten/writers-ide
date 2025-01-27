@@ -8,6 +8,7 @@
 
 	import { schema } from './schema.js';
 	import { indentLess, indentMore, toggleBold, toggleItalics } from './actions.js';
+
 	let el: HTMLElement;
 	let state: EditorState;
 	let view: EditorView;
@@ -38,6 +39,7 @@
 				keymap(baseKeymap)
 			]
 		});
+
 		view = new EditorView(el, {
 			state,
 			dispatchTransaction: (transaction) => handleTransaction(view, transaction)
@@ -45,11 +47,24 @@
 	});
 </script>
 
-<div class="editor-host" bind:this={el}></div>
-<p>This is outside of the editor.</p>
+<div class="outer-container">
+	<div class="editor-host" bind:this={el}></div>
+</div>
 
 <style>
-	.editor-host > :global([contenteditable]) {
-		outline: none;
+	.outer-container {
+		width: 100%;
+		height: 100%;
+	}
+
+	.editor-host {
+		& > :global([contenteditable]) {
+			outline: none;
+		}
+
+		& :global(.paragraph) {
+			margin: 0;
+			padding: 0;
+		}
 	}
 </style>

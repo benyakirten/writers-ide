@@ -1,8 +1,8 @@
 import type { DOMOutputSpec, NodeSpec } from 'prosemirror-model';
+
 import { clamp } from './utils.js';
 import { INDENT_MAX, INDENT_MIN, INDENT_SIZE_PX } from './constants.js';
 
-// Top level doc node.
 const doc: NodeSpec = {
 	content: 'block+'
 };
@@ -36,7 +36,7 @@ const paragraph: NodeSpec = {
 	],
 	toDOM(node) {
 		const { indent } = node.attrs;
-		return ['p', { style: `text-indent: ${indent * INDENT_SIZE_PX}px` }, 0];
+		return ['p', { class: 'paragraph', style: `text-indent: ${indent * INDENT_SIZE_PX}px` }, 0];
 	}
 };
 

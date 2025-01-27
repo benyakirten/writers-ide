@@ -67,7 +67,6 @@ export function indentLess(state: EditorState, dispatch?: (tr: Transaction) => v
 	state.doc.nodesBetween(from, to, (node, pos) => {
 		if (node.isTextblock) {
 			const newIndent = (node.attrs.indent || 0) - 1;
-			console.log(node.attrs.indent, newIndent);
 			tr.setNodeMarkup(pos, undefined, {
 				...node.attrs,
 				indent: clamp(newIndent, INDENT_MIN, INDENT_MAX)
@@ -75,7 +74,9 @@ export function indentLess(state: EditorState, dispatch?: (tr: Transaction) => v
 		}
 	});
 
-	if (tr.docChanged) dispatch(tr);
+	if (tr.docChanged) {
+		dispatch(tr);
+	}
 	return true;
 }
 
@@ -89,11 +90,12 @@ export function indentMore(state: EditorState, dispatch?: (tr: Transaction) => v
 	state.doc.nodesBetween(from, to, (node, pos) => {
 		if (node.isTextblock) {
 			const newIndent = (node.attrs.indent || INDENT_MIN) + 1;
-			console.log(node.attrs.indent, newIndent);
 			tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: clamp(newIndent, 0, INDENT_MAX) });
 		}
 	});
 
-	if (tr.docChanged) dispatch(tr);
+	if (tr.docChanged) {
+		dispatch(tr);
+	}
 	return true;
 }
