@@ -1,18 +1,42 @@
 import type { DOMOutputSpec, NodeSpec } from 'prosemirror-model';
+import { clamp } from './utils.js';
+import { INDENT_MAX, INDENT_MIN, INDENT_SIZE_PX } from './constants.js';
 
 // Top level doc node.
 const doc: NodeSpec = {
 	content: 'block+'
 };
 
-// Basic P block
-const pDOM: DOMOutputSpec = ['p', 0];
 const paragraph: NodeSpec = {
 	content: 'inline*',
 	group: 'block',
-	parseDOM: [{ tag: 'p' }],
-	toDOM() {
-		return pDOM;
+	attrs: {
+		indent: {
+			default: 0,
+			validate: (value) => {
+				const _value = parseInt(value);
+				if (isNaN(_value) || _value < INDENT_MIN || _value > INDENT_MAX) {
+					throw new Error('Indent must be an integer between INDENT_MIN and INDENT_MAX');
+				}
+			}
+		}
+	},
+	parseDOM: [
+		{
+			tag: 'p',
+			getAttrs: (node) => {
+				const indent = node.style.textIndent.split('px')[INDENT_MIN];
+				const _indent = parseInt(indent);
+				if (isNaN(_indent)) {
+					return { indent: INDENT_MIN };
+				}
+				return { indent: clamp(_indent, INDENT_MIN, INDENT_MAX) };
+			}
+		}
+	],
+	toDOM(node) {
+		const { indent } = node.attrs;
+		return ['p', { style: `text-indent: ${indent * INDENT_SIZE_PX}px` }, 0];
 	}
 };
 

@@ -7,7 +7,7 @@
 	import { baseKeymap } from 'prosemirror-commands';
 
 	import { schema } from './schema.js';
-	import { toggleBold, toggleItalics } from './toggles.js';
+	import { indentLess, indentMore, toggleBold, toggleItalics } from './actions.js';
 	let el: HTMLElement;
 	let state: EditorState;
 	let view: EditorView;
@@ -31,7 +31,9 @@
 					'Mod-z': undo,
 					'Mod-y': redo,
 					'Mod-b': toggleBold,
-					'Mod-i': toggleItalics
+					'Mod-i': toggleItalics,
+					'Mod-[': indentLess,
+					'Mod-]': indentMore
 				}),
 				keymap(baseKeymap)
 			]

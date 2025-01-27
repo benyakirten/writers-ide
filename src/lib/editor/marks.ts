@@ -55,26 +55,9 @@ const code: MarkSpec = {
 	}
 };
 
-const indent: MarkSpec = {
-	attrs: { level: { default: 0 } },
-	parseDOM: [
-		{
-			tag: 'span',
-			getAttrs(dom: HTMLElement) {
-				return { level: parseInt(dom.style.marginLeft) / 40 };
-			}
-		}
-	],
-	toDOM(node) {
-		return ['span', { style: `text-indent: ${node.attrs.level * 40}px` }, 0];
-	}
-};
-
-/// [Specs](#model.MarkSpec) for the marks in the schema.
 export const marks = {
 	link,
 	em,
 	strong,
-	code,
-	indent
-};
+	code
+} as const;
