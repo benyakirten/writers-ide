@@ -79,4 +79,11 @@
 	});
 </script>
 
-<div bind:this={el}></div>
+<div class="editor-host" bind:this={el}></div>
+<p>This is outside of the editor.</p>
+
+<style>
+	.editor-host > :global([contenteditable]) {
+		outline: none;
+	}
+</style>
