@@ -68,6 +68,14 @@
 		"vitest": "^2.0.4"
 	},
 	"dependencies": {
-		"@inlang/paraglide-sveltekit": "^0.11.1"
+		"@inlang/paraglide-sveltekit": "^0.11.1",
+		"prosemirror-commands": "^1.6.2",
+		"prosemirror-history": "^1.4.1",
+		"prosemirror-keymap": "^1.2.2",
+		"prosemirror-model": "^1.24.1",
+		"prosemirror-schema-basic": "^1.2.3",
+		"prosemirror-state": "^1.4.3",
+		"prosemirror-transform": "^1.10.2",
+		"prosemirror-view": "^1.37.1"
 	}
 }
