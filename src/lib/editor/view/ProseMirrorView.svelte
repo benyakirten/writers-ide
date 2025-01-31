@@ -8,10 +8,12 @@
 
 	import { schema } from './schema.js';
 	import { indentLess, indentMore, toggleBold, toggleItalics } from './actions.js';
+	import { GlobalState } from '../state.js';
 
 	let el: HTMLElement;
 	let state: EditorState;
 	let view: EditorView;
+	let deregister: () => void;
 	let initialState = schema.node('doc', null, [
 		schema.node('paragraph', null, [schema.text('This is a basic paragraph with no children.')]),
 		schema.node('paragraph', null, [schema.text('This is a paragraph with more nodes.')])
@@ -44,6 +46,8 @@
 			state,
 			dispatchTransaction: (transaction) => handleTransaction(view, transaction)
 		});
+
+		deregister = GlobalState.register(view);
 	});
 </script>
 
