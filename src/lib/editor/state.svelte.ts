@@ -1,28 +1,29 @@
 import type { EditorView } from 'prosemirror-view';
 
-type EditorData = {
+export type WindowData = {
 	id: string;
-	view?: EditorView;
+	view?: EditorView | null;
 };
 
 class GlobalEditorState {
-	editors = $state<EditorData[]>([]);
+	windows = $state<WindowData[]>([]);
 
-	register(id: string, view: EditorView): () => void {
-		const index = this.editors.findIndex((item) => item.id === id);
-		this.editors[index].view = view;
-		return () => this.editors.splice(index, 1);
+	// Other types of tabs?
+	register(id: string, view: EditorView | null): () => void {
+		const index = this.windows.findIndex((item) => item.id === id);
+		this.windows[index].view = view;
+		return () => this.windows.splice(index, 1);
 	}
 
 	preregister(): string {
 		const id = crypto.randomUUID();
-		this.editors.push({ id });
+		this.windows.push({ id });
 		return id;
 	}
 
 	remove(id: string): void {
-		const index = this.editors.findIndex((item) => item.id === id);
-		this.editors.splice(index, 1);
+		const index = this.windows.findIndex((item) => item.id === id);
+		this.windows.splice(index, 1);
 	}
 }
 
