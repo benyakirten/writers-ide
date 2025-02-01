@@ -1,6 +1,5 @@
 <script lang="ts">
-	import PromiseMirrorEditor from '$lib/editor/view/ProseMirrorView.svelte';
-
+	import Editor from '$lib/editor/Editor.svelte';
 </script>
 
-<PromiseMirrorEditor />
+<Editor />

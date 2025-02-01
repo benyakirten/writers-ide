@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { EditorState, Transaction } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import { keymap } from 'prosemirror-keymap';
@@ -8,7 +8,9 @@
 
 	import { schema } from './schema.js';
 	import { indentLess, indentMore, toggleBold, toggleItalics } from './actions.js';
-	import { GlobalState } from '../state.js';
+	import GlobalEditorState from '../state.svelte.js';
+
+	let { id } = $props<{ id: string }>();
 
 	let el: HTMLElement;
 	let state: EditorState;
@@ -47,7 +49,12 @@
 			dispatchTransaction: (transaction) => handleTransaction(view, transaction)
 		});
 
-		deregister = GlobalState.register(view);
+		deregister = GlobalEditorState.register(id, view);
+	});
+
+	onDestroy(() => {
+		view.destroy();
+		deregister?.();
 	});
 </script>
 
