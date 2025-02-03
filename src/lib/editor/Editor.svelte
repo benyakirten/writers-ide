@@ -4,35 +4,45 @@
 </script>
 
 <div class="overlay">
-	<MainView />
-
-	{#if GlobalEditorState.ui[BarPosition.LeftExtreme].visible}
-		<div style="width: 200px; background-color: #f0f0f0; border-right: 1px solid black;">
-			Left Extreme
-		</div>
-	{/if}
-
-	{#if GlobalEditorState.ui[BarPosition.Left].visible}
-		<div style="width: 200px; background-color: #f0f0f0; border-right: 1px solid black;">Left</div>
-	{/if}
-
-	{#if GlobalEditorState.ui[BarPosition.Right].visible}
-		<div style="width: 200px; background-color: #f0f0f0; border-left: 1px solid black;">Right</div>
-	{/if}
-
 	{#if GlobalEditorState.ui[BarPosition.WindowTop].visible}
-		<div style="height: 200px; background-color: #f0f0f0; border-bottom: 1px solid black;">
-			Window Top
-		</div>
+		<div style="border: 1px solid black;">Window Top</div>
 	{/if}
+	<div class="main-container">
+		{#if GlobalEditorState.ui[BarPosition.InlineBeginning].visible}
+			<div
+				style={`background-color: #f0f0f0; border: 1px solid black; width: ${GlobalEditorState.ui[BarPosition.InlineBeginning].width ?? 200}px;}`}
+			>
+				Left Extreme
+			</div>
+		{/if}
+
+		{#if GlobalEditorState.ui[BarPosition.InlineStart].visible}
+			<div
+				style={`background-color: #f0f0f0; border: 1px solid black; width: ${GlobalEditorState.ui[BarPosition.InlineBeginning].width ?? 200}px;}`}
+			>
+				Left
+			</div>
+		{/if}
+
+		<main style="flex: 1;">
+			<MainView />
+		</main>
+
+		{#if GlobalEditorState.ui[BarPosition.InlinEnd].visible}
+			<div
+				style={`background-color: #f0f0f0; border: 1px solid black; width: ${GlobalEditorState.ui[BarPosition.InlineBeginning].width ?? 200}px;}`}
+			>
+				Right
+			</div>
+		{/if}
+	</div>
 </div>
 
 <style>
-	.overlay {
+	.main-container {
 		display: flex;
+		width: 100vw;
+		height: 100vh;
 		position: relative;
-		& > :global(*) {
-			border: 1px solid black;
-		}
 	}
 </style>

@@ -3,9 +3,12 @@
 	import Tab from './Tab.svelte';
 </script>
 
-<!-- TODO: Style -->
-<main>
+<div class="main-view">
 	{#each GlobalEditorState.windows as window (window.id)}
 		<Tab {...window} />
 	{/each}
-</main>
+</div>
+
+<style>
+	/* Main view will be grid */
+</style>

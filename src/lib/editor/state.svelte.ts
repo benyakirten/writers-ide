@@ -6,9 +6,9 @@ export type WindowData = {
 };
 
 export enum BarPosition {
-	LeftExtreme,
-	Left,
-	Right,
+	InlineBeginning,
+	InlineStart,
+	InlinEnd,
 	WindowTop,
 	EditorTop,
 	EditorBottom
@@ -16,18 +16,19 @@ export enum BarPosition {
 
 export type BarState = {
 	visible: boolean;
+	width?: number;
 	data?: null;
 };
 
 class GlobalEditorState {
 	windows = $state<WindowData[]>([]);
 	ui = $state<Record<BarPosition, BarState>>({
-		[BarPosition.LeftExtreme]: { visible: true },
-		[BarPosition.Left]: { visible: false },
-		[BarPosition.Right]: { visible: false },
-		[BarPosition.WindowTop]: { visible: false },
-		[BarPosition.EditorTop]: { visible: false },
-		[BarPosition.EditorBottom]: { visible: false }
+		[BarPosition.InlineBeginning]: { visible: true },
+		[BarPosition.InlineStart]: { visible: true },
+		[BarPosition.InlinEnd]: { visible: true },
+		[BarPosition.WindowTop]: { visible: true },
+		[BarPosition.EditorTop]: { visible: true },
+		[BarPosition.EditorBottom]: { visible: true }
 	});
 	floatingBars = $state<BarPosition[]>([]);
 
