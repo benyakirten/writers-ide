@@ -5,8 +5,31 @@ export type WindowData = {
 	view?: EditorView | null;
 };
 
+export enum BarPosition {
+	LeftExtreme,
+	Left,
+	Right,
+	WindowTop,
+	EditorTop,
+	EditorBottom
+}
+
+export type BarState = {
+	visible: boolean;
+	data?: null;
+};
+
 class GlobalEditorState {
 	windows = $state<WindowData[]>([]);
+	ui = $state<Record<BarPosition, BarState>>({
+		[BarPosition.LeftExtreme]: { visible: true },
+		[BarPosition.Left]: { visible: false },
+		[BarPosition.Right]: { visible: false },
+		[BarPosition.WindowTop]: { visible: false },
+		[BarPosition.EditorTop]: { visible: false },
+		[BarPosition.EditorBottom]: { visible: false }
+	});
+	floatingBars = $state<BarPosition[]>([]);
 
 	// Other types of tabs?
 	register(id: string, view: EditorView | null): () => void {
@@ -24,6 +47,50 @@ class GlobalEditorState {
 	remove(id: string): void {
 		const index = this.windows.findIndex((item) => item.id === id);
 		this.windows.splice(index, 1);
+	}
+
+	swap(id1: string, id2: string): boolean {
+		const index1 = this.windows.findIndex((item) => item.id === id1);
+		const index2 = this.windows.findIndex((item) => item.id === id2);
+
+		if (index1 === -1 || index2 === -1) {
+			return false;
+		}
+
+		const temp = this.windows[index1];
+		this.windows[index1] = this.windows[index2];
+		this.windows[index2] = temp;
+
+		return true;
+	}
+
+	private isValidWindowIndex(index: number): boolean {
+		return index >= 0 && index < this.windows.length;
+	}
+
+	swapByIndex(index1: number, index2: number): boolean {
+		if (!this.isValidWindowIndex(index1) || !this.isValidWindowIndex(index2)) {
+			return false;
+		}
+
+		const temp = this.windows[index1];
+		this.windows[index1] = this.windows[index2];
+		this.windows[index2] = temp;
+
+		return true;
+	}
+
+	moveToPosition(id: string | number, position: number): boolean {
+		const index = typeof id === 'number' ? id : this.windows.findIndex((item) => item.id === id);
+
+		if (index === -1 || position < 0 || position >= this.windows.length) {
+			return false;
+		}
+
+		const [item] = this.windows.splice(index, 1);
+		this.windows.splice(position, 0, item);
+
+		return true;
 	}
 }
 

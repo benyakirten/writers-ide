@@ -5,6 +5,7 @@
 	let { id, view } = $props<{ id: string; view?: WindowData['view'] }>();
 </script>
 
+<!-- TODO: Much more complexity here -->
 <div class="tab">
 	{#if view === undefined}
 		<div></div>
