@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { WindowData } from './state.svelte.js';
+	import type { WindowData } from './state/tab-state.svelte.js';
 	import ProseMirrorView from './view/ProseMirrorView.svelte';
 
 	let { id, view } = $props<{ id: string; view?: WindowData['view'] }>();
@@ -16,8 +16,8 @@
 
 <style>
 	.tab {
-		width: 100%;
-		min-height: 50vh;
+		height: 200px;
+		width: 200px;
 		border: 1px solid black;
 	}
 </style>

@@ -8,7 +8,7 @@
 
 	import { schema } from './schema.js';
 	import { indentLess, indentMore, toggleBold, toggleItalics } from './actions.js';
-	import GlobalEditorState from '../state.svelte.js';
+	import TabState from '../state/tab-state.svelte.js';
 
 	let { id } = $props<{ id: string }>();
 
@@ -49,7 +49,7 @@
 			dispatchTransaction: (transaction) => handleTransaction(view, transaction)
 		});
 
-		deregister = GlobalEditorState.register(id, view);
+		deregister = TabState.registerEditor(id, view);
 	});
 
 	onDestroy(() => {

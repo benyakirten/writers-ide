@@ -5,44 +5,25 @@ export type WindowData = {
 	view?: EditorView | null;
 };
 
-export enum BarPosition {
-	InlineBeginning,
-	InlineStart,
-	InlinEnd,
-	WindowTop,
-	EditorTop,
-	EditorBottom
-}
-
-export type BarState = {
-	visible: boolean;
-	width?: number;
-	data?: null;
-};
-
-class GlobalEditorState {
+class TabState {
 	windows = $state<WindowData[]>([]);
-	ui = $state<Record<BarPosition, BarState>>({
-		[BarPosition.InlineBeginning]: { visible: true },
-		[BarPosition.InlineStart]: { visible: true },
-		[BarPosition.InlinEnd]: { visible: true },
-		[BarPosition.WindowTop]: { visible: true },
-		[BarPosition.EditorTop]: { visible: true },
-		[BarPosition.EditorBottom]: { visible: true }
-	});
-	floatingBars = $state<BarPosition[]>([]);
 
 	// Other types of tabs?
-	register(id: string, view: EditorView | null): () => void {
+	registerEditor(id: string, view: EditorView | null): () => void {
 		const index = this.windows.findIndex((item) => item.id === id);
 		this.windows[index].view = view;
 		return () => this.windows.splice(index, 1);
 	}
 
-	preregister(): string {
+	createTab(): string {
 		const id = crypto.randomUUID();
 		this.windows.push({ id });
 		return id;
+	}
+
+	createEditor(): void {
+		const id = this.createTab();
+		this.registerEditor(id, null);
 	}
 
 	remove(id: string): void {
@@ -95,5 +76,5 @@ class GlobalEditorState {
 	}
 }
 
-const globalEditorState = new GlobalEditorState();
+const globalEditorState = new TabState();
 export default globalEditorState;
