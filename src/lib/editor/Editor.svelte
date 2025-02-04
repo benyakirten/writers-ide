@@ -7,9 +7,10 @@
 
 	function startResize(event: MouseEvent, section: BarPosition) {
 		resizedSection = { bar: section, startingXPosition: event.clientX };
-		console.log(event.clientX);
 	}
 
+	// TODO: Resize adjacent sections if releant
+	// TODO: Offload this to state class
 	function mouseMove(event: MouseEvent) {
 		if (resizedSection === null || !(event.target instanceof HTMLElement)) {
 			return;
