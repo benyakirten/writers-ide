@@ -7,9 +7,6 @@ export enum BarPosition {
 	EditorBottom
 }
 
-// TODO: Add all CSS units
-// type CSSUnit = 'px' | 'em' | 'rem' | 'vw' | 'vh' | 'vmin' | 'vmax' | '%' | 'fr';
-
 export type BarState = {
 	visible: boolean;
 	width: number;
@@ -17,15 +14,15 @@ export type BarState = {
 };
 
 class UIState {
+	readonly MIN_SIZE = 100;
 	ui = $state<Record<BarPosition, BarState>>({
-		[BarPosition.InlineBeginning]: { visible: true, width: 200 },
-		[BarPosition.InlineStart]: { visible: true, width: 200 },
-		[BarPosition.InlinEnd]: { visible: true, width: 200 },
-		[BarPosition.WindowTop]: { visible: true, width: 200 },
-		[BarPosition.EditorTop]: { visible: true, width: 200 },
-		[BarPosition.EditorBottom]: { visible: true, width: 200 }
+		[BarPosition.InlineBeginning]: { visible: true, width: 200, data: null },
+		[BarPosition.InlineStart]: { visible: true, width: 200, data: null },
+		[BarPosition.InlinEnd]: { visible: true, width: 200, data: null },
+		[BarPosition.WindowTop]: { visible: true, width: 200, data: null },
+		[BarPosition.EditorTop]: { visible: true, width: 200, data: null },
+		[BarPosition.EditorBottom]: { visible: true, width: 200, data: null }
 	});
-	floatingBars = $state<BarPosition[]>([]);
 }
 
 const uiState = new UIState();

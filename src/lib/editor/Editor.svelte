@@ -17,8 +17,15 @@
 		}
 
 		const delta = event.clientX - resizedSection.startingXPosition;
-		UIState.ui[resizedSection.bar].width += delta;
-		resizedSection.startingXPosition = event.clientX;
+		const newSize = UIState.ui[resizedSection.bar].width + delta;
+
+		if (newSize <= UIState.MIN_SIZE) {
+			resizedSection.startingXPosition = event.target.getBoundingClientRect().left;
+			UIState.ui[resizedSection.bar].width = 0;
+		} else {
+			UIState.ui[resizedSection.bar].width = newSize;
+			resizedSection.startingXPosition = event.clientX;
+		}
 	}
 
 	function stopResize() {
@@ -26,7 +33,11 @@
 	}
 </script>
 
-<div class="overlay" onmouseupcapture={stopResize} onmousemovecapture={(event) => mouseMove(event)}>
+<div
+	class="overlay"
+	onmouseupcapture={() => stopResize()}
+	onmousemovecapture={(event) => mouseMove(event)}
+>
 	{#if UIState.ui[BarPosition.WindowTop].visible}
 		<div style="border: 1px solid black;">Window Top</div>
 	{/if}
