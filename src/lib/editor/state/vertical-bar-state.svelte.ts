@@ -5,8 +5,9 @@ export enum VerticalBarPosition {
 	InlineEndInner = 'END_INNER'
 }
 
-export type VerticalBarState = {
+export type VerticalBar = {
 	width: number;
+	visible: boolean;
 	data?: null;
 };
 
@@ -15,31 +16,42 @@ export enum TextDirection {
 	RTL
 }
 
-class VerticalVerticalBarState {
+class VerticalBarState {
 	static readonly MIN_SIZE = 100;
 	// TODO: Determine if this needs to be proxied with $state
 	// TODO: Determine if this needs to be private with a getter or if it's valuable as public property
-	resizedSection: { bar: VerticalBarPosition; x: number } | null = $state(null);
-	bars = $state<Record<VerticalBarPosition, VerticalBarState>>({
-		[VerticalBarPosition.InlineStartOuter]: { width: 200, data: null },
-		[VerticalBarPosition.InlineStartInner]: { width: 200, data: null },
-		[VerticalBarPosition.InlineEndInner]: { width: 200, data: null }
+	resizedSection: { bar: VerticalBarPosition; x: number; resized: boolean } | null = $state(null);
+	bars = $state<Record<VerticalBarPosition, VerticalBar>>({
+		[VerticalBarPosition.InlineStartOuter]: { width: 200, data: null, visible: true },
+		[VerticalBarPosition.InlineStartInner]: { width: 200, data: null, visible: true },
+		[VerticalBarPosition.InlineEndInner]: { width: 200, data: null, visible: true }
 	});
 
 	width(bar: VerticalBarPosition): number {
-		return this.bars[bar].width < VerticalVerticalBarState.MIN_SIZE ? 0 : this.bars[bar].width;
+		return this.bars[bar].width >= VerticalBarState.MIN_SIZE && this.bars[bar].visible
+			? this.bars[bar].width
+			: 0;
 	}
 
 	toggle(bar: VerticalBarPosition) {
-		if (this.bars[bar].width < VerticalVerticalBarState.MIN_SIZE) {
-			this.bars[bar].width = VerticalVerticalBarState.MIN_SIZE;
-		} else {
-			this.bars[bar].width = 0;
+		if (this.resizedSection?.resized) {
+			return;
+		}
+
+		const currentBar = this.bars[bar];
+		if (currentBar.visible) {
+			currentBar.visible = false;
+			return;
+		}
+
+		currentBar.visible = true;
+		if (this.bars[bar].width < VerticalBarState.MIN_SIZE) {
+			this.bars[bar].width = VerticalBarState.MIN_SIZE;
 		}
 	}
 
 	startResize(bar: VerticalBarPosition, x: number) {
-		this.resizedSection = { bar, x: x };
+		this.resizedSection = { bar, x: x, resized: false };
 	}
 
 	resize(event: MouseEvent) {
@@ -47,17 +59,24 @@ class VerticalVerticalBarState {
 			return;
 		}
 
+		if (!this.resizedSection.resized) {
+			this.resizedSection.resized = true;
+		}
+
 		const { bar, x } = this.resizedSection;
-		const shouldInvert = VerticalVerticalBarState.shouldInvert(bar);
+		const shouldInvert = VerticalBarState.shouldInvert(bar);
 
 		const delta = (event.clientX - x) * (shouldInvert ? -1 : 1);
 		const newSize = this.bars[bar].width + delta;
 
-		if (newSize <= VerticalVerticalBarState.MIN_SIZE) {
+		if (newSize <= VerticalBarState.MIN_SIZE) {
 			const { right, left } = event.target.getBoundingClientRect();
 			this.resizedSection.x = shouldInvert ? right : left;
 			this.bars[bar].width = 0;
 		} else {
+			if (newSize >= VerticalBarState.MIN_SIZE && !this.bars[bar].visible) {
+				this.bars[bar].visible = true;
+			}
 			this.bars[bar].width = newSize;
 			this.resizedSection.x = event.clientX;
 		}
@@ -70,7 +89,7 @@ class VerticalVerticalBarState {
 	}
 
 	static shouldInvert(bar: VerticalBarPosition): boolean {
-		const dir = VerticalVerticalBarState.getTextDirection();
+		const dir = VerticalBarState.getTextDirection();
 		switch (bar) {
 			case VerticalBarPosition.InlineStartOuter:
 				return dir === TextDirection.RTL;
@@ -81,10 +100,16 @@ class VerticalVerticalBarState {
 		}
 	}
 
-	endResize() {
-		this.resizedSection = null;
+	async endResize(): Promise<void> {
+		// We defer this because we want the click trigger to run first (`this.toggle`).
+		await new Promise((resolve) => {
+			requestAnimationFrame(() => {
+				this.resizedSection = null;
+				resolve(true);
+			});
+		});
 	}
 }
 
-const verticalVerticalBarState = new VerticalVerticalBarState();
+const verticalVerticalBarState = new VerticalBarState();
 export default verticalVerticalBarState;

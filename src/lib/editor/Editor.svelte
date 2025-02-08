@@ -1,20 +1,18 @@
 <script lang="ts">
 	import MainView from './MainView.svelte';
-	import VerticalVerticalBarState, {
-		VerticalBarPosition
-	} from './state/vertical-bar-state.svelte.js';
+	import VerticalBarState, { VerticalBarPosition } from './state/vertical-bar-state.svelte.js';
 	import TabState from './state/tab-state.svelte.js';
 </script>
 
 <div
 	class="overlay"
-	onmouseupcapture={() => VerticalVerticalBarState.endResize()}
-	onmousemovecapture={(event) => VerticalVerticalBarState.resize(event)}
+	onmouseupcapture={() => VerticalBarState.endResize()}
+	onmousemovecapture={(event) => VerticalBarState.resize(event)}
 >
 	<div style="border: 1px solid black;">Window Top</div>
 	<div class="main-container">
 		<div
-			style="background-color: #f0f0f0; border: 1px solid black; width: {VerticalVerticalBarState.width(
+			style="background-color: #f0f0f0; border: 1px solid black; width: {VerticalBarState.width(
 				VerticalBarPosition.InlineStartOuter
 			)}px; position: relative;"
 		>
@@ -23,12 +21,13 @@
 		<button
 			aria-label="Resize Inline Beginning"
 			class="resize"
+			onclick={() => VerticalBarState.toggle(VerticalBarPosition.InlineStartOuter)}
 			onmousedowncapture={(event) =>
-				VerticalVerticalBarState.startResize(VerticalBarPosition.InlineStartOuter, event.clientX)}
+				VerticalBarState.startResize(VerticalBarPosition.InlineStartOuter, event.clientX)}
 		></button>
 
 		<div
-			style="background-color: #f0f0f0; border: 1px solid black; width: {VerticalVerticalBarState.width(
+			style="background-color: #f0f0f0; border: 1px solid black; width: {VerticalBarState.width(
 				VerticalBarPosition.InlineStartInner
 			)}px; position: relative;"
 		>
@@ -38,8 +37,9 @@
 		<button
 			aria-label="Resize Inline Beginning"
 			class="resize"
+			onclick={() => VerticalBarState.toggle(VerticalBarPosition.InlineStartInner)}
 			onmousedowncapture={(event) =>
-				VerticalVerticalBarState.startResize(VerticalBarPosition.InlineStartInner, event.clientX)}
+				VerticalBarState.startResize(VerticalBarPosition.InlineStartInner, event.clientX)}
 		></button>
 
 		<main style="flex: 1;">
@@ -49,11 +49,12 @@
 		<button
 			aria-label="Resize Inline Beginning"
 			class="resize"
+			onclick={() => VerticalBarState.toggle(VerticalBarPosition.InlineEndInner)}
 			onmousedowncapture={(event) =>
-				VerticalVerticalBarState.startResize(VerticalBarPosition.InlineEndInner, event.clientX)}
+				VerticalBarState.startResize(VerticalBarPosition.InlineEndInner, event.clientX)}
 		></button>
 		<div
-			style="background-color: #f0f0f0; border: 1px solid black; width: {VerticalVerticalBarState.width(
+			style="background-color: #f0f0f0; border: 1px solid black; width: {VerticalBarState.width(
 				VerticalBarPosition.InlineEndInner
 			)}px; position: relative;"
 		>
@@ -73,7 +74,8 @@
 	.resize {
 		cursor: col-resize;
 		z-index: 1;
-		width: 1px;
+		width: 4px;
+		padding: 0;
 		appearance: none;
 		outline: none;
 		border: none;

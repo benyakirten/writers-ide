@@ -6,14 +6,15 @@ export enum HorizontalBarPosition {
 
 export type VerticalBarState = {
 	height: number;
+	visible: boolean;
 	data?: null;
 };
 
 class HorizontalVerticalBarState {
 	bars = $state<Record<HorizontalBarPosition, VerticalBarState>>({
-		[HorizontalBarPosition.WindowTop]: { height: 200, data: null },
-		[HorizontalBarPosition.EditorTop]: { height: 200, data: null },
-		[HorizontalBarPosition.EditorBottom]: { height: 200, data: null }
+		[HorizontalBarPosition.WindowTop]: { height: 200, data: null, visible: true },
+		[HorizontalBarPosition.EditorTop]: { height: 200, data: null, visible: true },
+		[HorizontalBarPosition.EditorBottom]: { height: 200, data: null, visible: true }
 	});
 }
 
