@@ -1,7 +1,7 @@
 import type { EditorView } from 'prosemirror-view';
 import type { EditorState, Transaction } from 'prosemirror-state';
 
-import { clamp } from './utils.js';
+import { clamp } from '../utils.js';
 import { isSelectionAllBold, isSelectionAllItalics } from './selection.js';
 import { INDENT_MAX, INDENT_MIN } from './constants.js';
 
