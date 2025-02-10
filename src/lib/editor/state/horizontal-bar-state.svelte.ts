@@ -11,12 +11,12 @@ export type HorizontalBar = {
 };
 
 class HorizontalBarState {
-	constructor(public readonly minSize = 100) {}
+	constructor(public readonly minSize = 20) {}
 
 	bars = $state<Record<HorizontalBarPosition, HorizontalBar>>({
-		[HorizontalBarPosition.WindowTop]: { height: 200, data: null, visible: true },
-		[HorizontalBarPosition.EditorTop]: { height: 200, data: null, visible: true },
-		[HorizontalBarPosition.EditorBottom]: { height: 200, data: null, visible: true }
+		[HorizontalBarPosition.WindowTop]: { height: 100, data: null, visible: true },
+		[HorizontalBarPosition.EditorTop]: { height: 100, data: null, visible: true },
+		[HorizontalBarPosition.EditorBottom]: { height: 100, data: null, visible: true }
 	});
 
 	resizedSection: { bar: HorizontalBarPosition; y: number; resized: boolean } | null = $state(null);
@@ -58,7 +58,7 @@ class HorizontalBarState {
 		}
 
 		const { bar, y } = this.resizedSection;
-		const shouldInvert = HorizontalBarState.shouldInvert(bar);
+		const shouldInvert = this.shouldInvert(bar);
 
 		const delta = (event.clientY - y) * (shouldInvert ? -1 : 1);
 		const newSize = this.bars[bar].height + delta;
@@ -82,7 +82,7 @@ class HorizontalBarState {
 		}
 	}
 
-	static shouldInvert(bar: HorizontalBarPosition): boolean {
+	shouldInvert(bar: HorizontalBarPosition): boolean {
 		return bar === HorizontalBarPosition.EditorBottom;
 	}
 

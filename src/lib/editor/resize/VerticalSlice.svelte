@@ -1,8 +1,8 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
+
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
 	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
-
-	import type { Snippet } from 'svelte';
 
 	let { position, children } = $props<{ position: VerticalBarPosition; children: Snippet }>();
 
@@ -18,17 +18,22 @@
 	></button>
 {/snippet}
 
-{#if shouldInvert}
-	{@render resizeBar()}
-{/if}
-<div class="vertical-slice" style:width={`${VerticalBarState.width(position)}px`}>
-	{@render children()}
+<div class="vertical-container">
+	{#if shouldInvert}
+		{@render resizeBar()}
+	{/if}
+	<div class="vertical-slice" style:width={`${VerticalBarState.width(position)}px`}>
+		{@render children()}
+	</div>
+	{#if !shouldInvert}
+		{@render resizeBar()}
+	{/if}
 </div>
-{#if !shouldInvert}
-	{@render resizeBar()}
-{/if}
 
 <style>
+	.vertical-container {
+		display: flex;
+	}
 	.resize {
 		cursor: col-resize;
 		z-index: 1;
