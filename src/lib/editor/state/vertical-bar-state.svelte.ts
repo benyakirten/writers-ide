@@ -17,9 +17,8 @@ export enum TextDirection {
 }
 
 class VerticalBarState {
-	static readonly MIN_SIZE = 100;
-	// TODO: Determine if this needs to be proxied with $state
-	// TODO: Determine if this needs to be private with a getter or if it's valuable as public property
+	constructor(public readonly minSize = 100) {}
+
 	resizedSection: { bar: VerticalBarPosition; x: number; resized: boolean } | null = $state(null);
 	bars = $state<Record<VerticalBarPosition, VerticalBar>>({
 		[VerticalBarPosition.InlineStartOuter]: { width: 200, data: null, visible: true },
@@ -28,7 +27,7 @@ class VerticalBarState {
 	});
 
 	width(bar: VerticalBarPosition): number {
-		return this.bars[bar].width >= VerticalBarState.MIN_SIZE && this.bars[bar].visible
+		return this.bars[bar].width >= this.minSize && this.bars[bar].visible
 			? this.bars[bar].width
 			: 0;
 	}
@@ -45,13 +44,13 @@ class VerticalBarState {
 		}
 
 		currentBar.visible = true;
-		if (this.bars[bar].width < VerticalBarState.MIN_SIZE) {
-			this.bars[bar].width = VerticalBarState.MIN_SIZE;
+		if (this.bars[bar].width < this.minSize) {
+			this.bars[bar].width = this.minSize;
 		}
 	}
 
 	startResize(bar: VerticalBarPosition, x: number) {
-		this.resizedSection = { bar, x: x, resized: false };
+		this.resizedSection = { bar, x, resized: false };
 	}
 
 	resize(event: MouseEvent) {
@@ -64,17 +63,17 @@ class VerticalBarState {
 		}
 
 		const { bar, x } = this.resizedSection;
-		const shouldInvert = VerticalBarState.shouldInvert(bar);
+		const shouldInvert = this.shouldInvert(bar);
 
 		const delta = (event.clientX - x) * (shouldInvert ? -1 : 1);
 		const newSize = this.bars[bar].width + delta;
 
-		if (newSize <= VerticalBarState.MIN_SIZE) {
+		if (newSize <= this.minSize) {
 			const { right, left } = event.target.getBoundingClientRect();
 			this.resizedSection.x = shouldInvert ? right : left;
 			this.bars[bar].width = 0;
 		} else {
-			if (newSize >= VerticalBarState.MIN_SIZE && !this.bars[bar].visible) {
+			if (newSize >= this.minSize && !this.bars[bar].visible) {
 				this.bars[bar].visible = true;
 			}
 			this.bars[bar].width = newSize;
@@ -82,14 +81,14 @@ class VerticalBarState {
 		}
 	}
 
-	static getTextDirection(): TextDirection {
+	getTextDirection(): TextDirection {
 		const { body } = document;
 		const dir = getComputedStyle(body).direction;
 		return dir === 'rtl' ? TextDirection.RTL : TextDirection.LTR;
 	}
 
-	static shouldInvert(bar: VerticalBarPosition): boolean {
-		const dir = VerticalBarState.getTextDirection();
+	shouldInvert(bar: VerticalBarPosition): boolean {
+		const dir = this.getTextDirection();
 		switch (bar) {
 			case VerticalBarPosition.InlineStartOuter:
 				return dir === TextDirection.RTL;
@@ -108,6 +107,17 @@ class VerticalBarState {
 				resolve(true);
 			});
 		});
+	}
+
+	humanize(bar: VerticalBarPosition): string {
+		switch (bar) {
+			case VerticalBarPosition.InlineStartOuter:
+				return 'Inline Start Outer';
+			case VerticalBarPosition.InlineStartInner:
+				return 'Inline Start Inner';
+			case VerticalBarPosition.InlineEndInner:
+				return 'Inline End Inner';
+		}
 	}
 }
 
