@@ -1,56 +1,78 @@
-// TODO: Should there be a far enline end to mirror InlineStartOuter?
-export enum VerticalBarPosition {
-	InlineStartOuter = 'START_OUTER',
-	InlineStartInner = 'START_INNER',
-	InlineEndInner = 'END_INNER'
-}
-
 export type VerticalBar = {
 	width: number;
 	visible: boolean;
+	id: string;
 	data?: null;
 };
 
-export enum TextDirection {
-	LTR,
-	RTL
+export enum HorizontalTextDirection {
+	LTR = 'LTR',
+	RTL = 'RTL'
+}
+
+export enum VerticalBarPosition {
+	InlineStart = 'START',
+	InlineEnd = 'END'
 }
 
 class VerticalBarState {
 	constructor(public readonly minSize = 100) {}
 
-	resizedSection: { bar: VerticalBarPosition; x: number; resized: boolean } | null = $state(null);
-	bars = $state<Record<VerticalBarPosition, VerticalBar>>({
-		[VerticalBarPosition.InlineStartOuter]: { width: 200, data: null, visible: true },
-		[VerticalBarPosition.InlineStartInner]: { width: 200, data: null, visible: true },
-		[VerticalBarPosition.InlineEndInner]: { width: 200, data: null, visible: true }
-	});
+	resizedSection: {
+		id: string;
+		x: number;
+		resized: boolean;
+		position: VerticalBarPosition;
+	} | null = $state(null);
+	inlineStart = $state<VerticalBar[]>([
+		{ width: 200, data: null, visible: true, id: 'inline-start-1' },
+		{ width: 200, data: null, visible: true, id: 'inline-start-2' }
+	]);
 
-	width(bar: VerticalBarPosition): number {
-		return this.bars[bar].width >= this.minSize && this.bars[bar].visible
-			? this.bars[bar].width
-			: 0;
+	inlineEnd = $state<VerticalBar[]>([
+		{ width: 200, data: null, visible: true, id: 'inline-start-3' }
+	]);
+
+	bars(id: string | number, position: VerticalBarPosition): VerticalBar | undefined {
+		const bars = position === VerticalBarPosition.InlineStart ? this.inlineStart : this.inlineEnd;
+		const bar = typeof id === 'number' ? bars.at(id) : bars.find((bar) => bar.id === id);
+		return bar;
 	}
 
-	toggle(bar: VerticalBarPosition) {
-		if (this.resizedSection?.resized) {
+	width(id: string | number, position: VerticalBarPosition): number {
+		const bar = this.bars(id, position);
+		if (!bar) {
+			return 0;
+		}
+
+		return bar.width >= this.minSize && bar.visible ? bar.width : 0;
+	}
+
+	toggleBar(bar: VerticalBar) {
+		if (bar.visible) {
+			bar.visible = false;
 			return;
 		}
 
-		const currentBar = this.bars[bar];
-		if (currentBar.visible) {
-			currentBar.visible = false;
-			return;
-		}
-
-		currentBar.visible = true;
-		if (this.bars[bar].width < this.minSize) {
-			this.bars[bar].width = this.minSize;
+		bar.visible = true;
+		if (bar.width < this.minSize) {
+			bar.width = this.minSize;
 		}
 	}
 
-	startResize(bar: VerticalBarPosition, x: number) {
-		this.resizedSection = { bar, x, resized: false };
+	toggle(id: string | number, position: VerticalBarPosition) {
+		const bar = this.bars(id, position);
+
+		// Cannot toggle bar if the bar is being resized.
+		// This is to fix that the mouseup listener is not removed when the bar is toggled.
+		if (!bar || this.resizedSection?.resized) {
+			return;
+		}
+		this.toggleBar(bar);
+	}
+
+	startResize(id: string, position: VerticalBarPosition, x: number) {
+		this.resizedSection = { id, position, x, resized: false };
 	}
 
 	resize(event: MouseEvent) {
@@ -62,40 +84,42 @@ class VerticalBarState {
 			this.resizedSection.resized = true;
 		}
 
-		const { bar, x } = this.resizedSection;
-		const shouldInvert = this.shouldInvert(bar);
+		const { id, position, x } = this.resizedSection;
+		const bar = this.bars(id, position);
+		if (!bar) {
+			return;
+		}
+
+		const shouldInvert = this.shouldInvert(position);
 
 		const delta = (event.clientX - x) * (shouldInvert ? -1 : 1);
-		const newSize = this.bars[bar].width + delta;
+		const newSize = bar.width + delta;
 
 		if (newSize <= this.minSize) {
 			const { right, left } = event.target.getBoundingClientRect();
 			this.resizedSection.x = shouldInvert ? right : left;
-			this.bars[bar].width = 0;
+			bar.width = 0;
 		} else {
-			if (newSize >= this.minSize && !this.bars[bar].visible) {
-				this.bars[bar].visible = true;
+			if (newSize >= this.minSize && !bar.visible) {
+				bar.visible = true;
 			}
-			this.bars[bar].width = newSize;
+			bar.width = newSize;
 			this.resizedSection.x = event.clientX;
 		}
 	}
 
-	getTextDirection(): TextDirection {
+	getHorizontalTextDirection(): HorizontalTextDirection {
 		const { body } = document;
 		const dir = getComputedStyle(body).direction;
-		return dir === 'rtl' ? TextDirection.RTL : TextDirection.LTR;
+		return dir === 'rtl' ? HorizontalTextDirection.RTL : HorizontalTextDirection.LTR;
 	}
 
 	shouldInvert(bar: VerticalBarPosition): boolean {
-		const dir = this.getTextDirection();
-		switch (bar) {
-			case VerticalBarPosition.InlineStartOuter:
-				return dir === TextDirection.RTL;
-			case VerticalBarPosition.InlineStartInner:
-				return dir === TextDirection.RTL;
-			case VerticalBarPosition.InlineEndInner:
-				return dir === TextDirection.LTR;
+		const dir = this.getHorizontalTextDirection();
+		if (dir === HorizontalTextDirection.LTR) {
+			return bar === VerticalBarPosition.InlineEnd;
+		} else {
+			return bar === VerticalBarPosition.InlineStart;
 		}
 	}
 
@@ -109,15 +133,11 @@ class VerticalBarState {
 		});
 	}
 
-	humanize(bar: VerticalBarPosition): string {
-		switch (bar) {
-			case VerticalBarPosition.InlineStartOuter:
-				return 'Inline Start Outer';
-			case VerticalBarPosition.InlineStartInner:
-				return 'Inline Start Inner';
-			case VerticalBarPosition.InlineEndInner:
-				return 'Inline End Inner';
-		}
+	humanize(id: string | number, position: VerticalBarPosition): string {
+		const index = typeof id === 'string' ? this.inlineStart.findIndex((bar) => bar.id === id) : id;
+		const description =
+			position === VerticalBarPosition.InlineStart ? 'inline start bar' : 'inline end bar';
+		return `${description} #${index + 1}`;
 	}
 }
 

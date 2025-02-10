@@ -28,18 +28,20 @@
 >
 	<HorizontalSlice position={HorizontalBarPosition.WindowTop}>Window Top</HorizontalSlice>
 	<div class="main-container">
-		<VerticalSlice position={VerticalBarPosition.InlineStartOuter}>Inline Beginning</VerticalSlice>
-		<VerticalSlice position={VerticalBarPosition.InlineStartInner}>
-			<button onclick={() => TabState.createTab()}>Add empty tab</button>
-			<button onclick={() => TabState.createEditor()}>Add empty tab</button>
-		</VerticalSlice>
-
+		{#each VerticalBarState.inlineStart as bar, index (bar.id)}
+			<VerticalSlice id={bar.id} position={VerticalBarPosition.InlineStart} {index}>
+				Inline Bar Start #{index + 1}
+			</VerticalSlice>
+		{/each}
 		<main class="main">
 			<HorizontalSlice position={HorizontalBarPosition.EditorTop}>Editor Top</HorizontalSlice>
 			<MainView />
 		</main>
-
-		<VerticalSlice position={VerticalBarPosition.InlineEndInner}>Inline End</VerticalSlice>
+		{#each VerticalBarState.inlineEnd as bar, index (bar.id)}
+			<VerticalSlice id={bar.id} position={VerticalBarPosition.InlineEnd} {index}>
+				Inline Bar End #{index + 1}
+			</VerticalSlice>
+		{/each}
 	</div>
 </div>
 

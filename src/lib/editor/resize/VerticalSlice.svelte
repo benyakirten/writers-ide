@@ -4,17 +4,27 @@
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
 	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
 
-	let { position, children } = $props<{ position: VerticalBarPosition; children: Snippet }>();
+	let {
+		id,
+		position,
+		index,
+		children
+	}: {
+		id: string;
+		position: VerticalBarPosition;
+		index: number;
+		children: Snippet;
+	} = $props();
 
 	let shouldInvert = VerticalBarState.shouldInvert(position);
 </script>
 
 {#snippet resizeBar()}
 	<button
-		aria-label={`Resize ${position}`}
+		aria-label={VerticalBarState.humanize(index, position)}
 		class="resize"
-		onclick={() => VerticalBarState.toggle(position)}
-		onmousedowncapture={(event) => VerticalBarState.startResize(position, event.clientX)}
+		onclick={() => VerticalBarState.toggle(index, position)}
+		onmousedowncapture={(event) => VerticalBarState.startResize(id, position, event.clientX)}
 	></button>
 {/snippet}
 
@@ -22,7 +32,7 @@
 	{#if shouldInvert}
 		{@render resizeBar()}
 	{/if}
-	<div class="vertical-slice" style:width={`${VerticalBarState.width(position)}px`}>
+	<div class="vertical-slice" style:width={`${VerticalBarState.width(id, position)}px`}>
 		{@render children()}
 	</div>
 	{#if !shouldInvert}
