@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { EditorState, Transaction } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import { keymap } from 'prosemirror-keymap';
@@ -8,10 +8,14 @@
 
 	import { schema } from './schema.js';
 	import { indentLess, indentMore, toggleBold, toggleItalics } from './actions.js';
+	import TabState from '../state/tab-state.svelte.js';
+
+	let { id } = $props<{ id: string }>();
 
 	let el: HTMLElement;
 	let state: EditorState;
 	let view: EditorView;
+	let deregister: () => void;
 	let initialState = schema.node('doc', null, [
 		schema.node('paragraph', null, [schema.text('This is a basic paragraph with no children.')]),
 		schema.node('paragraph', null, [schema.text('This is a paragraph with more nodes.')])
@@ -44,6 +48,13 @@
 			state,
 			dispatchTransaction: (transaction) => handleTransaction(view, transaction)
 		});
+
+		deregister = TabState.registerEditor(id, view);
+	});
+
+	onDestroy(() => {
+		view.destroy();
+		deregister?.();
 	});
 </script>
 
