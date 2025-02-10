@@ -1,24 +1,25 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { Cross2 } from '@steeze-ui/radix-icons';
+	import { Cross2, Minus } from '@steeze-ui/radix-icons';
 	import { Icon } from '@steeze-ui/svelte-icon';
 
-	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
+	import { VerticalBarPosition, type VerticalBar } from '../state/vertical-bar-state.svelte.js';
 	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
 
 	let {
-		id,
+		bar,
 		position,
 		index,
 		children
 	}: {
-		id: string;
+		bar: VerticalBar;
 		position: VerticalBarPosition;
 		index: number;
 		children: Snippet;
 	} = $props();
 
 	let shouldInvert = VerticalBarState.shouldInvert(position);
+	let width = $derived(VerticalBarState.width(bar));
 </script>
 
 {#snippet resizeBar()}
@@ -26,7 +27,7 @@
 		aria-label={VerticalBarState.humanize(index, position)}
 		class="resize"
 		onclick={() => VerticalBarState.toggle(index, position)}
-		onmousedowncapture={(event) => VerticalBarState.startResize(id, position, event.clientX)}
+		onmousedowncapture={(event) => VerticalBarState.startResize(bar.id, position, event.clientX)}
 	></button>
 {/snippet}
 
@@ -34,15 +35,28 @@
 	{#if shouldInvert}
 		{@render resizeBar()}
 	{/if}
-	<div class="vertical-slice" style:width={`${VerticalBarState.width(id, position)}px`}>
-		<button
-			aria-label={`Close bar #${index + 1}`}
-			class="remove-button"
-			onclick={() => VerticalBarState.remove(id, position)}
-		>
-			<Icon src={Cross2} size="16px" />
-		</button>
-		{@render children()}
+	<div
+		class="vertical-slice"
+		style:width={`${width}px`}
+		style:overflow={width === 0 ? 'hidden' : 'auto'}
+	>
+		<div class="menu">
+			<button
+				aria-label={`Minimize bar #${index + 1}`}
+				onclick={() => VerticalBarState.toggle(index, position)}
+			>
+				<Icon src={Minus} size="16px" />
+			</button>
+			<button
+				aria-label={`Close bar #${index + 1}`}
+				onclick={() => VerticalBarState.remove(index, position)}
+			>
+				<Icon src={Cross2} size="16px" />
+			</button>
+		</div>
+		<div>
+			{@render children()}
+		</div>
 	</div>
 	{#if !shouldInvert}
 		{@render resizeBar()}
@@ -64,18 +78,15 @@
 		background-color: #bbb;
 	}
 
-	.remove-button {
-		position: absolute;
-		top: 8px;
-		right: 8px;
-		border: 0;
-		padding: 2px;
-		border-radius: 4px;
+	.menu {
+		display: flex;
+		justify-content: flex-end;
 	}
 
 	.vertical-slice {
 		background-color: #f0f0f0;
 		border: 1px solid black;
 		position: relative;
+		overflow: hidden;
 	}
 </style>

@@ -2,7 +2,6 @@
 	import MainView from './MainView.svelte';
 	import HorizontalBarState from './state/horizontal-bar-state.svelte.js';
 	import VerticalBarState, { VerticalBarPosition } from './state/vertical-bar-state.svelte.js';
-	import TabState from './state/tab-state.svelte.js';
 	import VerticalSlice from './resize/VerticalSlice.svelte';
 	import HorizontalSlice from './resize/HorizontalSlice.svelte';
 	import { HorizontalBarPosition } from './state/horizontal-bar-state.svelte.js';
@@ -29,7 +28,7 @@
 	<HorizontalSlice position={HorizontalBarPosition.WindowTop}>Window Top</HorizontalSlice>
 	<div class="main-container">
 		{#each VerticalBarState.inlineStart as bar, index (bar.id)}
-			<VerticalSlice id={bar.id} position={VerticalBarPosition.InlineStart} {index}>
+			<VerticalSlice {bar} position={VerticalBarPosition.InlineStart} {index}>
 				Inline Bar Start #{index + 1}
 			</VerticalSlice>
 		{/each}
@@ -38,7 +37,7 @@
 			<MainView />
 		</main>
 		{#each VerticalBarState.inlineEnd as bar, index (bar.id)}
-			<VerticalSlice id={bar.id} position={VerticalBarPosition.InlineEnd} {index}>
+			<VerticalSlice {bar} position={VerticalBarPosition.InlineEnd} {index}>
 				Inline Bar End #{index + 1}
 			</VerticalSlice>
 		{/each}

@@ -39,12 +39,7 @@ class VerticalBarState {
 		return bar;
 	}
 
-	width(id: string | number, position: VerticalBarPosition): number {
-		const bar = this.bars(id, position);
-		if (!bar) {
-			return 0;
-		}
-
+	width(bar: VerticalBar): number {
 		return bar.width >= this.minSize && bar.visible ? bar.width : 0;
 	}
 
