@@ -1,7 +1,6 @@
 export enum HorizontalBarPosition {
 	WindowTop = 'WINDOW_TOP',
-	EditorTop = 'EDITOR_TOP',
-	EditorBottom = 'EDITOR_BOTTOM'
+	EditorTop = 'EDITOR_TOP'
 }
 
 export type HorizontalBar = {
@@ -15,8 +14,7 @@ class HorizontalBarState {
 
 	bars = $state<Record<HorizontalBarPosition, HorizontalBar>>({
 		[HorizontalBarPosition.WindowTop]: { height: 100, data: null, visible: true },
-		[HorizontalBarPosition.EditorTop]: { height: 100, data: null, visible: true },
-		[HorizontalBarPosition.EditorBottom]: { height: 100, data: null, visible: true }
+		[HorizontalBarPosition.EditorTop]: { height: 100, data: null, visible: true }
 	});
 
 	resizedSection: { bar: HorizontalBarPosition; y: number; resized: boolean } | null = $state(null);
@@ -58,15 +56,14 @@ class HorizontalBarState {
 		}
 
 		const { bar, y } = this.resizedSection;
-		const shouldInvert = this.shouldInvert(bar);
 
-		const delta = (event.clientY - y) * (shouldInvert ? -1 : 1);
+		const delta = event.clientY - y;
 		const newSize = this.bars[bar].height + delta;
 
 		if (newSize <= this.minSize) {
 			// Collapse the bar
-			const { bottom, top } = event.target.getBoundingClientRect();
-			this.resizedSection.y = shouldInvert ? bottom : top;
+			const { top } = event.target.getBoundingClientRect();
+			this.resizedSection.y = top;
 			this.bars[bar].height = 0;
 		} else {
 			// Resize the bar doing two things:
@@ -80,10 +77,6 @@ class HorizontalBarState {
 			this.bars[bar].height = newSize;
 			this.resizedSection.y = event.clientY;
 		}
-	}
-
-	shouldInvert(bar: HorizontalBarPosition): boolean {
-		return bar === HorizontalBarPosition.EditorBottom;
 	}
 
 	async endResize(): Promise<void> {

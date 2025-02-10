@@ -10,5 +10,8 @@
 </div>
 
 <style>
+	.main-view {
+		flex: 1;
+	}
 	/* Main view will be grid */
 </style>

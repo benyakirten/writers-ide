@@ -35,6 +35,7 @@
 		</VerticalSlice>
 
 		<main class="main">
+			<HorizontalSlice position={HorizontalBarPosition.EditorTop}>Editor Top</HorizontalSlice>
 			<MainView />
 		</main>
 
@@ -43,16 +44,23 @@
 </div>
 
 <style>
-	.main-container {
-		display: flex;
+	.overlay {
 		width: 100vw;
 		height: 100vh;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.main-container {
+		flex: 1;
+		display: flex;
 		position: relative;
 	}
 
 	.main {
 		flex: 1;
 		position: relative;
-		display: grid;
+		display: flex;
+		flex-direction: column;
 	}
 </style>

@@ -5,8 +5,6 @@
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
 
 	let { position, children } = $props<{ position: HorizontalBarPosition; children: Snippet }>();
-
-	let shouldInvert = HorizontalBarState.shouldInvert(position);
 </script>
 
 {#snippet resizeBar()}
@@ -19,21 +17,15 @@
 {/snippet}
 
 <div class="horizontal-container">
-	{#if shouldInvert}
-		{@render resizeBar()}
-	{/if}
 	<div class="horizontal-slice" style:height={`${HorizontalBarState.height(position)}px`}>
 		{@render children()}
 	</div>
-	{#if !shouldInvert}
-		{@render resizeBar()}
-	{/if}
+	{@render resizeBar()}
 </div>
 
 <style>
 	.horizontal-container {
-		display: flex;
-		flex-direction: column;
+		display: grid;
 	}
 
 	.resize {
