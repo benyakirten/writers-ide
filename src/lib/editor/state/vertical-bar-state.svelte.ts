@@ -139,6 +139,12 @@ class VerticalBarState {
 			position === VerticalBarPosition.InlineStart ? 'inline start bar' : 'inline end bar';
 		return `${description} #${index + 1}`;
 	}
+
+	remove(id: string | number, position: VerticalBarPosition) {
+		const bars = position === VerticalBarPosition.InlineStart ? this.inlineStart : this.inlineEnd;
+		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
+		bars.splice(index, 1);
+	}
 }
 
 const verticalVerticalBarState = new VerticalBarState();
