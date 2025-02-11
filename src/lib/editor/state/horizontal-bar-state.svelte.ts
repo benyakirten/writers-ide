@@ -13,7 +13,7 @@ export type HorizontalBar = {
 };
 
 class HorizontalBarState {
-	constructor(public readonly minSize = 20) {}
+	constructor(public readonly minSize = 50) {}
 
 	windowBlockStart = $state<HorizontalBar[]>([
 		{ height: 100, data: null, visible: true, id: 'window-start-1' }
@@ -106,12 +106,13 @@ class HorizontalBarState {
 		const delta = (event.clientY - y) * (shouldInvert ? -1 : 1);
 		const newSize = bar.height + delta;
 
+		console.table({ height: bar.height, y, clientY: event.clientY, delta, newSize });
 		if (newSize <= this.minSize) {
 			bar.height = 0;
 			requestAnimationFrame(() => {
 				if (this.resizedSection) {
 					const { top, bottom } = target.getBoundingClientRect();
-					this.resizedSection.y = shouldInvert ? top : bottom;
+					this.resizedSection.y = shouldInvert ? bottom : top;
 				}
 			});
 		} else {

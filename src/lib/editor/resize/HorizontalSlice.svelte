@@ -22,7 +22,7 @@
 	} = $props();
 
 	let shouldInvert = HorizontalBarState.shouldInvert(position);
-	let width = $derived(HorizontalBarState.height(bar));
+	let height = $derived(HorizontalBarState.height(bar));
 </script>
 
 {#snippet resizeBar()}
@@ -40,8 +40,8 @@
 	{/if}
 	<div
 		class="horizontal-slice"
-		style:width={`${width}px`}
-		style:overflow={width === 0 ? 'hidden' : 'auto'}
+		style:height={`${height}px`}
+		style:overflow={height === 0 ? 'hidden' : 'auto'}
 	>
 		<div class="menu">
 			<button
@@ -68,12 +68,13 @@
 
 <style>
 	.horizontal-container {
-		display: flex;
+		display: grid;
+		width: 100%;
 	}
 	.resize {
-		cursor: col-resize;
+		cursor: row-resize;
 		z-index: 1;
-		width: 4px;
+		height: 4px;
 		padding: 0;
 		appearance: none;
 		outline: none;
@@ -91,5 +92,6 @@
 		border: 1px solid black;
 		position: relative;
 		overflow: hidden;
+		width: 100%;
 	}
 </style>
