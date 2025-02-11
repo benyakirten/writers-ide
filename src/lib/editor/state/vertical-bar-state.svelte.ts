@@ -33,8 +33,12 @@ class VerticalBarState {
 		{ width: 200, data: null, visible: true, id: 'inline-start-3' }
 	]);
 
-	bars(id: string | number, position: VerticalBarPosition): VerticalBar | undefined {
-		const bars = position === VerticalBarPosition.InlineStart ? this.inlineStart : this.inlineEnd;
+	bars(position: VerticalBarPosition): VerticalBar[] {
+		return position === VerticalBarPosition.InlineStart ? this.inlineStart : this.inlineEnd;
+	}
+
+	bar(id: string | number, position: VerticalBarPosition): VerticalBar | undefined {
+		const bars = this.bars(position);
 		const bar = typeof id === 'number' ? bars.at(id) : bars.find((bar) => bar.id === id);
 		return bar;
 	}
@@ -56,7 +60,7 @@ class VerticalBarState {
 	}
 
 	toggle(id: string | number, position: VerticalBarPosition) {
-		const bar = this.bars(id, position);
+		const bar = this.bar(id, position);
 
 		// Cannot toggle bar if the bar is being resized.
 		// This is to fix that the mouseup listener is not removed when the bar is toggled.
@@ -71,7 +75,8 @@ class VerticalBarState {
 	}
 
 	resize(event: MouseEvent) {
-		if (!this.resizedSection || !(event.target instanceof HTMLElement)) {
+		const { target } = event;
+		if (!this.resizedSection || !(target instanceof HTMLElement)) {
 			return;
 		}
 
@@ -80,7 +85,7 @@ class VerticalBarState {
 		}
 
 		const { id, position, x } = this.resizedSection;
-		const bar = this.bars(id, position);
+		const bar = this.bar(id, position);
 		if (!bar) {
 			return;
 		}
@@ -91,9 +96,13 @@ class VerticalBarState {
 		const newSize = bar.width + delta;
 
 		if (newSize <= this.minSize) {
-			const { right, left } = event.target.getBoundingClientRect();
-			this.resizedSection.x = shouldInvert ? right : left;
 			bar.width = 0;
+			requestAnimationFrame(() => {
+				if (this.resizedSection) {
+					const { right, left } = target.getBoundingClientRect();
+					this.resizedSection.x = shouldInvert ? right : left;
+				}
+			});
 		} else {
 			if (newSize >= this.minSize && !bar.visible) {
 				bar.visible = true;
@@ -129,9 +138,10 @@ class VerticalBarState {
 	}
 
 	humanize(id: string | number, position: VerticalBarPosition): string {
-		const index = typeof id === 'string' ? this.inlineStart.findIndex((bar) => bar.id === id) : id;
+		const index =
+			typeof id === 'string' ? this.bars(position).findIndex((bar) => bar.id === id) : id;
 		const description =
-			position === VerticalBarPosition.InlineStart ? 'inline start bar' : 'inline end bar';
+			position === VerticalBarPosition.InlineStart ? 'Inline Start Bar' : 'Inline End Bar';
 		return `${description} #${index + 1}`;
 	}
 
