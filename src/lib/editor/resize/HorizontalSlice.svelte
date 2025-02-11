@@ -30,7 +30,7 @@
 		aria-label={HorizontalBarState.humanize(index, position)}
 		class="resize"
 		onclick={() => HorizontalBarState.toggle(index, position)}
-		onmousedowncapture={(event) => HorizontalBarState.startResize(bar.id, position, event.clientX)}
+		onmousedowncapture={(event) => HorizontalBarState.startResize(bar.id, position, event.clientY)}
 	></button>
 {/snippet}
 

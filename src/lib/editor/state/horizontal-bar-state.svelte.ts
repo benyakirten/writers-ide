@@ -106,7 +106,6 @@ class HorizontalBarState {
 		const delta = (event.clientY - y) * (shouldInvert ? -1 : 1);
 		const newSize = bar.height + delta;
 
-		console.table({ height: bar.height, y, clientY: event.clientY, delta, newSize });
 		if (newSize <= this.minSize) {
 			bar.height = 0;
 			requestAnimationFrame(() => {
