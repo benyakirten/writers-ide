@@ -160,6 +160,12 @@ class HorizontalBarState {
 
 		return `${description} ${index + 1}`;
 	}
+
+	remove(id: string | number, position: HorizontalBarPosition) {
+		const bars = this.bars(position);
+		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
+		bars.splice(index, 1);
+	}
 }
 
 const horizontalBarState = new HorizontalBarState();

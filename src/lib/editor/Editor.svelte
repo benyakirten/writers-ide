@@ -7,11 +7,8 @@
 	import { HorizontalBarPosition } from './state/horizontal-bar-state.svelte.js';
 
 	function resize(e: MouseEvent) {
-		if (VerticalBarState.resizedSection) {
-			VerticalBarState.resize(e);
-		} else if (HorizontalBarState.resizedSection) {
-			HorizontalBarState.resize(e);
-		}
+		VerticalBarState.resize(e);
+		HorizontalBarState.resize(e);
 	}
 
 	function endResize() {
@@ -25,7 +22,11 @@
 	onmouseupcapture={() => endResize()}
 	onmousemovecapture={(event) => resize(event)}
 >
-	<HorizontalSlice position={HorizontalBarPosition.WindowTop}>Window Top</HorizontalSlice>
+	{#each HorizontalBarState.windowBlockStart as bar, index (bar.id)}
+		<HorizontalSlice {bar} position={HorizontalBarPosition.WindowBlockStart} {index}>
+			Window Block Start Bar #{index + 1}
+		</HorizontalSlice>
+	{/each}
 	<div class="main-container">
 		{#each VerticalBarState.inlineStart as bar, index (bar.id)}
 			<VerticalSlice {bar} position={VerticalBarPosition.InlineStart} {index}>
@@ -33,7 +34,6 @@
 			</VerticalSlice>
 		{/each}
 		<main class="main">
-			<HorizontalSlice position={HorizontalBarPosition.EditorTop}>Editor Top</HorizontalSlice>
 			<MainView />
 		</main>
 		{#each VerticalBarState.inlineEnd as bar, index (bar.id)}
@@ -42,6 +42,11 @@
 			</VerticalSlice>
 		{/each}
 	</div>
+	{#each HorizontalBarState.windowBlockEnd as bar, index (bar.id)}
+		<HorizontalSlice {bar} position={HorizontalBarPosition.WindowBlockEnd} {index}>
+			Window Block End Bar #{index + 1}
+		</HorizontalSlice>
+	{/each}
 </div>
 
 <style>
