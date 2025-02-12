@@ -12,6 +12,7 @@
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
 		"test:e2e": "playwright test",
+		"test:unit:ci": "vitest --run",
 		"test:unit": "vitest",
 		"test": "pnpm test:unit -- --run && pnpm test:e2e",
 		"storybook": "storybook dev -p 6006",

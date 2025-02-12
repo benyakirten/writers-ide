@@ -101,10 +101,10 @@ class HorizontalBarState {
 		this.resizedSection = { id, position, y, resized: false };
 	}
 
-	resize(event: MouseEvent) {
+	async resize(event: MouseEvent): Promise<boolean> {
 		const { target } = event;
 		if (!this.resizedSection || !(target instanceof HTMLElement)) {
-			return;
+			return false;
 		}
 
 		if (!this.resizedSection.resized) {
@@ -114,7 +114,7 @@ class HorizontalBarState {
 		const { id, position, y } = this.resizedSection;
 		const bar = this.bar(id, position);
 		if (!bar) {
-			return;
+			return false;
 		}
 
 		const shouldInvert = this.shouldInvert(position);
@@ -124,11 +124,14 @@ class HorizontalBarState {
 
 		if (newSize <= this.minSize(position)) {
 			bar.height = 0;
-			requestAnimationFrame(() => {
-				if (this.resizedSection) {
-					const { top, bottom } = target.getBoundingClientRect();
-					this.resizedSection.y = shouldInvert ? bottom : top;
-				}
+			return new Promise((resolve) => {
+				requestAnimationFrame(() => {
+					if (this.resizedSection) {
+						const { top, bottom } = target.getBoundingClientRect();
+						this.resizedSection.y = shouldInvert ? bottom : top;
+					}
+					resolve(true);
+				});
 			});
 		} else {
 			if (!bar.visible) {
@@ -136,6 +139,7 @@ class HorizontalBarState {
 			}
 			bar.height = newSize;
 			this.resizedSection.y = event.clientY;
+			return true;
 		}
 	}
 
