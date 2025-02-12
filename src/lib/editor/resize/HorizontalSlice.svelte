@@ -22,7 +22,7 @@
 	} = $props();
 
 	let shouldInvert = HorizontalBarState.shouldInvert(position);
-	let height = $derived(HorizontalBarState.height(bar));
+	let height = $derived(HorizontalBarState.height(bar, position));
 </script>
 
 {#snippet resizeBar()}

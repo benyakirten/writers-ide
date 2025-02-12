@@ -13,7 +13,10 @@ export type HorizontalBar = {
 };
 
 class HorizontalBarState {
-	constructor(public readonly minSize = 50) {}
+	constructor(
+		public readonly windowMinSize = 50,
+		public readonly editorMinSize = 30
+	) {}
 
 	windowBlockStart = $state<HorizontalBar[]>([
 		{ height: 100, data: null, visible: true, id: 'window-start-1' }
@@ -35,6 +38,17 @@ class HorizontalBarState {
 		position: HorizontalBarPosition;
 	} | null = $state(null);
 
+	minSize(position: HorizontalBarPosition): number {
+		if (
+			position === HorizontalBarPosition.WindowBlockEnd ||
+			HorizontalBarPosition.WindowBlockStart
+		) {
+			return this.windowMinSize;
+		} else {
+			return this.editorMinSize;
+		}
+	}
+
 	bars(position: HorizontalBarPosition): HorizontalBar[] {
 		switch (position) {
 			case HorizontalBarPosition.WindowBlockStart:
@@ -54,19 +68,21 @@ class HorizontalBarState {
 		return bar;
 	}
 
-	height(bar: HorizontalBar): number {
-		return bar.height >= this.minSize && bar.visible ? bar.height : 0;
+	height(bar: HorizontalBar, position: HorizontalBarPosition): number {
+		return bar.height >= this.minSize(position) && bar.visible ? bar.height : 0;
 	}
 
-	toggleBar(bar: HorizontalBar) {
+	toggleBar(bar: HorizontalBar, position: HorizontalBarPosition) {
 		if (bar.visible) {
 			bar.visible = false;
 			return;
 		}
 
+		const minSize = this.minSize(position);
+
 		bar.visible = true;
-		if (bar.height < this.minSize) {
-			bar.height = this.minSize;
+		if (bar.height < minSize) {
+			bar.height = minSize;
 		}
 	}
 
@@ -78,7 +94,7 @@ class HorizontalBarState {
 		if (!bar || this.resizedSection?.resized) {
 			return;
 		}
-		this.toggleBar(bar);
+		this.toggleBar(bar, position);
 	}
 
 	startResize(id: string, position: HorizontalBarPosition, y: number) {
@@ -106,7 +122,7 @@ class HorizontalBarState {
 		const delta = (event.clientY - y) * (shouldInvert ? -1 : 1);
 		const newSize = bar.height + delta;
 
-		if (newSize <= this.minSize) {
+		if (newSize <= this.minSize(position)) {
 			bar.height = 0;
 			requestAnimationFrame(() => {
 				if (this.resizedSection) {
@@ -115,7 +131,7 @@ class HorizontalBarState {
 				}
 			});
 		} else {
-			if (newSize >= this.minSize && !bar.visible) {
+			if (!bar.visible) {
 				bar.visible = true;
 			}
 			bar.height = newSize;

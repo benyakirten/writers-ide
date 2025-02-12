@@ -34,7 +34,17 @@
 			</VerticalSlice>
 		{/each}
 		<main class="main">
+			{#each HorizontalBarState.editorBlockStart as bar, index (bar.id)}
+				<HorizontalSlice {bar} position={HorizontalBarPosition.EditorBlockStart} {index}>
+					Editor Block Start Bar #{index + 1}
+				</HorizontalSlice>
+			{/each}
 			<MainView />
+			{#each HorizontalBarState.editorBlockEnd as bar, index (bar.id)}
+				<HorizontalSlice {bar} position={HorizontalBarPosition.EditorBlockEnd} {index}>
+					Editor Block End Bar #{index + 1}
+				</HorizontalSlice>
+			{/each}
 		</main>
 		{#each VerticalBarState.inlineEnd as bar, index (bar.id)}
 			<VerticalSlice {bar} position={VerticalBarPosition.InlineEnd} {index}>
