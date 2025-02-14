@@ -20,6 +20,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install
       - name: Lint
-        run: pnpm lint:ci
+        run: pnpm lint
       - name: Unit Test
-        run: pnpm test:unit
+        run: pnpm test:unit:ci
