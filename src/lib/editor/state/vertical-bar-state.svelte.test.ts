@@ -112,6 +112,60 @@ describe('VerticalBarState', () => {
 		});
 	});
 
+	describe('toggleBar', () => {
+		it('should toggle the visibility of a bar', () => {
+			const bar = state.add(
+				{ id: 'inline-start-1', visible: true },
+				VerticalBarPosition.InlineStart
+			);
+			state.toggleBar(bar);
+			expect(bar.visible).toBe(false);
+
+			state.toggleBar(bar);
+			expect(bar.visible).toBe(true);
+		});
+	});
+
+	describe('toggle', () => {
+		it('should toggle the visibility of a bar by index if a number is provided', () => {
+			state.add({ id: 'inline-start-1', visible: true }, VerticalBarPosition.InlineStart);
+			const [bar] = state.inlineStart;
+
+			let got = state.toggle(0, VerticalBarPosition.InlineStart);
+			expect(bar.visible).toBe(false);
+			expect(got).toBe(true);
+
+			got = state.toggle(0, VerticalBarPosition.InlineStart);
+			expect(bar.visible).toBe(true);
+			expect(got).toBe(true);
+		});
+
+		it('should toggle the visibility of a bar by its id if a string is provided', () => {
+			state.add({ id: 'inline-start-1', visible: true }, VerticalBarPosition.InlineStart);
+			const [bar] = state.inlineStart;
+
+			let got = state.toggle('inline-start-1', VerticalBarPosition.InlineStart);
+			expect(bar.visible).toBe(false);
+			expect(got).toBe(true);
+
+			got = state.toggle('inline-start-1', VerticalBarPosition.InlineStart);
+			expect(bar.visible).toBe(true);
+			expect(got).toBe(true);
+		});
+
+		it('should not toggle a bar if the bar is being resized', () => {
+			state.add({ id: 'inline-start-1', visible: true }, VerticalBarPosition.InlineEnd);
+			const [bar] = state.inlineEnd;
+
+			state.startResize('inline-start-1', VerticalBarPosition.InlineEnd, 0);
+			state.resizedSection!.resized = true;
+
+			const got = state.toggle('inline-start-1', VerticalBarPosition.InlineEnd);
+			expect(bar.visible).toBe(true);
+			expect(got).toBe(false);
+		});
+	});
+
 	// it('should toggle the visibility of a bar', () => {
 	// 	const bar = state.inlineStart[0];
 	// 	state.toggleBar(bar);

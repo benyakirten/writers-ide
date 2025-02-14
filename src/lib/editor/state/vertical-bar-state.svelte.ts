@@ -91,15 +91,16 @@ export class VerticalBarState {
 		}
 	}
 
-	toggle(id: string | number, position: VerticalBarPosition) {
+	toggle(id: string | number, position: VerticalBarPosition): boolean {
 		const bar = this.bar(id, position);
 
 		// Cannot toggle bar if the bar is being resized.
 		// This is to fix that the mouseup listener is not removed when the bar is toggled.
-		if (!bar || this.resizedSection?.resized) {
-			return;
+		if (!bar || (this.resizedSection?.resized && this.resizedSection.id === id)) {
+			return false;
 		}
 		this.toggleBar(bar);
+		return true;
 	}
 
 	startResize(id: string, position: VerticalBarPosition, x: number) {
