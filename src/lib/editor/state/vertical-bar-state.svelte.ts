@@ -15,23 +15,47 @@ export enum VerticalBarPosition {
 	InlineEnd = 'END'
 }
 
-class VerticalBarState {
-	constructor(public readonly minSize = 100) {}
-
+export class VerticalBarState {
+	inlineStart: VerticalBar[] = $state([]);
+	inlineEnd: VerticalBar[] = $state([]);
 	resizedSection: {
 		id: string;
 		x: number;
 		resized: boolean;
 		position: VerticalBarPosition;
 	} | null = $state(null);
-	inlineStart = $state<VerticalBar[]>([
-		{ width: 200, data: null, visible: true, id: 'inline-start-1' },
-		{ width: 200, data: null, visible: true, id: 'inline-start-2' }
-	]);
 
-	inlineEnd = $state<VerticalBar[]>([
-		{ width: 200, data: null, visible: true, id: 'inline-start-3' }
-	]);
+	constructor(
+		public readonly minSize = 100,
+		inlineStart: VerticalBar[] = [],
+		inlineEnd: VerticalBar[] = []
+	) {
+		this.inlineStart = this.inlineStart.concat(inlineStart);
+		this.inlineEnd = this.inlineEnd.concat(inlineEnd);
+	}
+
+	add(
+		width: number = this.minSize,
+		position: VerticalBarPosition,
+		id: string = crypto.randomUUID(),
+		data?: null
+	): VerticalBar {
+		const bars = this.bars(position);
+		const existingBar = bars.find((bar) => bar.id === id);
+		if (existingBar) {
+			return existingBar;
+		}
+
+		const bar = { width, visible: true, id, data };
+		bars.push(bar);
+		return bar;
+	}
+
+	remove(id: string | number, position: VerticalBarPosition) {
+		const bars = position === VerticalBarPosition.InlineStart ? this.inlineStart : this.inlineEnd;
+		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
+		bars.splice(index, 1);
+	}
 
 	bars(position: VerticalBarPosition): VerticalBar[] {
 		return position === VerticalBarPosition.InlineStart ? this.inlineStart : this.inlineEnd;
@@ -151,12 +175,6 @@ class VerticalBarState {
 		const description =
 			position === VerticalBarPosition.InlineStart ? 'Inline Start Bar' : 'Inline End Bar';
 		return `${description} #${index + 1}`;
-	}
-
-	remove(id: string | number, position: VerticalBarPosition) {
-		const bars = position === VerticalBarPosition.InlineStart ? this.inlineStart : this.inlineEnd;
-		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
-		bars.splice(index, 1);
 	}
 }
 
