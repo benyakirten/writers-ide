@@ -5,7 +5,7 @@ export type WindowData = {
 	view?: EditorView | null;
 };
 
-class TabState {
+export class TabState {
 	windows = $state<WindowData[]>([]);
 
 	// Other types of tabs?
