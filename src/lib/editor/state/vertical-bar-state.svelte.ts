@@ -35,10 +35,13 @@ export class VerticalBarState {
 	}
 
 	add(
-		width: number = this.minSize,
-		position: VerticalBarPosition,
-		id: string = crypto.randomUUID(),
-		data?: null
+		{
+			width = this.minSize,
+			id = crypto.randomUUID(),
+			visible = true,
+			data = null
+		}: Partial<VerticalBar>,
+		position: VerticalBarPosition
 	): VerticalBar {
 		const bars = this.bars(position);
 		const existingBar = bars.find((bar) => bar.id === id);
@@ -46,7 +49,7 @@ export class VerticalBarState {
 			return existingBar;
 		}
 
-		const bar = { width, visible: true, id, data };
+		const bar = { width, id, visible, data };
 		bars.push(bar);
 		return bar;
 	}
@@ -69,6 +72,11 @@ export class VerticalBarState {
 
 	width(bar: VerticalBar): number {
 		return bar.width >= this.minSize && bar.visible ? bar.width : 0;
+	}
+
+	widthOf(id: string | number, position: VerticalBarPosition): number | undefined {
+		const bar = this.bar(id, position);
+		return bar ? this.width(bar) : undefined;
 	}
 
 	toggleBar(bar: VerticalBar) {

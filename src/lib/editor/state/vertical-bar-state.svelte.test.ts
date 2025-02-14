@@ -52,24 +52,24 @@ describe('VerticalBarState', () => {
 
 	describe('add', () => {
 		it('should add a bar to the inline start list if the position is InlineStart', () => {
-			const bar = state.add(100, VerticalBarPosition.InlineStart, 'inline-start-1');
+			const bar = state.add({ width: 100, id: 'inline-start-1' }, VerticalBarPosition.InlineStart);
 			expect(state.inlineStart).toEqual([bar]);
 		});
 
 		it('should add a bar to the inline end list if the position is InlineEnd', () => {
-			const bar = state.add(100, VerticalBarPosition.InlineEnd, 'inline-end-1');
+			const bar = state.add({ width: 100, id: 'inline-end-1' }, VerticalBarPosition.InlineEnd);
 			expect(state.inlineEnd).toEqual([bar]);
 		});
 	});
 
 	describe('bar', () => {
 		it('should find a bar by id if given a number', () => {
-			const bar = state.add(100, VerticalBarPosition.InlineStart, 'inline-start-1');
+			const bar = state.add({ width: 100, id: 'inline-start-1' }, VerticalBarPosition.InlineStart);
 			expect(state.bar(0, VerticalBarPosition.InlineStart)).toEqual(bar);
 		});
 
 		it('should find a bar by id if given a string', () => {
-			const bar = state.add(100, VerticalBarPosition.InlineEnd, 'inline-end-1');
+			const bar = state.add({ width: 100, id: 'inline-end-1' }, VerticalBarPosition.InlineEnd);
 			expect(state.bar('inline-end-1', VerticalBarPosition.InlineEnd)).toEqual(bar);
 		});
 
@@ -78,20 +78,39 @@ describe('VerticalBarState', () => {
 		});
 	});
 
-	// it('should find a bar by id or index', () => {
-	// 	expect(state.bar('inline-start-1', VerticalBarPosition.InlineStart)).toBe(state.inlineStart[0]);
-	// 	expect(state.bar(1, VerticalBarPosition.InlineStart)).toBe(state.inlineStart[1]);
-	// 	expect(state.bar('non-existent', VerticalBarPosition.InlineStart)).toBeUndefined();
-	// });
+	describe('width', () => {
+		it("should return the width of a bar if it's visible and the widht is over the minimum size", () => {
+			const bar = state.add({ width: 100, id: 'inline-start-1' }, VerticalBarPosition.InlineStart);
+			expect(state.width(bar)).toBe(100);
+		});
 
-	// it('should return the correct width of a bar', () => {
-	// 	expect(state.width(state.inlineStart[0])).toBe(200);
-	// 	state.inlineStart[0].visible = false;
-	// 	expect(state.width(state.inlineStart[0])).toBe(0);
-	// 	state.inlineStart[0].visible = true;
-	// 	state.inlineStart[0].width = 50;
-	// 	expect(state.width(state.inlineStart[0])).toBe(0);
-	// });
+		it('should return 0 if the bar is not visible', () => {
+			const bar = state.add(
+				{ width: 100, id: 'inline-start-1', visible: false },
+				VerticalBarPosition.InlineEnd
+			);
+			expect(state.width(bar)).toBe(0);
+		});
+
+		it('should return 0 if the bar is visible but the width is below the minimum size', () => {
+			const bar = state.add(
+				{ width: MIN_SIZE / 2, id: 'inline-start-1' },
+				VerticalBarPosition.InlineStart
+			);
+			expect(state.width(bar)).toBe(0);
+		});
+	});
+
+	describe('widthOf', () => {
+		it('should return the width of a bar by id', () => {
+			state.add({ width: 100, id: 'inline-start-1' }, VerticalBarPosition.InlineStart);
+			expect(state.widthOf('inline-start-1', VerticalBarPosition.InlineStart)).toBe(100);
+		});
+
+		it('should return undefined if the bar does not exist', () => {
+			expect(state.widthOf('non-existent', VerticalBarPosition.InlineStart)).toBeUndefined();
+		});
+	});
 
 	// it('should toggle the visibility of a bar', () => {
 	// 	const bar = state.inlineStart[0];
