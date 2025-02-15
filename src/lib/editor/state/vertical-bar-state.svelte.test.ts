@@ -9,26 +9,6 @@ describe('VerticalBarState', () => {
 	let state: VerticalBarState;
 	const MIN_SIZE = 70;
 
-	const inlineStartBars: VerticalBar[] = [
-		{
-			id: 'inline-start-1',
-			visible: true,
-			width: 200
-		},
-		{
-			id: 'inline-start-2',
-			visible: true,
-			width: 200
-		}
-	];
-	const inlineEndBars: VerticalBar[] = [
-		{
-			id: 'inline-end-1',
-			visible: true,
-			width: 200
-		}
-	];
-
 	beforeEach(() => {
 		state = new VerticalBarState(MIN_SIZE);
 	});
@@ -51,6 +31,26 @@ describe('VerticalBarState', () => {
 	}
 
 	describe('bars', () => {
+		const inlineStartBars: VerticalBar[] = [
+			{
+				id: 'inline-start-1',
+				visible: true,
+				width: 200
+			},
+			{
+				id: 'inline-start-2',
+				visible: true,
+				width: 200
+			}
+		];
+		const inlineEndBars: VerticalBar[] = [
+			{
+				id: 'inline-end-1',
+				visible: true,
+				width: 200
+			}
+		];
+
 		beforeEach(() => {
 			state.inlineStart = state.inlineStart.concat(inlineStartBars);
 			state.inlineEnd = state.inlineEnd.concat(inlineEndBars);

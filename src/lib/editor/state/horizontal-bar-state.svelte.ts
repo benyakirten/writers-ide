@@ -12,7 +12,7 @@ export type HorizontalBar = {
 	data?: null;
 };
 
-class HorizontalBarState {
+export class HorizontalBarState {
 	constructor(
 		public readonly windowMinSize = 50,
 		public readonly editorMinSize = 30
@@ -37,6 +37,22 @@ class HorizontalBarState {
 		resized: boolean;
 		position: HorizontalBarPosition;
 	} | null = $state(null);
+
+	add(
+		{ height, id = crypto.randomUUID(), visible = true, data = null }: Partial<HorizontalBar>,
+		position: HorizontalBarPosition
+	): HorizontalBar {
+		const bars = this.bars(position);
+		const existingBar = bars.find((bar) => bar.id === id);
+		if (existingBar) {
+			return existingBar;
+		}
+
+		height = height ?? this.minSize(position);
+		const bar = { height, id, visible, data };
+		bars.push(bar);
+		return bar;
+	}
 
 	minSize(position: HorizontalBarPosition): number {
 		if (
@@ -129,8 +145,8 @@ class HorizontalBarState {
 					if (this.resizedSection) {
 						const { top, bottom } = target.getBoundingClientRect();
 						this.resizedSection.y = shouldInvert ? bottom : top;
+						resolve(true);
 					}
-					resolve(true);
 				});
 			});
 		} else {
