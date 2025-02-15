@@ -22,18 +22,10 @@ export class HorizontalBarState {
 		public readonly editorMinSize = 30
 	) {}
 
-	windowBlockStart = $state<HorizontalBar[]>([
-		{ height: 100, data: null, visible: true, id: 'window-start-1' }
-	]);
-	windowBlockEnd = $state<HorizontalBar[]>([
-		{ height: 100, data: null, visible: true, id: 'window-end-1' }
-	]);
-	editorBlockStart = $state<HorizontalBar[]>([
-		{ height: 100, data: null, visible: true, id: 'editor-start-1' }
-	]);
-	editorBlockEnd = $state<HorizontalBar[]>([
-		{ height: 100, data: null, visible: true, id: 'editor-end-1' }
-	]);
+	windowBlockStart = $state<HorizontalBar[]>([]);
+	windowBlockEnd = $state<HorizontalBar[]>([]);
+	editorBlockStart = $state<HorizontalBar[]>([]);
+	editorBlockEnd = $state<HorizontalBar[]>([]);
 
 	resizedSection: {
 		id: string;

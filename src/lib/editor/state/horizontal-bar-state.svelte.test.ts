@@ -249,116 +249,117 @@ describe('HorizontalBarState', () => {
 		});
 	});
 
-	// describe('resize', () => {
-	// 	function createBarAndStartResizing(
-	// 		height: number,
-	// 		y: number,
-	// 		position: HorizontalBarPosition,
-	// 		visible = true
-	// 	) {
-	// 		const id = crypto.randomUUID();
-	// 		const bar = state.add({ height, id, visible }, position);
-	// 		state.startResize(id, position, y);
-	// 		return bar;
-	// 	}
+	describe('resize', () => {
+		function createBarAndStartResizing(
+			height: number,
+			y: number,
+			position: HorizontalBarPosition,
+			visible = true
+		) {
+			const id = crypto.randomUUID();
+			const bar = state.add({ height, id, visible }, position);
+			state.startResize(id, position, y);
+			return bar;
+		}
 
-	// 	it('should set the resized property to true, change the height on the bar, change the y coordinate of the resized section', async () => {
-	// 		createBarAndStartResizing(150, 150, HorizontalBarPosition.WindowBlockStart);
-	// 		const evt = makeEvent(175, { top: 225, bottom: 275 });
+		it('should set the resized property to true, change the height on the bar, change the y coordinate of the resized section', async () => {
+			createBarAndStartResizing(150, 150, HorizontalBarPosition.WindowBlockStart);
+			const evt = makeEvent(175, { top: 225, bottom: 275 });
 
-	// 		const got = await state.resize(evt);
+			const got = await state.resize(evt);
 
-	// 		const [bar] = state.windowBlockStart;
-	// 		expect(got).toBe(true);
-	// 		expect(bar.height).toEqual(175);
-	// 		expect(state.resizedSection!.resized).toBe(true);
-	// 		expect(state.resizedSection!.y).toBe(175);
-	// 	});
+			console.log(state.windowBlockStart.length);
+			const [bar] = state.windowBlockStart;
+			expect(got).toBe(true);
+			expect(bar.height).toEqual(175);
+			expect(state.resizedSection!.resized).toBe(true);
+			expect(state.resizedSection!.y).toBe(175);
+		});
 
-	// 	it('should subtract the distance from the bar height instead if the bar should be inverted', async () => {
-	// 		createBarAndStartResizing(150, 150, HorizontalBarPosition.WindowBlockEnd);
-	// 		const evt = makeEvent(175, { top: 225, bottom: 275 });
+		it('should subtract the distance from the bar height instead if the bar should be inverted', async () => {
+			createBarAndStartResizing(150, 150, HorizontalBarPosition.WindowBlockEnd);
+			const evt = makeEvent(175, { top: 225, bottom: 275 });
 
-	// 		const got = await state.resize(evt);
+			const got = await state.resize(evt);
 
-	// 		const [bar] = state.windowBlockEnd;
-	// 		expect(got).toBe(true);
-	// 		expect(bar.height).toEqual(125);
-	// 		expect(state.resizedSection!.resized).toBe(true);
-	// 		expect(state.resizedSection!.y).toBe(175);
-	// 	});
+			const [bar] = state.windowBlockEnd;
+			expect(got).toBe(true);
+			expect(bar.height).toEqual(125);
+			expect(state.resizedSection!.resized).toBe(true);
+			expect(state.resizedSection!.y).toBe(175);
+		});
 
-	// 	it('should set the bar to visible if it was previously not visible and the new size is larger than the minimum size', async () => {
-	// 		createBarAndStartResizing(50, 50, HorizontalBarPosition.WindowBlockStart, false);
-	// 		const evt = makeEvent(75, { top: 125, bottom: 175 });
+		it('should set the bar to visible if it was previously not visible and the new size is larger than the minimum size', async () => {
+			createBarAndStartResizing(50, 50, HorizontalBarPosition.WindowBlockStart, false);
+			const evt = makeEvent(75, { top: 125, bottom: 175 });
 
-	// 		const got = await state.resize(evt);
-	// 		const [bar] = state.windowBlockStart;
-	// 		expect(got).toBe(true);
-	// 		expect(bar.visible).toBe(true);
-	// 		expect(bar.height).toBe(75);
-	// 	});
+			const got = await state.resize(evt);
+			const [bar] = state.windowBlockStart;
+			expect(got).toBe(true);
+			expect(bar.visible).toBe(true);
+			expect(bar.height).toBe(75);
+		});
 
-	// 	it("should set the bar to 0 height if the new size is below the minimum size and update the resizedSection y to the target's top if it should not invert", async () => {
-	// 		createBarAndStartResizing(50, 50, HorizontalBarPosition.WindowBlockStart);
-	// 		const evt = makeEvent(25, { top: 75, bottom: 125 });
+		it("should set the bar to 0 height if the new size is below the minimum size and update the resizedSection y to the target's top if it should not invert", async () => {
+			createBarAndStartResizing(50, 50, HorizontalBarPosition.WindowBlockStart);
+			const evt = makeEvent(25, { top: 75, bottom: 125 });
 
-	// 		const got = await state.resize(evt);
-	// 		const [bar] = state.windowBlockStart;
-	// 		expect(got).toBe(true);
-	// 		expect(bar.height).toBe(0);
-	// 		expect(state.resizedSection!.y).toBe(75);
-	// 	});
+			const got = await state.resize(evt);
+			const [bar] = state.windowBlockStart;
+			expect(got).toBe(true);
+			expect(bar.height).toBe(0);
+			expect(state.resizedSection!.y).toBe(75);
+		});
 
-	// 	it("should set the bar to 0 height if the new size is below the minimum size and update the resizedSection y to the target's bottom if it should invert", async () => {
-	// 		createBarAndStartResizing(50, 50, HorizontalBarPosition.WindowBlockEnd);
-	// 		const evt = makeEvent(75, { top: 75, bottom: 125 });
+		it("should set the bar to 0 height if the new size is below the minimum size and update the resizedSection y to the target's bottom if it should invert", async () => {
+			createBarAndStartResizing(50, 50, HorizontalBarPosition.WindowBlockEnd);
+			const evt = makeEvent(75, { top: 75, bottom: 125 });
 
-	// 		const got = await state.resize(evt);
-	// 		const [bar] = state.windowBlockEnd;
-	// 		expect(got).toBe(true);
-	// 		expect(bar.height).toBe(0);
-	// 		expect(state.resizedSection!.y).toBe(125);
-	// 	});
+			const got = await state.resize(evt);
+			const [bar] = state.windowBlockEnd;
+			expect(got).toBe(true);
+			expect(bar.height).toBe(0);
+			expect(state.resizedSection!.y).toBe(125);
+		});
 
-	// 	it("should not resize the section if the event's target is not an HTMLElement", async () => {
-	// 		createBarAndStartResizing(150, 150, HorizontalBarPosition.WindowBlockStart);
-	// 		const evt = {
-	// 			clientY: 100,
-	// 			target: { getBoundingClientRect: () => ({ top: 225, bottom: 275 }) }
-	// 		} as unknown as MouseEvent;
-	// 		const got = await state.resize(evt);
-	// 		expect(got).toBe(false);
+		it("should not resize the section if the event's target is not an HTMLElement", async () => {
+			createBarAndStartResizing(150, 150, HorizontalBarPosition.WindowBlockStart);
+			const evt = {
+				clientY: 100,
+				target: { getBoundingClientRect: () => ({ top: 225, bottom: 275 }) }
+			} as unknown as MouseEvent;
+			const got = await state.resize(evt);
+			expect(got).toBe(false);
 
-	// 		const [bar] = state.windowBlockStart;
-	// 		expect(bar.height).toBe(150);
-	// 		expect(state.resizedSection!.resized).toBe(false);
-	// 		expect(state.resizedSection!.y).toBe(150);
-	// 	});
+			const [bar] = state.windowBlockStart;
+			expect(bar.height).toBe(150);
+			expect(state.resizedSection!.resized).toBe(false);
+			expect(state.resizedSection!.y).toBe(150);
+		});
 
-	// 	it("should not resize the section if the bar doesn't exist and return false", async () => {
-	// 		state.startResize('window-start-1', HorizontalBarPosition.WindowBlockStart, 200);
-	// 		const evt = makeEvent(100, { top: 225, bottom: 275 });
+		it("should not resize the section if the bar doesn't exist and return false", async () => {
+			state.startResize('window-start-1', HorizontalBarPosition.WindowBlockStart, 200);
+			const evt = makeEvent(100, { top: 225, bottom: 275 });
 
-	// 		const got = await state.resize(evt);
+			const got = await state.resize(evt);
 
-	// 		expect(got).toBe(false);
-	// 		expect(state.resizedSection!.resized).toBe(false);
-	// 		expect(state.resizedSection!.y).toBe(200);
-	// 	});
+			expect(got).toBe(false);
+			expect(state.resizedSection!.resized).toBe(false);
+			expect(state.resizedSection!.y).toBe(200);
+		});
 
-	// 	it('should return false if there is no resized section', async () => {
-	// 		createBarAndStartResizing(150, 150, HorizontalBarPosition.WindowBlockStart);
-	// 		const evt = makeEvent(100, { top: 225, bottom: 275 });
-	// 		await state.endResize();
+		it('should return false if there is no resized section', async () => {
+			createBarAndStartResizing(150, 150, HorizontalBarPosition.WindowBlockStart);
+			const evt = makeEvent(100, { top: 225, bottom: 275 });
+			await state.endResize();
 
-	// 		const got = await state.resize(evt);
-	// 		const [bar] = state.windowBlockStart;
+			const got = await state.resize(evt);
+			const [bar] = state.windowBlockStart;
 
-	// 		expect(got).toBe(false);
-	// 		expect(bar.height).toBe(150);
-	// 	});
-	// });
+			expect(got).toBe(false);
+			expect(bar.height).toBe(150);
+		});
+	});
 
 	describe('endResize', () => {
 		it('should end resizing a bar', async () => {
@@ -369,6 +370,13 @@ describe('HorizontalBarState', () => {
 	});
 
 	describe('humanize', () => {
+		beforeEach(() => {
+			state.add({ id: 'window-start-1', visible: true }, HorizontalBarPosition.WindowBlockStart);
+			state.add({ id: 'window-end-1', visible: true }, HorizontalBarPosition.WindowBlockEnd);
+			state.add({ id: 'editor-start-1', visible: true }, HorizontalBarPosition.EditorBlockStart);
+			state.add({ id: 'editor-end-1', visible: true }, HorizontalBarPosition.EditorBlockEnd);
+		});
+
 		it('should return the humanized description for a window start bar by index', () => {
 			const description = state.humanize(0, HorizontalBarPosition.WindowBlockStart);
 			expect(description).toBe('Window block start #1');
