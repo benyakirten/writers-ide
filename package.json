@@ -12,6 +12,7 @@
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
 		"test:e2e": "playwright test",
+		"test:unit:ci": "vitest --run",
 		"test:unit": "vitest",
 		"test": "pnpm test:unit -- --run && pnpm test:e2e",
 		"storybook": "storybook dev -p 6006",
@@ -69,6 +70,9 @@
 	},
 	"dependencies": {
 		"@inlang/paraglide-sveltekit": "^0.11.1",
+		"@steeze-ui/radix-icons": "^1.1.2",
+		"@steeze-ui/svelte-icon": "^1.6.2",
+		"jsdom": "^26.0.0",
 		"prosemirror-commands": "^1.6.2",
 		"prosemirror-history": "^1.4.1",
 		"prosemirror-keymap": "^1.2.2",

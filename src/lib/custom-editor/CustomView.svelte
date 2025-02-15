@@ -16,7 +16,7 @@
 	} from './caret.js';
 	import { nextAnimationFrame } from './utils.js';
 
-		// let blocks: Blocks = $state([
+	// let blocks: Blocks = $state([
 	// 	{
 	// 		classes: [],
 	// 		properties: {},
@@ -75,10 +75,10 @@
 		}
 		let range: Range | null = selection.getRangeAt(0);
 
+		let newContent = '';
 		switch (e.key) {
 			case 'Enter':
 				e.preventDefault();
-				let newContent = '';
 
 				if (selection) {
 					const position = selection.getRangeAt(0).startOffset;

@@ -2,17 +2,13 @@
 	import MainView from './MainView.svelte';
 	import HorizontalBarState from './state/horizontal-bar-state.svelte.js';
 	import VerticalBarState, { VerticalBarPosition } from './state/vertical-bar-state.svelte.js';
-	import TabState from './state/tab-state.svelte.js';
 	import VerticalSlice from './resize/VerticalSlice.svelte';
 	import HorizontalSlice from './resize/HorizontalSlice.svelte';
 	import { HorizontalBarPosition } from './state/horizontal-bar-state.svelte.js';
 
 	function resize(e: MouseEvent) {
-		if (VerticalBarState.resizedSection) {
-			VerticalBarState.resize(e);
-		} else if (HorizontalBarState.resizedSection) {
-			HorizontalBarState.resize(e);
-		}
+		VerticalBarState.resize(e);
+		HorizontalBarState.resize(e);
 	}
 
 	function endResize() {
@@ -26,21 +22,41 @@
 	onmouseupcapture={() => endResize()}
 	onmousemovecapture={(event) => resize(event)}
 >
-	<HorizontalSlice position={HorizontalBarPosition.WindowTop}>Window Top</HorizontalSlice>
+	{#each HorizontalBarState.windowBlockStart as bar, index (bar.id)}
+		<HorizontalSlice {bar} position={HorizontalBarPosition.WindowBlockStart} {index}>
+			Window Block Start Bar #{index + 1}
+		</HorizontalSlice>
+	{/each}
 	<div class="main-container">
-		<VerticalSlice position={VerticalBarPosition.InlineStartOuter}>Inline Beginning</VerticalSlice>
-		<VerticalSlice position={VerticalBarPosition.InlineStartInner}>
-			<button onclick={() => TabState.createTab()}>Add empty tab</button>
-			<button onclick={() => TabState.createEditor()}>Add empty tab</button>
-		</VerticalSlice>
-
+		{#each VerticalBarState.inlineStart as bar, index (bar.id)}
+			<VerticalSlice {bar} position={VerticalBarPosition.InlineStart} {index}>
+				Inline Bar Start #{index + 1}
+			</VerticalSlice>
+		{/each}
 		<main class="main">
-			<HorizontalSlice position={HorizontalBarPosition.EditorTop}>Editor Top</HorizontalSlice>
+			{#each HorizontalBarState.editorBlockStart as bar, index (bar.id)}
+				<HorizontalSlice {bar} position={HorizontalBarPosition.EditorBlockStart} {index}>
+					Editor Block Start Bar #{index + 1}
+				</HorizontalSlice>
+			{/each}
 			<MainView />
+			{#each HorizontalBarState.editorBlockEnd as bar, index (bar.id)}
+				<HorizontalSlice {bar} position={HorizontalBarPosition.EditorBlockEnd} {index}>
+					Editor Block End Bar #{index + 1}
+				</HorizontalSlice>
+			{/each}
 		</main>
-
-		<VerticalSlice position={VerticalBarPosition.InlineEndInner}>Inline End</VerticalSlice>
+		{#each VerticalBarState.inlineEnd as bar, index (bar.id)}
+			<VerticalSlice {bar} position={VerticalBarPosition.InlineEnd} {index}>
+				Inline Bar End #{index + 1}
+			</VerticalSlice>
+		{/each}
 	</div>
+	{#each HorizontalBarState.windowBlockEnd as bar, index (bar.id)}
+		<HorizontalSlice {bar} position={HorizontalBarPosition.WindowBlockEnd} {index}>
+			Window Block End Bar #{index + 1}
+		</HorizontalSlice>
+	{/each}
 </div>
 
 <style>
