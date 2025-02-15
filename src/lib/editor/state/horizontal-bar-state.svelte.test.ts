@@ -268,7 +268,6 @@ describe('HorizontalBarState', () => {
 
 			const got = await state.resize(evt);
 
-			console.log(state.windowBlockStart.length);
 			const [bar] = state.windowBlockStart;
 			expect(got).toBe(true);
 			expect(bar.height).toEqual(175);

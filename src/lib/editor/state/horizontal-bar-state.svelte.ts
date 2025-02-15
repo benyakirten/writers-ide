@@ -121,14 +121,14 @@ export class HorizontalBarState {
 			return false;
 		}
 
-		if (!this.resizedSection.resized) {
-			this.resizedSection.resized = true;
-		}
-
 		const { id, position, y } = this.resizedSection;
 		const bar = this.bar(id, position);
 		if (!bar) {
 			return false;
+		}
+
+		if (!this.resizedSection.resized) {
+			this.resizedSection.resized = true;
 		}
 
 		const shouldInvert = this.shouldInvert(position);
