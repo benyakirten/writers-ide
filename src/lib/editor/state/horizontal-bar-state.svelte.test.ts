@@ -367,4 +367,56 @@ describe('HorizontalBarState', () => {
 			expect(state.resizedSection).toBeNull();
 		});
 	});
+
+	describe('humanize', () => {
+		it('should return the humanized description for a window start bar by index', () => {
+			const description = state.humanize(0, HorizontalBarPosition.WindowBlockStart);
+			expect(description).toBe('Window block start #1');
+		});
+
+		it('should return the humanized description for a window end bar by index', () => {
+			const description = state.humanize(0, HorizontalBarPosition.WindowBlockEnd);
+			expect(description).toBe('Window block end #1');
+		});
+
+		it('should return the humanized description for an editor start bar by index', () => {
+			const description = state.humanize(0, HorizontalBarPosition.EditorBlockStart);
+			expect(description).toBe('Editor block start #1');
+		});
+
+		it('should return the humanized description for an editor end bar by index', () => {
+			const description = state.humanize(0, HorizontalBarPosition.EditorBlockEnd);
+			expect(description).toBe('Editor block end #1');
+		});
+
+		it('should return the humanized description for a window start bar by id', () => {
+			const description = state.humanize('window-start-1', HorizontalBarPosition.WindowBlockStart);
+			expect(description).toBe('Window block start #1');
+		});
+
+		it('should return the humanized description for a window end bar by id', () => {
+			const description = state.humanize('window-end-1', HorizontalBarPosition.WindowBlockEnd);
+			expect(description).toBe('Window block end #1');
+		});
+
+		it('should return the humanized description for an editor start bar by id', () => {
+			const description = state.humanize('editor-start-1', HorizontalBarPosition.EditorBlockStart);
+			expect(description).toBe('Editor block start #1');
+		});
+
+		it('should return the humanized description for an editor end bar by id', () => {
+			const description = state.humanize('editor-end-1', HorizontalBarPosition.EditorBlockEnd);
+			expect(description).toBe('Editor block end #1');
+		});
+
+		it('should return unknown description if the bar does not exist by index', () => {
+			const description = state.humanize(999, HorizontalBarPosition.WindowBlockStart);
+			expect(description).toBe('Unknown window block start');
+		});
+
+		it('should return unknown description if the bar does not exist by id', () => {
+			const description = state.humanize('non-existent', HorizontalBarPosition.WindowBlockStart);
+			expect(description).toBe('Unknown window block start');
+		});
+	});
 });

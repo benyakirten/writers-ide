@@ -1,3 +1,7 @@
+import * as m from '$lib/paraglide/messages.js';
+
+import { capitalize } from '../utils.js';
+
 export enum HorizontalBarPosition {
 	WindowBlockStart = 'WINDOW_START',
 	WindowBlockEnd = 'WINDOW_END',
@@ -184,20 +188,25 @@ export class HorizontalBarState {
 		let description: string;
 		switch (bar) {
 			case HorizontalBarPosition.WindowBlockStart:
-				description = 'Window Block Start';
+				description = m.window_block_start();
 				break;
 			case HorizontalBarPosition.WindowBlockEnd:
-				description = 'Window Block End';
+				description = m.window_block_end();
 				break;
 			case HorizontalBarPosition.EditorBlockStart:
-				description = 'Editor Block Start';
+				description = m.editor_block_start();
 				break;
 			case HorizontalBarPosition.EditorBlockEnd:
-				description = 'Editor Block End';
+				description = m.editor_block_end();
 				break;
 		}
 
-		return `${description} ${index + 1}`;
+		const message =
+			index === -1 || index >= bars.length
+				? `${m.unknown()} ${description}`
+				: `${description} ${m.number({ count: index + 1 })}`;
+
+		return capitalize(message);
 	}
 
 	remove(id: string | number, position: HorizontalBarPosition) {
