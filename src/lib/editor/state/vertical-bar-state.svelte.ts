@@ -1,3 +1,6 @@
+import * as m from '$lib/paraglide/messages.js';
+import { capitalize } from '../utils.js';
+
 export type VerticalBar = {
 	width: number;
 	visible: boolean;
@@ -179,11 +182,17 @@ export class VerticalBarState {
 	}
 
 	humanize(id: string | number, position: VerticalBarPosition): string {
-		const index =
-			typeof id === 'string' ? this.bars(position).findIndex((bar) => bar.id === id) : id;
+		const bars = this.bars(position);
+		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
 		const description =
-			position === VerticalBarPosition.InlineStart ? 'Inline Start Bar' : 'Inline End Bar';
-		return `${description} #${index + 1}`;
+			position === VerticalBarPosition.InlineStart ? m.inline_start_bar() : m.inline_end_bar();
+
+		const message =
+			index === -1 || index >= bars.length
+				? `${m.unknown()} ${description}`
+				: `${description} ${m.number({ count: index + 1 })}`;
+
+		return capitalize(message);
 	}
 }
 

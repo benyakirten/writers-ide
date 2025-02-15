@@ -164,29 +164,40 @@ describe('VerticalBarState', () => {
 			expect(bar.visible).toBe(true);
 			expect(got).toBe(false);
 		});
+
+		describe('humanize', () => {
+			it('should return the correct description for an inline start bar by id', () => {
+				state.add({ id: 'inline-start-1', width: 100 }, VerticalBarPosition.InlineStart);
+				const description = state.humanize('inline-start-1', VerticalBarPosition.InlineStart);
+				expect(description).toBe('Inline start bar #1');
+			});
+
+			it('should return the correct description for an inline end bar by id', () => {
+				state.add({ id: 'inline-end-1', width: 100 }, VerticalBarPosition.InlineEnd);
+				const description = state.humanize('inline-end-1', VerticalBarPosition.InlineEnd);
+				expect(description).toBe('Inline end bar #1');
+			});
+
+			it('should return the correct description for an inline start bar by index', () => {
+				state.add({ id: 'inline-start-1', width: 100 }, VerticalBarPosition.InlineStart);
+				state.add({ id: 'inline-start-2', width: 100 }, VerticalBarPosition.InlineStart);
+				const description = state.humanize(1, VerticalBarPosition.InlineStart);
+				expect(description).toBe('Inline start bar #2');
+			});
+
+			it('should return the correct description for an inline end bar by index', () => {
+				state.add({ id: 'inline-end-1', width: 100 }, VerticalBarPosition.InlineEnd);
+				state.add({ id: 'inline-end-2', width: 100 }, VerticalBarPosition.InlineEnd);
+				const description = state.humanize(1, VerticalBarPosition.InlineEnd);
+				expect(description).toBe('Inline end bar #2');
+			});
+
+			it('should give an error message if the bar does not exist', () => {
+				const description = state.humanize('non-existent', VerticalBarPosition.InlineStart);
+				expect(description).toBe('Unknown inline start bar');
+			});
+		});
 	});
-
-	// it('should toggle the visibility of a bar', () => {
-	// 	const bar = state.inlineStart[0];
-	// 	state.toggleBar(bar);
-	// 	expect(bar.visible).toBe(false);
-	// 	state.toggleBar(bar);
-	// 	expect(bar.visible).toBe(true);
-	// 	expect(bar.width).toBe(200);
-	// 	bar.width = 50;
-	// 	state.toggleBar(bar);
-	// 	expect(bar.visible).toBe(false);
-	// 	state.toggleBar(bar);
-	// 	expect(bar.visible).toBe(true);
-	// 	expect(bar.width).toBe(100);
-	// });
-
-	// it('should not toggle a bar if it is being resized', () => {
-	// 	state.startResize('inline-start-1', VerticalBarPosition.InlineStart, 0);
-	// 	state.resizedSection!.resized = true;
-	// 	state.toggle('inline-start-1', VerticalBarPosition.InlineStart);
-	// 	expect(state.inlineStart[0].visible).toBe(true);
-	// });
 
 	// it('should start resizing a bar', () => {
 	// 	state.startResize('inline-start-1', VerticalBarPosition.InlineStart, 100);
@@ -210,16 +221,6 @@ describe('VerticalBarState', () => {
 	// 	state.startResize('inline-start-1', VerticalBarPosition.InlineStart, 100);
 	// 	await state.endResize();
 	// 	expect(state.resizedSection).toBeNull();
-	// });
-
-	// it('should humanize bar descriptions', () => {
-	// 	expect(state.humanize('inline-start-1', VerticalBarPosition.InlineStart)).toBe(
-	// 		'Inline Start Bar #1'
-	// 	);
-	// 	expect(state.humanize(1, VerticalBarPosition.InlineStart)).toBe('Inline Start Bar #2');
-	// 	expect(state.humanize('inline-start-3', VerticalBarPosition.InlineEnd)).toBe(
-	// 		'Inline End Bar #1'
-	// 	);
 	// });
 
 	// it('should remove a bar', () => {

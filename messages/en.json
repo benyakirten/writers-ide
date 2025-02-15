@@ -1,4 +1,8 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
-	"hello_world": "Hello, {name} from en!"
+	"hello_world": "Hello, {name} from en!",
+	"inline_start_bar": "inline start bar",
+	"inline_end_bar": "inline end bar",
+	"number": "#{count}",
+	"unknown": "Unknown"
 }
