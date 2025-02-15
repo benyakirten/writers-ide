@@ -197,45 +197,45 @@ describe('HorizontalBarState', () => {
 		});
 	});
 
-	// describe('toggle', () => {
-	// 	it('should toggle the visibility of a bar by index if a number is provided', () => {
-	// 		state.add({ id: 'window-start-1', visible: true }, HorizontalBarPosition.WindowBlockStart);
-	// 		const [bar] = state.windowBlockStart;
+	describe('toggle', () => {
+		it('should toggle the visibility of a bar by index if a number is provided', () => {
+			state.add({ id: 'window-start-1', visible: true }, HorizontalBarPosition.WindowBlockStart);
 
-	// 		let got = state.toggle(0, HorizontalBarPosition.WindowBlockStart);
-	// 		expect(bar.visible).toBe(false);
-	// 		expect(got).toBe(true);
+			let got = state.toggle(0, HorizontalBarPosition.WindowBlockStart);
+			const [bar] = state.windowBlockStart;
+			expect(bar.visible).toBe(false);
+			expect(got).toBe(true);
 
-	// 		got = state.toggle(0, HorizontalBarPosition.WindowBlockStart);
-	// 		expect(bar.visible).toBe(true);
-	// 		expect(got).toBe(true);
-	// 	});
+			got = state.toggle(0, HorizontalBarPosition.WindowBlockStart);
+			expect(bar.visible).toBe(true);
+			expect(got).toBe(true);
+		});
 
-	// 	it('should toggle the visibility of a bar by its id if a string is provided', () => {
-	// 		state.add({ id: 'window-start-1', visible: true }, HorizontalBarPosition.WindowBlockStart);
-	// 		const [bar] = state.windowBlockStart;
+		it('should toggle the visibility of a bar by its id if a string is provided', () => {
+			state.add({ id: 'window-start-1', visible: true }, HorizontalBarPosition.WindowBlockStart);
+			const [bar] = state.windowBlockStart;
 
-	// 		let got = state.toggle('window-start-1', HorizontalBarPosition.WindowBlockStart);
-	// 		expect(bar.visible).toBe(false);
-	// 		expect(got).toBe(true);
+			let got = state.toggle('window-start-1', HorizontalBarPosition.WindowBlockStart);
+			expect(bar.visible).toBe(false);
+			expect(got).toBe(true);
 
-	// 		got = state.toggle('window-start-1', HorizontalBarPosition.WindowBlockStart);
-	// 		expect(bar.visible).toBe(true);
-	// 		expect(got).toBe(true);
-	// 	});
+			got = state.toggle('window-start-1', HorizontalBarPosition.WindowBlockStart);
+			expect(bar.visible).toBe(true);
+			expect(got).toBe(true);
+		});
 
-	// 	it('should not toggle a bar if the bar is being resized', () => {
-	// 		state.add({ id: 'window-start-1', visible: true }, HorizontalBarPosition.WindowBlockEnd);
-	// 		const [bar] = state.windowBlockEnd;
+		it('should not toggle a bar if the bar is being resized', () => {
+			state.add({ id: 'window-start-1', visible: true }, HorizontalBarPosition.WindowBlockEnd);
+			const [bar] = state.windowBlockEnd;
 
-	// 		state.startResize('window-start-1', HorizontalBarPosition.WindowBlockEnd, 0);
-	// 		state.resizedSection!.resized = true;
+			state.startResize('window-start-1', HorizontalBarPosition.WindowBlockEnd, 0);
+			state.resizedSection!.resized = true;
 
-	// 		const got = state.toggle('window-start-1', HorizontalBarPosition.WindowBlockEnd);
-	// 		expect(bar.visible).toBe(true);
-	// 		expect(got).toBe(false);
-	// 	});
-	// });
+			const got = state.toggle('window-start-1', HorizontalBarPosition.WindowBlockEnd);
+			expect(bar.visible).toBe(true);
+			expect(got).toBe(false);
+		});
+	});
 
 	// describe('startResize', () => {
 	// 	it('should start resizing a bar', () => {

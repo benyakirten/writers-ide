@@ -108,9 +108,11 @@ export class HorizontalBarState {
 		// Cannot toggle bar if the bar is being resized.
 		// This is to fix that the mouseup listener is not removed when the bar is toggled.
 		if (!bar || this.resizedSection?.resized) {
-			return;
+			return false;
 		}
+
 		this.toggleBar(bar, position);
+		return true;
 	}
 
 	startResize(id: string, position: HorizontalBarPosition, y: number) {
