@@ -33,6 +33,23 @@ describe('VerticalBarState', () => {
 		state = new VerticalBarState(MIN_SIZE);
 	});
 
+	function makeEvent(
+		clientX: number,
+		{ left = 0, right = 0 }: { left: number; right: number }
+	): MouseEvent {
+		const target = document.createElement('div');
+		const getBoundingClientRect = () => ({ left, right });
+
+		// @ts-expect-error: Test Object
+		target.getBoundingClientRect = getBoundingClientRect;
+
+		// @ts-expect-error: Test Object
+		return {
+			clientX,
+			target
+		};
+	}
+
 	describe('bars', () => {
 		beforeEach(() => {
 			state.inlineStart = state.inlineStart.concat(inlineStartBars);
@@ -199,33 +216,134 @@ describe('VerticalBarState', () => {
 		});
 	});
 
-	// it('should start resizing a bar', () => {
-	// 	state.startResize('inline-start-1', VerticalBarPosition.InlineStart, 100);
-	// 	expect(state.resizedSection).toEqual({
-	// 		id: 'inline-start-1',
-	// 		position: VerticalBarPosition.InlineStart,
-	// 		x: 100,
-	// 		resized: false
-	// 	});
-	// });
+	describe('startResize', () => {
+		it('should start resizing a bar', () => {
+			state.startResize('inline-start-1', VerticalBarPosition.InlineStart, 100);
+			expect(state.resizedSection).toEqual({
+				id: 'inline-start-1',
+				position: VerticalBarPosition.InlineStart,
+				x: 100,
+				resized: false
+			});
+		});
+	});
 
-	// it('should resize a bar', async () => {
-	// 	state.startResize('inline-start-1', VerticalBarPosition.InlineStart, 100);
-	// 	const event = new MouseEvent('mousemove', { clientX: 150 });
-	// 	const result = await state.resize(event);
-	// 	expect(result).toBe(true);
-	// 	expect(state.inlineStart[0].width).toBe(250);
-	// });
+	describe('resize', () => {
+		function createBarAndStartResizing(
+			width: number,
+			x: number,
+			position: VerticalBarPosition,
+			visible = true
+		) {
+			const id = crypto.randomUUID();
+			const bar = state.add({ width, id, visible }, position);
+			state.startResize(id, position, x);
+			return bar;
+		}
 
-	// it('should end resizing a bar', async () => {
-	// 	state.startResize('inline-start-1', VerticalBarPosition.InlineStart, 100);
-	// 	await state.endResize();
-	// 	expect(state.resizedSection).toBeNull();
-	// });
+		it('should set the resized property to true, change the width on the bar, change the x coordinate of the resized section', async () => {
+			createBarAndStartResizing(150, 150, VerticalBarPosition.InlineStart);
+			const evt = makeEvent(175, { left: 225, right: 275 });
 
-	// it('should remove a bar', () => {
-	// 	state.remove('inline-start-1', VerticalBarPosition.InlineStart);
-	// 	expect(state.inlineStart).toHaveLength(1);
-	// 	expect(state.inlineStart[0].id).toBe('inline-start-2');
-	// });
+			const got = await state.resize(evt);
+
+			const [bar] = state.inlineStart;
+			expect(got).toBe(true);
+			expect(bar.width).toEqual(175);
+			expect(state.resizedSection!.resized).toBe(true);
+			expect(state.resizedSection!.x).toBe(175);
+		});
+
+		it('should subtract the distance from the bar width instead if the bar should be inverted', async () => {
+			createBarAndStartResizing(150, 150, VerticalBarPosition.InlineEnd);
+			const evt = makeEvent(175, { left: 225, right: 275 });
+
+			const got = await state.resize(evt);
+
+			const [bar] = state.inlineEnd;
+			expect(got).toBe(true);
+			expect(bar.width).toEqual(125);
+			expect(state.resizedSection!.resized).toBe(true);
+			expect(state.resizedSection!.x).toBe(175);
+		});
+
+		it('should set the bar to visible if it was previously not visible and the new size is larger than the minimum size', async () => {
+			createBarAndStartResizing(50, 50, VerticalBarPosition.InlineStart, false);
+			const evt = makeEvent(75, { left: 125, right: 175 });
+
+			const got = await state.resize(evt);
+			const [bar] = state.inlineStart;
+			expect(got).toBe(true);
+			expect(bar.visible).toBe(true);
+			expect(bar.width).toBe(75);
+		});
+
+		it("should set the bar to 0 width if the new size is below the minimum size and update the resizedSection x to the target's left if it should not invert", async () => {
+			createBarAndStartResizing(50, 50, VerticalBarPosition.InlineStart);
+			const evt = makeEvent(25, { left: 75, right: 125 });
+
+			const got = await state.resize(evt);
+			const [bar] = state.inlineStart;
+			expect(got).toBe(true);
+			expect(bar.width).toBe(0);
+			expect(state.resizedSection!.x).toBe(75);
+		});
+
+		it("should set the bar to 0 width if the new size is below the minimum size and update the resizedSection x to the target's right if it should not invert", async () => {
+			createBarAndStartResizing(50, 50, VerticalBarPosition.InlineEnd);
+			const evt = makeEvent(75, { left: 75, right: 125 });
+
+			const got = await state.resize(evt);
+			const [bar] = state.inlineEnd;
+			expect(got).toBe(true);
+			expect(bar.width).toBe(0);
+			expect(state.resizedSection!.x).toBe(125);
+		});
+
+		it("should not resize the section if the event's target is not an HTMLElement", async () => {
+			createBarAndStartResizing(150, 150, VerticalBarPosition.InlineStart);
+			const evt = {
+				clientX: 100,
+				target: { getBoundingClientRect: () => ({ left: 225, right: 275 }) }
+			} as unknown as MouseEvent;
+			const got = await state.resize(evt);
+			expect(got).toBe(false);
+
+			const [bar] = state.inlineStart;
+			expect(bar.width).toBe(150);
+			expect(state.resizedSection!.resized).toBe(false);
+			expect(state.resizedSection!.x).toBe(150);
+		});
+
+		it("should not resize the section if the bar doesn't exist and return false", async () => {
+			state.startResize('inline-start-1', VerticalBarPosition.InlineStart, 200);
+			const evt = makeEvent(100, { left: 225, right: 275 });
+
+			const got = await state.resize(evt);
+
+			expect(got).toBe(false);
+			expect(state.resizedSection!.resized).toBe(false);
+			expect(state.resizedSection!.x).toBe(200);
+		});
+
+		it('should return false if there is no resized section', async () => {
+			createBarAndStartResizing(150, 150, VerticalBarPosition.InlineStart);
+			const evt = makeEvent(100, { left: 225, right: 275 });
+			await state.endResize();
+
+			const got = await state.resize(evt);
+			const [bar] = state.inlineStart;
+
+			expect(got).toBe(false);
+			expect(bar.width).toBe(150);
+		});
+	});
+
+	describe('endResize', () => {
+		it('should end resizing a bar', async () => {
+			state.startResize('inline-start-1', VerticalBarPosition.InlineStart, 100);
+			await state.endResize();
+			expect(state.resizedSection).toBeNull();
+		});
+	});
 });

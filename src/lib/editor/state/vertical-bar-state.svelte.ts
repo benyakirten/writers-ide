@@ -119,14 +119,14 @@ export class VerticalBarState {
 			return false;
 		}
 
-		if (!this.resizedSection.resized) {
-			this.resizedSection.resized = true;
-		}
-
 		const { id, position, x } = this.resizedSection;
 		const bar = this.bar(id, position);
 		if (!bar) {
 			return false;
+		}
+
+		if (!this.resizedSection.resized) {
+			this.resizedSection.resized = true;
 		}
 
 		const shouldInvert = this.shouldInvert(position);
@@ -141,13 +141,12 @@ export class VerticalBarState {
 					if (this.resizedSection) {
 						const { right, left } = target.getBoundingClientRect();
 						this.resizedSection.x = shouldInvert ? right : left;
+						resolve(true);
 					}
 				});
-
-				resolve(true);
 			});
 		} else {
-			if (newSize >= this.minSize && !bar.visible) {
+			if (!bar.visible) {
 				bar.visible = true;
 			}
 			bar.width = newSize;
