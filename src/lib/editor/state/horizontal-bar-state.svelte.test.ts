@@ -32,53 +32,53 @@ describe('HorizontalBarState', () => {
 	}
 
 	describe('bars', () => {
-		const windowStartBar: HorizontalBar = {
-			data: null,
-			id: 'window-start-1',
-			visible: true,
-			height: 100
-		};
-
-		const windowEndBar: HorizontalBar = {
-			data: null,
-			id: 'window-end-1',
-			visible: true,
-			height: 100
-		};
-
-		const editorStartBar: HorizontalBar = {
-			data: null,
-			id: 'editor-start-1',
-			visible: true,
-			height: 100
-		};
-
-		const editorEndBar: HorizontalBar = {
-			data: null,
-			id: 'editor-end-1',
-			visible: true,
-			height: 100
-		};
-
 		it('should return the list of window start bars if the position is WindowBlockStart', () => {
+			const windowStartBar: HorizontalBar = {
+				data: null,
+				id: 'window-start-1',
+				visible: true,
+				height: 100
+			};
+
 			state.add(windowStartBar, HorizontalBarPosition.WindowBlockStart);
 			const bars = state.bars(HorizontalBarPosition.WindowBlockStart);
 			expect(bars).toEqual([windowStartBar]);
 		});
 
 		it('should return the list of window end bars if the position is WindowBlockEnd', () => {
+			const windowEndBar: HorizontalBar = {
+				data: null,
+				id: 'window-end-1',
+				visible: true,
+				height: 100
+			};
+
 			state.add(windowEndBar, HorizontalBarPosition.WindowBlockEnd);
 			const bars = state.bars(HorizontalBarPosition.WindowBlockEnd);
 			expect(bars).toEqual([windowEndBar]);
 		});
 
 		it('should return the list of editor start bars if the position is EditorBlockStart', () => {
+			const editorStartBar: HorizontalBar = {
+				data: null,
+				id: 'editor-start-1',
+				visible: true,
+				height: 100
+			};
+
 			state.add(editorStartBar, HorizontalBarPosition.EditorBlockStart);
 			const bars = state.bars(HorizontalBarPosition.EditorBlockStart);
 			expect(bars).toEqual([editorStartBar]);
 		});
 
 		it('should return the list of editor end bars if the position is EditorBlockEnd', () => {
+			const editorEndBar: HorizontalBar = {
+				data: null,
+				id: 'editor-end-1',
+				visible: true,
+				height: 100
+			};
+
 			state.add(editorEndBar, HorizontalBarPosition.EditorBlockEnd);
 			const bars = state.bars(HorizontalBarPosition.EditorBlockEnd);
 			expect(bars).toEqual([editorEndBar]);
@@ -141,45 +141,61 @@ describe('HorizontalBarState', () => {
 		});
 	});
 
-	// describe('height', () => {
-	// 	it("should return the height of a bar if it's visible and the height is over the minimum size", () => {
-	// 		const bar = state.add(
-	// 			{ height: 100, id: 'window-start-1' },
-	// 			HorizontalBarPosition.WindowBlockStart
-	// 		);
-	// 		expect(state.height(bar, HorizontalBarPosition.WindowBlockStart)).toBe(100);
-	// 	});
+	describe('height', () => {
+		it("should return the height of a bar if it's visible and the height is over the minimum size", () => {
+			const bar = {
+				height: 100,
+				id: 'window-start-1',
+				visible: true
+			};
 
-	// 	it('should return 0 if the bar is not visible', () => {
-	// 		const bar = state.add(
-	// 			{ height: 100, id: 'window-start-1', visible: false },
-	// 			HorizontalBarPosition.WindowBlockEnd
-	// 		);
-	// 		expect(state.height(bar, HorizontalBarPosition.WindowBlockEnd)).toBe(0);
-	// 	});
+			const got = state.height(bar, HorizontalBarPosition.WindowBlockStart);
+			expect(got).toBe(100);
+		});
 
-	// 	it('should return 0 if the bar is visible but the height is below the minimum size', () => {
-	// 		const bar = state.add(
-	// 			{ height: WINDOW_MIN_SIZE / 2, id: 'window-start-1' },
-	// 			HorizontalBarPosition.WindowBlockStart
-	// 		);
-	// 		expect(state.height(bar, HorizontalBarPosition.WindowBlockStart)).toBe(0);
-	// 	});
-	// });
+		it('should return 0 if the bar is not visible', () => {
+			const bar = {
+				height: 100,
+				id: 'window-start-1',
+				visible: false
+			};
 
-	// describe('toggleBar', () => {
-	// 	it('should toggle the visibility of a bar', () => {
-	// 		const bar = state.add(
-	// 			{ id: 'window-start-1', visible: true },
-	// 			HorizontalBarPosition.WindowBlockStart
-	// 		);
-	// 		state.toggleBar(bar, HorizontalBarPosition.WindowBlockStart);
-	// 		expect(bar.visible).toBe(false);
+			const got = state.height(bar, HorizontalBarPosition.WindowBlockEnd);
+			expect(got).toBe(0);
+		});
 
-	// 		state.toggleBar(bar, HorizontalBarPosition.WindowBlockStart);
-	// 		expect(bar.visible).toBe(true);
-	// 	});
-	// });
+		it('should return 0 if the bar is visible but the height is below the minimum size', () => {
+			const bar = { height: WINDOW_MIN_SIZE / 2, id: 'window-start-1', visible: true };
+			const got = state.height(bar, HorizontalBarPosition.WindowBlockStart);
+			expect(got).toBe(0);
+		});
+	});
+
+	describe('toggleBar', () => {
+		it('should toggle the visibility of a bar', () => {
+			const bar = state.add(
+				{ id: 'window-start-1', visible: true },
+				HorizontalBarPosition.WindowBlockStart
+			);
+
+			state.toggleBar(bar, HorizontalBarPosition.WindowBlockStart);
+			expect(bar.visible).toBe(false);
+
+			state.toggleBar(bar, HorizontalBarPosition.WindowBlockStart);
+			expect(bar.visible).toBe(true);
+		});
+
+		it("should set the bar's height to the minimum size if the bar is being toggled to visible", () => {
+			const bar = {
+				height: 0,
+				id: 'window-start-1',
+				visible: false
+			};
+
+			state.toggleBar(bar, HorizontalBarPosition.WindowBlockStart);
+			expect(bar.height).toBe(WINDOW_MIN_SIZE);
+		});
+	});
 
 	// describe('toggle', () => {
 	// 	it('should toggle the visibility of a bar by index if a number is provided', () => {
