@@ -3,6 +3,10 @@
 	"hello_world": "Hello, {name} from en!",
 	"inline_start_bar": "inline start bar",
 	"inline_end_bar": "inline end bar",
+	"window_block_start": "window block start",
+	"window_block_end": "window block end",
+	"editor_block_start": "editor block start",
+	"editor_block_end": "editor block end",
 	"number": "#{count}",
 	"unknown": "Unknown"
 }

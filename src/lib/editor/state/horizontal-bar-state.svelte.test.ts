@@ -237,17 +237,17 @@ describe('HorizontalBarState', () => {
 		});
 	});
 
-	// describe('startResize', () => {
-	// 	it('should start resizing a bar', () => {
-	// 		state.startResize('window-start-1', HorizontalBarPosition.WindowBlockStart, 100);
-	// 		expect(state.resizedSection).toEqual({
-	// 			id: 'window-start-1',
-	// 			position: HorizontalBarPosition.WindowBlockStart,
-	// 			y: 100,
-	// 			resized: false
-	// 		});
-	// 	});
-	// });
+	describe('startResize', () => {
+		it('should start resizing a bar', () => {
+			state.startResize('window-start-1', HorizontalBarPosition.WindowBlockStart, 100);
+			expect(state.resizedSection).toEqual({
+				id: 'window-start-1',
+				position: HorizontalBarPosition.WindowBlockStart,
+				y: 100,
+				resized: false
+			});
+		});
+	});
 
 	// describe('resize', () => {
 	// 	function createBarAndStartResizing(
@@ -360,11 +360,11 @@ describe('HorizontalBarState', () => {
 	// 	});
 	// });
 
-	// describe('endResize', () => {
-	// 	it('should end resizing a bar', async () => {
-	// 		state.startResize('window-start-1', HorizontalBarPosition.WindowBlockStart, 100);
-	// 		await state.endResize();
-	// 		expect(state.resizedSection).toBeNull();
-	// 	});
-	// });
+	describe('endResize', () => {
+		it('should end resizing a bar', async () => {
+			state.startResize('window-start-1', HorizontalBarPosition.WindowBlockStart, 100);
+			await state.endResize();
+			expect(state.resizedSection).toBeNull();
+		});
+	});
 });

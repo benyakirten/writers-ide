@@ -179,7 +179,8 @@ export class HorizontalBarState {
 	}
 
 	humanize(id: string | number, bar: HorizontalBarPosition): string {
-		const index = typeof id === 'string' ? this.bars(bar).findIndex((bar) => bar.id === id) : id;
+		const bars = this.bars(bar);
+		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
 		let description: string;
 		switch (bar) {
 			case HorizontalBarPosition.WindowBlockStart:
