@@ -18,7 +18,11 @@ class FloaterState {
 	readonly TOLERANCE = 2;
 	readonly OFFSET = 2;
 	readonly DEFAULT_HEIGHT = 80;
+	readonly DEFAULT_WIDTH = 20;
+	readonly FULL_WIDTH = 100;
 	readonly FULL_HEIGHT = 100;
+
+	root: HTMLElement | null = null;
 
 	bars = $state<FloatingBar[]>([]);
 
@@ -48,7 +52,7 @@ class FloaterState {
 		}
 
 		const left =
-			from.left > this.FULL_HEIGHT - (this.DEFAULT_HEIGHT + this.OFFSET)
+			from.left > this.FULL_HEIGHT - (this.DEFAULT_WIDTH + this.OFFSET)
 				? from.left - this.OFFSET
 				: from.left + this.OFFSET;
 		const top =
