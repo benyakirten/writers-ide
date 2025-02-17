@@ -14,6 +14,7 @@ export type FloatingBar = {
 	data?: null;
 	z: number;
 	id: string;
+	minimized: boolean;
 };
 
 class FloaterState {
@@ -29,7 +30,19 @@ class FloaterState {
 	readonly FULL_HEIGHT = 100;
 
 	root: HTMLElement | null = null;
-	bars = $state<FloatingBar[]>([]);
+	bars = $state<FloatingBar[]>([
+		{
+			position: {
+				top: 2,
+				left: 2,
+				width: 200,
+				height: 800
+			},
+			z: 10,
+			id: 'floater-1',
+			minimized: false
+		}
+	]);
 	highestBar = $derived.by(() => {
 		let highestBar: FloatingBar | null = null;
 		for (const bar of this.bars) {
@@ -41,6 +54,7 @@ class FloaterState {
 		}
 		return highestBar;
 	});
+	dragging: string | null = null;
 
 	bar(id: string | number): FloatingBar | undefined {
 		if (typeof id === 'number') {
@@ -145,6 +159,7 @@ class FloaterState {
 			z?: number;
 			data?: null;
 			id?: string;
+			minimized?: boolean;
 		} = {}
 	): FloatingBar {
 		const position = this.determineStartingCoordinates({
@@ -159,7 +174,7 @@ class FloaterState {
 			startingInformation.height
 		);
 
-		const bar = {
+		const bar: FloatingBar = {
 			position: {
 				...position,
 				width,
@@ -167,15 +182,20 @@ class FloaterState {
 			},
 			z,
 			data: startingInformation.data,
-			id
+			id,
+			minimized: !!startingInformation.minimized
 		};
 
 		this.bars.push(bar);
 		return bar;
 	}
 
-	moveToTop(id: string | number): FloatingBar | null {
-		if (this.bars.length < 2) {
+	focus(id: string | number): FloatingBar | null {
+		if (
+			this.bars.length < 2 ||
+			(typeof id === 'string' && this.highestBar?.id === id) ||
+			(typeof id === 'number' && this.highestBar?.id === this.bars.at(id)?.id)
+		) {
 			return null;
 		}
 
@@ -217,6 +237,36 @@ class FloaterState {
 		);
 
 		return bar;
+	}
+
+	startDragging(id: string | number): boolean {
+		const bar = this.bar(id);
+		if (!bar) {
+			return false;
+		}
+
+		this.dragging = bar.id;
+		return true;
+	}
+
+	move(e: MouseEvent & { currentTarget: HTMLElement }) {
+		if (!this.dragging || !this.root) {
+			return;
+		}
+
+		const bar = this.bar(this.dragging);
+		if (!bar) {
+			return;
+		}
+
+		const { width, height } = bar.position;
+		const { clientX, clientY } = e;
+		const { left, top } = this.root.getBoundingClientRect();
+		const x = clientX - left - width / 2;
+		const y = clientY - top - height / 2;
+
+		bar.position.left = clamp(x, 0, this.root.clientWidth - width);
+		bar.position.top = clamp(y, 0, this.root.clientHeight - height);
 	}
 }
 
