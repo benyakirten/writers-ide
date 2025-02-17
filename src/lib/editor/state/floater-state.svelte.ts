@@ -26,15 +26,16 @@ class FloaterState {
 	readonly MAX_HEIGHT_PERCENT = 90;
 	readonly DEFAULT_HEIGHT_PERCENT = 80;
 	readonly DEFAULT_WIDTH_PERCENT = 20;
-	readonly FULL_WIDTH = 100;
-	readonly FULL_HEIGHT = 100;
+	readonly DEFAULT_TOP_PX = 20;
+	readonly DEFAULT_LEFT_PX = 20;
+	readonly NUDGE_AMOUNT_PERCENT = 0.5;
 
 	root: HTMLElement | null = null;
 	bars = $state<FloatingBar[]>([
 		{
 			position: {
-				top: 2,
-				left: 2,
+				top: 20,
+				left: 20,
 				width: 200,
 				height: 800
 			},
@@ -65,20 +66,27 @@ class FloaterState {
 	}
 
 	findNextOpenPosition(from?: FloatingPosition): { top: number; left: number } {
-		if (!from) {
-			return { top: this.OFFSET, left: this.OFFSET };
+		if (!this.root) {
+			return { top: this.DEFAULT_TOP_PX, left: this.DEFAULT_LEFT_PX };
 		}
 
+		const { clientWidth, clientHeight } = this.root;
+
+		if (!from) {
+			return { top: this.OFFSET * clientHeight, left: this.OFFSET * clientWidth };
+		}
+
+		// We don't want to create a floating barr off screen
 		const left =
-			from.left >= this.FULL_HEIGHT - (this.DEFAULT_WIDTH_PERCENT + this.OFFSET)
+			from.left >= 100 - (this.DEFAULT_WIDTH_PERCENT + this.OFFSET)
 				? from.left - this.OFFSET
 				: from.left + this.OFFSET;
 		const top =
-			from.top >= this.FULL_HEIGHT - (this.DEFAULT_HEIGHT_PERCENT + this.OFFSET)
+			from.top >= 100 - (this.DEFAULT_HEIGHT_PERCENT + this.OFFSET)
 				? from.top - this.OFFSET
 				: from.top + this.OFFSET;
 
-		return { top, left };
+		return { top: top * clientHeight, left: left * clientWidth };
 	}
 
 	determineStartingCoordinates({ top, left }: { left?: number; top?: number }): {
@@ -130,10 +138,10 @@ class FloaterState {
 
 		let { width, height } = this.root.getBoundingClientRect();
 
-		width *= this.DEFAULT_WIDTH_PERCENT / this.FULL_WIDTH;
+		width *= this.DEFAULT_WIDTH_PERCENT / 100;
 		width = Math.max(this.MIN_WIDTH_PX, width);
 
-		height *= this.DEFAULT_HEIGHT_PERCENT / this.FULL_HEIGHT;
+		height *= this.DEFAULT_HEIGHT_PERCENT / 100;
 		height = Math.max(this.MIN_HEIGHT_PX, height);
 
 		return { width: startingWidth ?? width, height: startingHeight ?? height };
@@ -249,6 +257,10 @@ class FloaterState {
 		return true;
 	}
 
+	stopDragging(): void {
+		this.dragging = null;
+	}
+
 	move(e: MouseEvent & { currentTarget: HTMLElement }) {
 		if (!this.dragging || !this.root) {
 			return;
@@ -267,6 +279,36 @@ class FloaterState {
 
 		bar.position.left = clamp(x, 0, this.root.clientWidth - width);
 		bar.position.top = clamp(y, 0, this.root.clientHeight - height);
+	}
+
+	nudge(id: string | number, direction: 'up' | 'left' | 'down' | 'right'): FloatingBar | null {
+		const bar = this.bar(id);
+		if (!bar) {
+			return null;
+		}
+
+		const { width, height, top, left } = bar.position;
+		const { clientWidth, clientHeight } = this.root ?? { clientWidth: 0, clientHeight: 0 };
+
+		const delta =
+			(this.NUDGE_AMOUNT_PERCENT / 100) *
+			(direction === 'up' || direction === 'down' ? clientHeight : clientWidth);
+		switch (direction) {
+			case 'up':
+				bar.position.top = Math.max(top - delta, 0);
+				break;
+			case 'left':
+				bar.position.left = Math.max(left - delta, 0);
+				break;
+			case 'down':
+				bar.position.top = Math.min(top + delta, clientHeight - height);
+				break;
+			case 'right':
+				bar.position.left = Math.min(left + delta, clientWidth - width);
+				break;
+		}
+
+		return bar;
 	}
 }
 

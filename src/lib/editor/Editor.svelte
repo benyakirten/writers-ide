@@ -8,6 +8,7 @@
 	import FloaterState from './state/floater-state.svelte.js';
 	import FloaterBar from './bars/FloaterBar.svelte';
 	import VerticalBaseBar from './bars/base/VerticalBaseBar.svelte';
+	import FloaterState from './state/floater-state.svelte.js';
 
 	function resize(e: MouseEvent) {
 		VerticalBarState.resize(e);
@@ -17,6 +18,7 @@
 	function endResize() {
 		VerticalBarState.endResize();
 		HorizontalBarState.endResize();
+		FloaterState.stopDragging();
 	}
 </script>
 

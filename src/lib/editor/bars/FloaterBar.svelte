@@ -22,6 +22,23 @@
 	});
 
 	let dragging = false;
+
+	function handleKeydown(e: KeyboardEvent) {
+		switch (e.key) {
+			case 'ArrowLeft':
+				FloaterState.nudge(index, 'left');
+				break;
+			case 'ArrowRight':
+				FloaterState.nudge(index, 'right');
+				break;
+			case 'ArrowUp':
+				FloaterState.nudge(index, 'up');
+				break;
+			case 'ArrowDown':
+				FloaterState.nudge(index, 'down');
+				break;
+		}
+	}
 </script>
 
 <div
@@ -38,7 +55,14 @@
 	style:max-height={`${FloaterState.MAX_HEIGHT_PERCENT}%`}
 	onfocus={() => FloaterState.focus(index)}
 >
-	<div style:cursor={dragging ? 'grab' : 'grabbing'} class="menu">
+	<div
+		style:cursor={dragging ? 'grab' : 'grabbing'}
+		class="menu"
+		tabindex="0"
+		onkeydown={(e) => handleKeydown(e)}
+		onmousedown={() => FloaterState.startDragging(index)}
+		role="button"
+	>
 		<button aria-label={`Minimize bar #${index + 1}`}>
 			<Icon src={Minus} size="16px" />
 		</button>
@@ -62,5 +86,9 @@
 		padding: 2px;
 		display: flex;
 		justify-content: flex-end;
+
+		&:focus {
+			outline: 1px solid blue;
+		}
 	}
 </style>
