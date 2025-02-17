@@ -4,7 +4,6 @@
 	import { type FloatingBar } from '../state/floater-state.svelte.js';
 
 	let { bar, children }: { bar: FloatingBar; children: Snippet } = $props();
-	$inspect(bar);
 </script>
 
 <div

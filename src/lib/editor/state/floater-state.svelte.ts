@@ -17,8 +17,10 @@ export type FloatingBar = {
 class FloaterState {
 	readonly TOLERANCE = 2;
 	readonly OFFSET = 2;
-	readonly MIN_WIDTH_PX = 150;
+	readonly MIN_WIDTH_PX = 200;
+	readonly MAX_DEFAULT_WIDTH_PX = 300;
 	readonly MIN_HEIGHT_PX = 100;
+	readonly MAX_DEFAULT_HEIGHT_PX = 800;
 	readonly DEFAULT_HEIGHT_PERCENT = 80;
 	readonly DEFAULT_WIDTH_PERCENT = 20;
 	readonly FULL_WIDTH = 100;
@@ -26,16 +28,7 @@ class FloaterState {
 
 	root: HTMLElement | null = null;
 	bars = $state<FloatingBar[]>([]);
-
-	bar(id: string | number): FloatingBar | undefined {
-		if (typeof id === 'number') {
-			return this.bars.at(id);
-		}
-
-		return this.bars.find((bar) => bar.id === id);
-	}
-
-	highestBar(): FloatingBar | null {
+	highestBar = $derived.by(() => {
 		let highestBar: FloatingBar | null = null;
 		for (const bar of this.bars) {
 			if (!highestBar) {
@@ -45,6 +38,14 @@ class FloaterState {
 			}
 		}
 		return highestBar;
+	});
+
+	bar(id: string | number): FloatingBar | undefined {
+		if (typeof id === 'number') {
+			return this.bars.at(id);
+		}
+
+		return this.bars.find((bar) => bar.id === id);
 	}
 
 	findNextOpenPosition(from?: FloatingPosition): { top: number; left: number } {
@@ -53,20 +54,21 @@ class FloaterState {
 		}
 
 		const left =
-			from.left > this.FULL_HEIGHT - (this.DEFAULT_WIDTH_PERCENT + this.OFFSET)
+			from.left >= this.FULL_HEIGHT - (this.DEFAULT_WIDTH_PERCENT + this.OFFSET)
 				? from.left - this.OFFSET
 				: from.left + this.OFFSET;
 		const top =
-			from.top > this.FULL_HEIGHT - (this.DEFAULT_HEIGHT_PERCENT + this.OFFSET)
+			from.top >= this.FULL_HEIGHT - (this.DEFAULT_HEIGHT_PERCENT + this.OFFSET)
 				? from.top - this.OFFSET
 				: from.top + this.OFFSET;
+
 		return { top, left };
 	}
 
-	determineStartingCoordinates(
-		{ top, left }: { left?: number; top?: number },
-		highestBar?: FloatingPosition
-	): { top: number; left: number } {
+	determineStartingCoordinates({ top, left }: { left?: number; top?: number }): {
+		top: number;
+		left: number;
+	} {
 		// If they have a top and left, use it.
 		// If they only have a top, find the next open left position and use that
 		// If they only have a left, use that and an automatically generated top
@@ -84,16 +86,16 @@ class FloaterState {
 			return { top: nearbyTop + this.OFFSET, left };
 		}
 
-		const { top: nextTop, left: nextLeft } = this.findNextOpenPosition(highestBar);
-		return { top: top ?? nextTop, left: left ?? nextLeft };
+		const { top: nextTop, left: nextLeft } = this.findNextOpenPosition(this.highestBar?.position);
+		return { top: top ?? nextTop, left: nextLeft };
 	}
 
-	determineStartingZ(defaultZ?: number, highestZ?: number): number {
+	determineStartingZ(defaultZ?: number): number {
 		if (defaultZ) {
 			return Math.min(BASE_FLOATER_Z, defaultZ);
 		}
-		if (highestZ) {
-			return highestZ;
+		if (this.highestBar) {
+			return this.highestBar.z;
 		}
 		return BASE_FLOATER_Z;
 	}
@@ -140,13 +142,12 @@ class FloaterState {
 			id?: string;
 		} = {}
 	): FloatingBar {
-		const highestBar = this.highestBar();
-		const position = this.determineStartingCoordinates(
-			{ top: startingInformation.top, left: startingInformation.left },
-			highestBar?.position
-		);
+		const position = this.determineStartingCoordinates({
+			top: startingInformation.top,
+			left: startingInformation.left
+		});
 
-		const z = this.determineStartingZ(startingInformation.z, highestBar?.z);
+		const z = this.determineStartingZ(startingInformation.z) + 1;
 		const id = startingInformation.id ?? crypto.randomUUID();
 		const { width, height } = this.determineStartingMeasurements(
 			startingInformation.width,
@@ -178,7 +179,7 @@ class FloaterState {
 			return null;
 		}
 
-		const highestBar = this.highestBar();
+		const highestBar = this.highestBar;
 		if (highestBar && highestBar.z > bar.z) {
 			bar.z = highestBar.z + 1;
 		}

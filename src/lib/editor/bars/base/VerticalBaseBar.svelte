@@ -29,7 +29,7 @@
 </script>
 
 <div class="base-bar">
-	Base Horizontal Bar
+	Base Vertical Bar
 	<button onclick={() => FloaterState.add()}>Add Floating Bar</button>
 	<form onsubmit={addFloatingBar}>
 		<input required type="number" name="width" placeholder="Width" />
