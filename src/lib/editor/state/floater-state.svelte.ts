@@ -18,9 +18,7 @@ class FloaterState {
 	readonly TOLERANCE = 2;
 	readonly OFFSET = 2;
 	readonly MIN_WIDTH_PX = 200;
-	readonly MAX_DEFAULT_WIDTH_PX = 300;
 	readonly MIN_HEIGHT_PX = 100;
-	readonly MAX_DEFAULT_HEIGHT_PX = 800;
 	readonly DEFAULT_HEIGHT_PERCENT = 80;
 	readonly DEFAULT_WIDTH_PERCENT = 20;
 	readonly FULL_WIDTH = 100;
@@ -109,13 +107,16 @@ class FloaterState {
 		}
 
 		if (!this.root) {
-			return { width: this.MIN_WIDTH_PX, height: this.DEFAULT_HEIGHT_PERCENT };
+			return { width: this.MIN_WIDTH_PX, height: this.MIN_HEIGHT_PX };
 		}
 
 		let { width, height } = this.root.getBoundingClientRect();
 
 		width *= this.DEFAULT_WIDTH_PERCENT / this.FULL_WIDTH;
+		width = Math.max(this.MIN_WIDTH_PX, width);
+
 		height *= this.DEFAULT_HEIGHT_PERCENT / this.FULL_HEIGHT;
+		height = Math.max(this.MIN_HEIGHT_PX, height);
 
 		return { width: startingWidth ?? width, height: startingHeight ?? height };
 	}
