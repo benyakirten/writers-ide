@@ -17,13 +17,14 @@ export type FloatingBar = {
 class FloaterState {
 	readonly TOLERANCE = 2;
 	readonly OFFSET = 2;
-	readonly DEFAULT_HEIGHT = 80;
-	readonly DEFAULT_WIDTH = 20;
+	readonly MIN_WIDTH_PX = 150;
+	readonly MIN_HEIGHT_PX = 100;
+	readonly DEFAULT_HEIGHT_PERCENT = 80;
+	readonly DEFAULT_WIDTH_PERCENT = 20;
 	readonly FULL_WIDTH = 100;
 	readonly FULL_HEIGHT = 100;
 
 	root: HTMLElement | null = null;
-
 	bars = $state<FloatingBar[]>([]);
 
 	bar(id: string | number): FloatingBar | undefined {
@@ -52,11 +53,11 @@ class FloaterState {
 		}
 
 		const left =
-			from.left > this.FULL_HEIGHT - (this.DEFAULT_WIDTH + this.OFFSET)
+			from.left > this.FULL_HEIGHT - (this.DEFAULT_WIDTH_PERCENT + this.OFFSET)
 				? from.left - this.OFFSET
 				: from.left + this.OFFSET;
 		const top =
-			from.top > this.FULL_HEIGHT - (this.DEFAULT_HEIGHT + this.OFFSET)
+			from.top > this.FULL_HEIGHT - (this.DEFAULT_HEIGHT_PERCENT + this.OFFSET)
 				? from.top - this.OFFSET
 				: from.top + this.OFFSET;
 		return { top, left };
@@ -97,6 +98,26 @@ class FloaterState {
 		return BASE_FLOATER_Z;
 	}
 
+	determineStartingMeasurements(
+		startingWidth?: number,
+		startingHeight?: number
+	): { width: number; height: number } {
+		if (startingWidth && startingHeight) {
+			return { width: startingWidth, height: startingHeight };
+		}
+
+		if (!this.root) {
+			return { width: this.MIN_WIDTH_PX, height: this.DEFAULT_HEIGHT_PERCENT };
+		}
+
+		let { width, height } = this.root.getBoundingClientRect();
+
+		width *= this.DEFAULT_WIDTH_PERCENT / this.FULL_WIDTH;
+		height *= this.DEFAULT_HEIGHT_PERCENT / this.FULL_HEIGHT;
+
+		return { width: startingWidth ?? width, height: startingHeight ?? height };
+	}
+
 	sortBarsByZIndex(): void {
 		this.bars.sort((a, b) => a.z - b.z);
 		let nextZ = BASE_FLOATER_Z;
@@ -127,9 +148,17 @@ class FloaterState {
 
 		const z = this.determineStartingZ(startingInformation.z, highestBar?.z);
 		const id = startingInformation.id ?? crypto.randomUUID();
+		const { width, height } = this.determineStartingMeasurements(
+			startingInformation.width,
+			startingInformation.height
+		);
 
 		const bar = {
-			position: { ...position, width: this.DEFAULT_HEIGHT, height: this.DEFAULT_HEIGHT },
+			position: {
+				...position,
+				width,
+				height
+			},
 			z,
 			data: startingInformation.data,
 			id
