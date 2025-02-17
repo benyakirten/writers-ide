@@ -1,3 +1,5 @@
+import { clamp } from '../utils.js';
+
 const BASE_FLOATER_Z = 10;
 
 export type FloatingPosition = {
@@ -18,7 +20,9 @@ class FloaterState {
 	readonly TOLERANCE = 2;
 	readonly OFFSET = 2;
 	readonly MIN_WIDTH_PX = 200;
+	readonly MAX_WIDTH_PX = 400;
 	readonly MIN_HEIGHT_PX = 100;
+	readonly MAX_HEIGHT_PERCENT = 90;
 	readonly DEFAULT_HEIGHT_PERCENT = 80;
 	readonly DEFAULT_WIDTH_PERCENT = 20;
 	readonly FULL_WIDTH = 100;
@@ -197,6 +201,22 @@ class FloaterState {
 		this.bars = this.bars.filter((b) => b.id !== bar.id);
 		this.sortBarsByZIndex();
 		return true;
+	}
+
+	updateMeasurements(id: string | number, width: number, height: number): FloatingBar | null {
+		const bar = this.bar(id);
+		if (!bar) {
+			return null;
+		}
+
+		bar.position.width = clamp(width, this.MIN_WIDTH_PX, this.MAX_WIDTH_PX);
+		bar.position.height = clamp(
+			height,
+			this.MIN_HEIGHT_PX,
+			this.root ? this.MAX_HEIGHT_PERCENT * this.root.clientHeight : height
+		);
+
+		return bar;
 	}
 }
 
