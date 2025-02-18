@@ -2,9 +2,12 @@
 	import MainView from './MainView.svelte';
 	import HorizontalBarState from './state/horizontal-bar-state.svelte.js';
 	import VerticalBarState, { VerticalBarPosition } from './state/vertical-bar-state.svelte.js';
-	import VerticalSlice from './resize/VerticalSlice.svelte';
-	import HorizontalSlice from './resize/HorizontalSlice.svelte';
+	import VerticalSlice from './bars/VerticalSlice.svelte';
+	import HorizontalSlice from './bars/HorizontalSlice.svelte';
 	import { HorizontalBarPosition } from './state/horizontal-bar-state.svelte.js';
+	import FloaterBar from './bars/floater/FloaterBar.svelte';
+	import VerticalBaseBar from './bars/base/VerticalBaseBar.svelte';
+	import FloaterState from './state/floater-state.svelte.js';
 
 	function resize(e: MouseEvent) {
 		VerticalBarState.resize(e);
@@ -14,20 +17,28 @@
 	function endResize() {
 		VerticalBarState.endResize();
 		HorizontalBarState.endResize();
+		FloaterState.stopDragging();
 	}
 </script>
 
 <div
+	bind:this={FloaterState.root}
 	class="overlay"
 	onmouseupcapture={() => endResize()}
 	onmousemovecapture={(event) => resize(event)}
 >
+	{#each FloaterState.visibleBars as bar, index (bar.id)}
+		<FloaterBar {bar} {index}>
+			Floater Bar #{index + 1}
+		</FloaterBar>
+	{/each}
 	{#each HorizontalBarState.windowBlockStart as bar, index (bar.id)}
 		<HorizontalSlice {bar} position={HorizontalBarPosition.WindowBlockStart} {index}>
 			Window Block Start Bar #{index + 1}
 		</HorizontalSlice>
 	{/each}
 	<div class="main-container">
+		<VerticalBaseBar />
 		{#each VerticalBarState.inlineStart as bar, index (bar.id)}
 			<VerticalSlice {bar} position={VerticalBarPosition.InlineStart} {index}>
 				Inline Bar Start #{index + 1}
@@ -65,6 +76,7 @@
 		height: 100vh;
 		display: flex;
 		flex-direction: column;
+		position: relative;
 	}
 
 	.main-container {
