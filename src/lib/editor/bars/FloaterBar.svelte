@@ -61,6 +61,7 @@
 	style:max-height={`${FloaterState.MAX_HEIGHT_PERCENT}%`}
 	onfocus={() => FloaterState.focus(index)}
 	onkeydown={(e) => handleKeydown(e)}
+	onmousemove={(e) => FloaterState.move(e)}
 	tabindex="0"
 	role="button"
 >
@@ -69,7 +70,6 @@
 		class="menu"
 		bind:this={menu}
 		onmousedown={(e) => handleMousedown(e)}
-		onmousemove={(e) => FloaterState.move(e)}
 		tabindex="0"
 		role="button"
 	>
