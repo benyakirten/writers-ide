@@ -75,7 +75,7 @@ export class FloaterState {
 		return this.bars.find((bar) => bar.id === id);
 	}
 
-	findNextOpenPosition(from?: FloatingPosition): { top: number; left: number } {
+	findNextOpenPosition(from?: { top: number; left: number }): { top: number; left: number } {
 		if (!this.root) {
 			return { top: this.DEFAULT_TOP_PX, left: this.DEFAULT_LEFT_PX };
 		}

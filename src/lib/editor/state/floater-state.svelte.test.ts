@@ -8,6 +8,13 @@ describe('FloaterState', () => {
 		floaterState = new FloaterState();
 	});
 
+	function createRoot(width: number, height: number) {
+		const root = document.createElement('div');
+		Object.defineProperty(root, 'clientWidth', { get: () => width });
+		Object.defineProperty(root, 'clientHeight', { get: () => height });
+		return root;
+	}
+
 	describe('derived', () => {
 		test('titleNumbers should return the number of floating bars with that title case-insensitive', () => {
 			const bar1 = floaterState.add({ title: 'cool' });
@@ -72,8 +79,54 @@ describe('FloaterState', () => {
 		});
 	});
 
-	describe.todo('findNextOpenPosition', () => {
-		// TODO
+	describe('findNextOpenPosition', () => {
+		it("should return the default position if there isn't a root element", () => {
+			const got = floaterState.findNextOpenPosition();
+			expect(got).toEqual({ top: floaterState.DEFAULT_TOP_PX, left: floaterState.DEFAULT_LEFT_PX });
+		});
+
+		it("should return the default's position multiplied by the default offset as a percent if the from parameter is not defined", () => {
+			const rootWidth = 150;
+			const rootHeight = 350;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const wantLeft = (floaterState.OFFSET / 100) * rootWidth;
+			const wantTop = (floaterState.OFFSET / 100) * rootHeight;
+
+			const got = floaterState.findNextOpenPosition();
+			expect(got).toEqual({ top: wantTop, left: wantLeft });
+		});
+
+		it("should add the default offset distance to the parameter's left or top position if it is less than the max distance from the left or top respectively", () => {
+			const rootWidth = 15000;
+			const rootHeight = 35000;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const from = { left: 2000, top: 2000 };
+			const wantLeft = from.left + (floaterState.OFFSET / 100) * rootWidth;
+			const wantTop = from.top + (floaterState.OFFSET / 100) * rootHeight;
+
+			const got = floaterState.findNextOpenPosition(from);
+			expect(got.left).toEqual(wantLeft);
+			expect(got.top).toEqual(wantTop);
+		});
+
+		it("should subtract the default offset distance from the parameter's left or top position if it is greater than the max distance from the right or bottom respectively", () => {
+			const rootWidth = 15000;
+			const rootHeight = 35000;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const from = { left: 14950, top: 34950 };
+			const wantLeft = from.left - (floaterState.OFFSET / 100) * rootWidth;
+			const wantTop = from.top - (floaterState.OFFSET / 100) * rootHeight;
+
+			const got = floaterState.findNextOpenPosition(from);
+			expect(got.left).toEqual(wantLeft);
+			expect(got.top).toEqual(wantTop);
+		});
 	});
 
 	describe.todo('determineStartingCoordinates', () => {
