@@ -209,7 +209,58 @@ describe('FloaterState', () => {
 			expect(got).toEqual({ width, height });
 		});
 
-		// TODO: Add mroe tests
+		it('should provide default values if there is no root element', () => {
+			const got = floaterState.determineStartingMeasurements();
+			expect(got).toEqual({ width: floaterState.MIN_WIDTH_PX, height: floaterState.MIN_HEIGHT_PX });
+		});
+
+		it("should provide the value of width and/or height if they are passed in and the other isn't", () => {
+			const rootWidth = 1500;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const height = 850;
+			const wantWidth = (rootWidth * floaterState.DEFAULT_WIDTH_PERCENT) / 100;
+			const got = floaterState.determineStartingMeasurements(undefined, height);
+			expect(got).toEqual({ width: wantWidth, height });
+		});
+
+		it('should provide values for width and height if they are not passed in', () => {
+			const rootWidth = 1500;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const wantWidth = (rootWidth * floaterState.DEFAULT_WIDTH_PERCENT) / 100;
+			const wantHeight = (rootHeight * floaterState.DEFAULT_HEIGHT_PERCENT) / 100;
+
+			const got = floaterState.determineStartingMeasurements();
+			expect(got).toEqual({ width: wantWidth, height: wantHeight });
+		});
+
+		it("should provide a minimum value for height and width if the root element's dimensions are too small", () => {
+			const rootWidth = 10;
+			const rootHeight = 10;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const got = floaterState.determineStartingMeasurements();
+			expect(got).toEqual({ width: floaterState.MIN_WIDTH_PX, height: floaterState.MIN_HEIGHT_PX });
+		});
+
+		it("should provide a maximum value fo width but not height if the root element's dimensions are too large", () => {
+			const rootWidth = 15000;
+			const rootHeight = 35000;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const wantWidth = floaterState.MAX_WIDTH_PX;
+			const wantHeight = (rootHeight * floaterState.DEFAULT_HEIGHT_PERCENT) / 100;
+
+			const got = floaterState.determineStartingMeasurements();
+			expect(got).toEqual({ width: wantWidth, height: wantHeight });
+		});
 	});
 
 	describe.todo('removeZGaps', () => {

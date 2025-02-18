@@ -156,7 +156,7 @@ export class FloaterState {
 		width = clamp(width, this.MIN_WIDTH_PX, this.MAX_WIDTH_PX);
 
 		let height = (clientHeight * this.DEFAULT_HEIGHT_PERCENT) / 100;
-		height = clamp(height, this.MIN_HEIGHT_PX, (this.MAX_HEIGHT_PERCENT * clientHeight) / 100);
+		height = Math.max(height, this.MIN_HEIGHT_PX);
 
 		return { width: startingWidth ?? width, height: startingHeight ?? height };
 	}
