@@ -129,8 +129,50 @@ describe('FloaterState', () => {
 		});
 	});
 
-	describe.todo('determineStartingCoordinates', () => {
-		// TODO
+	describe('determineStartingCoordinates', () => {
+		it("should return the parameters if they're both defined", () => {
+			const top = 100;
+			const left = 200;
+			const got = floaterState.determineStartingCoordinates({ top, left });
+			expect(got).toEqual({ top, left });
+		});
+
+		it('should return the left with a slightly adjusted top if a left position is given and a nearby bar is found', () => {
+			floaterState.add({ left: 100, top: 150 });
+			const got = floaterState.determineStartingCoordinates({ left: 104 });
+			expect(got).toEqual({ top: 150 + floaterState.DEFAULT_TOP_PX, left: 104 });
+		});
+
+		it('should provide a deafult top value if a left position is given but a nearby bar is not found', () => {
+			const got = floaterState.determineStartingCoordinates({ left: 104 });
+			expect(got).toEqual({ top: floaterState.DEFAULT_TOP_PX, left: 104 });
+		});
+
+		it('should provide values for left and top otherwise', () => {
+			const rootWidth = 150;
+			const rootHeight = 350;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const wantLeft = (floaterState.OFFSET / 100) * rootWidth;
+			const wantTop = (floaterState.OFFSET / 100) * rootHeight;
+
+			const got = floaterState.determineStartingCoordinates({});
+			expect(got).toEqual({ top: wantTop, left: wantLeft });
+		});
+
+		it('should use the value for top if it is provided by left is not', () => {
+			const rootWidth = 150;
+			const rootHeight = 350;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const wantLeft = (floaterState.OFFSET / 100) * rootWidth;
+
+			const top = 123;
+			const got = floaterState.determineStartingCoordinates({ top });
+			expect(got).toEqual({ top, left: wantLeft });
+		});
 	});
 
 	describe('determineStartingZ', () => {
@@ -159,8 +201,15 @@ describe('FloaterState', () => {
 		});
 	});
 
-	describe.todo('determineStartingMeasurements', () => {
-		// TODO
+	describe('determineStartingMeasurements', () => {
+		it("should return the parameters if they're both defined", () => {
+			const width = 100;
+			const height = 200;
+			const got = floaterState.determineStartingMeasurements(width, height);
+			expect(got).toEqual({ width, height });
+		});
+
+		// TODO: Add mroe tests
 	});
 
 	describe.todo('removeZGaps', () => {

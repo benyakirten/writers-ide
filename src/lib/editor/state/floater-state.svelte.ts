@@ -17,7 +17,7 @@ export type FloatingBar = {
 };
 
 export class FloaterState {
-	readonly TOLERANCE = 2;
+	readonly TOLERANCE = 8;
 	readonly OFFSET = 2;
 	readonly MIN_WIDTH_PX = 200;
 	readonly MAX_WIDTH_PX = 400;
@@ -121,7 +121,7 @@ export class FloaterState {
 					bar.position.left - this.TOLERANCE < left && bar.position.left + this.TOLERANCE > left
 			);
 			const nearbyTop = nearbyBar?.position.top ?? 0;
-			return { top: nearbyTop + this.OFFSET, left };
+			return { top: nearbyTop + this.DEFAULT_TOP_PX, left };
 		}
 
 		const { top: nextTop, left: nextLeft } = this.findNextOpenPosition(this.highestBar?.position);
@@ -150,13 +150,13 @@ export class FloaterState {
 			return { width: this.MIN_WIDTH_PX, height: this.MIN_HEIGHT_PX };
 		}
 
-		let { width, height } = this.root.getBoundingClientRect();
+		const { clientWidth, clientHeight } = this.root;
 
-		width *= this.DEFAULT_WIDTH_PERCENT / 100;
-		width = Math.max(this.MIN_WIDTH_PX, width);
+		let width = (clientWidth * this.DEFAULT_WIDTH_PERCENT) / 100;
+		width = clamp(width, this.MIN_WIDTH_PX, this.MAX_WIDTH_PX);
 
-		height *= this.DEFAULT_HEIGHT_PERCENT / 100;
-		height = Math.max(this.MIN_HEIGHT_PX, height);
+		let height = (clientHeight * this.DEFAULT_HEIGHT_PERCENT) / 100;
+		height = clamp(height, this.MIN_HEIGHT_PX, (this.MAX_HEIGHT_PERCENT * clientHeight) / 100);
 
 		return { width: startingWidth ?? width, height: startingHeight ?? height };
 	}
