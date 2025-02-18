@@ -36,16 +36,14 @@ export class FloaterState {
 	bars = $state<FloatingBar[]>([]);
 	visibleBars = $derived(this.bars.filter((bar) => !bar.minimized));
 	minimizedBars = $derived(this.bars.filter((bar) => bar.minimized));
-	titleNumbers = $derived.by<Map<string, string>>(() => {
-		const titles = new Map<string, string>();
+	titleNumbers = $derived.by<Map<string, number>>(() => {
+		const titles = new Map<string, number>();
 		const existingTitles = new Map<string, number>();
 
 		for (const { title, id } of this.bars) {
-			const _title = title.toLowerCase();
+			const _title = title.toLowerCase().trim();
 			const existingTitleOccurrences = existingTitles.get(_title) ?? 0;
-			if (existingTitleOccurrences > 0) {
-				titles.set(id, `(${existingTitleOccurrences})`);
-			}
+			titles.set(id, existingTitleOccurrences);
 
 			existingTitles.set(_title, existingTitleOccurrences + 1);
 		}
@@ -58,7 +56,7 @@ export class FloaterState {
 		for (const bar of this.bars) {
 			if (!highestBar) {
 				highestBar = bar;
-			} else if (highestBar.z < bar.z) {
+			} else if (bar.z > highestBar.z) {
 				highestBar = bar;
 			}
 		}
@@ -133,7 +131,7 @@ export class FloaterState {
 
 	determineStartingZ(defaultZ?: number): number {
 		if (defaultZ) {
-			return Math.min(BASE_FLOATER_Z, defaultZ);
+			return Math.max(BASE_FLOATER_Z, defaultZ);
 		}
 		if (this.highestBar) {
 			return this.highestBar.z;

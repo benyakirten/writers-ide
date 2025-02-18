@@ -13,7 +13,6 @@
 	let formRef: HTMLFormElement | null = $state(null);
 
 	function handleSubmit(event: SubmitEvent & { currentTarget: EventTarget & HTMLFormElement }) {
-		console.log('HELLO 2');
 		event.preventDefault();
 		isEditing = false;
 
@@ -61,11 +60,14 @@
 			</button>
 		</form>
 	{:else}
+		{@const titleNumber = FloaterState.titleNumbers.get(id) ?? 0}
 		<button onclick={() => startEditing()}>
 			<p>
 				{title}
 			</p>
-			<span>{FloaterState.titleNumbers.get(id) ?? ''}</span>
+			{#if titleNumber > 1}
+				<span>({titleNumber})</span>
+			{/if}
 		</button>
 	{/if}
 </div>
