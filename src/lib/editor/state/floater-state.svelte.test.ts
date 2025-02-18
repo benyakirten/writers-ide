@@ -263,12 +263,46 @@ describe('FloaterState', () => {
 		});
 	});
 
-	describe.todo('removeZGaps', () => {
-		// TODO
+	describe('removeZGaps', () => {
+		it('should compress all z indexes for the bars without changing sort order', () => {
+			const bar1 = floaterState.add({ z: 100 });
+			const bar2 = floaterState.add({ z: 2000 });
+			const bar3 = floaterState.add({ z: 300 });
+
+			floaterState.removeZGaps();
+			const { bars } = floaterState;
+			expect(bars[0].id).toBe(bar1.id);
+			expect(bars[0].z).toBe(floaterState.BASE_Z);
+
+			expect(bars[1].id).toBe(bar2.id);
+			expect(bars[1].z).toBe(floaterState.BASE_Z + 2);
+
+			expect(bars[2].id).toBe(bar3.id);
+			expect(bars[2].z).toBe(floaterState.BASE_Z + 1);
+		});
 	});
 
-	describe.todo('add', () => {
-		// TODO
+	describe('add', () => {
+		// Most of the functionality is described by the above functions
+		// This will just test functionality not described above
+		// e.g.: id, title, minimized
+		it("should add the bar's id, title, and minimized properties", () => {
+			const id = 'unique-id';
+			const title = 'Floating Bar';
+			const minimized = true;
+
+			const bar = floaterState.add({ id, title, minimized });
+			expect(bar.id).toBe(id);
+			expect(bar.title).toBe(title);
+			expect(bar.minimized).toBe(minimized);
+		});
+
+		it("should default to a random UUID, 'New Bar' and minimized to false if not provided", () => {
+			const bar = floaterState.add();
+			expect(typeof bar.id).toBe('string');
+			expect(bar.title).toBe('New Bar');
+			expect(bar.minimized).toBe(false);
+		});
 	});
 
 	describe('focus', () => {

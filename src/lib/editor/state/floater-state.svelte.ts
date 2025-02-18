@@ -195,7 +195,6 @@ export class FloaterState {
 		});
 
 		const z = this.determineStartingZ(startingInformation.z);
-		const id = startingInformation.id ?? crypto.randomUUID();
 		const { width, height } = this.determineStartingMeasurements(
 			startingInformation.width,
 			startingInformation.height
@@ -209,7 +208,7 @@ export class FloaterState {
 			},
 			z,
 			data: startingInformation.data,
-			id,
+			id: startingInformation.id ?? crypto.randomUUID(),
 			minimized: !!startingInformation.minimized,
 			title: startingInformation.title ?? 'New Bar'
 		};
