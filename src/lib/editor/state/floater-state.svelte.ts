@@ -134,7 +134,7 @@ export class FloaterState {
 			return Math.max(BASE_FLOATER_Z, defaultZ);
 		}
 		if (this.highestBar) {
-			return this.highestBar.z;
+			return this.highestBar.z + 1;
 		}
 		return BASE_FLOATER_Z;
 	}
@@ -163,7 +163,7 @@ export class FloaterState {
 	}
 
 	// TODO: Determine if this function is needed.
-	sortBarsByZIndex(): void {
+	removeZGaps(): void {
 		const bars = this.bars.toSorted((a, b) => a.z - b.z);
 		let nextZ = BASE_FLOATER_Z;
 		for (const bar of bars) {
@@ -195,7 +195,7 @@ export class FloaterState {
 			left: startingInformation.left
 		});
 
-		const z = this.determineStartingZ(startingInformation.z) + 1;
+		const z = this.determineStartingZ(startingInformation.z);
 		const id = startingInformation.id ?? crypto.randomUUID();
 		const { width, height } = this.determineStartingMeasurements(
 			startingInformation.width,
@@ -220,16 +220,12 @@ export class FloaterState {
 	}
 
 	focus(id: string | number): FloatingBar | null {
-		if (
-			this.bars.length < 2 ||
-			(typeof id === 'string' && this.highestBar?.id === id) ||
-			(typeof id === 'number' && this.highestBar?.id === this.bars.at(id)?.id)
-		) {
+		if (this.bars.length < 2) {
 			return null;
 		}
 
 		const bar = this.bar(id);
-		if (!bar) {
+		if (!bar || bar.id === this.highestBar?.id) {
 			return null;
 		}
 

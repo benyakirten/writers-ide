@@ -88,7 +88,7 @@ describe('FloaterState', () => {
 		// TODO
 	});
 
-	describe.todo('sortBarsByZIndex', () => {
+	describe.todo('removeZGaps', () => {
 		// TODO
 	});
 
@@ -96,8 +96,40 @@ describe('FloaterState', () => {
 		// TODO
 	});
 
-	describe.todo('focus', () => {
-		// TODO
+	describe('focus', () => {
+		it("should return null if there aren't at least 2 floating bars", () => {
+			const bar = floaterState.add();
+			const got = floaterState.focus(bar.id);
+			expect(got).toBeNull();
+		});
+
+		it('should return null if the ID passed in already belongs to the highest bar', () => {
+			floaterState.add({ z: 100 });
+			const bar2 = floaterState.add({ z: 2000 });
+			floaterState.add({ z: 300 });
+
+			const got = floaterState.focus(bar2.id);
+			expect(got).toBeNull();
+		});
+
+		it("should return null if the bar doesn't exist", () => {
+			floaterState.add();
+			const got = floaterState.focus('non-existent');
+			expect(got).toBeNull();
+		});
+
+		it("should set the bar's z-index to the highest bar's z-index + 1", () => {
+			const bar1 = floaterState.add({ z: 100 });
+			const bar2 = floaterState.add({ z: 2000 });
+
+			expect(bar1.z).toBe(100);
+			expect(floaterState.highestBar!.id).toBe(bar2.id);
+
+			const got = floaterState.focus(bar1.id);
+			expect(got!.id).toEqual(bar1.id);
+			expect(got!.z).toEqual(2001);
+			expect(floaterState.highestBar!.id).toBe(bar1.id);
+		});
 	});
 
 	describe('remove', () => {
@@ -120,12 +152,37 @@ describe('FloaterState', () => {
 		// TODO
 	});
 
-	describe.todo('startDragging', () => {
-		// TODO
+	describe('startDragging', () => {
+		it('should set the dragging bar with the speified x and y coordinates if the bar exists', () => {
+			const bar = floaterState.add();
+
+			const event = new MouseEvent('mousedown', { clientX: 100, clientY: 100 });
+			const got = floaterState.startDragging(bar.id, event);
+
+			expect(got).toBe(true);
+			expect(floaterState.dragging).toEqual({ id: bar.id, x: 100, y: 100 });
+		});
+
+		it("should not set the dragging bar if the bar doesn't exist", () => {
+			const event = new MouseEvent('mousedown', { clientX: 100, clientY: 100 });
+			const got = floaterState.startDragging('non-existent', event);
+
+			expect(got).toBe(false);
+			expect(floaterState.dragging).toBeNull();
+		});
 	});
 
-	describe.todo('stopDragging', () => {
-		// TODO
+	describe('stopDragging', () => {
+		it('should set the dragging bar to null', () => {
+			const bar = floaterState.add();
+			const event = new MouseEvent('mousedown', { clientX: 100, clientY: 100 });
+
+			const got = floaterState.startDragging(bar.id, event);
+			expect(got).toBe(true);
+
+			floaterState.stopDragging();
+			expect(floaterState.dragging).toBeNull();
+		});
 	});
 
 	describe.todo('nudge', () => {
@@ -137,80 +194,16 @@ describe('FloaterState', () => {
 	});
 
 	describe.todo('update', () => {
-		// TODO
+		it("should update the bar's properties if it is found", () => {
+			const bar = floaterState.add({ minimized: true, title: 'Floating Bar' });
+			expect(bar.title).toBe('Floating Bar');
+			expect(bar.minimized).toBe(true);
+
+			floaterState.update(bar.id, 'title', 'New Title');
+			expect(bar.title).toBe('New Title');
+
+			floaterState.update(bar.id, 'minimized', false);
+			expect(bar.minimized).toBe(false);
+		});
 	});
-
-	// describe('focus', () => {
-	// 	it('should focus a floating bar', () => {
-	// 		const bar1 = floaterState.add();
-	// 		const bar2 = floaterState.add();
-	// 		floaterState.focus(bar1.id);
-	// 		expect(bar1.z).toBeGreaterThan(bar2.z);
-	// 	});
-	// });
-
-	// describe('add', () => {
-	// 	// TODO: Add tests for every possible condition
-	// 	it('should add a new floating bar', () => {
-	// 		const bar = floaterState.add();
-	// 		expect(bar).toBeDefined();
-	// 		expect(floaterState.bars.length).toBe(1);
-	// 		expect(bar.position.top).toBeGreaterThan(0);
-	// 		expect(bar.position.left).toBeGreaterThan(0);
-	// 	});
-	// });
-
-	// describe('updateMeasurements', () => {
-	// 	it('should update measurements of a floating bar', () => {
-	// 		const bar = floaterState.add();
-	// 		floaterState.updateMeasurements(bar.id, 300, 200);
-	// 		expect(bar.position.width).toBe(300);
-	// 		expect(bar.position.height).toBe(200);
-	// 	});
-	// });
-
-	// it('should start dragging a floating bar', () => {
-	// 	const bar = floaterState.add();
-	// 	const event = new MouseEvent('mousedown', { clientX: 100, clientY: 100 });
-	// 	const result = floaterState.startDragging(bar.id, event);
-	// 	expect(result).toBe(true);
-	// 	expect(floaterState.dragging).toBeDefined();
-	// });
-
-	// it('should stop dragging a floating bar', () => {
-	// 	const bar = floaterState.add();
-	// 	const event = new MouseEvent('mousedown', { clientX: 100, clientY: 100 });
-	// 	floaterState.startDragging(bar.id, event);
-	// 	floaterState.stopDragging();
-	// 	expect(floaterState.dragging).toBeNull();
-	// });
-
-	// it('should move a floating bar', () => {
-	// 	const bar = floaterState.add();
-	// 	const startEvent = new MouseEvent('mousedown', { clientX: 100, clientY: 100 });
-	// 	floaterState.startDragging(bar.id, startEvent);
-	// 	const moveEvent = new MouseEvent('mousemove', { clientX: 200, clientY: 200 });
-	// 	floaterState.move({ ...moveEvent, currentTarget: floaterState.root! });
-	// 	expect(bar.position.left).toBeGreaterThan(100);
-	// 	expect(bar.position.top).toBeGreaterThan(100);
-	// });
-
-	// it('should minimize a floating bar', () => {
-	// 	const bar = floaterState.add();
-	// 	floaterState.minimize(bar.id, true);
-	// 	expect(bar.minimized).toBe(true);
-	// });
-
-	// it('should rename a floating bar', () => {
-	// 	const bar = floaterState.add();
-	// 	floaterState.rename(bar.id, 'New Title');
-	// 	expect(bar.title).toBe('New Title');
-	// });
-
-	// it('should nudge a floating bar', () => {
-	// 	const bar = floaterState.add();
-	// 	const initialTop = bar.position.top;
-	// 	floaterState.nudge(bar.id, 'down');
-	// 	expect(bar.position.top).toBeGreaterThan(initialTop);
-	// });
 });
