@@ -1,11 +1,19 @@
 <script lang="ts">
+	import { CheckCircled } from '@steeze-ui/radix-icons';
+	import { Icon } from '@steeze-ui/svelte-icon';
+
 	import FloaterState from '$lib/editor/state/floater-state.svelte.js';
+	import { tick } from 'svelte';
 
 	let { title, id }: { index: number; title: string; id: string } = $props();
 
 	let isEditing = $state(false);
 
+	let inputRef: HTMLInputElement | null = $state(null);
+	let formRef: HTMLFormElement | null = $state(null);
+
 	function handleSubmit(event: SubmitEvent & { currentTarget: EventTarget & HTMLFormElement }) {
+		console.log('HELLO 2');
 		event.preventDefault();
 		isEditing = false;
 
@@ -22,19 +30,38 @@
 			isEditing = false;
 		}
 	}
+
+	async function startEditing() {
+		isEditing = true;
+		await tick();
+		inputRef?.focus();
+	}
+
+	async function stopEditing(e: FocusEvent) {
+		// We want the form to revert to a P tag if the user clicks outside of the form.
+		// However, clicking the submit button will cause this event to trigger.
+		// We can check if the related target is the button to prevent this.
+		if (!formRef?.contains(e.relatedTarget as Node)) {
+			isEditing = false;
+		}
+	}
 </script>
 
 <div class="container">
 	{#if isEditing}
 		<form
-			onfocusout={() => (isEditing = false)}
+			bind:this={formRef}
+			onfocusout={(e) => stopEditing(e)}
 			onsubmit={handleSubmit}
 			onkeydowncapture={(e) => handleKeydown(e)}
 		>
-			<input type="text" value={title} name="title" />
+			<input bind:this={inputRef} type="text" value={title} name="title" />
+			<button aria-label="Change Title" type="submit">
+				<Icon src={CheckCircled} size="16px" />
+			</button>
 		</form>
 	{:else}
-		<button onclick={() => (isEditing = true)}>
+		<button onclick={() => startEditing()}>
 			<p>
 				{title}
 			</p>
@@ -54,12 +81,32 @@
 		display: inline;
 	}
 
-	input {
-		width: 100%;
-	}
-
 	form {
 		position: relative;
+		background-color: white;
+		border: 1px solid black;
+
+		&:focus {
+			outline: 1px solid blue;
+		}
+
+		& > input {
+			width: 80%;
+			background: none;
+			border: none;
+			outline: none;
+		}
+
+		& > button {
+			cursor: pointer;
+			position: absolute;
+			right: 2px;
+			top: 50%;
+			transform: translateY(-50%);
+			width: fit-content;
+			padding: 0;
+			height: min-content;
+		}
 	}
 	button {
 		appearance: none;
