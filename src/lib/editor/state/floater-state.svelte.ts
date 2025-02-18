@@ -36,7 +36,7 @@ class FloaterState {
 	bars = $state<FloatingBar[]>([]);
 	visibleBars = $derived(this.bars.filter((bar) => !bar.minimized));
 	minimizedBars = $derived(this.bars.filter((bar) => bar.minimized));
-	titles = $derived.by<Map<string, string>>(() => {
+	titleNumbers = $derived.by<Map<string, string>>(() => {
 		const titles = new Map<string, string>();
 		const existingTitles = new Map<string, number>();
 
@@ -44,9 +44,7 @@ class FloaterState {
 			const _title = title.toLowerCase();
 			const existingTitleOccurrences = existingTitles.get(_title) ?? 0;
 			if (existingTitleOccurrences > 0) {
-				titles.set(id, `${title} (${existingTitleOccurrences})`);
-			} else {
-				titles.set(id, title);
+				titles.set(id, `(${existingTitleOccurrences})`);
 			}
 
 			existingTitles.set(_title, existingTitleOccurrences + 1);
@@ -202,7 +200,6 @@ class FloaterState {
 			startingInformation.height
 		);
 
-		console.log(startingInformation.title ?? 'New Bar');
 		const bar: FloatingBar = {
 			position: {
 				...position,
@@ -353,6 +350,16 @@ class FloaterState {
 		}
 
 		bar.minimized = state;
+		return bar;
+	}
+
+	rename(id: string | number, title: string): FloatingBar | null {
+		const bar = this.bar(id);
+		if (!bar) {
+			return null;
+		}
+
+		bar.title = title;
 		return bar;
 	}
 }
