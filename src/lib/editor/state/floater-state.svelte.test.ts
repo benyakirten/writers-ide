@@ -53,14 +53,92 @@ describe('FloaterState', () => {
 		});
 	});
 
-	// describe('remove', () => {
-	// 	it('should remove a floating bar', () => {
-	// 		const bar = floaterState.add();
-	// 		const result = floaterState.remove(bar.id);
-	// 		expect(result).toBe(true);
-	// 		expect(floaterState.bars.length).toBe(0);
-	// 	});
-	// });
+	describe('bar', () => {
+		it('should find a bar by its id when passed a string', () => {
+			const bar = floaterState.add();
+			const gotBar = floaterState.bar(bar.id);
+			expect(gotBar!.id).toEqual(bar.id);
+		});
+
+		it('should find a bar by its index when passed a number', () => {
+			const bar = floaterState.add();
+			const gotBar = floaterState.bar(0);
+			expect(gotBar!.id).toEqual(bar.id);
+		});
+
+		it('should return undefined if the bar is not found', () => {
+			const gotBar = floaterState.bar('not-found');
+			expect(gotBar).toBeUndefined();
+		});
+	});
+
+	describe.todo('findNextOpenPosition', () => {
+		// TODO
+	});
+
+	describe.todo('determineStartingCoordinates', () => {
+		// TODO
+	});
+
+	describe.todo('determineStartingZ', () => {
+		// TODO
+	});
+
+	describe.todo('determineStartingMeasurements', () => {
+		// TODO
+	});
+
+	describe.todo('sortBarsByZIndex', () => {
+		// TODO
+	});
+
+	describe.todo('add', () => {
+		// TODO
+	});
+
+	describe.todo('focus', () => {
+		// TODO
+	});
+
+	describe('remove', () => {
+		it('should remove a floating bar', () => {
+			const bar = floaterState.add();
+			const got = floaterState.remove(bar.id);
+			expect(got).toBe(true);
+			expect(floaterState.bars.length).toBe(0);
+		});
+
+		it("should not remove a floating bar that doesn't exist", () => {
+			const bar = floaterState.add();
+			const got = floaterState.remove('non-existent');
+			expect(got).toBe(false);
+			expect(floaterState.bar(bar.id)).toBeDefined();
+		});
+	});
+
+	describe.todo('updateMeasurements', () => {
+		// TODO
+	});
+
+	describe.todo('startDragging', () => {
+		// TODO
+	});
+
+	describe.todo('stopDragging', () => {
+		// TODO
+	});
+
+	describe.todo('nudge', () => {
+		// TODO
+	});
+
+	describe.todo('move', () => {
+		// TODO
+	});
+
+	describe.todo('update', () => {
+		// TODO
+	});
 
 	// describe('focus', () => {
 	// 	it('should focus a floating bar', () => {

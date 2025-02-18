@@ -162,12 +162,16 @@ export class FloaterState {
 		return { width: startingWidth ?? width, height: startingHeight ?? height };
 	}
 
+	// TODO: Determine if this function is needed.
 	sortBarsByZIndex(): void {
-		this.bars.sort((a, b) => a.z - b.z);
+		const bars = this.bars.toSorted((a, b) => a.z - b.z);
 		let nextZ = BASE_FLOATER_Z;
-		for (const bar of this.bars) {
+		for (const bar of bars) {
 			if (bar.z !== nextZ) {
-				bar.z = nextZ;
+				const originalBar = this.bar(bar.id);
+				if (originalBar) {
+					originalBar.z = nextZ;
+				}
 			}
 			nextZ += 1;
 		}
@@ -244,7 +248,6 @@ export class FloaterState {
 		}
 
 		this.bars = this.bars.filter((b) => b.id !== bar.id);
-		this.sortBarsByZIndex();
 		return true;
 	}
 
@@ -341,23 +344,17 @@ export class FloaterState {
 		return bar;
 	}
 
-	minimize(id: string | number, state: boolean): FloatingBar | null {
+	update<Key extends 'title' | 'minimized', Value extends FloatingBar[Key]>(
+		id: string | number,
+		key: Key,
+		value: Value
+	) {
 		const bar = this.bar(id);
 		if (!bar) {
 			return null;
 		}
 
-		bar.minimized = state;
-		return bar;
-	}
-
-	rename(id: string | number, title: string): FloatingBar | null {
-		const bar = this.bar(id);
-		if (!bar) {
-			return null;
-		}
-
-		bar.title = title;
+		bar[key] = value;
 		return bar;
 	}
 }

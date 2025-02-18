@@ -78,7 +78,7 @@
 		<FloaterBarTitle {index} title={bar.title} id={bar.id} />
 		<div class="buttons">
 			<button
-				onclickcapture={() => FloaterState.minimize(index, true)}
+				onclickcapture={() => FloaterState.update(index, 'minimized', true)}
 				aria-label={`Minimize bar #${index + 1}`}
 			>
 				<Icon src={Minus} size="16px" />

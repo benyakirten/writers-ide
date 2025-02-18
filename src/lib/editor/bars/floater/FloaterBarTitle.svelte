@@ -19,7 +19,7 @@
 		const formData = new FormData(event.currentTarget);
 		const newTitle = formData.get('title');
 		if (newTitle !== null && newTitle !== title) {
-			FloaterState.rename(id, newTitle.toString());
+			FloaterState.update(id, 'title', newTitle.toString());
 		}
 	}
 
