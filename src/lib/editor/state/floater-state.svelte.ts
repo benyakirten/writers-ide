@@ -40,15 +40,16 @@ class FloaterState {
 		const titles = new Map<string, string>();
 		const existingTitles = new Map<string, number>();
 
-		for (const { title } of this.bars) {
-			const existingTitleOccurrences = existingTitles.get(title.toLowerCase()) ?? 0;
+		for (const { title, id } of this.bars) {
+			const _title = title.toLowerCase();
+			const existingTitleOccurrences = existingTitles.get(_title) ?? 0;
 			if (existingTitleOccurrences > 0) {
-				titles.set(title, `${title} (${existingTitleOccurrences + 1})`);
+				titles.set(id, `${title} (${existingTitleOccurrences})`);
 			} else {
-				titles.set(title, title);
+				titles.set(id, title);
 			}
 
-			existingTitles.set(title, existingTitleOccurrences + 1);
+			existingTitles.set(_title, existingTitleOccurrences + 1);
 		}
 
 		return titles;
@@ -201,6 +202,7 @@ class FloaterState {
 			startingInformation.height
 		);
 
+		console.log(startingInformation.title ?? 'New Bar');
 		const bar: FloatingBar = {
 			position: {
 				...position,
