@@ -442,11 +442,129 @@ describe('FloaterState', () => {
 		});
 	});
 
-	describe.todo('nudge', () => {
-		// TODO
+	describe('move', () => {
+		it("should return false if the dragging bar doesn't exist", () => {
+			const event = new MouseEvent('mousemove', { clientX: 100, clientY: 100 });
+			const got = floaterState.move(event);
+			expect(got).toBe(false);
+		});
+
+		it("should return false if the root element doesn't exist", () => {
+			const bar = floaterState.add();
+			const event = new MouseEvent('mousemove', { clientX: 100, clientY: 100 });
+
+			const got = floaterState.startDragging(bar.id, event);
+			expect(got).toBe(true);
+
+			floaterState.root = null;
+			const got2 = floaterState.move(event);
+			expect(got2).toBe(false);
+		});
+
+		it("should return false if the dragging bar doesn't exist", () => {
+			const root = createRoot(1000, 1500);
+			floaterState.root = root;
+
+			const event = new MouseEvent('mousemove', { clientX: 100, clientY: 100 });
+			floaterState.dragging = { id: 'non-existant', x: 100, y: 100 };
+
+			const got = floaterState.move(event);
+			expect(got).toBe(false);
+		});
+
+		it('should increase the top and left of the bar and the x and y of the dragging bar to the new x and y coordinates if they are moved down and to the right', () => {
+			const root = createRoot(2000, 3500);
+			floaterState.root = root;
+
+			const bar = floaterState.add({ left: 500, top: 600, height: 400, width: 300 });
+			const event1 = new MouseEvent('mousemove', { clientX: 1000, clientY: 1100 });
+
+			const got = floaterState.startDragging(bar.id, event1);
+			expect(got).toBe(true);
+
+			const event2 = new MouseEvent('mousemove', { clientX: 1200, clientY: 1400 });
+			const got2 = floaterState.move(event2);
+			expect(got2).toBe(true);
+
+			const wantLeft = 700; // 500 + (1200 - 1000);
+			const wantTop = 900; // 600 + (1400 - 1100);
+			const gotBar = floaterState.bar(bar.id)!;
+
+			expect(floaterState.dragging).toEqual({ id: bar.id, x: 1200, y: 1400 });
+			expect(gotBar.position.left).toBe(wantLeft);
+			expect(gotBar.position.top).toBe(wantTop);
+		});
+
+		it('should decrease the top and left of the bar and the x and y of the dragging bar to the new x and y coordinates if they are moved down and to the right', () => {
+			const root = createRoot(20000, 35000);
+			floaterState.root = root;
+
+			const bar = floaterState.add({ left: 5000, top: 6000, height: 400, width: 300 });
+			const event1 = new MouseEvent('mousemove', { clientX: 2000, clientY: 2100 });
+
+			const got = floaterState.startDragging(bar.id, event1);
+			expect(got).toBe(true);
+
+			const event2 = new MouseEvent('mousemove', { clientX: 1900, clientY: 2000 });
+			const got2 = floaterState.move(event2);
+			expect(got2).toBe(true);
+
+			const wantLeft = 4900; // 5000 + (1900 - 2000);
+			const wantTop = 5900; // 6000 + (2000 - 2100);
+			const gotBar = floaterState.bar(bar.id)!;
+
+			expect(floaterState.dragging).toEqual({ id: bar.id, x: 1900, y: 2000 });
+			expect(gotBar.position.left).toBe(wantLeft);
+			expect(gotBar.position.top).toBe(wantTop);
+		});
+
+		it('should not move the left and top below 0', () => {
+			const root = createRoot(2000, 3500);
+			floaterState.root = root;
+
+			const bar = floaterState.add({ left: 300, top: 300, height: 400, width: 300 });
+			const event1 = new MouseEvent('mousemove', { clientX: 1000, clientY: 1100 });
+
+			const got = floaterState.startDragging(bar.id, event1);
+			expect(got).toBe(true);
+
+			const event2 = new MouseEvent('mousemove', { clientX: 500, clientY: 500 });
+			const got2 = floaterState.move(event2);
+			expect(got2).toBe(true);
+
+			const gotBar = floaterState.bar(bar.id)!;
+
+			expect(gotBar.position.left).toBe(0);
+			expect(gotBar.position.top).toBe(0);
+		});
+
+		it('should keep the top and left below the width of the screen minus the width and buffer', () => {
+			const rootWidth = 2000;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const barWidth = 300;
+			const barHeight = 400;
+
+			const bar = floaterState.add({ left: 1500, top: 3000, height: barHeight, width: barWidth });
+			const event1 = new MouseEvent('mousemove', { clientX: 1000, clientY: 1000 });
+
+			const got = floaterState.startDragging(bar.id, event1);
+			expect(got).toBe(true);
+
+			const event2 = new MouseEvent('mousemove', { clientX: 2500, clientY: 2500 });
+			const got2 = floaterState.move(event2);
+			expect(got2).toBe(true);
+
+			const gotBar = floaterState.bar(bar.id)!;
+
+			expect(gotBar.position.left).toBe(rootWidth - barWidth - floaterState.EDGE_BUFFER_PX);
+			expect(gotBar.position.top).toBe(rootHeight - barHeight - floaterState.EDGE_BUFFER_PX);
+		});
 	});
 
-	describe.todo('move', () => {
+	describe.todo('nudge', () => {
 		// TODO
 	});
 

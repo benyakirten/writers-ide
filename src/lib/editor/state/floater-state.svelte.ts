@@ -263,8 +263,6 @@ export class FloaterState {
 				: Math.max(height, this.MIN_HEIGHT_PX);
 		bar.position.height = newHeight;
 
-		console.log(bar.position.height);
-
 		return bar;
 	}
 
@@ -286,7 +284,7 @@ export class FloaterState {
 		this.dragging = null;
 	}
 
-	move(e: MouseEvent & { currentTarget: HTMLElement }) {
+	move(e: MouseEvent): boolean {
 		if (!this.dragging || !this.root) {
 			return false;
 		}
@@ -314,10 +312,10 @@ export class FloaterState {
 		return true;
 	}
 
-	nudge(id: string | number, direction: 'up' | 'left' | 'down' | 'right'): FloatingBar | null {
+	nudge(id: string | number, direction: 'up' | 'left' | 'down' | 'right'): boolean {
 		const bar = this.bar(id);
 		if (!bar) {
-			return null;
+			return false;
 		}
 
 		const { width, height, top, left } = bar.position;
@@ -342,7 +340,7 @@ export class FloaterState {
 				break;
 		}
 
-		return bar;
+		return true;
 	}
 
 	update<Key extends 'title' | 'minimized', Value extends FloatingBar[Key]>(
