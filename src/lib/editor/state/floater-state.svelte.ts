@@ -1,4 +1,4 @@
-import { clamp } from '../utils.js';
+import { clamp } from '$lib/utils/numbers.js';
 
 const BASE_FLOATER_Z = 10;
 
@@ -18,7 +18,7 @@ export type FloatingBar = {
 	minimized: boolean;
 };
 
-class FloaterState {
+export class FloaterState {
 	readonly TOLERANCE = 2;
 	readonly OFFSET = 2;
 	readonly MIN_WIDTH_PX = 200;

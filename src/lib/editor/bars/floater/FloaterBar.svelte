@@ -3,15 +3,14 @@
 	import { Cross2, Minus } from '@steeze-ui/radix-icons';
 	import { Icon } from '@steeze-ui/svelte-icon';
 
-	import FloaterState, { type FloatingBar } from '../state/floater-state.svelte.js';
-	import { Debouncer } from '$lib/debounce.js';
+	import FloaterState, { type FloatingBar } from '$lib/editor/state/floater-state.svelte.js';
+	import FloaterBarTitle from './FloaterBarTitle.svelte';
 
 	let { bar, children, index }: { bar: FloatingBar; children: Snippet; index: number } = $props();
 
 	let floater: HTMLElement;
 	let mutationObserver: MutationObserver;
 	let menu: HTMLElement;
-	let renamer = new Debouncer((name: string) => FloaterState.rename(index, name));
 
 	onMount(() => {
 		mutationObserver = new MutationObserver(() => {
@@ -76,27 +75,7 @@
 		tabindex="0"
 		role="button"
 	>
-		<div>
-			<p
-				style:display="inline"
-				contenteditable
-				onkeydown={(e) => {
-					e.stopPropagation();
-					if (e.key === 'Enter') {
-						e.preventDefault();
-						e.currentTarget.blur();
-					}
-				}}
-				oninput={(e) => {
-					if (e.currentTarget instanceof HTMLElement && e.currentTarget.textContent !== null) {
-						renamer.update(e.currentTarget.textContent);
-					}
-				}}
-			>
-				{bar.title}
-			</p>
-			<span>{FloaterState.titleNumbers.get(bar.id) ?? ''}</span>
-		</div>
+		<FloaterBarTitle {index} title={bar.title} id={bar.id} />
 		<div class="buttons">
 			<button
 				onclickcapture={() => FloaterState.minimize(index, true)}
@@ -125,14 +104,11 @@
 	}
 
 	.menu {
-		padding: 2px;
+		padding-inline: 2px;
 		display: flex;
+		gap: 8px;
 		justify-content: space-between;
 		align-items: center;
-
-		& p {
-			margin: 0;
-		}
 	}
 
 	.buttons {

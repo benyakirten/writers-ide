@@ -1,6 +1,6 @@
 import * as m from '$lib/paraglide/messages.js';
 
-import { capitalize } from '../utils.js';
+import { capitalize } from '$lib/utils/strings.js';
 
 export type VerticalBar = {
 	width: number;
