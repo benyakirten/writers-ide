@@ -73,18 +73,21 @@
 		tabindex="0"
 		role="button"
 	>
-		<button
-			onclickcapture={() => FloaterState.minimize(index)}
-			aria-label={`Minimize bar #${index + 1}`}
-		>
-			<Icon src={Minus} size="16px" />
-		</button>
-		<button
-			aria-label={`Close bar #${index + 1}`}
-			onclickcapture={() => FloaterState.remove(index)}
-		>
-			<Icon src={Cross2} size="16px" />
-		</button>
+		<p>{FloaterState.titles.get(bar.id) ?? 'Unknown Bar'}</p>
+		<div class="buttons">
+			<button
+				onclickcapture={() => FloaterState.minimize(index, true)}
+				aria-label={`Minimize bar #${index + 1}`}
+			>
+				<Icon src={Minus} size="16px" />
+			</button>
+			<button
+				aria-label={`Close bar #${index + 1}`}
+				onclickcapture={() => FloaterState.remove(index)}
+			>
+				<Icon src={Cross2} size="16px" />
+			</button>
+		</div>
 	</div>
 	{@render children()}
 </div>
@@ -101,6 +104,16 @@
 	.menu {
 		padding: 2px;
 		display: flex;
-		justify-content: flex-end;
+		justify-content: space-between;
+		align-items: center;
+
+		& p {
+			margin: 0;
+		}
+	}
+
+	.buttons {
+		display: flex;
+		align-items: center;
 	}
 </style>

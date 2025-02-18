@@ -14,6 +14,7 @@ export type FloatingBar = {
 	data?: null;
 	z: number;
 	id: string;
+	title: string;
 	minimized: boolean;
 };
 
@@ -42,11 +43,29 @@ class FloaterState {
 			},
 			z: 10,
 			id: 'floater-1',
-			minimized: false
+			minimized: false,
+			title: 'Floater 1'
 		}
 	]);
 	visibleBars = $derived(this.bars.filter((bar) => !bar.minimized));
 	minimizedBars = $derived(this.bars.filter((bar) => bar.minimized));
+	titles = $derived.by<Map<string, string>>(() => {
+		const titles = new Map<string, string>();
+		const existingTitles = new Map<string, number>();
+
+		for (const { title } of this.bars) {
+			const existingTitleOccurrences = existingTitles.get(title.toLowerCase()) ?? 0;
+			if (existingTitleOccurrences > 0) {
+				titles.set(title, `${title} (${existingTitleOccurrences + 1})`);
+			} else {
+				titles.set(title, title);
+			}
+
+			existingTitles.set(title, existingTitleOccurrences + 1);
+		}
+
+		return titles;
+	});
 
 	highestBar = $derived.by(() => {
 		let highestBar: FloatingBar | null = null;
@@ -176,6 +195,7 @@ class FloaterState {
 			data?: null;
 			id?: string;
 			minimized?: boolean;
+			title?: string;
 		} = {}
 	): FloatingBar {
 		const position = this.determineStartingCoordinates({
@@ -199,7 +219,8 @@ class FloaterState {
 			z,
 			data: startingInformation.data,
 			id,
-			minimized: !!startingInformation.minimized
+			minimized: !!startingInformation.minimized,
+			title: startingInformation.title ?? 'New Bar'
 		};
 
 		this.bars.push(bar);
@@ -332,13 +353,13 @@ class FloaterState {
 		return bar;
 	}
 
-	minimize(id: string | number): FloatingBar | null {
+	minimize(id: string | number, state: boolean): FloatingBar | null {
 		const bar = this.bar(id);
 		if (!bar) {
 			return null;
 		}
 
-		bar.minimized = true;
+		bar.minimized = state;
 		return bar;
 	}
 }
