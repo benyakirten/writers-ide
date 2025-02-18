@@ -283,15 +283,20 @@ class FloaterState {
 			return false;
 		}
 
-		const deltaX = e.clientX - this.dragging.x;
-		const deltaY = e.clientY - this.dragging.y;
+		const { clientX, clientY } = e;
+
+		const deltaX = clientX - this.dragging.x;
+		const deltaY = clientY - this.dragging.y;
 
 		const { width, height, left, top } = bar.position;
 		const x = left + deltaX;
 		const y = top + deltaY;
 
-		bar.position.left = clamp(x, 0, this.root.clientWidth - width);
-		bar.position.top = clamp(y, 0, this.root.clientHeight - height);
+		bar.position.left = clamp(x, 0, this.root.clientWidth - width - this.EDGE_BUFFER_PX);
+		bar.position.top = clamp(y, 0, this.root.clientHeight - height - this.EDGE_BUFFER_PX);
+
+		this.dragging.x = clientX;
+		this.dragging.y = clientY;
 
 		return true;
 	}
