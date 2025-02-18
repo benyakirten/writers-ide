@@ -23,7 +23,8 @@
 	});
 
 	function handleMousedown(e: MouseEvent) {
-		if (e.target !== menu) {
+		FloaterState.focus(index);
+		if (!(e.target instanceof HTMLElement) || !menu.contains(e.target)) {
 			return;
 		}
 		FloaterState.startDragging(index, e);
@@ -59,7 +60,7 @@
 	style:min-height={`${FloaterState.MIN_HEIGHT_PX}px`}
 	style:max-width={`${FloaterState.MAX_WIDTH_PX}px`}
 	style:max-height={`${FloaterState.MAX_HEIGHT_PERCENT}%`}
-	onfocus={() => FloaterState.focus(index)}
+	onfocusin={() => FloaterState.focus(index)}
 	onkeydown={(e) => handleKeydown(e)}
 	onmousemove={(e) => FloaterState.move(e)}
 	tabindex="0"

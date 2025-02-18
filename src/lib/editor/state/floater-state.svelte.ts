@@ -33,20 +33,7 @@ class FloaterState {
 	readonly EDGE_BUFFER_PX = 3;
 
 	root: HTMLElement | null = null;
-	bars = $state<FloatingBar[]>([
-		{
-			position: {
-				top: 20,
-				left: 20,
-				width: 200,
-				height: 800
-			},
-			z: 10,
-			id: 'floater-1',
-			minimized: false,
-			title: 'Floater 1'
-		}
-	]);
+	bars = $state<FloatingBar[]>([]);
 	visibleBars = $derived(this.bars.filter((bar) => !bar.minimized));
 	minimizedBars = $derived(this.bars.filter((bar) => bar.minimized));
 	titles = $derived.by<Map<string, string>>(() => {
@@ -99,21 +86,25 @@ class FloaterState {
 
 		const { clientWidth, clientHeight } = this.root;
 
+		const leftDistance = (this.OFFSET / 100) * clientWidth;
+		const topDistance = (this.OFFSET / 100) * clientHeight;
 		if (!from) {
-			return { top: this.OFFSET * clientHeight, left: this.OFFSET * clientWidth };
+			return { top: topDistance, left: leftDistance };
 		}
 
 		// We don't want to create a floating barr off screen
+		// At most, the bar's bottom should touch the bottom of the screen
+		const maxLeftPercentage = (100 - (this.DEFAULT_WIDTH_PERCENT + this.OFFSET)) / 100;
 		const left =
-			from.left >= 100 - (this.DEFAULT_WIDTH_PERCENT + this.OFFSET)
-				? from.left - this.OFFSET
-				: from.left + this.OFFSET;
-		const top =
-			from.top >= 100 - (this.DEFAULT_HEIGHT_PERCENT + this.OFFSET)
-				? from.top - this.OFFSET
-				: from.top + this.OFFSET;
+			from.left >= maxLeftPercentage * clientWidth
+				? from.left - leftDistance
+				: from.left + leftDistance;
 
-		return { top: top * clientHeight, left: left * clientWidth };
+		const maxTopPercentage = (100 - (this.DEFAULT_HEIGHT_PERCENT + this.OFFSET)) / 100;
+		const top =
+			from.top >= maxTopPercentage * clientHeight ? from.top - topDistance : from.top + topDistance;
+
+		return { left, top };
 	}
 
 	determineStartingCoordinates({ top, left }: { left?: number; top?: number }): {
