@@ -1,7 +1,5 @@
 import { clamp } from '$lib/utils/numbers.js';
 
-const BASE_FLOATER_Z = 10;
-
 export type FloatingPosition = {
 	top: number;
 	left: number;
@@ -31,6 +29,7 @@ export class FloaterState {
 	readonly DEFAULT_LEFT_PX = 20;
 	readonly NUDGE_AMOUNT_PERCENT = 0.5;
 	readonly EDGE_BUFFER_PX = 3;
+	readonly BASE_Z = 10;
 
 	root: HTMLElement | null = null;
 	bars = $state<FloatingBar[]>([]);
@@ -131,12 +130,12 @@ export class FloaterState {
 
 	determineStartingZ(defaultZ?: number): number {
 		if (defaultZ) {
-			return Math.max(BASE_FLOATER_Z, defaultZ);
+			return Math.max(this.BASE_Z, defaultZ);
 		}
 		if (this.highestBar) {
 			return this.highestBar.z + 1;
 		}
-		return BASE_FLOATER_Z;
+		return this.BASE_Z;
 	}
 
 	determineStartingMeasurements(
@@ -165,7 +164,7 @@ export class FloaterState {
 	// TODO: Determine if this function is needed.
 	removeZGaps(): void {
 		const bars = this.bars.toSorted((a, b) => a.z - b.z);
-		let nextZ = BASE_FLOATER_Z;
+		let nextZ = this.BASE_Z;
 		for (const bar of bars) {
 			if (bar.z !== nextZ) {
 				const originalBar = this.bar(bar.id);

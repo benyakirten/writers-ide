@@ -80,8 +80,30 @@ describe('FloaterState', () => {
 		// TODO
 	});
 
-	describe.todo('determineStartingZ', () => {
-		// TODO
+	describe('determineStartingZ', () => {
+		it("should return the paramter as the z index if it's greater than the minimum z index", () => {
+			const zIndex = floaterState.BASE_Z * 2;
+			const got = floaterState.determineStartingZ(zIndex);
+			expect(got).toBe(zIndex);
+		});
+
+		it('should return the minimum z index if the parameter is less than the minimum z index', () => {
+			const zIndex = floaterState.BASE_Z / 2 - 1;
+			const got = floaterState.determineStartingZ(zIndex);
+			expect(got).toBe(floaterState.BASE_Z);
+		});
+
+		it("should return the highst bar's z index + 1 if no paramter is passed in", () => {
+			floaterState.add({ z: 100 });
+
+			const got = floaterState.determineStartingZ();
+			expect(got).toBe(101);
+		});
+
+		it('should return the minimum z index if there is no parameter passed in and no highest bar', () => {
+			const got = floaterState.determineStartingZ();
+			expect(got).toBe(floaterState.BASE_Z);
+		});
 	});
 
 	describe.todo('determineStartingMeasurements', () => {
@@ -193,17 +215,18 @@ describe('FloaterState', () => {
 		// TODO
 	});
 
-	describe.todo('update', () => {
+	describe('update', () => {
 		it("should update the bar's properties if it is found", () => {
 			const bar = floaterState.add({ minimized: true, title: 'Floating Bar' });
 			expect(bar.title).toBe('Floating Bar');
 			expect(bar.minimized).toBe(true);
 
-			floaterState.update(bar.id, 'title', 'New Title');
-			expect(bar.title).toBe('New Title');
+			let got = floaterState.update(bar.id, 'title', 'New Title');
+			expect(got!.id).toBe(bar.id);
+			expect(got!.title).toBe('New Title');
 
-			floaterState.update(bar.id, 'minimized', false);
-			expect(bar.minimized).toBe(false);
+			got = floaterState.update(bar.id, 'minimized', false);
+			expect(got!.minimized).toBe(false);
 		});
 	});
 });
