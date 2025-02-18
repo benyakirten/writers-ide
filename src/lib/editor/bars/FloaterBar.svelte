@@ -12,7 +12,7 @@
 
 	onMount(() => {
 		mutationObserver = new MutationObserver(() => {
-			FloaterState.updateMeasurements(bar.id, floater.offsetWidth, floater.offsetHeight);
+			FloaterState.updateMeasurements(bar.id, floater.clientWidth, floater.clientHeight);
 		});
 		mutationObserver.observe(floater, { attributes: true });
 
@@ -54,13 +54,15 @@
 	style:max-width={`${FloaterState.MAX_WIDTH_PX}px`}
 	style:max-height={`${FloaterState.MAX_HEIGHT_PERCENT}%`}
 	onfocus={() => FloaterState.focus(index)}
+	onkeydown={(e) => handleKeydown(e)}
+	tabindex="0"
+	role="button"
 >
 	<div
-		style:cursor={dragging ? 'grab' : 'grabbing'}
+		style:cursor={FloaterState.dragging === bar.id ? 'grab' : 'grabbing'}
 		class="menu"
-		tabindex="0"
-		onkeydown={(e) => handleKeydown(e)}
 		onmousedown={() => FloaterState.startDragging(index)}
+		tabindex="0"
 		role="button"
 	>
 		<button aria-label={`Minimize bar #${index + 1}`}>

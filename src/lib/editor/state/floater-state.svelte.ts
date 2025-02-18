@@ -29,6 +29,7 @@ class FloaterState {
 	readonly DEFAULT_TOP_PX = 20;
 	readonly DEFAULT_LEFT_PX = 20;
 	readonly NUDGE_AMOUNT_PERCENT = 0.5;
+	readonly EDGE_BUFFER_PX = 3;
 
 	root: HTMLElement | null = null;
 	bars = $state<FloatingBar[]>([
@@ -288,7 +289,8 @@ class FloaterState {
 		}
 
 		const { width, height, top, left } = bar.position;
-		const { clientWidth, clientHeight } = this.root ?? { clientWidth: 0, clientHeight: 0 };
+		const clientWidth = this.root?.clientWidth ?? 0;
+		const clientHeight = this.root?.clientHeight ?? 0;
 
 		const delta =
 			(this.NUDGE_AMOUNT_PERCENT / 100) *
@@ -301,10 +303,10 @@ class FloaterState {
 				bar.position.left = Math.max(left - delta, 0);
 				break;
 			case 'down':
-				bar.position.top = Math.min(top + delta, clientHeight - height);
+				bar.position.top = Math.min(top + delta, clientHeight - height - this.EDGE_BUFFER_PX);
 				break;
 			case 'right':
-				bar.position.left = Math.min(left + delta, clientWidth - width);
+				bar.position.left = Math.min(left + delta, clientWidth - width - this.EDGE_BUFFER_PX);
 				break;
 		}
 
