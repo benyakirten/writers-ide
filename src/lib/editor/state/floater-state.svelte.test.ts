@@ -357,8 +357,56 @@ describe('FloaterState', () => {
 		});
 	});
 
-	describe.todo('updateMeasurements', () => {
-		// TODO
+	describe('updateMeasurements', () => {
+		it('should return null if the bar does not exist', () => {
+			const got = floaterState.updateMeasurements('non-existent', 100, 200);
+			expect(got).toBeNull();
+		});
+
+		it("should update the bar's width and height if it is found", () => {
+			const bar = floaterState.add({ width: 200, height: 300 });
+			const got = floaterState.updateMeasurements(bar.id, 250, 350);
+
+			expect(got!.position.width).toBe(250);
+			expect(got!.position.height).toBe(350);
+		});
+
+		it("should keep the bar's width and height within the minimums", () => {
+			const bar = floaterState.add({ width: 200, height: 300 });
+
+			const got = floaterState.updateMeasurements(bar.id, 50, 50);
+
+			expect(got!.position.width).toBe(floaterState.MIN_WIDTH_PX);
+			expect(got!.position.height).toBe(floaterState.MIN_HEIGHT_PX);
+		});
+
+		it("should keep the bar's width within the maximum", () => {
+			const bar = floaterState.add({ width: 200, height: 300 });
+
+			const got = floaterState.updateMeasurements(bar.id, 5000, 50);
+
+			expect(got!.position.width).toBe(floaterState.MAX_WIDTH_PX);
+		});
+
+		it("should have a maximum height if the root element's height times the maximum height is greater than the minimum height", () => {
+			const rootWidth = 1500;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const bar = floaterState.add({ width: 200, height: 300 });
+
+			const wantHeight = (floaterState.MAX_HEIGHT_PERCENT * rootHeight) / 100;
+			const got = floaterState.updateMeasurements(bar.id, 300, 5000);
+
+			expect(got!.position.height).toBe(wantHeight);
+		});
+
+		it("should have a maximum height if the root element's height times the maximum height is greater than the minimum height", () => {
+			const bar = floaterState.add({ width: 200, height: 300 });
+			const got = floaterState.updateMeasurements(bar.id, 300, 5000);
+			expect(got!.position.height).toBe(5000);
+		});
 	});
 
 	describe('startDragging', () => {

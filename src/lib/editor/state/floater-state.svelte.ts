@@ -252,11 +252,18 @@ export class FloaterState {
 		}
 
 		bar.position.width = clamp(width, this.MIN_WIDTH_PX, this.MAX_WIDTH_PX);
-		bar.position.height = clamp(
-			height,
-			this.MIN_HEIGHT_PX,
-			this.root ? this.MAX_HEIGHT_PERCENT * this.root.clientHeight : height
-		);
+
+		const newHeight =
+			this.root && this.MAX_HEIGHT_PERCENT * this.root.clientHeight > this.MIN_HEIGHT_PX
+				? clamp(
+						height,
+						this.MIN_HEIGHT_PX,
+						(this.MAX_HEIGHT_PERCENT * this.root.clientHeight) / 100
+					)
+				: Math.max(height, this.MIN_HEIGHT_PX);
+		bar.position.height = newHeight;
+
+		console.log(bar.position.height);
 
 		return bar;
 	}
