@@ -27,7 +27,7 @@ export class FloaterState {
 	readonly DEFAULT_WIDTH_PERCENT = 20;
 	readonly DEFAULT_TOP_PX = 20;
 	readonly DEFAULT_LEFT_PX = 20;
-	readonly NUDGE_AMOUNT_PERCENT = 0.5;
+	readonly NUDGE_PERCENT = 0.5;
 	readonly EDGE_BUFFER_PX = 3;
 	readonly BASE_Z = 10;
 
@@ -314,16 +314,16 @@ export class FloaterState {
 
 	nudge(id: string | number, direction: 'up' | 'left' | 'down' | 'right'): boolean {
 		const bar = this.bar(id);
-		if (!bar) {
+		if (!bar || !this.root) {
 			return false;
 		}
 
 		const { width, height, top, left } = bar.position;
-		const clientWidth = this.root?.clientWidth ?? 0;
-		const clientHeight = this.root?.clientHeight ?? 0;
+		const clientWidth = this.root.clientWidth;
+		const clientHeight = this.root.clientHeight;
 
 		const delta =
-			(this.NUDGE_AMOUNT_PERCENT / 100) *
+			(this.NUDGE_PERCENT / 100) *
 			(direction === 'up' || direction === 'down' ? clientHeight : clientWidth);
 		switch (direction) {
 			case 'up':

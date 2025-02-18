@@ -564,8 +564,142 @@ describe('FloaterState', () => {
 		});
 	});
 
-	describe.todo('nudge', () => {
-		// TODO
+	describe('nudge', () => {
+		it("should return false if the bar doesn't exist", () => {
+			const got = floaterState.nudge('non-existent', 'up');
+			expect(got).toBe(false);
+		});
+
+		it("should return false if the root doesn't exist", () => {
+			const bar = floaterState.add();
+			floaterState.root = null;
+
+			const got = floaterState.nudge(bar.id, 'up');
+			expect(got).toBe(false);
+		});
+
+		it("should decrease the bar's top by the nudge percent of the root's height if the direction is 'up'", () => {
+			const rootWidth = 1500;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const bar = floaterState.add({ left: 1000, top: 800, height: 400, width: 300 });
+			const got = floaterState.nudge(bar.id, 'up');
+			const gotBar = floaterState.bar(bar.id)!;
+
+			expect(got).toBe(true);
+			expect(gotBar.position.top).toBe(800 - (floaterState.NUDGE_PERCENT * rootHeight) / 100);
+		});
+
+		it("should increase the bar's top by the nudge percent of the root's height if the direction is 'down'", () => {
+			const rootWidth = 1500;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const bar = floaterState.add({ left: 1000, top: 800, height: 400, width: 300 });
+			const got = floaterState.nudge(bar.id, 'down');
+			const gotBar = floaterState.bar(bar.id)!;
+
+			expect(got).toBe(true);
+			expect(gotBar.position.top).toBe(800 + (floaterState.NUDGE_PERCENT * rootHeight) / 100);
+		});
+
+		it("should decrease the bar's left by the nudge percent of the root's width if the direction is 'left'", () => {
+			const rootWidth = 1500;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const bar = floaterState.add({ left: 1000, top: 800, height: 400, width: 300 });
+			const got = floaterState.nudge(bar.id, 'left');
+			const gotBar = floaterState.bar(bar.id)!;
+
+			expect(got).toBe(true);
+			expect(gotBar.position.left).toBe(1000 - (floaterState.NUDGE_PERCENT * rootWidth) / 100);
+		});
+
+		it("should increase the bar's left by the nudge percent of the root's height if the direction is 'right'", () => {
+			const rootWidth = 1500;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const bar = floaterState.add({ left: 1000, top: 800, height: 400, width: 300 });
+			const got = floaterState.nudge(bar.id, 'right');
+			const gotBar = floaterState.bar(bar.id)!;
+
+			expect(got).toBe(true);
+			expect(gotBar.position.left).toBe(1000 + (floaterState.NUDGE_PERCENT * rootWidth) / 100);
+		});
+
+		it('should not nudge left further than 0', () => {
+			const rootWidth = 1500;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const bar = floaterState.add({ left: 0, top: 800, height: 400, width: 300 });
+			for (let i = 0; i < 100; i++) {
+				const got = floaterState.nudge(bar.id, 'left');
+				expect(got).toBe(true);
+			}
+			const gotBar = floaterState.bar(bar.id)!;
+			expect(gotBar.position.left).toBe(0);
+		});
+
+		it('should not nudge left further than the maximum width minus the width of the bar minus the buffer', () => {
+			const rootWidth = 1500;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const barWidth = 300;
+			const bar = floaterState.add({ left: 1000, top: 800, height: 400, width: barWidth });
+			const wantLeft = rootWidth - barWidth - floaterState.EDGE_BUFFER_PX;
+			for (let i = 0; i < 100; i++) {
+				const got = floaterState.nudge(bar.id, 'right');
+				expect(got).toBe(true);
+			}
+
+			const gotBar = floaterState.bar(bar.id)!;
+			expect(gotBar.position.left).toBe(wantLeft);
+		});
+
+		it('should not nudge up further than 0', () => {
+			const rootWidth = 1500;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const bar = floaterState.add({ left: 500, top: 0, height: 400, width: 300 });
+			for (let i = 0; i < 100; i++) {
+				const got = floaterState.nudge(bar.id, 'up');
+				expect(got).toBe(true);
+			}
+
+			const gotBar = floaterState.bar(bar.id)!;
+			expect(gotBar.position.top).toBe(0);
+		});
+
+		it('should not nudge down further than the editor width minus the height of the item minus a buffer', () => {
+			const rootWidth = 1500;
+			const rootHeight = 3500;
+			const root = createRoot(rootWidth, rootHeight);
+			floaterState.root = root;
+
+			const barHeight = 400;
+			const bar = floaterState.add({ left: 1000, top: 3200, height: barHeight, width: 300 });
+			const wantTop = rootHeight - barHeight - floaterState.EDGE_BUFFER_PX;
+			for (let i = 0; i < 100; i++) {
+				const got = floaterState.nudge(bar.id, 'down');
+				expect(got).toBe(true);
+			}
+
+			const gotBar = floaterState.bar(bar.id)!;
+			expect(gotBar.position.top).toBe(wantTop);
+		});
 	});
 
 	describe('update', () => {
