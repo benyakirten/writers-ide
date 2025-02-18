@@ -27,7 +27,7 @@
 	onmouseupcapture={() => endResize()}
 	onmousemovecapture={(event) => resize(event)}
 >
-	{#each FloaterState.bars as bar, index (bar.id)}
+	{#each FloaterState.visibleBars as bar, index (bar.id)}
 		<FloaterBar {bar} {index}>
 			Floater Bar #{index + 1}
 		</FloaterBar>

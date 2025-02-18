@@ -9,6 +9,7 @@
 
 	let floater: HTMLElement;
 	let mutationObserver: MutationObserver;
+	let menu: HTMLElement;
 
 	onMount(() => {
 		mutationObserver = new MutationObserver(() => {
@@ -21,7 +22,12 @@
 		};
 	});
 
-	let dragging = false;
+	function handleMousedown(e: MouseEvent) {
+		if (e.target !== menu) {
+			return;
+		}
+		FloaterState.startDragging(index, e);
+	}
 
 	function handleKeydown(e: KeyboardEvent) {
 		switch (e.key) {
@@ -59,16 +65,24 @@
 	role="button"
 >
 	<div
-		style:cursor={FloaterState.dragging === bar.id ? 'grab' : 'grabbing'}
+		style:cursor={FloaterState.dragging?.id === bar.id ? 'grabbing' : 'grab'}
 		class="menu"
-		onmousedown={() => FloaterState.startDragging(index)}
+		bind:this={menu}
+		onmousedown={(e) => handleMousedown(e)}
+		onmousemove={(e) => FloaterState.move(e)}
 		tabindex="0"
 		role="button"
 	>
-		<button aria-label={`Minimize bar #${index + 1}`}>
+		<button
+			onclickcapture={() => FloaterState.minimize(index)}
+			aria-label={`Minimize bar #${index + 1}`}
+		>
 			<Icon src={Minus} size="16px" />
 		</button>
-		<button aria-label={`Close bar #${index + 1}`} onclick={() => FloaterState.remove(index)}>
+		<button
+			aria-label={`Close bar #${index + 1}`}
+			onclickcapture={() => FloaterState.remove(index)}
+		>
 			<Icon src={Cross2} size="16px" />
 		</button>
 	</div>
@@ -88,9 +102,5 @@
 		padding: 2px;
 		display: flex;
 		justify-content: flex-end;
-
-		&:focus {
-			outline: 1px solid blue;
-		}
 	}
 </style>

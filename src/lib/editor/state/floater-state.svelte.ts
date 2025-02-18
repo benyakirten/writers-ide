@@ -45,6 +45,9 @@ class FloaterState {
 			minimized: false
 		}
 	]);
+	visibleBars = $derived(this.bars.filter((bar) => !bar.minimized));
+	minimizedBars = $derived(this.bars.filter((bar) => bar.minimized));
+
 	highestBar = $derived.by(() => {
 		let highestBar: FloatingBar | null = null;
 		for (const bar of this.bars) {
@@ -56,7 +59,11 @@ class FloaterState {
 		}
 		return highestBar;
 	});
-	dragging: string | null = null;
+	dragging: {
+		id: string;
+		x: number;
+		y: number;
+	} | null = $state(null);
 
 	bar(id: string | number): FloatingBar | undefined {
 		if (typeof id === 'number') {
@@ -248,13 +255,17 @@ class FloaterState {
 		return bar;
 	}
 
-	startDragging(id: string | number): boolean {
+	startDragging(id: string | number, e: MouseEvent): boolean {
 		const bar = this.bar(id);
 		if (!bar) {
 			return false;
 		}
 
-		this.dragging = bar.id;
+		this.dragging = {
+			id: bar.id,
+			x: e.clientX,
+			y: e.clientY
+		};
 		return true;
 	}
 
@@ -264,22 +275,25 @@ class FloaterState {
 
 	move(e: MouseEvent & { currentTarget: HTMLElement }) {
 		if (!this.dragging || !this.root) {
-			return;
+			return false;
 		}
 
-		const bar = this.bar(this.dragging);
+		const bar = this.bar(this.dragging.id);
 		if (!bar) {
-			return;
+			return false;
 		}
 
-		const { width, height } = bar.position;
-		const { clientX, clientY } = e;
-		const { left, top } = this.root.getBoundingClientRect();
-		const x = clientX - left - width / 2;
-		const y = clientY - top - height / 2;
+		const deltaX = e.clientX - this.dragging.x;
+		const deltaY = e.clientY - this.dragging.y;
+
+		const { width, height, left, top } = bar.position;
+		const x = left + deltaX;
+		const y = top + deltaY;
 
 		bar.position.left = clamp(x, 0, this.root.clientWidth - width);
 		bar.position.top = clamp(y, 0, this.root.clientHeight - height);
+
+		return true;
 	}
 
 	nudge(id: string | number, direction: 'up' | 'left' | 'down' | 'right'): FloatingBar | null {
@@ -310,6 +324,16 @@ class FloaterState {
 				break;
 		}
 
+		return bar;
+	}
+
+	minimize(id: string | number): FloatingBar | null {
+		const bar = this.bar(id);
+		if (!bar) {
+			return null;
+		}
+
+		bar.minimized = true;
 		return bar;
 	}
 }
