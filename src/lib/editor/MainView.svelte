@@ -4,8 +4,8 @@
 </script>
 
 <div class="main-view">
-	{#each TabState.windows as window (window.id)}
-		<Tab {...window} />
+	{#each TabState.windows as window, index (window.id)}
+		<Tab {...window} {index} />
 	{/each}
 </div>
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import { EditorState, Transaction } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import { keymap } from 'prosemirror-keymap';
@@ -8,9 +8,9 @@
 
 	import { schema } from './schema.js';
 	import { indentLess, indentMore, toggleBold, toggleItalics } from './actions.js';
-	import TabState from '../state/tab-state.svelte.js';
+	import TabState from '../../state/tab-state.svelte.js';
 
-	let { id } = $props<{ id: string }>();
+	let { index, id }: { index: number; id: string } = $props();
 
 	let el: HTMLElement;
 	let state: EditorState;
@@ -50,15 +50,14 @@
 		});
 
 		deregister = TabState.registerEditor(id, view);
-	});
-
-	onDestroy(() => {
-		view.destroy();
-		deregister?.();
+		return () => {
+			view.destroy();
+			deregister?.();
+		};
 	});
 </script>
 
-<div class="outer-container">
+<div class="outer-container" onfocusincapture={() => TabState.activate(id)}>
 	<div class="editor-host" bind:this={el}></div>
 </div>
 

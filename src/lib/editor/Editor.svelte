@@ -6,8 +6,10 @@
 	import HorizontalSlice from './bars/HorizontalSlice.svelte';
 	import { HorizontalBarPosition } from './state/horizontal-bar-state.svelte.js';
 	import FloaterBar from './bars/floater/FloaterBar.svelte';
-	import VerticalBaseBar from './bars/base/VerticalBaseBar.svelte';
+	import VerticalBaseBar from './bars/VerticalBaseBar.svelte';
 	import FloaterState from './state/floater-state.svelte.js';
+	import HorizontalBaseBar from './bars/HorizontalBaseBar.svelte';
+	import TabState from './state/tab-state.svelte.js';
 
 	function resize(e: MouseEvent) {
 		VerticalBarState.resize(e);
@@ -27,6 +29,7 @@
 	onmouseupcapture={() => endResize()}
 	onmousemovecapture={(event) => resize(event)}
 >
+	<HorizontalBaseBar selection={TabState.selection} />
 	{#each FloaterState.visibleBars as bar, index (bar.id)}
 		<FloaterBar {bar} {index}>
 			Floater Bar #{index + 1}
@@ -38,7 +41,9 @@
 		</HorizontalSlice>
 	{/each}
 	<div class="main-container">
-		<VerticalBaseBar />
+		{#if false}
+			<VerticalBaseBar />
+		{/if}
 		{#each VerticalBarState.inlineStart as bar, index (bar.id)}
 			<VerticalSlice {bar} position={VerticalBarPosition.InlineStart} {index}>
 				Inline Bar Start #{index + 1}

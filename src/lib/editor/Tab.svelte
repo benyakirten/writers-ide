@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { WindowData } from './state/tab-state.svelte.js';
-	import ProseMirrorView from './view/ProseMirrorView.svelte';
+	import ProseMirrorView from './prosemirror/view/ProseMirrorView.svelte';
 
-	let { id, view } = $props<{ id: string; view?: WindowData['view'] }>();
+	let { index, id, view }: { index: number; id: string; view?: WindowData['view'] } = $props();
 </script>
 
 <!-- TODO: Much more complexity here -->
@@ -10,7 +10,7 @@
 	{#if view === undefined}
 		<div></div>
 	{:else}
-		<ProseMirrorView {id} />
+		<ProseMirrorView {index} {id} />
 	{/if}
 </div>
 

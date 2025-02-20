@@ -6,7 +6,45 @@ export type WindowData = {
 };
 
 export class TabState {
-	windows = $state<WindowData[]>([]);
+	windows = $state<WindowData[]>([
+		{
+			id: '1',
+			view: null
+		},
+		{
+			id: '2',
+			view: null
+		}
+	]);
+
+	#active = $state<number | null>(null);
+	active = $derived.by(() => {
+		if (this.#active === null) {
+			return;
+		}
+
+		return this.windows.at(this.#active);
+	});
+	selection = $derived(this.active?.view?.state.selection);
+
+	activate(id: string | number): boolean {
+		if (typeof id === 'number') {
+			if (id > this.windows.length) {
+				return false;
+			}
+
+			this.#active = id;
+			return true;
+		}
+
+		const index = this.windows.findIndex((item) => item.id === id);
+		if (index === -1) {
+			return false;
+		}
+
+		this.#active = index;
+		return true;
+	}
 
 	// Other types of tabs?
 	registerEditor(id: string, view: EditorView | null): () => void {
@@ -76,5 +114,5 @@ export class TabState {
 	}
 }
 
-const globalEditorState = new TabState();
-export default globalEditorState;
+const tabState = new TabState();
+export default tabState;
