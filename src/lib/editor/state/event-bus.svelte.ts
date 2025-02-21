@@ -49,6 +49,7 @@ export class ProseMirrorEventBus extends Observable<{ id: string; view: EditorVi
 			if (!node.isText) {
 				return;
 			}
+
 			const marks = node.marks.map((mark) => mark.type.name);
 			if (isFirstRun) {
 				marks.forEach((mark) => complete.add(mark));
