@@ -16,47 +16,59 @@ export const createUpdtePlugin = (id: string) =>
 		}
 	});
 
+/**
+ * Identify which marks cover a portion of the selection,
+ * and which marks cover the entire selection.
+ */
 export type MarkAnalysis = {
-	active: Set<string>;
+	/** Marks that cover the entire selection. */
+	complete: Set<string>;
+	/** Marks that cover a portion of the selection. */
 	partial: Set<string>;
 };
 export class ProseMirrorEventBus extends Observable<{ id: string; view: EditorView }> {
-	// based off https://github.com/PierBover/prosemirror-cookbook?tab=readme-ov-file#utils
-	getActiveMarkCodes(view: EditorView | undefined): string[] {
-		// TODO: Seperate these into marks that are in every part of the selection
-		// and marks that are only in some parts of the selection
+	/**  based off https://github.com/PierBover/prosemirror-cookbook?tab=readme-ov-file#utils */
+	analyzeTextMarks(view: EditorView | undefined): MarkAnalysis {
+		const complete = new Set<string>();
+		const partial = new Set<string>();
+		const analysis = {
+			complete,
+			partial
+		};
+
 		if (!view) {
-			return [];
+			return analysis;
 		}
 
-		const isEmpty = view.state.selection.empty;
-		const state = view.state;
+		const { selection, doc } = view.state;
+		const { from, to } = selection;
 
-		if (isEmpty) {
-			const from = view.state.selection.$from;
-			const storedMarks = state.storedMarks;
+		let isFirstRun = true;
 
-			// Return either the stored marks, or the marks at the cursor position.
-			// Stored marks are the marks that are going to be applied to the next input
-			// if you dispatched a mark toggle with an empty cursor.
-			if (storedMarks) {
-				return storedMarks.map((mark) => mark.type.name);
-			} else {
-				return from.marks().map((mark) => mark.type.name);
+		doc.nodesBetween(from, to, (node) => {
+			if (!node.isText) {
+				return;
 			}
-		} else {
-			const head = view.state.selection.$head;
-			const anchor = view.state.selection.$anchor;
+			const marks = node.marks.map((mark) => mark.type.name);
+			if (isFirstRun) {
+				marks.forEach((mark) => complete.add(mark));
+				isFirstRun = false;
+			} else {
+				complete.forEach((mark) => {
+					if (!marks.includes(mark)) {
+						complete.delete(mark);
+						partial.add(mark);
+					}
+				});
+				marks.forEach((mark) => {
+					if (!complete.has(mark)) {
+						partial.add(mark);
+					}
+				});
+			}
+		});
 
-			// We're using a Set to not get duplicate values
-			const activeMarks = new Set<string>();
-
-			// Here we're getting the marks at the head and anchor of the selection
-			head.marks().forEach((mark) => activeMarks.add(mark.type.name));
-			anchor.marks().forEach((mark) => activeMarks.add(mark.type.name));
-
-			return Array.from(activeMarks);
-		}
+		return analysis;
 	}
 }
 
