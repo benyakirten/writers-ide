@@ -54,7 +54,7 @@ describe('Observable', () => {
 		const observable = new Observable<number>();
 		const mock = vi.fn();
 		const callback = async (data: number) => {
-			await new Promise((resolve) => setTimeout(resolve));
+			await new Promise((resolve) => setTimeout(resolve, 100));
 			mock(data);
 		};
 
