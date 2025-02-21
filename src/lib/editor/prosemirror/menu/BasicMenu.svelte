@@ -6,7 +6,7 @@
 	let activeCodeMarks = $state<string[]>([]);
 
 	onMount(() => {
-		const sub = ProseMirrorEventBus.subscribe((view) => {
+		const sub = ProseMirrorEventBus.subscribe(({ view }) => {
 			const marks = proseMirrorEventBus.getActiveMarkCodes(view);
 			activeCodeMarks = marks;
 		});

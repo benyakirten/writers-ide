@@ -1,55 +1,30 @@
-import { Observable } from '$lib/utils/observable.js';
 import { Plugin } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
-const observer = new Observable<{ id: string; view: EditorView }>();
+import { Observable } from '$lib/utils/observable.js';
 
 export const createUpdtePlugin = (id: string) =>
 	new Plugin({
 		view(view) {
-			observer.update({ id, view });
+			proseMirrorEventBus.update({ id, view });
 
 			return {
-				destroy() {
-					proseMirrorEventBus.remove(id);
-				},
 				update(view) {
-					observer.update({ id, view });
+					proseMirrorEventBus.update({ id, view });
 				}
 			};
 		}
 	});
 
-export class ProseMirrorEventBus {
-	#subscribers: Map<string, (view: EditorView) => void> = new Map();
-	views: Map<string, EditorView> = new Map();
-	unsubscribe: () => void;
-
-	constructor() {
-		this.unsubscribe = observer.subscribe(({ id, view }) => {
-			this.views.set(id, view);
-			for (const subscriber of this.#subscribers.values()) {
-				subscriber(view);
-			}
-		});
-	}
-
-	remove(id: string) {
-		this.views.delete(id);
-	}
-
-	destroy() {
-		this.unsubscribe();
-	}
-
-	subscribe(callback: (view: EditorView) => void) {
-		const id = crypto.randomUUID();
-		this.#subscribers.set(id, callback);
-		return () => this.#subscribers.delete(id);
-	}
-
-	// https://github.com/PierBover/prosemirror-cookbook?tab=readme-ov-file#utils
+export type MarkAnalysis = {
+	active: Set<string>;
+	partial: Set<string>;
+};
+export class ProseMirrorEventBus extends Observable<{ id: string; view: EditorView }> {
+	// based off https://github.com/PierBover/prosemirror-cookbook?tab=readme-ov-file#utils
 	getActiveMarkCodes(view: EditorView | undefined): string[] {
+		// TODO: Seperate these into marks that are in every part of the selection
+		// and marks that are only in some parts of the selection
 		if (!view) {
 			return [];
 		}
