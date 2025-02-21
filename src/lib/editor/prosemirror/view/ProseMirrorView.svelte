@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { EditorState, Transaction } from 'prosemirror-state';
+	import { EditorState, Plugin, Transaction } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import { keymap } from 'prosemirror-keymap';
 	import { undo, redo, history } from 'prosemirror-history';
@@ -10,7 +10,7 @@
 	import { indentLess, indentMore, toggleBold, toggleItalics } from './actions.js';
 	import TabState from '../../state/tab-state.svelte.js';
 
-	let { index, id }: { index: number; id: string } = $props();
+	let { index, id, plugins = [] }: { index: number; id: string; plugins?: Plugin[] } = $props();
 
 	let el: HTMLElement;
 	let state: EditorState;
@@ -40,7 +40,8 @@
 					'Mod-[': indentLess,
 					'Mod-]': indentMore
 				}),
-				keymap(baseKeymap)
+				keymap(baseKeymap),
+				...plugins
 			]
 		});
 

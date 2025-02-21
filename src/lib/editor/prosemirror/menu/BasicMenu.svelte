@@ -1,8 +1,20 @@
 <script lang="ts">
-	import type { Selection } from 'prosemirror-state';
-	import type { EditorView } from 'prosemirror-view';
+	import proseMirrorEventBus from '$lib/editor/state/event-bus.svelte.js';
+	import ProseMirrorEventBus from '$lib/editor/state/event-bus.svelte.js';
+	import { onMount } from 'svelte';
 
-	let { selection }: { selection: Selection | undefined } = $props();
+	let activeCodeMarks = $state<string[]>([]);
+
+	onMount(() => {
+		const sub = ProseMirrorEventBus.subscribe((view) => {
+			const marks = proseMirrorEventBus.getActiveMarkCodes(view);
+			activeCodeMarks = marks;
+		});
+
+		return () => sub();
+	});
+
+	$inspect(activeCodeMarks);
 </script>
 
 <div class="menu">This is a menu.</div>

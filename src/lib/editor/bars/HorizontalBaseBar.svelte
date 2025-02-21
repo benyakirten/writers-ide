@@ -1,13 +1,11 @@
 <script lang="ts">
-	import type { Selection } from 'prosemirror-state';
+	import type { EditorView } from 'prosemirror-view';
 
 	import BasicMenu from '$lib/editor/prosemirror/menu/BasicMenu.svelte';
-
-	let { selection }: { selection: Selection | undefined } = $props();
 </script>
 
 <div class="base-bar">
-	<BasicMenu {selection} />
+	<BasicMenu />
 </div>
 
 <style>

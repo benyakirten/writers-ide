@@ -29,7 +29,7 @@
 	onmouseupcapture={() => endResize()}
 	onmousemovecapture={(event) => resize(event)}
 >
-	<HorizontalBaseBar selection={TabState.selection} />
+	<HorizontalBaseBar />
 	{#each FloaterState.visibleBars as bar, index (bar.id)}
 		<FloaterBar {bar} {index}>
 			Floater Bar #{index + 1}

@@ -8,47 +8,48 @@ export type WindowData = {
 export class TabState {
 	windows = $state<WindowData[]>([
 		{
-			id: '1',
+			id: 'my-1',
 			view: null
 		},
 		{
-			id: '2',
+			id: 'my-2',
 			view: null
 		}
 	]);
 
-	#active = $state<number | null>(null);
-	active = $derived.by(() => {
-		if (this.#active === null) {
-			return;
-		}
-
-		return this.windows.at(this.#active);
-	});
-	selection = $derived(this.active?.view?.state.selection);
-
-	activate(id: string | number): boolean {
+	#active = $state<string | null>(null);
+	active = $derived.by(
+		() => this.windows.find((window) => window.id === this.#active)?.view ?? null
+	);
+	activate = (id: string | number): boolean => {
 		if (typeof id === 'number') {
 			if (id > this.windows.length) {
 				return false;
 			}
 
-			this.#active = id;
+			this.#active = this.windows[id].id;
 			return true;
 		}
 
-		const index = this.windows.findIndex((item) => item.id === id);
-		if (index === -1) {
+		const active = this.windows.find((item) => item.id === id);
+		if (!active) {
 			return false;
 		}
 
-		this.#active = index;
+		this.#active = active.id;
 		return true;
+	};
+
+	deactivate(): void {
+		this.#active = null;
 	}
 
 	// Other types of tabs?
 	registerEditor(id: string, view: EditorView | null): () => void {
 		const index = this.windows.findIndex((item) => item.id === id);
+		if (index === -1) {
+			return () => {};
+		}
 		this.windows[index].view = view;
 		return () => this.windows.splice(index, 1);
 	}
