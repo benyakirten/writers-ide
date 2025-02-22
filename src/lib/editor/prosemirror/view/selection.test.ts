@@ -4,6 +4,7 @@ import { Schema, Node } from 'prosemirror-model';
 import { EditorView } from 'prosemirror-view';
 
 import { findTextMarks } from './selection.js';
+import { doesSelectionAllHaveMark } from './selection.js';
 
 function createEditorView(
 	nodes: Node[],
@@ -21,25 +22,25 @@ function createEditorView(
 	return new EditorView(element, { state });
 }
 
-describe('findTextMarks', () => {
-	const schema = new Schema({
-		nodes: {
-			doc: { content: 'block+' },
-			paragraph: { group: 'block', content: 'text*', toDOM: () => ['p', 0] },
-			text: { inline: true, group: 'inline' }
+const schema = new Schema({
+	nodes: {
+		doc: { content: 'block+' },
+		paragraph: { group: 'block', content: 'text*', toDOM: () => ['p', 0] },
+		text: { inline: true, group: 'inline' }
+	},
+	marks: {
+		bOlD: {
+			parseDom: [{ tag: 'strong' }],
+			toDOM: () => ['strong']
 		},
-		marks: {
-			bOlD: {
-				parseDom: [{ tag: 'strong' }],
-				toDOM: () => ['strong']
-			},
-			itaLIC: {
-				parseDOM: [{ tag: 'em' }],
-				toDOM: () => ['em']
-			}
+		itaLIC: {
+			parseDOM: [{ tag: 'em' }],
+			toDOM: () => ['em']
 		}
-	});
+	}
+});
 
+describe('findTextMarks', () => {
 	it('should identify partial marks with no overlap', () => {
 		const view = createEditorView(
 			[
@@ -149,5 +150,69 @@ describe('findTextMarks', () => {
 
 		const got = findTextMarks(view.state.selection, view.state.doc);
 		expect(got.size).toBe(0);
+	});
+});
+
+describe('doesSelectionAllHaveMark', () => {
+	it('should return true if the entire selection is bold', () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', null, [schema.text('Bold text', [schema.mark('bOlD')])]),
+				schema.node('paragraph', null, [schema.text('Bolder text', [schema.mark('bOlD')])]),
+				schema.node('paragraph', null, [schema.text('Boldest text', [schema.mark('bOlD')])])
+			],
+
+			schema
+		);
+
+		const result = doesSelectionAllHaveMark(view.state.selection, view.state.doc, 'BoLD');
+		expect(result).toBe(true);
+	});
+
+	it('should return false if the entire selection is not bold', () => {
+		const view = createEditorView(
+			[schema.node('paragraph', null, [schema.text('Not bold text')])],
+			schema
+		);
+
+		const result = doesSelectionAllHaveMark(view.state.selection, view.state.doc, 'BOLD');
+		expect(result).toBe(false);
+	});
+
+	it('should return false if part of the selection is not bold', () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', null, [
+					schema.text('Bold text', [schema.mark('bOlD')]),
+					schema.text(' and not bold text')
+				])
+			],
+			schema
+		);
+
+		const result = doesSelectionAllHaveMark(view.state.selection, view.state.doc, 'bolD');
+		expect(result).toBe(false);
+	});
+
+	it('should return true if the selection is partially bold but fully within bold text', () => {
+		const view = createEditorView(
+			[schema.node('paragraph', null, [schema.text('Bold text', [schema.mark('bOlD')])])],
+			schema,
+			{ start: 1, end: 4 }
+		);
+
+		const result = doesSelectionAllHaveMark(view.state.selection, view.state.doc, 'bold');
+		expect(result).toBe(true);
+	});
+
+	it('should return false if the selection is empty', () => {
+		const view = createEditorView(
+			[schema.node('paragraph', null, [schema.text('Bold text', [schema.mark('bOlD')])])],
+			schema,
+			{ start: 0, end: 0 }
+		);
+
+		const result = doesSelectionAllHaveMark(view.state.selection, view.state.doc, 'beLD');
+		expect(result).toBe(false);
 	});
 });

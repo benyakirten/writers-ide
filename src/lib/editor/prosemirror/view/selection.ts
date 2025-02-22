@@ -1,34 +1,27 @@
 import type { Node } from 'prosemirror-model';
 import type { Selection } from 'prosemirror-state';
 
-export function isSelectionAllBold({ from, to }: Selection, doc: Node): boolean {
+export function doesSelectionAllHaveMark(
+	{ from, to }: Selection,
+	doc: Node,
+	name: string
+): boolean {
+	if (from === to) {
+		return false;
+	}
+
 	let isBold = true;
 	doc.nodesBetween(from, to, (node) => {
 		if (
 			isBold &&
 			node.isText &&
-			!node.marks.find((mark) => mark.type.name.toLowerCase().includes('bold'))
+			!node.marks.find((mark) => mark.type.name.toLowerCase().includes(name.toLowerCase()))
 		) {
 			isBold = false;
 			return isBold;
 		}
 	});
 	return isBold;
-}
-
-export function isSelectionAllItalics({ from, to }: Selection, doc: Node): boolean {
-	let isItalics = true;
-	doc.nodesBetween(from, to, (node) => {
-		if (
-			isItalics &&
-			node.isText &&
-			!node.marks.find((mark) => mark.type.name.toLowerCase().includes('italic'))
-		) {
-			isItalics = false;
-			return isItalics;
-		}
-	});
-	return isItalics;
 }
 
 /**

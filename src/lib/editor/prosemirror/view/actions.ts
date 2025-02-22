@@ -2,7 +2,7 @@ import type { EditorView } from 'prosemirror-view';
 import { type EditorState, type Transaction } from 'prosemirror-state';
 
 import { clamp } from '$lib/utils/numbers.js';
-import { isSelectionAllBold, isSelectionAllItalics } from './selection.js';
+import { doesSelectionAllHaveMark } from './selection.js';
 import { INDENT_MAX, INDENT_MIN } from './constants.js';
 
 export function toggleBold(
@@ -20,7 +20,7 @@ export function toggleBold(
 		return false;
 	}
 
-	if (isSelectionAllBold(tr.selection, tr.doc)) {
+	if (doesSelectionAllHaveMark(tr.selection, tr.doc, 'bold')) {
 		tr.removeMark(from, to, state.schema.marks.bold);
 		dispatch(tr);
 		return true;
@@ -46,7 +46,7 @@ export function toggleItalics(
 		return false;
 	}
 
-	if (isSelectionAllItalics(tr.selection, tr.doc)) {
+	if (doesSelectionAllHaveMark(tr.selection, tr.doc, 'italic')) {
 		tr.removeMark(from, to, state.schema.marks.italic);
 		dispatch(tr);
 		return true;
