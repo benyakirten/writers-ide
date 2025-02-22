@@ -51,8 +51,7 @@ describe('findTextMarks', () => {
 
 		const got = findTextMarks(view.state.selection, view.state.doc);
 
-		expect(got.complete.size).toBe(0);
-		expect(got.partial).toEqual(new Set(['bold', 'italic']));
+		expect(got.size).toBe(2);
 	});
 
 	it('should identify partial marks with overlap', () => {

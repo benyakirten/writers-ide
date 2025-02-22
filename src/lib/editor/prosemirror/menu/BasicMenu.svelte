@@ -5,9 +5,7 @@
 		label: string;
 		icon: IconSource;
 		onClick: () => void;
-		getIconInversion: (
-			activeCodeMarks: TextMarkPresence | undefined
-		) => 'full' | 'partial' | 'none';
+		getIconInversion: (activeCodeMarks: TextMarkPresence | undefined) => number;
 	};
 	const menu: MenuItem[] = [
 		{
@@ -17,14 +15,8 @@
 				console.log('BOLD CLICKED');
 			},
 			getIconInversion: (activeCodeMarks) => {
-				if (activeCodeMarks?.complete.has('bold')) {
-					return 'full';
-				}
-				if (activeCodeMarks?.partial.has('bold')) {
-					return 'partial';
-				}
-
-				return 'none';
+				const ratio = activeCodeMarks?.get('bold');
+				return ratio ?? 0;
 			}
 		},
 		{
@@ -34,14 +26,8 @@
 				console.log('ITALIC CLICKED');
 			},
 			getIconInversion: (activeCodeMarks) => {
-				if (activeCodeMarks?.complete.has('italic')) {
-					return 'full';
-				}
-				if (activeCodeMarks?.partial.has('italic')) {
-					return 'partial';
-				}
-
-				return 'none';
+				const ratio = activeCodeMarks?.get('italic');
+				return ratio ?? 0;
 			}
 		}
 	];

@@ -13,14 +13,14 @@
 		onClick,
 		id = crypto.randomUUID(),
 		tooltip,
-		inversion = 'none'
+		inversion = 0
 	}: {
 		icon: IconSource;
 		label: string;
 		onClick: () => void;
 		id?: string;
 		tooltip?: Snippet;
-		inversion?: 'full' | 'partial' | 'none';
+		inversion?: number;
 	} = $props();
 
 	onMount(() => {
@@ -30,21 +30,10 @@
 		const popper = createPopper(buttonEl, tooltipEl);
 		return () => popper.destroy();
 	});
-
-	let inversionAmount = $derived.by(() => {
-		switch (inversion) {
-			case 'full':
-				return '100%';
-			case 'partial':
-				return '75%';
-			default:
-				return '0%';
-		}
-	});
 </script>
 
 <button
-	style:--inversion={inversionAmount}
+	style:--inversion={`${Math.floor(inversion * 100)}%`}
 	aria-label={label}
 	onclick={onClick}
 	bind:this={buttonEl}
