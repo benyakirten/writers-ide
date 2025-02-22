@@ -12,11 +12,11 @@ const schema = new Schema({
 		text: { inline: true, group: 'inline' }
 	},
 	marks: {
-		bold: {
+		bOlD: {
 			parseDom: [{ tag: 'strong' }],
 			toDOM: () => ['strong']
 		},
-		italic: {
+		itaLIC: {
 			parseDOM: [{ tag: 'em' }],
 			toDOM: () => ['em']
 		}
@@ -50,8 +50,8 @@ describe('ProseMirrorEventBus', () => {
 
 		it('should identify partial marks with no overlap', () => {
 			const view = createEditorView([
-				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bOlD')])]),
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('itaLIC')])])
 			]);
 
 			const got = bus.analyzeTextMarks(view);
@@ -63,9 +63,9 @@ describe('ProseMirrorEventBus', () => {
 		it('should identify partial marks with overlap', () => {
 			const view = createEditorView([
 				schema.node('paragraph', null, [
-					schema.text('First Item', [schema.mark('bold'), schema.mark('italic')])
+					schema.text('First Item', [schema.mark('bOlD'), schema.mark('itaLIC')])
 				]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])]),
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('itaLIC')])]),
 				schema.node('paragraph', null, [schema.text('Third item')])
 			]);
 			const got = bus.analyzeTextMarks(view);
@@ -76,18 +76,18 @@ describe('ProseMirrorEventBus', () => {
 
 		it('should identify complete marks', () => {
 			const view = createEditorView([
-				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])])
+				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bOlD')])])
 			]);
 
 			const got = bus.analyzeTextMarks(view);
-			expect(got.complete).toEqual(new Set(['bold']));
+			expect(got.complete).toEqual(new Set(['bOlD']));
 			expect(got.partial.size).toBe(0);
 		});
 
 		it('should identify complete marks across multiple nodes', () => {
 			const view = createEditorView([
-				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('bold')])])
+				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bOlD')])]),
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('bOlD')])])
 			]);
 
 			const got = bus.analyzeTextMarks(view);
@@ -97,9 +97,9 @@ describe('ProseMirrorEventBus', () => {
 
 		it('should be able to identify mixed complete and partial marks', () => {
 			const view = createEditorView([
-				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
+				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bOlD')])]),
 				schema.node('paragraph', null, [
-					schema.text('Second item', [schema.mark('bold'), schema.mark('italic')])
+					schema.text('Second item', [schema.mark('bOlD'), schema.mark('itaLIC')])
 				])
 			]);
 

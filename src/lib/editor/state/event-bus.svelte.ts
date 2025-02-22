@@ -50,7 +50,7 @@ export class ProseMirrorEventBus extends Observable<{ id: string; view: EditorVi
 				return;
 			}
 
-			const marks = node.marks.map((mark) => mark.type.name);
+			const marks = node.marks.map((mark) => mark.type.name.toLowerCase());
 			if (isFirstRun) {
 				marks.forEach((mark) => complete.add(mark));
 				isFirstRun = false;
