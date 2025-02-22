@@ -20,7 +20,7 @@ export function toggleBold(
 		return false;
 	}
 
-	if (isSelectionAllBold(tr)) {
+	if (isSelectionAllBold(tr.selection, tr.doc)) {
 		tr.removeMark(from, to, state.schema.marks.bold);
 		dispatch(tr);
 		return true;
@@ -46,7 +46,7 @@ export function toggleItalics(
 		return false;
 	}
 
-	if (isSelectionAllItalics(tr)) {
+	if (isSelectionAllItalics(tr.selection, tr.doc)) {
 		tr.removeMark(from, to, state.schema.marks.italic);
 		dispatch(tr);
 		return true;

@@ -69,9 +69,12 @@
 			position: absolute;
 			top: 0;
 			left: 0;
-			width: var(--inversion);
+			width: 100%;
 			height: 100%;
 			backdrop-filter: invert(100%);
+			transform: scaleX(var(--inversion, 0));
+			transform-origin: left;
+			transition: transform 0.2s ease-in;
 		}
 	}
 

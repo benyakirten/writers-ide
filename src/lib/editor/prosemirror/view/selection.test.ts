@@ -40,12 +40,6 @@ describe('findTextMarks', () => {
 		}
 	});
 
-	it('should return empty sets when the view is undefined', () => {
-		const got = findTextMarks(undefined);
-		expect(got.complete.size).toBe(0);
-		expect(got.partial.size).toBe(0);
-	});
-
 	it('should identify partial marks with no overlap', () => {
 		const view = createEditorView(
 			[
@@ -55,7 +49,7 @@ describe('findTextMarks', () => {
 			schema
 		);
 
-		const got = findTextMarks(view);
+		const got = findTextMarks(view.state.selection, view.state.doc);
 
 		expect(got.complete.size).toBe(0);
 		expect(got.partial).toEqual(new Set(['bold', 'italic']));
@@ -72,7 +66,7 @@ describe('findTextMarks', () => {
 			],
 			schema
 		);
-		const got = findTextMarks(view);
+		const got = findTextMarks(view.state.selection, view.state.doc);
 
 		expect(got.complete.size).toBe(0);
 		expect(got.partial).toEqual(new Set(['bold', 'italic']));
@@ -84,7 +78,7 @@ describe('findTextMarks', () => {
 			schema
 		);
 
-		const got = findTextMarks(view);
+		const got = findTextMarks(view.state.selection, view.state.doc);
 		expect(got.complete).toEqual(new Set(['bold']));
 		expect(got.partial.size).toBe(0);
 	});
@@ -98,7 +92,7 @@ describe('findTextMarks', () => {
 			schema
 		);
 
-		const got = findTextMarks(view);
+		const got = findTextMarks(view.state.selection, view.state.doc);
 		expect(got.complete).toEqual(new Set(['bold']));
 		expect(got.partial.size).toBe(0);
 	});
@@ -114,7 +108,7 @@ describe('findTextMarks', () => {
 			schema
 		);
 
-		const got = findTextMarks(view);
+		const got = findTextMarks(view.state.selection, view.state.doc);
 		expect(got.complete).toEqual(new Set(['bold']));
 		expect(got.partial).toEqual(new Set(['italic']));
 	});
@@ -134,7 +128,7 @@ describe('findTextMarks', () => {
 			}
 		);
 
-		const got = findTextMarks(view);
+		const got = findTextMarks(view.state.selection, view.state.doc);
 		expect(got.complete.size).toBe(0);
 		expect(got.partial.size).toBe(0);
 	});

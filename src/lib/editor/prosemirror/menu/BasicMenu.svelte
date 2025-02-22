@@ -58,7 +58,7 @@
 
 	onMount(() => {
 		const unsub = ProseMirrorEventBus.subscribe(({ view }) => {
-			const marks = findTextMarks(view);
+			const marks = view && findTextMarks(view.state.selection, view.state.doc);
 			activeCodeMarks = marks;
 		});
 

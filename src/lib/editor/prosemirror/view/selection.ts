@@ -1,10 +1,9 @@
-import type { Transaction } from 'prosemirror-state';
-import type { EditorView } from 'prosemirror-view';
+import type { Node } from 'prosemirror-model';
+import type { Selection } from 'prosemirror-state';
 
-export function isSelectionAllBold(tr: Transaction): boolean {
-	const { from, to } = tr.selection;
+export function isSelectionAllBold({ from, to }: Selection, doc: Node): boolean {
 	let isBold = true;
-	tr.doc.nodesBetween(from, to, (node) => {
+	doc.nodesBetween(from, to, (node) => {
 		if (
 			isBold &&
 			node.isText &&
@@ -17,10 +16,9 @@ export function isSelectionAllBold(tr: Transaction): boolean {
 	return isBold;
 }
 
-export function isSelectionAllItalics(tr: Transaction): boolean {
-	const { from, to } = tr.selection;
+export function isSelectionAllItalics({ from, to }: Selection, doc: Node): boolean {
 	let isItalics = true;
-	tr.doc.nodesBetween(from, to, (node) => {
+	doc.nodesBetween(from, to, (node) => {
 		if (
 			isItalics &&
 			node.isText &&
@@ -48,7 +46,7 @@ export type TextMarkPresence = {
  * Get all marks for text nodes in the current selection. If the selection range is 0,
  * no marks are returned.
  * based off https://github.com/PierBover/prosemirror-cookbook?tab=readme-ov-file#utils */
-export function findTextMarks(view: EditorView | undefined): TextMarkPresence {
+export function findTextMarks({ from, to }: Selection, doc: Node): TextMarkPresence {
 	const complete = new Set<string>();
 	const partial = new Set<string>();
 	const analysis = {
@@ -56,12 +54,6 @@ export function findTextMarks(view: EditorView | undefined): TextMarkPresence {
 		partial
 	};
 
-	if (!view) {
-		return analysis;
-	}
-
-	const { selection, doc } = view.state;
-	const { from, to } = selection;
 	if (from === to) {
 		return analysis;
 	}
