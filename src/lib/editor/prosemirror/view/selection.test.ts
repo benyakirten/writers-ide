@@ -8,7 +8,7 @@ import { findTextMarks } from './selection.js';
 function createEditorView(
 	nodes: Node[],
 	schema: Schema,
-	selection?: { start: number; end: number }
+	selection?: { start?: number; end?: number }
 ) {
 	const element = document.createElement('div');
 
@@ -52,6 +52,8 @@ describe('findTextMarks', () => {
 		const got = findTextMarks(view.state.selection, view.state.doc);
 
 		expect(got.size).toBe(2);
+		expect(got.get('bold')).toBe(10 / 21);
+		expect(got.get('italic')).toBe(11 / 21);
 	});
 
 	it('should identify partial marks with overlap', () => {
@@ -67,8 +69,9 @@ describe('findTextMarks', () => {
 		);
 		const got = findTextMarks(view.state.selection, view.state.doc);
 
-		expect(got.complete.size).toBe(0);
-		expect(got.partial).toEqual(new Set(['bold', 'italic']));
+		expect(got.size).toBe(2);
+		expect(got.get('bold')).toBe(10 / 31);
+		expect(got.get('italic')).toBe(21 / 31);
 	});
 
 	it('should identify complete marks', () => {
@@ -78,8 +81,8 @@ describe('findTextMarks', () => {
 		);
 
 		const got = findTextMarks(view.state.selection, view.state.doc);
-		expect(got.complete).toEqual(new Set(['bold']));
-		expect(got.partial.size).toBe(0);
+		expect(got.size).toBe(1);
+		expect(got.get('bold')).toBe(1);
 	});
 
 	it('should identify complete marks across multiple nodes', () => {
@@ -92,8 +95,8 @@ describe('findTextMarks', () => {
 		);
 
 		const got = findTextMarks(view.state.selection, view.state.doc);
-		expect(got.complete).toEqual(new Set(['bold']));
-		expect(got.partial.size).toBe(0);
+		expect(got.size).toBe(1);
+		expect(got.get('bold')).toEqual(1);
 	});
 
 	it('should be able to identify mixed complete and partial marks', () => {
@@ -108,8 +111,25 @@ describe('findTextMarks', () => {
 		);
 
 		const got = findTextMarks(view.state.selection, view.state.doc);
-		expect(got.complete).toEqual(new Set(['bold']));
-		expect(got.partial).toEqual(new Set(['italic']));
+		expect(got.size).toBe(2);
+		expect(got.get('bold')).toEqual(1);
+		expect(got.get('italic')).toEqual(11 / 21);
+	});
+
+	it('should get the correct ratio over a partial selection', () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bOlD')])]),
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('itaLIC')])]),
+				schema.node('paragraph', null, [schema.text('Third item')])
+			],
+			schema,
+			{ start: 3 }
+		);
+		const got = findTextMarks(view.state.selection, view.state.doc);
+		expect(got.size).toBe(2);
+		expect(got.get('bold')).toBe(8 / 29);
+		expect(got.get('italic')).toBe(11 / 29);
 	});
 
 	it('should return empty sets if the selection is empty', () => {
@@ -128,7 +148,6 @@ describe('findTextMarks', () => {
 		);
 
 		const got = findTextMarks(view.state.selection, view.state.doc);
-		expect(got.complete.size).toBe(0);
-		expect(got.partial.size).toBe(0);
+		expect(got.size).toBe(0);
 	});
 });
