@@ -21,12 +21,12 @@ export function toggleBold(
 	}
 
 	if (isSelectionAllBold(tr)) {
-		tr.removeMark(from, to, state.schema.marks.strong);
+		tr.removeMark(from, to, state.schema.marks.bold);
 		dispatch(tr);
 		return true;
 	}
 
-	tr.addMark(from, to, state.schema.marks.strong.create());
+	tr.addMark(from, to, state.schema.marks.bold.create());
 	dispatch(tr);
 	return true;
 }
@@ -47,12 +47,12 @@ export function toggleItalics(
 	}
 
 	if (isSelectionAllItalics(tr)) {
-		tr.removeMark(from, to, state.schema.marks.em);
+		tr.removeMark(from, to, state.schema.marks.italic);
 		dispatch(tr);
 		return true;
 	}
 
-	tr.addMark(from, to, state.schema.marks.em.create());
+	tr.addMark(from, to, state.schema.marks.italic.create());
 	dispatch(tr);
 	return true;
 }

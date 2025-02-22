@@ -1,7 +1,7 @@
 import type { DOMOutputSpec, MarkSpec } from 'prosemirror-model';
 
 const emDOM: DOMOutputSpec = ['em', 0];
-const strongDOM: DOMOutputSpec = ['strong', 0];
+const boldDOM: DOMOutputSpec = ['strong', 0];
 const codeDOM: DOMOutputSpec = ['code', 0];
 
 const link: MarkSpec = {
@@ -24,27 +24,27 @@ const link: MarkSpec = {
 	}
 };
 
-const em: MarkSpec = {
+const italic: MarkSpec = {
 	parseDOM: [
 		{ tag: 'i' },
 		{ tag: 'em' },
 		{ style: 'font-style=italic' },
-		{ style: 'font-style=normal', clearMark: (m) => m.type.name === 'em' }
+		{ style: 'font-style=normal', clearMark: (m) => m.type.name === 'italic' }
 	],
 	toDOM() {
 		return emDOM;
 	}
 };
 
-const strong: MarkSpec = {
+const bold: MarkSpec = {
 	parseDOM: [
 		{ tag: 'b' },
 		{ tag: 'strong' },
 		{ style: 'font-weight=bold' },
-		{ style: 'font-weight=normal', clearMark: (m) => m.type.name === 'strong' }
+		{ style: 'font-weight=normal', clearMark: (m) => m.type.name === 'bold' }
 	],
 	toDOM() {
-		return strongDOM;
+		return boldDOM;
 	}
 };
 
@@ -57,7 +57,7 @@ const code: MarkSpec = {
 
 export const marks = {
 	link,
-	em,
-	strong,
+	italic,
+	bold,
 	code
 } as const;

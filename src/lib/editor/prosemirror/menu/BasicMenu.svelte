@@ -5,20 +5,41 @@
 		label: string;
 		icon: IconSource;
 		onClick: () => void;
+		getIconInversion: (activeCodeMarks: MarkAnalysis | undefined) => 'full' | 'partial' | 'none';
 	};
 	const menu: MenuItem[] = [
 		{
-			label: 'Bold',
+			label: 'Make text bold',
 			icon: FontBold,
 			onClick: () => {
 				console.log('BOLD CLICKED');
+			},
+			getIconInversion: (activeCodeMarks) => {
+				if (activeCodeMarks?.complete.has('bold')) {
+					return 'full';
+				}
+				if (activeCodeMarks?.partial.has('bold')) {
+					return 'partial';
+				}
+
+				return 'none';
 			}
 		},
 		{
-			label: 'Italic',
+			label: 'Make text italic',
 			icon: FontItalic,
 			onClick: () => {
 				console.log('ITALIC CLICKED');
+			},
+			getIconInversion: (activeCodeMarks) => {
+				if (activeCodeMarks?.complete.has('italic')) {
+					return 'full';
+				}
+				if (activeCodeMarks?.partial.has('italic')) {
+					return 'partial';
+				}
+
+				return 'none';
 			}
 		}
 	];
@@ -41,24 +62,11 @@
 
 		return () => unsub();
 	});
-
-	function determineInversionAmount(activeCodeMarks: MarkAnalysis | undefined, label: string) {
-		if (activeCodeMarks?.complete.has(label)) {
-			console.log('FULL');
-			return 'full';
-		}
-		if (activeCodeMarks?.partial.has(label)) {
-			console.log('PARTIAL');
-			return 'partial';
-		}
-		console.log('NONE');
-		return 'none';
-	}
 </script>
 
 <div class="menu">
-	{#each menu as { label, icon, onClick } (label)}
-		{@const inversion = determineInversionAmount(activeCodeMarks, label.toLowerCase())}
+	{#each menu as { label, icon, onClick, getIconInversion } (label)}
+		{@const inversion = getIconInversion(activeCodeMarks)}
 		<IconButton {inversion} {icon} {label} {onClick} />
 	{/each}
 </div>

@@ -3,7 +3,7 @@ import type { EditorView } from 'prosemirror-view';
 
 import { Observable } from '$lib/utils/observable.js';
 
-export const createUpdtePlugin = (id: string) =>
+export const createUpdatePlugin = (id: string) =>
 	new Plugin({
 		view(view) {
 			proseMirrorEventBus.update({ id, view });
@@ -42,6 +42,9 @@ export class ProseMirrorEventBus extends Observable<{ id: string; view: EditorVi
 
 		const { selection, doc } = view.state;
 		const { from, to } = selection;
+		if (from === to) {
+			return analysis;
+		}
 
 		let isFirstRun = true;
 

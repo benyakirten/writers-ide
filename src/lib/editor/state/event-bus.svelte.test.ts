@@ -80,7 +80,7 @@ describe('ProseMirrorEventBus', () => {
 			]);
 
 			const got = bus.analyzeTextMarks(view);
-			expect(got.complete).toEqual(new Set(['bOlD']));
+			expect(got.complete).toEqual(new Set(['bold']));
 			expect(got.partial.size).toBe(0);
 		});
 

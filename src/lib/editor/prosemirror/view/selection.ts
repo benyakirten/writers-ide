@@ -7,7 +7,7 @@ export function isSelectionAllBold(tr: Transaction): boolean {
 		if (
 			isBold &&
 			node.isText &&
-			!node.marks.find((mark) => mark.type.name.toLowerCase().includes('strong'))
+			!node.marks.find((mark) => mark.type.name.toLowerCase().includes('bold'))
 		) {
 			isBold = false;
 			return isBold;
@@ -18,16 +18,16 @@ export function isSelectionAllBold(tr: Transaction): boolean {
 
 export function isSelectionAllItalics(tr: Transaction): boolean {
 	const { from, to } = tr.selection;
-	let isItalic = true;
+	let isItalics = true;
 	tr.doc.nodesBetween(from, to, (node) => {
 		if (
-			isItalic &&
+			isItalics &&
 			node.isText &&
-			!node.marks.find((mark) => mark.type.name.toLowerCase().includes('em'))
+			!node.marks.find((mark) => mark.type.name.toLowerCase().includes('italic'))
 		) {
-			isItalic = false;
-			return isItalic;
+			isItalics = false;
+			return isItalics;
 		}
 	});
-	return isItalic;
+	return isItalics;
 }
