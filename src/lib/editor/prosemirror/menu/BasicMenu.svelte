@@ -5,7 +5,9 @@
 		label: string;
 		icon: IconSource;
 		onClick: () => void;
-		getIconInversion: (activeCodeMarks: MarkAnalysis | undefined) => 'full' | 'partial' | 'none';
+		getIconInversion: (
+			activeCodeMarks: TextMarkPresence | undefined
+		) => 'full' | 'partial' | 'none';
 	};
 	const menu: MenuItem[] = [
 		{
@@ -48,15 +50,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	import proseMirrorEventBus, { type MarkAnalysis } from '$lib/editor/state/event-bus.svelte.js';
 	import ProseMirrorEventBus from '$lib/editor/state/event-bus.svelte.js';
 	import IconButton from '$lib/components/IconButton.svelte';
+	import { findTextMarks, type TextMarkPresence } from '../view/selection.js';
 
-	let activeCodeMarks = $state<MarkAnalysis>();
+	let activeCodeMarks = $state<TextMarkPresence>();
 
 	onMount(() => {
 		const unsub = ProseMirrorEventBus.subscribe(({ view }) => {
-			const marks = proseMirrorEventBus.analyzeTextMarks(view);
+			const marks = findTextMarks(view);
 			activeCodeMarks = marks;
 		});
 
