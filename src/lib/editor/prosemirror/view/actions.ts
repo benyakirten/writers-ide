@@ -1,5 +1,5 @@
 import type { EditorView } from 'prosemirror-view';
-import type { EditorState, Transaction } from 'prosemirror-state';
+import { type EditorState, type Transaction } from 'prosemirror-state';
 
 import { clamp } from '$lib/utils/numbers.js';
 import { isSelectionAllBold, isSelectionAllItalics } from './selection.js';
