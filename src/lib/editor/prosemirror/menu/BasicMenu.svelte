@@ -80,7 +80,7 @@
 			},
 			determineInversion: (selection, doc) => {
 				const ratio = getIndentRatio(selection, doc);
-				return typeof ratio === 'number' ? 1 - ratio : 0;
+				return ratio === null ? 0 : 1 - ratio;
 			}
 		}
 	];

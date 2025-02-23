@@ -74,9 +74,7 @@ export function getIndentRatio({ from, to }: Selection, doc: Node): number | nul
 	let indentLevels = 0;
 	let maxIndents = 0;
 
-	console.log('REP');
 	doc.nodesBetween(from, to, (node) => {
-		console.log(node.type.name);
 		if (node.type.name !== 'paragraph') {
 			return;
 		}
