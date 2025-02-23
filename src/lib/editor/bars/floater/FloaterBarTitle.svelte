@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CheckCircled } from '@steeze-ui/radix-icons';
+	import { CheckCircle } from '@steeze-ui/phosphor-icons';
 	import { Icon } from '@steeze-ui/svelte-icon';
 
 	import FloaterState from '$lib/editor/state/floater-state.svelte.js';
@@ -56,7 +56,7 @@
 		>
 			<input bind:this={inputRef} type="text" value={title} name="title" />
 			<button aria-label="Change Title" type="submit">
-				<Icon src={CheckCircled} size="16px" />
+				<Icon src={CheckCircle} size="16px" />
 			</button>
 		</form>
 	{:else}

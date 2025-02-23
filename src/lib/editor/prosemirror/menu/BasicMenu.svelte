@@ -1,19 +1,27 @@
 <script module lang="ts">
 	import { Icon, type IconSource } from '@steeze-ui/svelte-icon';
-	import { Bold, Italic, Superscript, Subscript } from '@steeze-ui/lucide-icons';
+	import {
+		TextB,
+		TextItalic,
+		TextSuperscript,
+		TextSubscript,
+		TextIndent,
+		TextOutdent
+	} from '@steeze-ui/phosphor-icons';
 	import type { EditorView } from 'prosemirror-view';
 	import type { Selection } from 'prosemirror-state';
+	import type { Node } from 'prosemirror-model';
 
 	import { indentLess, indentMore, toggleMark } from '$lib/editor/prosemirror/view/actions.js';
 
 	type TextMenuIcon = {
-		steezeIcon: IconSource;
+		iconSrc: IconSource;
 		onClick: (view: EditorView | null) => void;
 		markName: string;
 	};
 	const textMarks: TextMenuIcon[] = [
 		{
-			steezeIcon: Bold,
+			iconSrc: TextB,
 			onClick: (view) => {
 				if (!view) {
 					return;
@@ -26,7 +34,7 @@
 			markName: 'bold'
 		},
 		{
-			steezeIcon: Italic,
+			iconSrc: TextItalic,
 			onClick: (view) => {
 				if (!view) {
 					return;
@@ -37,7 +45,7 @@
 			markName: 'italic'
 		},
 		{
-			steezeIcon: Superscript,
+			iconSrc: TextSuperscript,
 			onClick: (view) => {
 				if (!view) {
 					return;
@@ -49,7 +57,7 @@
 			markName: 'superscript'
 		},
 		{
-			steezeIcon: Subscript,
+			iconSrc: TextSubscript,
 			onClick: (view) => {
 				if (!view) {
 					return;
@@ -63,14 +71,14 @@
 
 	type BlockMenuIcon = {
 		label: string;
-		Icon: Component<{ size: number | string }>;
+		iconSrc: IconSource;
 		onClick: (view: EditorView | null) => void;
 		determineInversion: (selection: Selection, doc: Node) => number;
 	};
 	const blockMarks: BlockMenuIcon[] = [
 		{
 			label: 'Indent text more.',
-			Icon: IndentMore,
+			iconSrc: TextIndent,
 			onClick: (view) => {
 				if (!view) {
 					return;
@@ -85,7 +93,7 @@
 		},
 		{
 			label: 'Indent text less.',
-			Icon: IndentLess,
+			iconSrc: TextOutdent,
 			onClick: (view) => {
 				if (!view) {
 					return;
@@ -107,9 +115,6 @@
 	import ProseMirrorEventBus from '$lib/editor/state/event-bus.svelte.js';
 	import IconButton from '$lib/components/IconButton.svelte';
 	import { findTextMarks, getIndentRatio, type TextMarkPresence } from '../view/selection.js';
-	import IndentMore from '$lib/editor/icons/IndentMore.svelte';
-	import IndentLess from '$lib/editor/icons/IndentLess.svelte';
-	import type { Node } from 'prosemirror-model';
 
 	let activeCodeMarks = $state<TextMarkPresence>();
 	let editorView = $state<EditorView | null>(null);
@@ -129,23 +134,23 @@
 
 <div class="menu">
 	<div class="grouping">
-		{#each textMarks as { steezeIcon, onClick, markName } (markName)}
+		{#each textMarks as { iconSrc, onClick, markName } (markName)}
 			{@const inversion = activeCodeMarks?.get(markName) ?? 0}
 			{@const label = inversion === 1 ? `Remove ${markName} from text.` : `Make text ${markName}.`}
 			<IconButton {inversion} {label} onClick={() => onClick(editorView)}>
 				{#snippet icon()}
-					<Icon src={steezeIcon} title={label} size="16px" />
+					<Icon src={iconSrc} title={label} size="16px" />
 				{/snippet}
 			</IconButton>
 		{/each}
 	</div>
 	<div class="grouping">
-		{#each blockMarks as { label, Icon, onClick, determineInversion } (label)}
+		{#each blockMarks as { label, iconSrc, onClick, determineInversion } (label)}
 			{@const inversion =
 				editorView && selection ? determineInversion(selection, editorView.state.doc) : 0}
 			<IconButton {inversion} {label} onClick={() => onClick(editorView)}>
 				{#snippet icon()}
-					<Icon size={16} />
+					<Icon src={iconSrc} title={label} size="16px" />
 				{/snippet}
 			</IconButton>
 		{/each}

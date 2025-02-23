@@ -71,8 +71,7 @@
 	"dependencies": {
 		"@inlang/paraglide-sveltekit": "^0.11.1",
 		"@popperjs/core": "^2.11.8",
-		"@steeze-ui/lucide-icons": "^1.4.1",
-		"@steeze-ui/radix-icons": "^1.1.2",
+		"@steeze-ui/phosphor-icons": "^2.1.1",
 		"@steeze-ui/svelte-icon": "^1.6.2",
 		"i": "^0.3.7",
 		"jsdom": "^26.0.0",

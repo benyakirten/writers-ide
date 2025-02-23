@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
-	import { Cross2, Minus } from '@steeze-ui/radix-icons';
+	import { X, Minus } from '@steeze-ui/phosphor-icons';
 	import { Icon } from '@steeze-ui/svelte-icon';
 
 	import FloaterState, { type FloatingBar } from '$lib/editor/state/floater-state.svelte.js';
@@ -87,7 +87,7 @@
 				aria-label={`Close bar #${index + 1}`}
 				onclickcapture={() => FloaterState.remove(index)}
 			>
-				<Icon src={Cross2} size="16px" />
+				<Icon src={X} size="16px" />
 			</button>
 		</div>
 	</div>
