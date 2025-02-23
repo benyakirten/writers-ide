@@ -57,11 +57,13 @@ const code: MarkSpec = {
 	}
 };
 
+// TODO: Add support for vertical-align +/- amount
+// Word use vertical-alignment: % to let you offset by a specific amount
 const superscript: MarkSpec = {
 	parseDOM: [
 		{ tag: 'sup' },
 		{ style: 'vertical-align=super' },
-		{ style: 'vertical-align=top', clearMark: (m) => m.type.name === 'superscript' }
+		{ style: 'vertical-align=baseline', clearMark: (m) => m.type.name === 'superscript' }
 	],
 	toDOM() {
 		return supDOM;
@@ -72,7 +74,7 @@ const subscript: MarkSpec = {
 	parseDOM: [
 		{ tag: 'sub' },
 		{ style: 'vertical-align=sub' },
-		{ style: 'vertical-align=bottom', clearMark: (m) => m.type.name === 'subscript' }
+		{ style: 'vertical-align=baseline', clearMark: (m) => m.type.name === 'subscript' }
 	],
 	toDOM() {
 		return subDOM;

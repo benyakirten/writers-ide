@@ -35,7 +35,9 @@ export type TextMarkPresence = Map<string, number>;
 /**
  * Get all marks for text nodes in the current selection. If the selection range is 0,
  * no marks are returned.
- * based off https://github.com/PierBover/prosemirror-cookbook?tab=readme-ov-file#utils */
+ * based off https://github.com/PierBover/prosemirror-cookbook?tab=readme-ov-file#utils
+ * but heavily modified.
+ */
 export function findTextMarks({ from, to }: Selection, doc: Node): TextMarkPresence {
 	const ratios = new Map<string, number>();
 
@@ -86,7 +88,6 @@ export function getIndentRatio({ from, to }: Selection, doc: Node): number | nul
 		}
 	});
 
-	console.log(indentLevels, maxIndents);
 	if (maxIndents === 0) {
 		return null;
 	}

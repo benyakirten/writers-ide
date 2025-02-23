@@ -1,45 +1,37 @@
 <script module lang="ts">
 	import { Icon, type IconSource } from '@steeze-ui/svelte-icon';
-	import { FontBold, FontItalic } from '@steeze-ui/radix-icons';
+	import { Bold, Italic, Superscript, Subscript } from '@steeze-ui/lucide-icons';
 	import type { EditorView } from 'prosemirror-view';
 	import type { Selection } from 'prosemirror-state';
 
-	import {
-		indentLess,
-		indentMore,
-		toggleBold,
-		toggleItalics
-	} from '$lib/editor/prosemirror/view/actions.js';
+	import { indentLess, indentMore, toggleMark } from '$lib/editor/prosemirror/view/actions.js';
 
 	type TextMenuIcon = {
-		label: string;
 		steezeIcon: IconSource;
 		onClick: (view: EditorView | null) => void;
 		markName: string;
 	};
 	const textMarks: TextMenuIcon[] = [
 		{
-			label: 'Make text bold',
-			steezeIcon: FontBold,
+			steezeIcon: Bold,
 			onClick: (view) => {
 				if (!view) {
 					return;
 				}
 
 				const { state, dispatch } = view;
-				toggleBold(state, dispatch, view);
+				toggleMark('bold', state, dispatch, view);
 				view.focus();
 			},
 			markName: 'bold'
 		},
 		{
-			label: 'Make text italic',
-			steezeIcon: FontItalic,
+			steezeIcon: Italic,
 			onClick: (view) => {
 				if (!view) {
 					return;
 				}
-				toggleItalics(view.state, view.dispatch, view);
+				toggleMark('italic', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'italic'
@@ -54,7 +46,7 @@
 	};
 	const blockMarks: BlockMenuIcon[] = [
 		{
-			label: 'Indent more',
+			label: 'Indent text more.',
 			Icon: IndentMore,
 			onClick: (view) => {
 				if (!view) {
@@ -69,7 +61,7 @@
 			}
 		},
 		{
-			label: 'Indent less',
+			label: 'Indent text less.',
 			Icon: IndentLess,
 			onClick: (view) => {
 				if (!view) {
@@ -114,8 +106,9 @@
 
 <div class="menu">
 	<div class="grouping">
-		{#each textMarks as { label, steezeIcon, onClick, markName } (label)}
+		{#each textMarks as { steezeIcon, onClick, markName } (markName)}
 			{@const inversion = activeCodeMarks?.get(markName) ?? 0}
+			{@const label = inversion === 1 ? `Remove ${markName} from text.` : `Make text ${markName}.`}
 			<IconButton {inversion} {label} onClick={() => onClick(editorView)}>
 				{#snippet icon()}
 					<Icon src={steezeIcon} title={label} size="16px" />

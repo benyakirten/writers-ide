@@ -5,11 +5,12 @@ import { clamp } from '$lib/utils/numbers.js';
 import { doesSelectionHaveTextMark } from './selection.js';
 import { INDENT_MAX, INDENT_MIN } from './constants.js';
 
-export function toggleBold(
+export function toggleMark(
+	mark: string,
 	state: EditorState,
 	dispatch?: (tr: Transaction) => void,
 	view?: EditorView
-): boolean {
+) {
 	if (!view || !dispatch) {
 		return false;
 	}
@@ -20,39 +21,13 @@ export function toggleBold(
 		return false;
 	}
 
-	if (doesSelectionHaveTextMark(tr.selection, tr.doc, 'bold')) {
-		tr.removeMark(from, to, state.schema.marks.bold);
+	if (doesSelectionHaveTextMark(tr.selection, tr.doc, mark)) {
+		tr.removeMark(from, to, state.schema.marks[mark]);
 		dispatch(tr);
 		return true;
 	}
 
-	tr.addMark(from, to, state.schema.marks.bold.create());
-	dispatch(tr);
-	return true;
-}
-
-export function toggleItalics(
-	state: EditorState,
-	dispatch?: (tr: Transaction) => void,
-	view?: EditorView
-): boolean {
-	if (!view || !dispatch) {
-		return false;
-	}
-
-	const { tr } = view.state;
-	const { from, to } = tr.selection;
-	if (from === to) {
-		return false;
-	}
-
-	if (doesSelectionHaveTextMark(tr.selection, tr.doc, 'italic')) {
-		tr.removeMark(from, to, state.schema.marks.italic);
-		dispatch(tr);
-		return true;
-	}
-
-	tr.addMark(from, to, state.schema.marks.italic.create());
+	tr.addMark(from, to, state.schema.marks[mark].create());
 	dispatch(tr);
 	return true;
 }

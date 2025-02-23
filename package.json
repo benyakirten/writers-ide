@@ -71,9 +71,12 @@
 	"dependencies": {
 		"@inlang/paraglide-sveltekit": "^0.11.1",
 		"@popperjs/core": "^2.11.8",
+		"@steeze-ui/lucide-icons": "^1.4.1",
 		"@steeze-ui/radix-icons": "^1.1.2",
 		"@steeze-ui/svelte-icon": "^1.6.2",
+		"i": "^0.3.7",
 		"jsdom": "^26.0.0",
+		"pnpm": "^10.4.1",
 		"prosemirror-commands": "^1.6.2",
 		"prosemirror-history": "^1.4.1",
 		"prosemirror-keymap": "^1.2.2",

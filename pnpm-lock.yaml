@@ -14,15 +14,24 @@ importers:
       '@popperjs/core':
         specifier: ^2.11.8
         version: 2.11.8
+      '@steeze-ui/lucide-icons':
+        specifier: ^1.4.1
+        version: 1.4.1
       '@steeze-ui/radix-icons':
         specifier: ^1.1.2
         version: 1.1.2
       '@steeze-ui/svelte-icon':
         specifier: ^1.6.2
         version: 1.6.2(svelte@5.2.7)
+      i:
+        specifier: ^0.3.7
+        version: 0.3.7
       jsdom:
         specifier: ^26.0.0
         version: 26.0.0
+      pnpm:
+        specifier: ^10.4.1
+        version: 10.4.1
       prosemirror-commands:
         specifier: ^1.6.2
         version: 1.6.2
@@ -860,6 +869,9 @@ packages:
 
   '@sinclair/typebox@0.31.28':
     resolution: {integrity: sha512-/s55Jujywdw/Jpan+vsy6JZs1z2ZTGxTmbZTPiuSL2wz9mfzA2gN1zzaqmvfi4pq+uOt7Du85fkiwv5ymW84aQ==}
+
+  '@steeze-ui/lucide-icons@1.4.1':
+    resolution: {integrity: sha512-hkiFMr81bkmuR5jeT475OhWVzCHkvdwtNv5sVSYMK+7+8ZHbT2dS8iLGr06qvOgjLAXo0a7cqvMkXwxd6WIhbA==}
 
   '@steeze-ui/radix-icons@1.1.2':
     resolution: {integrity: sha512-Oh8+pC4TwBNDmYEw0lnbNXV3EPqJdAN1XMu/ZzwkrnNz0mOBMr7vhGqynNZH7572QOv01ORLUhHjRhg2B0tykw==}
@@ -1919,6 +1931,10 @@ packages:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
 
+  i@0.3.7:
+    resolution: {integrity: sha512-FYz4wlXgkQwIPqhzC5TdNMLSE5+GS1IIDJZY/1ZiEPCT2S3COUVZeT5OW4BmW4r5LHLQuOosSwsvnroG9GR59Q==}
+    engines: {node: '>=0.4'}
+
   iconv-lite@0.6.3:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
     engines: {node: '>=0.10.0'}
@@ -2289,6 +2305,11 @@ packages:
   playwright@1.49.0:
     resolution: {integrity: sha512-eKpmys0UFDnfNb3vfsf8Vx2LEOtflgRebl0Im2eQQnYMA4Aqd+Zw8bEOB+7ZKvN76901mRnqdsiOGKxzVTbi7A==}
     engines: {node: '>=18'}
+    hasBin: true
+
+  pnpm@10.4.1:
+    resolution: {integrity: sha512-x1O2w616+hOvOI+m2AgDWgCOMOqZk/WMZmPivF/yFnmqg02wlJhxKapNSIuG31f3tjSYGy+CfNysxpjMDPuIrw==}
+    engines: {node: '>=18.12'}
     hasBin: true
 
   polished@4.3.1:
@@ -3611,6 +3632,8 @@ snapshots:
 
   '@sinclair/typebox@0.31.28': {}
 
+  '@steeze-ui/lucide-icons@1.4.1': {}
+
   '@steeze-ui/radix-icons@1.1.2': {}
 
   '@steeze-ui/svelte-icon@1.6.2(svelte@5.2.7)':
@@ -4850,6 +4873,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  i@0.3.7: {}
+
   iconv-lite@0.6.3:
     dependencies:
       safer-buffer: 2.1.2
@@ -5201,6 +5226,8 @@ snapshots:
       playwright-core: 1.49.0
     optionalDependencies:
       fsevents: 2.3.2
+
+  pnpm@10.4.1: {}
 
   polished@4.3.1:
     dependencies:
