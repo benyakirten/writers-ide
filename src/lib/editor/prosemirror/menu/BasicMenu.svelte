@@ -35,6 +35,29 @@
 				view.focus();
 			},
 			markName: 'italic'
+		},
+		{
+			steezeIcon: Superscript,
+			onClick: (view) => {
+				if (!view) {
+					return;
+				}
+				// TODO: Make superscript exclusive with subscript.
+				toggleMark('superscript', view.state, view.dispatch, view);
+				view.focus();
+			},
+			markName: 'superscript'
+		},
+		{
+			steezeIcon: Subscript,
+			onClick: (view) => {
+				if (!view) {
+					return;
+				}
+				toggleMark('subscript', view.state, view.dispatch, view);
+				view.focus();
+			},
+			markName: 'subscript'
 		}
 	];
 
