@@ -70,15 +70,13 @@ export function findTextMarks({ from, to }: Selection, doc: Node): TextMarkPrese
 	return ratios;
 }
 
-export function getIndentLevels({ from, to }: Selection, doc: Node): number {
+export function getIndentRatio({ from, to }: Selection, doc: Node): number | null {
 	let indentLevels = 0;
 	let maxIndents = 0;
 
-	if (from === to) {
-		return 0;
-	}
-
+	console.log('REP');
 	doc.nodesBetween(from, to, (node) => {
+		console.log(node.type.name);
 		if (node.type.name !== 'paragraph') {
 			return;
 		}
@@ -89,8 +87,10 @@ export function getIndentLevels({ from, to }: Selection, doc: Node): number {
 			indentLevels += node.attrs.indent ?? 0;
 		}
 	});
+
+	console.log(indentLevels, maxIndents);
 	if (maxIndents === 0) {
-		return 0;
+		return null;
 	}
 
 	return indentLevels / maxIndents;
