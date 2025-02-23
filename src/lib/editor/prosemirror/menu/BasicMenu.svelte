@@ -1,20 +1,25 @@
 <script module lang="ts">
-	import { type IconSource } from '@steeze-ui/svelte-icon';
+	import { Icon, type IconSource } from '@steeze-ui/svelte-icon';
 	import { FontBold, FontItalic } from '@steeze-ui/radix-icons';
 	import type { EditorView } from 'prosemirror-view';
 
-	import { toggleBold, toggleItalics } from '$lib/editor/prosemirror/view/actions.js';
+	import {
+		indentLess,
+		indentMore,
+		toggleBold,
+		toggleItalics
+	} from '$lib/editor/prosemirror/view/actions.js';
 
-	type MenuItem = {
+	type TextMenuIcon = {
 		label: string;
-		icon: IconSource;
-		onClick: (view: EditorView | undefined) => void;
-		getIconInversion: (activeCodeMarks: TextMarkPresence | undefined) => number;
+		steezeIcon: IconSource;
+		onClick: (view: EditorView | null) => void;
+		markName: string;
 	};
-	const menu: MenuItem[] = [
+	const textMarks: TextMenuIcon[] = [
 		{
 			label: 'Make text bold',
-			icon: FontBold,
+			steezeIcon: FontBold,
 			onClick: (view) => {
 				if (!view) {
 					return;
@@ -24,14 +29,11 @@
 				toggleBold(state, dispatch, view);
 				view.focus();
 			},
-			getIconInversion: (activeCodeMarks) => {
-				const ratio = activeCodeMarks?.get('bold');
-				return ratio ?? 0;
-			}
+			markName: 'bold'
 		},
 		{
 			label: 'Make text italic',
-			icon: FontItalic,
+			steezeIcon: FontItalic,
 			onClick: (view) => {
 				if (!view) {
 					return;
@@ -39,24 +41,59 @@
 				toggleItalics(view.state, view.dispatch, view);
 				view.focus();
 			},
-			getIconInversion: (activeCodeMarks) => {
-				const ratio = activeCodeMarks?.get('italic');
-				return ratio ?? 0;
+			markName: 'italic'
+		}
+	];
+
+	type BlockMenuIcon = {
+		label: string;
+		Icon: Component<{ size: number | string }>;
+		onClick: (view: EditorView | null) => void;
+		determineInversion: (view: EditorView | null) => number;
+	};
+	const blockMarks: BlockMenuIcon[] = [
+		{
+			label: 'Indent more',
+			Icon: IndentMore,
+			onClick: (view) => {
+				if (!view) {
+					return;
+				}
+				indentMore(view.state, view.dispatch);
+				view.focus();
+			},
+			determineInversion: (view) => {
+				return 0;
+			}
+		},
+		{
+			label: 'Indent less',
+			Icon: IndentLess,
+			onClick: (view) => {
+				if (!view) {
+					return;
+				}
+				indentLess(view.state, view.dispatch);
+				view.focus();
+			},
+			determineInversion: (view) => {
+				return 0;
 			}
 		}
 	];
 </script>
 
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, type Component } from 'svelte';
 
 	import ProseMirrorEventBus from '$lib/editor/state/event-bus.svelte.js';
 	import IconButton from '$lib/components/IconButton.svelte';
 	import { findTextMarks, type TextMarkPresence } from '../view/selection.js';
-	import { TextSelection } from 'prosemirror-state';
+	import IndentMore from '$lib/editor/icons/IndentMore.svelte';
+	import IndentLess from '$lib/editor/icons/IndentLess.svelte';
 
 	let activeCodeMarks = $state<TextMarkPresence>();
-	let editorView: EditorView | undefined;
+	let editorView: EditorView | null = $state(null);
 
 	onMount(() => {
 		const unsub = ProseMirrorEventBus.subscribe(({ view }) => {
@@ -70,10 +107,26 @@
 </script>
 
 <div class="menu">
-	{#each menu as { label, icon, onClick, getIconInversion } (label)}
-		{@const inversion = getIconInversion(activeCodeMarks)}
-		<IconButton {inversion} {icon} {label} onClick={() => onClick(editorView)} />
-	{/each}
+	<div class="grouping">
+		{#each textMarks as { label, steezeIcon, onClick, markName } (label)}
+			{@const inversion = activeCodeMarks?.get(markName) ?? 0}
+			<IconButton {inversion} {label} onClick={() => onClick(editorView)}>
+				{#snippet icon()}
+					<Icon src={steezeIcon} title={label} size="16px" />
+				{/snippet}
+			</IconButton>
+		{/each}
+	</div>
+	<div class="grouping">
+		{#each blockMarks as { label, Icon, onClick, determineInversion } (label)}
+			{@const inversion = determineInversion(editorView)}
+			<IconButton {inversion} {label} onClick={() => onClick(editorView)}>
+				{#snippet icon()}
+					<Icon size={16} />
+				{/snippet}
+			</IconButton>
+		{/each}
+	</div>
 </div>
 
 <style>
@@ -81,7 +134,13 @@
 		width: 100%;
 		display: flex;
 		align-items: center;
-		gap: 4px;
+		gap: 10px;
 		padding: 8px;
+	}
+
+	.grouping {
+		display: flex;
+		align-items: center;
+		gap: 4px;
 	}
 </style>

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { createPopper } from '@popperjs/core';
-	import { Icon, type IconSource } from '@steeze-ui/svelte-icon';
 	import { onMount, type Snippet } from 'svelte';
 
 	// svelte-ignore non_reactive_update
@@ -15,7 +14,7 @@
 		tooltip,
 		inversion = 0
 	}: {
-		icon: IconSource;
+		icon: Snippet;
 		label: string;
 		onClick: () => void;
 		id?: string;
@@ -38,7 +37,7 @@
 	onclick={onClick}
 	bind:this={buttonEl}
 >
-	<Icon src={icon} title={label} size="16px" />
+	{@render icon()}
 </button>
 
 {#if tooltip}

@@ -4,7 +4,7 @@ import { Schema, Node } from 'prosemirror-model';
 import { EditorView } from 'prosemirror-view';
 
 import { findTextMarks } from './selection.js';
-import { doesSelectionAllHaveMark } from './selection.js';
+import { doesSelectionHaveTextMark } from './selection.js';
 
 function createEditorView(
 	nodes: Node[],
@@ -153,7 +153,7 @@ describe('findTextMarks', () => {
 	});
 });
 
-describe('doesSelectionAllHaveMark', () => {
+describe('doesSelectionHaveTextMark', () => {
 	it('should return true if the entire selection is bold', () => {
 		const view = createEditorView(
 			[
@@ -165,7 +165,7 @@ describe('doesSelectionAllHaveMark', () => {
 			schema
 		);
 
-		const result = doesSelectionAllHaveMark(view.state.selection, view.state.doc, 'BoLD');
+		const result = doesSelectionHaveTextMark(view.state.selection, view.state.doc, 'BoLD');
 		expect(result).toBe(true);
 	});
 
@@ -175,7 +175,7 @@ describe('doesSelectionAllHaveMark', () => {
 			schema
 		);
 
-		const result = doesSelectionAllHaveMark(view.state.selection, view.state.doc, 'BOLD');
+		const result = doesSelectionHaveTextMark(view.state.selection, view.state.doc, 'BOLD');
 		expect(result).toBe(false);
 	});
 
@@ -190,7 +190,7 @@ describe('doesSelectionAllHaveMark', () => {
 			schema
 		);
 
-		const result = doesSelectionAllHaveMark(view.state.selection, view.state.doc, 'bolD');
+		const result = doesSelectionHaveTextMark(view.state.selection, view.state.doc, 'bolD');
 		expect(result).toBe(false);
 	});
 
@@ -201,7 +201,7 @@ describe('doesSelectionAllHaveMark', () => {
 			{ start: 1, end: 4 }
 		);
 
-		const result = doesSelectionAllHaveMark(view.state.selection, view.state.doc, 'bold');
+		const result = doesSelectionHaveTextMark(view.state.selection, view.state.doc, 'bold');
 		expect(result).toBe(true);
 	});
 
@@ -212,7 +212,7 @@ describe('doesSelectionAllHaveMark', () => {
 			{ start: 0, end: 0 }
 		);
 
-		const result = doesSelectionAllHaveMark(view.state.selection, view.state.doc, 'beLD');
+		const result = doesSelectionHaveTextMark(view.state.selection, view.state.doc, 'beLD');
 		expect(result).toBe(false);
 	});
 });

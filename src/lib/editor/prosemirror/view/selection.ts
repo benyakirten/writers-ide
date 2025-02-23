@@ -1,7 +1,7 @@
 import type { Node } from 'prosemirror-model';
 import type { Selection } from 'prosemirror-state';
 
-export function doesSelectionAllHaveMark(
+export function doesSelectionHaveTextMark(
 	{ from, to }: Selection,
 	doc: Node,
 	name: string
