@@ -10,10 +10,6 @@ export class TabState {
 		{
 			id: 'my-1',
 			view: null
-		},
-		{
-			id: 'my-2',
-			view: null
 		}
 	]);
 

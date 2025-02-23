@@ -65,7 +65,7 @@ export function indentLess(state: EditorState, dispatch?: (tr: Transaction) => v
 	const tr = state.tr;
 
 	state.doc.nodesBetween(from, to, (node, pos) => {
-		if (node.isTextblock) {
+		if (node.type.name === 'paragraph') {
 			const newIndent = (node.attrs.indent || 0) - 1;
 			tr.setNodeMarkup(pos, undefined, {
 				...node.attrs,
@@ -88,7 +88,7 @@ export function indentMore(state: EditorState, dispatch?: (tr: Transaction) => v
 	const tr = state.tr;
 
 	state.doc.nodesBetween(from, to, (node, pos) => {
-		if (node.isTextblock) {
+		if (node.type.name === 'paragraph') {
 			const newIndent = (node.attrs.indent || INDENT_MIN) + 1;
 			tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: clamp(newIndent, 0, INDENT_MAX) });
 		}

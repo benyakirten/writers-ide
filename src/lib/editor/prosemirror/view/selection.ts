@@ -1,6 +1,8 @@
 import type { Node } from 'prosemirror-model';
 import type { Selection } from 'prosemirror-state';
 
+import { INDENT_MAX } from './constants.js';
+
 export function doesSelectionHaveTextMark(
 	{ from, to }: Selection,
 	doc: Node,
@@ -66,4 +68,30 @@ export function findTextMarks({ from, to }: Selection, doc: Node): TextMarkPrese
 	});
 
 	return ratios;
+}
+
+export function getIndentLevels({ from, to }: Selection, doc: Node): number {
+	let indentLevels = 0;
+	let maxIndents = 0;
+
+	if (from === to) {
+		return 0;
+	}
+
+	doc.nodesBetween(from, to, (node) => {
+		if (node.type.name !== 'paragraph') {
+			return;
+		}
+
+		maxIndents += INDENT_MAX;
+
+		if (node.attrs.indent) {
+			indentLevels += node.attrs.indent ?? 0;
+		}
+	});
+	if (maxIndents === 0) {
+		return 0;
+	}
+
+	return indentLevels / maxIndents;
 }

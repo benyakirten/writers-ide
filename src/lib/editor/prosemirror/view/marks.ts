@@ -3,6 +3,8 @@ import type { DOMOutputSpec, MarkSpec } from 'prosemirror-model';
 const emDOM: DOMOutputSpec = ['em', 0];
 const boldDOM: DOMOutputSpec = ['strong', 0];
 const codeDOM: DOMOutputSpec = ['code', 0];
+const supDOM: DOMOutputSpec = ['sup', 0];
+const subDOM: DOMOutputSpec = ['sub', 0];
 
 const link: MarkSpec = {
 	attrs: {
@@ -55,9 +57,33 @@ const code: MarkSpec = {
 	}
 };
 
+const superscript: MarkSpec = {
+	parseDOM: [
+		{ tag: 'sup' },
+		{ style: 'vertical-align=super' },
+		{ style: 'vertical-align=top', clearMark: (m) => m.type.name === 'superscript' }
+	],
+	toDOM() {
+		return supDOM;
+	}
+};
+
+const subscript: MarkSpec = {
+	parseDOM: [
+		{ tag: 'sub' },
+		{ style: 'vertical-align=sub' },
+		{ style: 'vertical-align=bottom', clearMark: (m) => m.type.name === 'subscript' }
+	],
+	toDOM() {
+		return subDOM;
+	}
+};
+
 export const marks = {
 	link,
 	italic,
 	bold,
-	code
+	code,
+	superscript,
+	subscript
 } as const;

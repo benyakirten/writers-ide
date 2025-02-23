@@ -14,7 +14,11 @@
 	stroke-linejoin="round"
 >
 	<path d="M3 4h12" />
-	<path d="M3 12h10" />
+	<!-- Thinner, shorter top line -->
+	<path d="M3 12h12" />
+	<!-- Middle line matches top/bottom length -->
 	<path d="M3 20h12" />
-	<path d="M9 9l-3 3 3 3" />
+	<!-- Thinner, shorter bottom line -->
+	<path d="M6 9l-3 3 3 3" />
+	<!-- Left-pointing arrow at the far left -->
 </svg>
