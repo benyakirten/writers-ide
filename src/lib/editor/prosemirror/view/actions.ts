@@ -4,12 +4,16 @@ import { type EditorState, type Transaction } from 'prosemirror-state';
 import { clamp } from '$lib/utils/numbers.js';
 import { doesSelectionHaveTextMark } from './selection.js';
 import { INDENT_MAX, INDENT_MIN } from './constants.js';
+import type { marks } from './marks.js';
+
+type UseableMarkName = keyof typeof marks;
 
 export function toggleMark(
-	mark: string,
+	mark: UseableMarkName,
 	state: EditorState,
 	dispatch?: (tr: Transaction) => void,
-	view?: EditorView
+	view?: EditorView,
+	exclusiveWith?: UseableMarkName
 ) {
 	if (!view || !dispatch) {
 		return false;
@@ -28,6 +32,10 @@ export function toggleMark(
 	}
 
 	tr.addMark(from, to, state.schema.marks[mark].create());
+	if (exclusiveWith) {
+		tr.removeMark(from, to, state.schema.marks[exclusiveWith]);
+	}
+
 	dispatch(tr);
 	return true;
 }

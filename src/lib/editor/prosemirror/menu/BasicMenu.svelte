@@ -51,7 +51,7 @@
 					return;
 				}
 				// TODO: Make superscript exclusive with subscript.
-				toggleMark('superscript', view.state, view.dispatch, view);
+				toggleMark('superscript', view.state, view.dispatch, view, 'subscript');
 				view.focus();
 			},
 			markName: 'superscript'
@@ -62,7 +62,7 @@
 				if (!view) {
 					return;
 				}
-				toggleMark('subscript', view.state, view.dispatch, view);
+				toggleMark('subscript', view.state, view.dispatch, view, 'superscript');
 				view.focus();
 			},
 			markName: 'subscript'
