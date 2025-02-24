@@ -19,6 +19,16 @@ const paragraph: NodeSpec = {
 					throw new Error('Indent must be an integer between INDENT_MIN and INDENT_MAX');
 				}
 			}
+		},
+		align: {
+			default: 'start',
+			validate: (value) =>
+				value === 'start' ||
+				value === 'end' ||
+				value === 'left' ||
+				value === 'center' ||
+				value === 'right' ||
+				value === 'justify'
 		}
 	},
 	parseDOM: [
@@ -35,8 +45,15 @@ const paragraph: NodeSpec = {
 		}
 	],
 	toDOM(node) {
-		const { indent } = node.attrs;
-		return ['p', { class: 'paragraph', style: `text-indent: ${indent * INDENT_SIZE_PX}px` }, 0];
+		const { indent, align } = node.attrs;
+		return [
+			'p',
+			{
+				class: 'paragraph',
+				style: `text-indent: ${indent * INDENT_SIZE_PX}px; text-align: ${align};`
+			},
+			0
+		];
 	}
 };
 

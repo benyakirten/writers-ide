@@ -82,3 +82,27 @@ export function indentMore(state: EditorState, dispatch?: (tr: Transaction) => v
 	}
 	return true;
 }
+
+export type TextAlignment = 'start' | 'end' | 'left' | 'center' | 'right' | 'justify';
+export function setTextAlignment(
+	alignment: TextAlignment,
+	state: EditorState,
+	dispatch?: (tr: Transaction) => void
+) {
+	if (!dispatch) {
+		return false;
+	}
+	const { from, to } = state.selection;
+	const tr = state.tr;
+
+	state.doc.nodesBetween(from, to, (node, pos) => {
+		if (node.type.name === 'paragraph') {
+			tr.setNodeMarkup(pos, undefined, { ...node.attrs, align: alignment });
+		}
+	});
+
+	if (tr.docChanged) {
+		dispatch(tr);
+	}
+	return true;
+}
