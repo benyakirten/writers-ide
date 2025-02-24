@@ -42,7 +42,11 @@
 					'Ctrl-Shift-+': (state, dispatch, view) =>
 						toggleMark('superscript', state, dispatch, view, 'subscript'),
 					'Ctrl-Shift-_': (state, dispatch, view) =>
-						toggleMark('subscript', state, dispatch, view, 'superscript')
+						toggleMark('subscript', state, dispatch, view, 'superscript'),
+					'Mod-Shift-X': (state, dispatch, view) =>
+						toggleMark('strikethrough', state, dispatch, view),
+					'Mod-u': (state, dispatch, view) => toggleMark('underline', state, dispatch, view),
+					'Mod-j': (state, dispatch, view) => toggleMark('overline', state, dispatch, view)
 				}),
 				keymap(baseKeymap),
 				...plugins
