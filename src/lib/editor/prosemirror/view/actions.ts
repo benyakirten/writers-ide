@@ -92,6 +92,7 @@ export function setTextAlignment(
 	if (!dispatch) {
 		return false;
 	}
+
 	const { from, to } = state.selection;
 	const tr = state.tr;
 

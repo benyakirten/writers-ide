@@ -2,6 +2,7 @@ import type { Node } from 'prosemirror-model';
 import type { Selection } from 'prosemirror-state';
 
 import { INDENT_MAX } from './constants.js';
+import type { TextAlignment } from './actions.js';
 
 export function doesSelectionHaveTextMark(
 	{ from, to }: Selection,
@@ -93,4 +94,36 @@ export function getIndentRatio({ from, to }: Selection, doc: Node): number | nul
 	}
 
 	return indentLevels / maxIndents;
+}
+
+export function getBlockAttributeRatio<Value>(
+	{ from, to }: Selection,
+	doc: Node,
+	attribute: string,
+	value: TextAlignment | ((val: Value) => boolean)
+): number {
+	let totalBlocks = 0;
+	let occurrences = 0;
+
+	console.log('REP');
+	doc.nodesBetween(from, to, (node) => {
+		if (node.type.name !== 'paragraph') {
+			return;
+		}
+
+		totalBlocks++;
+		const val = node.attrs[attribute];
+		if ((typeof val === 'string' && val === value) || (typeof value === 'function' && value(val))) {
+			occurrences++;
+		}
+	});
+
+	console.log('totalBlocks', totalBlocks);
+	console.log('occurrences', occurrences);
+
+	if (totalBlocks === 0) {
+		return 0;
+	}
+
+	return occurrences / totalBlocks;
 }

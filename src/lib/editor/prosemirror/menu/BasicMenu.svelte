@@ -8,13 +8,22 @@
 		TextIndent,
 		TextOutdent,
 		TextUnderline,
-		TextStrikethrough
+		TextStrikethrough,
+		TextAlignLeft,
+		TextAlignCenter,
+		TextAlignRight,
+		TextAlignJustify
 	} from '@steeze-ui/phosphor-icons';
 	import type { EditorView } from 'prosemirror-view';
 	import type { Selection } from 'prosemirror-state';
 	import type { Node } from 'prosemirror-model';
 
-	import { indentLess, indentMore, toggleMark } from '$lib/editor/prosemirror/view/actions.js';
+	import {
+		indentLess,
+		indentMore,
+		setTextAlignment,
+		toggleMark
+	} from '$lib/editor/prosemirror/view/actions.js';
 	import { TextOverline } from '$lib/icons.js';
 
 	type TextMenuIcon = {
@@ -140,6 +149,69 @@
 				const ratio = getIndentRatio(selection, doc);
 				return ratio === null ? 0 : 1 - ratio;
 			}
+		},
+		{
+			label: 'Align text left.',
+			iconSrc: TextAlignLeft,
+			onClick: (view) => {
+				if (!view) {
+					return;
+				}
+				setTextAlignment('left', view.state, view.dispatch);
+				view.focus();
+			},
+			determineInversion: (selection, doc) =>
+				getBlockAttributeRatio(
+					selection,
+					doc,
+					'align',
+					// TODO: Add method to detect default alignment value
+					(value) => value === 'left' || value === 'start'
+				)
+		},
+		{
+			label: 'Align text center.',
+			iconSrc: TextAlignCenter,
+			onClick: (view) => {
+				if (!view) {
+					return;
+				}
+				setTextAlignment('center', view.state, view.dispatch);
+				view.focus();
+			},
+			determineInversion: (selection, doc) =>
+				getBlockAttributeRatio(selection, doc, 'align', 'center')
+		},
+		{
+			label: 'Align text right.',
+			iconSrc: TextAlignRight,
+			onClick: (view) => {
+				if (!view) {
+					return;
+				}
+				setTextAlignment('right', view.state, view.dispatch);
+				view.focus();
+			},
+			determineInversion: (selection, doc) =>
+				getBlockAttributeRatio(
+					selection,
+					doc,
+					'align',
+					(value) => value === 'right' || value === 'end'
+				)
+		},
+		{
+			label: 'Justify text.',
+			iconSrc: TextAlignJustify,
+			onClick: (view) => {
+				if (!view) {
+					return;
+				}
+				setTextAlignment('justify', view.state, view.dispatch);
+				view.focus();
+			},
+			determineInversion: (selection, doc) =>
+				getBlockAttributeRatio(selection, doc, 'align', 'justify')
 		}
 	];
 </script>
@@ -149,7 +221,12 @@
 
 	import ProseMirrorEventBus from '$lib/editor/state/event-bus.svelte.js';
 	import IconButton from '$lib/components/IconButton.svelte';
-	import { findTextMarks, getIndentRatio, type TextMarkPresence } from '../view/selection.js';
+	import {
+		findTextMarks,
+		getBlockAttributeRatio,
+		getIndentRatio,
+		type TextMarkPresence
+	} from '../view/selection.js';
 
 	let activeCodeMarks = $state<TextMarkPresence>();
 	let editorView = $state<EditorView | null>(null);
@@ -190,6 +267,7 @@
 			</IconButton>
 		{/each}
 	</div>
+	<Icon src={TextOverline} size="16px" />
 </div>
 
 <style>
@@ -204,6 +282,6 @@
 	.grouping {
 		display: flex;
 		align-items: center;
-		gap: 4px;
+		gap: 2px;
 	}
 </style>
