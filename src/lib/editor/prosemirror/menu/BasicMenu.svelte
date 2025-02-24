@@ -6,13 +6,16 @@
 		TextSuperscript,
 		TextSubscript,
 		TextIndent,
-		TextOutdent
+		TextOutdent,
+		TextUnderline,
+		TextStrikethrough
 	} from '@steeze-ui/phosphor-icons';
 	import type { EditorView } from 'prosemirror-view';
 	import type { Selection } from 'prosemirror-state';
 	import type { Node } from 'prosemirror-model';
 
 	import { indentLess, indentMore, toggleMark } from '$lib/editor/prosemirror/view/actions.js';
+	import { TextOverline } from '$lib/icons.js';
 
 	type TextMenuIcon = {
 		iconSrc: IconSource;
@@ -50,7 +53,6 @@
 				if (!view) {
 					return;
 				}
-				// TODO: Make superscript exclusive with subscript.
 				toggleMark('superscript', view.state, view.dispatch, view, 'subscript');
 				view.focus();
 			},
@@ -66,6 +68,39 @@
 				view.focus();
 			},
 			markName: 'subscript'
+		},
+		{
+			iconSrc: TextUnderline,
+			onClick: (view) => {
+				if (!view) {
+					return;
+				}
+				toggleMark('underline', view.state, view.dispatch, view);
+				view.focus();
+			},
+			markName: 'underline'
+		},
+		{
+			iconSrc: TextOverline,
+			onClick: (view) => {
+				if (!view) {
+					return;
+				}
+				toggleMark('overline', view.state, view.dispatch, view);
+				view.focus();
+			},
+			markName: 'overline'
+		},
+		{
+			iconSrc: TextStrikethrough,
+			onClick: (view) => {
+				if (!view) {
+					return;
+				}
+				toggleMark('strikethrough', view.state, view.dispatch, view);
+				view.focus();
+			},
+			markName: 'strikethrough'
 		}
 	];
 
@@ -110,7 +145,7 @@
 </script>
 
 <script lang="ts">
-	import { onMount, type Component } from 'svelte';
+	import { onMount } from 'svelte';
 
 	import ProseMirrorEventBus from '$lib/editor/state/event-bus.svelte.js';
 	import IconButton from '$lib/components/IconButton.svelte';

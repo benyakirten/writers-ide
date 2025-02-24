@@ -38,7 +38,11 @@
 					'Mod-b': (state, dispatch, view) => toggleMark('bold', state, dispatch, view),
 					'Mod-i': (state, dispatch, view) => toggleMark('italic', state, dispatch, view),
 					'Mod-[': indentLess,
-					'Mod-]': indentMore
+					'Mod-]': indentMore,
+					'Ctrl-Shift-+': (state, dispatch, view) =>
+						toggleMark('superscript', state, dispatch, view, 'subscript'),
+					'Ctrl-Shift-_': (state, dispatch, view) =>
+						toggleMark('subscript', state, dispatch, view, 'superscript')
 				}),
 				keymap(baseKeymap),
 				...plugins
