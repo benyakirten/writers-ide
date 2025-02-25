@@ -7,6 +7,7 @@ import { schema } from './schema.js';
 import { toggleTextMark } from './actions.js';
 import { dent } from './actions.js';
 import { INDENT_MIN, INDENT_MAX } from './constants.js';
+import { setTextAlignment } from './actions.js';
 
 function createEditorView(
 	nodes: Node[],
@@ -275,5 +276,65 @@ describe('dent', () => {
 
 		const paragraph2 = view.state.doc.content.content[1];
 		expect(paragraph2.attrs.indent).toBe(INDENT_MAX);
+	});
+});
+
+describe('setTextAlignment', () => {
+	it('should return false if dispatch is not provided', () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', { align: 'left' }, [schema.text('First Item')]),
+				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')])
+			],
+			schema
+		);
+
+		const got = setTextAlignment('center', view.state);
+		expect(got).toBe(false);
+
+		const paragraph1 = view.state.doc.content.content[0];
+		expect(paragraph1.attrs.align).toBe('left');
+
+		const paragraph2 = view.state.doc.content.content[1];
+		expect(paragraph2.attrs.align).toBe('right');
+	});
+
+	it('should set the alignment of paragraphs in the selection', () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', { align: 'left' }, [schema.text('First Item')]),
+				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')])
+			],
+			schema
+		);
+
+		const got = setTextAlignment('center', view.state, view.dispatch);
+		expect(got).toBe(true);
+
+		const paragraph1 = view.state.doc.content.content[0];
+		expect(paragraph1.attrs.align).toBe('center');
+
+		const paragraph2 = view.state.doc.content.content[1];
+		expect(paragraph2.attrs.align).toBe('center');
+	});
+
+	it('should not change alignment if no paragraphs are in the selection', () => {
+		const view = createEditorView(
+			[
+				schema.node('heading', [schema.text('First Item')]),
+				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')])
+			],
+			schema,
+			{
+				start: 0,
+				end: 2
+			}
+		);
+
+		const got = setTextAlignment('center', view.state, view.dispatch);
+		expect(got).toBe(true);
+
+		const paragraph = view.state.doc.content.content[1];
+		expect(paragraph.attrs.align).toBe('right');
 	});
 });
