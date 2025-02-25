@@ -5,6 +5,9 @@ import { EditorView } from 'prosemirror-view';
 
 import { findTextMarks } from './selection.js';
 import { doesSelectionHaveTextMark } from './selection.js';
+import { getIndentRatio } from './selection.js';
+import { INDENT_MAX } from './constants.js';
+import { schema as realSchema } from './schema.js';
 
 function createEditorView(
 	nodes: Node[],
@@ -214,5 +217,63 @@ describe('doesSelectionHaveTextMark', () => {
 
 		const result = doesSelectionHaveTextMark(view.state.selection, view.state.doc, 'beLD');
 		expect(result).toBe(false);
+	});
+});
+
+describe('getIndentRatio', () => {
+	it('should return null if there are no paragraphs', () => {
+		const view = createEditorView(
+			[realSchema.node('codeBlock', null, [realSchema.text('First paragraph')])],
+			realSchema
+		);
+		const result = getIndentRatio(view.state.selection, view.state.doc);
+		expect(result).toBeNull();
+	});
+	it('should return 0 if there are paragraphs but no indents', () => {
+		const view = createEditorView(
+			[
+				realSchema.node('paragraph', null, [realSchema.text('First paragraph')]),
+				realSchema.node('paragraph', null, [realSchema.text('Second paragraph')])
+			],
+			realSchema
+		);
+		const result = getIndentRatio(view.state.selection, view.state.doc);
+		expect(result).toBe(0);
+	});
+	it('should return the correct ratio of indents', () => {
+		const view = createEditorView(
+			[
+				realSchema.node('paragraph', { indent: 2 }, [realSchema.text('First paragraph')]),
+				realSchema.node('paragraph', { indent: 1 }, [realSchema.text('Second paragraph')])
+			],
+			realSchema
+		);
+		const result = getIndentRatio(view.state.selection, view.state.doc);
+		expect(result).toBe((2 + 1) / (INDENT_MAX * 2));
+	});
+	it('should handle mixed indents and no indents', () => {
+		const view = createEditorView(
+			[
+				realSchema.node('paragraph', { indent: 2 }, [realSchema.text('First paragraph')]),
+				realSchema.node('paragraph', null, [realSchema.text('Second paragraph')]),
+				realSchema.node('paragraph', { indent: 1 }, [realSchema.text('Third paragraph')])
+			],
+			realSchema
+		);
+		const result = getIndentRatio(view.state.selection, view.state.doc);
+		expect(result).toBe((2 + 1) / (INDENT_MAX * 3));
+	});
+	it('should return the correct ratio for a partial selection', () => {
+		const view = createEditorView(
+			[
+				realSchema.node('paragraph', { indent: 2 }, [realSchema.text('First paragraph')]),
+				realSchema.node('paragraph', { indent: 1 }, [realSchema.text('Second paragraph')]),
+				realSchema.node('paragraph', null, [realSchema.text('Third paragraph')])
+			],
+			realSchema,
+			{ start: 0, end: 2 }
+		);
+		const result = getIndentRatio(view.state.selection, view.state.doc);
+		expect(result).toBe(2 / INDENT_MAX);
 	});
 });

@@ -83,8 +83,8 @@ export function getIndentRatio({ from, to }: Selection, doc: Node): number | nul
 		}
 
 		maxIndents += INDENT_MAX;
-
-		if (node.attrs.indent) {
+		const indent = +node.attrs.indent;
+		if (!isNaN(indent)) {
 			indentLevels += node.attrs.indent ?? 0;
 		}
 	});
