@@ -3,7 +3,7 @@ import { EditorState, TextSelection } from 'prosemirror-state';
 import { Schema, Node } from 'prosemirror-model';
 import { EditorView } from 'prosemirror-view';
 
-import { findTextMarks } from './selection.js';
+import { findTextMarks, getBlockAttributeRatio } from './selection.js';
 import { doesSelectionHaveTextMark } from './selection.js';
 import { getIndentRatio } from './selection.js';
 import { INDENT_MAX } from './constants.js';
@@ -229,6 +229,7 @@ describe('getIndentRatio', () => {
 		const result = getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBeNull();
 	});
+
 	it('should return 0 if there are paragraphs but no indents', () => {
 		const view = createEditorView(
 			[
@@ -240,6 +241,7 @@ describe('getIndentRatio', () => {
 		const result = getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe(0);
 	});
+
 	it('should return the correct ratio of indents', () => {
 		const view = createEditorView(
 			[
@@ -251,6 +253,7 @@ describe('getIndentRatio', () => {
 		const result = getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe((2 + 1) / (INDENT_MAX * 2));
 	});
+
 	it('should handle mixed indents and no indents', () => {
 		const view = createEditorView(
 			[
@@ -263,6 +266,7 @@ describe('getIndentRatio', () => {
 		const result = getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe((2 + 1) / (INDENT_MAX * 3));
 	});
+
 	it('should return the correct ratio for a partial selection', () => {
 		const view = createEditorView(
 			[
@@ -275,5 +279,86 @@ describe('getIndentRatio', () => {
 		);
 		const result = getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe(2 / INDENT_MAX);
+	});
+});
+
+describe('getBlockAttributeRatio', () => {
+	it('should return 0 if there are no paragraphs', () => {
+		const view = createEditorView(
+			[realSchema.node('codeBlock', null, [realSchema.text('Code block text')])],
+			realSchema
+		);
+		const result = getBlockAttributeRatio(view.state.selection, view.state.doc, 'align', 'center');
+		expect(result).toBe(0);
+	});
+
+	it('should return 0 if no paragraphs have the specified attribute value', () => {
+		const view = createEditorView(
+			[
+				realSchema.node('paragraph', { align: 'left' }, [realSchema.text('First paragraph')]),
+				realSchema.node('paragraph', { align: 'left' }, [realSchema.text('Second paragraph')])
+			],
+			realSchema
+		);
+		const result = getBlockAttributeRatio(view.state.selection, view.state.doc, 'align', 'center');
+		expect(result).toBe(0);
+	});
+
+	it('should return the correct ratio of paragraphs with the specified attribute value', () => {
+		const view = createEditorView(
+			[
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('First paragraph')]),
+				realSchema.node('paragraph', { align: 'left' }, [realSchema.text('Second paragraph')]),
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')])
+			],
+			realSchema
+		);
+		const result = getBlockAttributeRatio(view.state.selection, view.state.doc, 'align', 'center');
+		expect(result).toBe(2 / 3);
+	});
+
+	it('should handle mixed attribute values and no attribute', () => {
+		const view = createEditorView(
+			[
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('First paragraph')]),
+				realSchema.node('paragraph', null, [realSchema.text('Second paragraph')]),
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')])
+			],
+			realSchema
+		);
+		const result = getBlockAttributeRatio(view.state.selection, view.state.doc, 'align', 'center');
+		expect(result).toBe(2 / 3);
+	});
+
+	it('should return the correct ratio for a partial selection', () => {
+		const view = createEditorView(
+			[
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('First paragraph')]),
+				realSchema.node('paragraph', { align: 'left' }, [realSchema.text('Second paragraph')]),
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')])
+			],
+			realSchema,
+			{ start: 0, end: 2 }
+		);
+		const result = getBlockAttributeRatio(view.state.selection, view.state.doc, 'align', 'center');
+		expect(result).toBe(1);
+	});
+
+	it('should return the correct ratio when using a function to check attribute value', () => {
+		const view = createEditorView(
+			[
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('First paragraph')]),
+				realSchema.node('paragraph', { align: 'left' }, [realSchema.text('Second paragraph')]),
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')])
+			],
+			realSchema
+		);
+		const result = getBlockAttributeRatio(
+			view.state.selection,
+			view.state.doc,
+			'align',
+			(val) => val === 'center'
+		);
+		expect(result).toBe(2 / 3);
 	});
 });

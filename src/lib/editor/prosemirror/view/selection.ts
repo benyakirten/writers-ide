@@ -105,7 +105,6 @@ export function getBlockAttributeRatio<Value>(
 	let totalBlocks = 0;
 	let occurrences = 0;
 
-	console.log('REP');
 	doc.nodesBetween(from, to, (node) => {
 		if (node.type.name !== 'paragraph') {
 			return;
@@ -117,9 +116,6 @@ export function getBlockAttributeRatio<Value>(
 			occurrences++;
 		}
 	});
-
-	console.log('totalBlocks', totalBlocks);
-	console.log('occurrences', occurrences);
 
 	if (totalBlocks === 0) {
 		return 0;
