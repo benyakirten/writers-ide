@@ -22,7 +22,7 @@
 		indentLess,
 		indentMore,
 		setTextAlignment,
-		toggleMark
+		toggleTextMark
 	} from '$lib/editor/prosemirror/view/actions.js';
 	import { TextOverline } from '$lib/icons.js';
 
@@ -40,7 +40,7 @@
 				}
 
 				const { state, dispatch } = view;
-				toggleMark('bold', state, dispatch, view);
+				toggleTextMark('bold', state, dispatch, view);
 				view.focus();
 			},
 			markName: 'bold'
@@ -51,7 +51,7 @@
 				if (!view) {
 					return;
 				}
-				toggleMark('italic', view.state, view.dispatch, view);
+				toggleTextMark('italic', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'italic'
@@ -62,7 +62,7 @@
 				if (!view) {
 					return;
 				}
-				toggleMark('superscript', view.state, view.dispatch, view, 'subscript');
+				toggleTextMark('superscript', view.state, view.dispatch, view, 'subscript');
 				view.focus();
 			},
 			markName: 'superscript'
@@ -73,7 +73,7 @@
 				if (!view) {
 					return;
 				}
-				toggleMark('subscript', view.state, view.dispatch, view, 'superscript');
+				toggleTextMark('subscript', view.state, view.dispatch, view, 'superscript');
 				view.focus();
 			},
 			markName: 'subscript'
@@ -84,7 +84,7 @@
 				if (!view) {
 					return;
 				}
-				toggleMark('underline', view.state, view.dispatch, view);
+				toggleTextMark('underline', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'underline'
@@ -95,7 +95,7 @@
 				if (!view) {
 					return;
 				}
-				toggleMark('overline', view.state, view.dispatch, view);
+				toggleTextMark('overline', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'overline'
@@ -106,7 +106,7 @@
 				if (!view) {
 					return;
 				}
-				toggleMark('strikethrough', view.state, view.dispatch, view);
+				toggleTextMark('strikethrough', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'strikethrough'

@@ -7,7 +7,7 @@
 	import { baseKeymap } from 'prosemirror-commands';
 
 	import { schema } from './schema.js';
-	import { indentLess, indentMore, setTextAlignment, toggleMark } from './actions.js';
+	import { indentLess, indentMore, setTextAlignment, toggleTextMark } from './actions.js';
 	import TabState from '../../state/tab-state.svelte.js';
 
 	let { index, id, plugins = [] }: { index: number; id: string; plugins?: Plugin[] } = $props();
@@ -34,23 +34,23 @@
 				history(),
 				keymap({
 					'Ctrl-Shift-+': (state, dispatch, view) =>
-						toggleMark('superscript', state, dispatch, view, 'subscript'),
+						toggleTextMark('superscript', state, dispatch, view, 'subscript'),
 					'Ctrl-Shift-_': (state, dispatch, view) =>
-						toggleMark('subscript', state, dispatch, view, 'superscript'),
+						toggleTextMark('subscript', state, dispatch, view, 'superscript'),
 					'Mod-Shift-X': (state, dispatch, view) =>
-						toggleMark('strikethrough', state, dispatch, view),
+						toggleTextMark('strikethrough', state, dispatch, view),
 					'Mod-Shift-{': (state, dispatch) => setTextAlignment('left', state, dispatch),
 					'Mod-Shift-}': (state, dispatch) => setTextAlignment('right', state, dispatch),
 					'Mod-Shift-:': (state, dispatch) => setTextAlignment('center', state, dispatch),
 					'Mod-Shift-"': (state, dispatch) => setTextAlignment('justify', state, dispatch),
 					'Mod-z': undo,
 					'Mod-y': redo,
-					'Mod-b': (state, dispatch, view) => toggleMark('bold', state, dispatch, view),
-					'Mod-i': (state, dispatch, view) => toggleMark('italic', state, dispatch, view),
+					'Mod-b': (state, dispatch, view) => toggleTextMark('bold', state, dispatch, view),
+					'Mod-i': (state, dispatch, view) => toggleTextMark('italic', state, dispatch, view),
 					'Mod-[': indentLess,
 					'Mod-]': indentMore,
-					'Mod-u': (state, dispatch, view) => toggleMark('underline', state, dispatch, view),
-					'Mod-j': (state, dispatch, view) => toggleMark('overline', state, dispatch, view)
+					'Mod-u': (state, dispatch, view) => toggleTextMark('underline', state, dispatch, view),
+					'Mod-j': (state, dispatch, view) => toggleTextMark('overline', state, dispatch, view)
 				}),
 				keymap(baseKeymap),
 				...plugins

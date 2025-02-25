@@ -8,7 +8,7 @@ import type { marks } from './marks.js';
 
 type UseableMarkName = keyof typeof marks;
 
-export function toggleMark(
+export function toggleTextMark(
 	mark: UseableMarkName,
 	state: EditorState,
 	dispatch?: (tr: Transaction) => void,

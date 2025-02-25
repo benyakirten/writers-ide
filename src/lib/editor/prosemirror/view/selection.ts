@@ -4,6 +4,9 @@ import type { Selection } from 'prosemirror-state';
 import { INDENT_MAX } from './constants.js';
 import type { TextAlignment } from './actions.js';
 
+/**
+ * Check if every text node in the selection has a specific mark.
+ */
 export function doesSelectionHaveTextMark(
 	{ from, to }: Selection,
 	doc: Node,
@@ -13,18 +16,18 @@ export function doesSelectionHaveTextMark(
 		return false;
 	}
 
-	let isBold = true;
+	let hasMark = true;
 	doc.nodesBetween(from, to, (node) => {
 		if (
-			isBold &&
+			hasMark &&
 			node.isText &&
 			!node.marks.find((mark) => mark.type.name.toLowerCase().includes(name.toLowerCase()))
 		) {
-			isBold = false;
-			return isBold;
+			hasMark = false;
+			return hasMark;
 		}
 	});
-	return isBold;
+	return hasMark;
 }
 
 /**
