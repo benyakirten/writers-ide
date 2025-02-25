@@ -5,6 +5,8 @@ import type { Schema, Node } from 'prosemirror-model';
 
 import { schema } from './schema.js';
 import { toggleTextMark } from './actions.js';
+import { dent } from './actions.js';
+import { INDENT_MIN, INDENT_MAX } from './constants.js';
 
 function createEditorView(
 	nodes: Node[],
@@ -176,5 +178,102 @@ describe('toggleTextMark', () => {
 		const text2 = view.state.doc.content.content[1].content.content[0];
 		expect(text2.marks.length).toBe(1);
 		expect(text2.marks[0].type.name).toBe('italic');
+	});
+});
+
+describe('dent', () => {
+	it('should return false if dispatch is not provided', () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', { indent: 1 }, [schema.text('First Item')]),
+				schema.node('paragraph', { indent: 2 }, [schema.text('Second item')])
+			],
+			schema
+		);
+
+		const got = dent('indent', view.state);
+		expect(got).toBe(false);
+
+		const paragraph1 = view.state.doc.content.content[0];
+		expect(paragraph1.attrs.indent).toBe(1);
+
+		const paragraph2 = view.state.doc.content.content[1];
+		expect(paragraph2.attrs.indent).toBe(2);
+	});
+
+	it('should increase the indent of paragraphs in the selection', () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', { indent: INDENT_MAX - 2 }, [schema.text('First Item')]),
+				schema.node('paragraph', { indent: INDENT_MAX - 1 }, [schema.text('Second item')])
+			],
+			schema
+		);
+
+		const got = dent('indent', view.state, view.dispatch);
+		expect(got).toBe(true);
+
+		const paragraph1 = view.state.doc.content.content[0];
+		expect(paragraph1.attrs.indent).toBe(INDENT_MAX - 1);
+
+		const paragraph2 = view.state.doc.content.content[1];
+		expect(paragraph2.attrs.indent).toBe(INDENT_MAX);
+	});
+
+	it('should decrease the indent of paragraphs in the selection', () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', { indent: INDENT_MIN + 1 }, [schema.text('First Item')]),
+				schema.node('paragraph', { indent: INDENT_MIN + 2 }, [schema.text('Second item')])
+			],
+			schema
+		);
+
+		const got = dent('dedent', view.state, view.dispatch);
+		expect(got).toBe(true);
+
+		const paragraph1 = view.state.doc.content.content[0];
+		expect(paragraph1.attrs.indent).toBe(INDENT_MIN);
+
+		const paragraph2 = view.state.doc.content.content[1];
+		expect(paragraph2.attrs.indent).toBe(INDENT_MIN + 1);
+	});
+
+	it('should prevent the indent from being less than INDENT_MIN', () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', { indent: INDENT_MIN }, [schema.text('First Item')]),
+				schema.node('paragraph', { indent: INDENT_MAX }, [schema.text('Second item')])
+			],
+			schema
+		);
+
+		const got = dent('dedent', view.state, view.dispatch);
+		expect(got).toBe(true);
+
+		const paragraph1 = view.state.doc.content.content[0];
+		expect(paragraph1.attrs.indent).toBe(INDENT_MIN);
+
+		const paragraph2 = view.state.doc.content.content[1];
+		expect(paragraph2.attrs.indent).toBe(INDENT_MAX - 1);
+	});
+
+	it('should prevent the indent from being more than INDENT_MX', () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', { indent: INDENT_MIN }, [schema.text('First Item')]),
+				schema.node('paragraph', { indent: INDENT_MAX }, [schema.text('Second item')])
+			],
+			schema
+		);
+
+		const got = dent('indent', view.state, view.dispatch);
+		expect(got).toBe(true);
+
+		const paragraph1 = view.state.doc.content.content[0];
+		expect(paragraph1.attrs.indent).toBe(INDENT_MIN + 1);
+
+		const paragraph2 = view.state.doc.content.content[1];
+		expect(paragraph2.attrs.indent).toBe(INDENT_MAX);
 	});
 });
