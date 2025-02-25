@@ -134,30 +134,47 @@ describe('toggleTextMark', () => {
 		expect(text2.marks[0].type.name).toBe('italic');
 		expect(text2.marks[1].type.name).toBe('bold');
 	});
+
+	it("should remove the exclusive mark if it's present and the mark will be added to the selection", () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+			],
+			schema
+		);
+
+		const got = toggleTextMark('bold', view.state, view.dispatch, view, 'italic');
+		expect(got).toBe(true);
+
+		const text1 = view.state.doc.content.content[0].content.content[0];
+		expect(text1.marks.length).toBe(1);
+		expect(text1.marks[0].type.name).toBe('bold');
+
+		const text2 = view.state.doc.content.content[1].content.content[0];
+		expect(text2.marks.length).toBe(1);
+		expect(text2.marks[0].type.name).toBe('bold');
+	});
+
+	it('should not remove the exclusive mark if the mark will be removed', () => {
+		const view = createEditorView(
+			[
+				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
+				schema.node('paragraph', null, [
+					schema.text('Second item', [schema.mark('bold'), schema.mark('italic')])
+				])
+			],
+			schema
+		);
+
+		const got = toggleTextMark('bold', view.state, view.dispatch, view, 'italic');
+		expect(got).toBe(true);
+
+		const text1 = view.state.doc.content.content[0].content.content[0];
+		expect(text1.marks.length).toBe(0);
+
+		const text2 = view.state.doc.content.content[1].content.content[0];
+		expect(text2.marks.length).toBe(1);
+		expect(text2.marks[0].type.name).toBe('italic');
+	});
 });
-
-// it('should add mark if selection does not have the mark', () => {
-//     const state = EditorState.create({ schema });
-//     const view = new EditorView(null, { state });
-//     const dispatch = vi.fn();
-//     const tr = state.tr.setSelection(state.selection.constructor.create(state.doc, 0, 5));
-//     view.state = state.apply(tr);
-//     view.dispatch = dispatch;
-
-//     expect(toggleTextMark('bold', view.state, dispatch, view)).toBe(true);
-//     expect(dispatch).toHaveBeenCalled();
-//     expect(dispatch.mock.calls[0][0].steps[0].toJSON().stepType).toBe('addMark');
-// });
-
-// it('should remove exclusive mark if provided', () => {
-//     const state = EditorState.create({ schema });
-//     const view = new EditorView(null, { state });
-//     const dispatch = vi.fn();
-//     const tr = state.tr.setSelection(state.selection.constructor.create(state.doc, 0, 5));
-//     view.state = state.apply(tr);
-//     view.dispatch = dispatch;
-
-//     expect(toggleTextMark('bold', view.state, dispatch, view, 'em')).toBe(true);
-//     expect(dispatch).toHaveBeenCalled();
-//     expect(dispatch.mock.calls[0][0].steps[1].toJSON().stepType).toBe('removeMark');
-// });
