@@ -40,7 +40,11 @@ export function toggleTextMark(
 	return true;
 }
 
-export function indentLess(state: EditorState, dispatch?: (tr: Transaction) => void) {
+export function dent(
+	direction: 'indent' | 'dedent',
+	state: EditorState,
+	dispatch?: (tr: Transaction) => void
+) {
 	if (!dispatch) {
 		return false;
 	}
@@ -49,31 +53,14 @@ export function indentLess(state: EditorState, dispatch?: (tr: Transaction) => v
 
 	state.doc.nodesBetween(from, to, (node, pos) => {
 		if (node.type.name === 'paragraph') {
-			const newIndent = (node.attrs.indent || 0) - 1;
+			const newIndent =
+				direction === 'dedent'
+					? (node.attrs.indent || 0) - 1
+					: (node.attrs.indent || INDENT_MIN) + 1;
 			tr.setNodeMarkup(pos, undefined, {
 				...node.attrs,
 				indent: clamp(newIndent, INDENT_MIN, INDENT_MAX)
 			});
-		}
-	});
-
-	if (tr.docChanged) {
-		dispatch(tr);
-	}
-	return true;
-}
-
-export function indentMore(state: EditorState, dispatch?: (tr: Transaction) => void) {
-	if (!dispatch) {
-		return false;
-	}
-	const { from, to } = state.selection;
-	const tr = state.tr;
-
-	state.doc.nodesBetween(from, to, (node, pos) => {
-		if (node.type.name === 'paragraph') {
-			const newIndent = (node.attrs.indent || INDENT_MIN) + 1;
-			tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: clamp(newIndent, 0, INDENT_MAX) });
 		}
 	});
 

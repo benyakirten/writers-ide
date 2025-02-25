@@ -7,7 +7,7 @@
 	import { baseKeymap } from 'prosemirror-commands';
 
 	import { schema } from './schema.js';
-	import { indentLess, indentMore, setTextAlignment, toggleTextMark } from './actions.js';
+	import { dent, setTextAlignment, toggleTextMark } from './actions.js';
 	import TabState from '../../state/tab-state.svelte.js';
 
 	let { index, id, plugins = [] }: { index: number; id: string; plugins?: Plugin[] } = $props();
@@ -47,8 +47,8 @@
 					'Mod-y': redo,
 					'Mod-b': (state, dispatch, view) => toggleTextMark('bold', state, dispatch, view),
 					'Mod-i': (state, dispatch, view) => toggleTextMark('italic', state, dispatch, view),
-					'Mod-[': indentLess,
-					'Mod-]': indentMore,
+					'Mod-[': (state, dispatch) => dent('dedent', state, dispatch),
+					'Mod-]': (state, dispatch) => dent('indent', state, dispatch),
 					'Mod-u': (state, dispatch, view) => toggleTextMark('underline', state, dispatch, view),
 					'Mod-j': (state, dispatch, view) => toggleTextMark('overline', state, dispatch, view)
 				}),

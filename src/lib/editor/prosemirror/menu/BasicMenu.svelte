@@ -18,12 +18,7 @@
 	import type { Selection } from 'prosemirror-state';
 	import type { Node } from 'prosemirror-model';
 
-	import {
-		indentLess,
-		indentMore,
-		setTextAlignment,
-		toggleTextMark
-	} from '$lib/editor/prosemirror/view/actions.js';
+	import { dent, setTextAlignment, toggleTextMark } from '$lib/editor/prosemirror/view/actions.js';
 	import { TextOverline } from '$lib/icons.js';
 
 	type TextMenuIcon = {
@@ -127,7 +122,7 @@
 				if (!view) {
 					return;
 				}
-				indentMore(view.state, view.dispatch);
+				dent('indent', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) => {
@@ -142,7 +137,7 @@
 				if (!view) {
 					return;
 				}
-				indentLess(view.state, view.dispatch);
+				dent('dedent', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) => {
