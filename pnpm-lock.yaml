@@ -20,9 +20,6 @@ importers:
       i:
         specifier: ^0.3.7
         version: 0.3.7
-      jsdom:
-        specifier: ^26.0.0
-        version: 26.0.0
       pnpm:
         specifier: ^10.4.1
         version: 10.4.1
@@ -105,6 +102,9 @@ importers:
       globals:
         specifier: ^15.0.0
         version: 15.12.0
+      jsdom:
+        specifier: ^26.0.0
+        version: 26.0.0
       prettier:
         specifier: ^3.3.2
         version: 3.3.3

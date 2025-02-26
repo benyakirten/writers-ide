@@ -7,13 +7,11 @@
 		icon,
 		label,
 		onClick,
-		tooltip,
 		inversion = 0
 	}: {
 		icon: Snippet;
 		label: string;
 		onClick: () => void;
-		tooltip?: Snippet;
 		inversion?: number;
 	} = $props();
 </script>
@@ -26,10 +24,6 @@
 >
 	{@render icon()}
 </button>
-
-{#if tooltip}
-	<!-- Add tooltip queue -->
-{/if}
 
 <style>
 	button {
