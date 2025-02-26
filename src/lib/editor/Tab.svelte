@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { WindowData } from './state/tab-state.svelte.js';
-	import ProseMirrorView from './view/ProseMirrorView.svelte';
+	import ProseMirrorView from './prosemirror/view/ProseMirrorView.svelte';
+	import { createUpdatePlugin } from './state/event-bus.svelte.js';
 
-	let { id, view } = $props<{ id: string; view?: WindowData['view'] }>();
+	let { index, id, view }: { index: number; id: string; view?: WindowData['view'] } = $props();
 </script>
 
 <!-- TODO: Much more complexity here -->
@@ -10,14 +11,15 @@
 	{#if view === undefined}
 		<div></div>
 	{:else}
-		<ProseMirrorView {id} />
+		{@const updatePlugin = createUpdatePlugin(id)}
+		<ProseMirrorView plugins={[updatePlugin]} {index} {id} />
 	{/if}
 </div>
 
 <style>
 	.tab {
-		height: 200px;
-		width: 200px;
+		width: 100%;
+		height: 100%;
 		border: 1px solid black;
 	}
 </style>

@@ -7,6 +7,7 @@ describe('TabState', () => {
 
 	beforeEach(() => {
 		tabState = new TabState();
+		tabState.windows = [];
 	});
 
 	describe('createTab', () => {

@@ -6,11 +6,46 @@ export type WindowData = {
 };
 
 export class TabState {
-	windows = $state<WindowData[]>([]);
+	windows = $state<WindowData[]>([
+		{
+			id: 'my-1',
+			view: null
+		}
+	]);
+
+	#active = $state<string | null>(null);
+	active = $derived.by(
+		() => this.windows.find((window) => window.id === this.#active)?.view ?? null
+	);
+	activate = (id: string | number): boolean => {
+		if (typeof id === 'number') {
+			if (id > this.windows.length) {
+				return false;
+			}
+
+			this.#active = this.windows[id].id;
+			return true;
+		}
+
+		const active = this.windows.find((item) => item.id === id);
+		if (!active) {
+			return false;
+		}
+
+		this.#active = active.id;
+		return true;
+	};
+
+	deactivate(): void {
+		this.#active = null;
+	}
 
 	// Other types of tabs?
 	registerEditor(id: string, view: EditorView | null): () => void {
 		const index = this.windows.findIndex((item) => item.id === id);
+		if (index === -1) {
+			return () => {};
+		}
 		this.windows[index].view = view;
 		return () => this.windows.splice(index, 1);
 	}
@@ -76,5 +111,5 @@ export class TabState {
 	}
 }
 
-const globalEditorState = new TabState();
-export default globalEditorState;
+const tabState = new TabState();
+export default tabState;

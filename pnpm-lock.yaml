@@ -11,15 +11,24 @@ importers:
       '@inlang/paraglide-sveltekit':
         specifier: ^0.11.1
         version: 0.11.5(@sveltejs/kit@2.8.1(@sveltejs/vite-plugin-svelte@4.0.1(svelte@5.2.7)(vite@5.4.11(@types/node@22.9.1)))(svelte@5.2.7)(vite@5.4.11(@types/node@22.9.1)))
-      '@steeze-ui/radix-icons':
-        specifier: ^1.1.2
-        version: 1.1.2
+      '@popperjs/core':
+        specifier: ^2.11.8
+        version: 2.11.8
+      '@steeze-ui/phosphor-icons':
+        specifier: ^2.1.1
+        version: 2.1.1
       '@steeze-ui/svelte-icon':
         specifier: ^1.6.2
         version: 1.6.2(svelte@5.2.7)
+      i:
+        specifier: ^0.3.7
+        version: 0.3.7
       jsdom:
         specifier: ^26.0.0
         version: 26.0.0
+      pnpm:
+        specifier: ^10.4.1
+        version: 10.4.1
       prosemirror-commands:
         specifier: ^1.6.2
         version: 1.6.2
@@ -762,6 +771,9 @@ packages:
   '@polka/url@1.0.0-next.28':
     resolution: {integrity: sha512-8LduaNlMZGwdZ6qWrKlfa+2M4gahzFkprZiAt2TF8uS0qQgBizKXpXURqvTJ4WtmupWxaLqjRb2UCTe72mu+Aw==}
 
+  '@popperjs/core@2.11.8':
+    resolution: {integrity: sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A==}
+
   '@rollup/rollup-android-arm-eabi@4.27.3':
     resolution: {integrity: sha512-EzxVSkIvCFxUd4Mgm4xR9YXrcp976qVaHnqom/Tgm+vU79k4vV4eYTjmRvGfeoW8m9LVcsAy/lGjcgVegKEhLQ==}
     cpu: [arm]
@@ -855,8 +867,8 @@ packages:
   '@sinclair/typebox@0.31.28':
     resolution: {integrity: sha512-/s55Jujywdw/Jpan+vsy6JZs1z2ZTGxTmbZTPiuSL2wz9mfzA2gN1zzaqmvfi4pq+uOt7Du85fkiwv5ymW84aQ==}
 
-  '@steeze-ui/radix-icons@1.1.2':
-    resolution: {integrity: sha512-Oh8+pC4TwBNDmYEw0lnbNXV3EPqJdAN1XMu/ZzwkrnNz0mOBMr7vhGqynNZH7572QOv01ORLUhHjRhg2B0tykw==}
+  '@steeze-ui/phosphor-icons@2.1.1':
+    resolution: {integrity: sha512-lpmoLr+OWawI5fwiLNfkB1STJ6jn4STARxD4/DvL+Ycs26BsgUktblcjT4ZnjQ7mOkcXPY0/L41ud/QFL5D+Kw==}
 
   '@steeze-ui/svelte-icon@1.6.2':
     resolution: {integrity: sha512-Q2WP/RkM1JhMueX0FJogSj4J1bncSHaAiiPCqjcseRcHKqfpjYFPJa8bA50I+4KbyOVJ9fdUvTQ3ww9X0ITRxQ==}
@@ -1913,6 +1925,10 @@ packages:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
 
+  i@0.3.7:
+    resolution: {integrity: sha512-FYz4wlXgkQwIPqhzC5TdNMLSE5+GS1IIDJZY/1ZiEPCT2S3COUVZeT5OW4BmW4r5LHLQuOosSwsvnroG9GR59Q==}
+    engines: {node: '>=0.4'}
+
   iconv-lite@0.6.3:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
     engines: {node: '>=0.10.0'}
@@ -2283,6 +2299,11 @@ packages:
   playwright@1.49.0:
     resolution: {integrity: sha512-eKpmys0UFDnfNb3vfsf8Vx2LEOtflgRebl0Im2eQQnYMA4Aqd+Zw8bEOB+7ZKvN76901mRnqdsiOGKxzVTbi7A==}
     engines: {node: '>=18'}
+    hasBin: true
+
+  pnpm@10.4.1:
+    resolution: {integrity: sha512-x1O2w616+hOvOI+m2AgDWgCOMOqZk/WMZmPivF/yFnmqg02wlJhxKapNSIuG31f3tjSYGy+CfNysxpjMDPuIrw==}
+    engines: {node: '>=18.12'}
     hasBin: true
 
   polished@4.3.1:
@@ -3547,6 +3568,8 @@ snapshots:
 
   '@polka/url@1.0.0-next.28': {}
 
+  '@popperjs/core@2.11.8': {}
+
   '@rollup/rollup-android-arm-eabi@4.27.3':
     optional: true
 
@@ -3603,7 +3626,7 @@ snapshots:
 
   '@sinclair/typebox@0.31.28': {}
 
-  '@steeze-ui/radix-icons@1.1.2': {}
+  '@steeze-ui/phosphor-icons@2.1.1': {}
 
   '@steeze-ui/svelte-icon@1.6.2(svelte@5.2.7)':
     dependencies:
@@ -4842,6 +4865,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  i@0.3.7: {}
+
   iconv-lite@0.6.3:
     dependencies:
       safer-buffer: 2.1.2
@@ -5193,6 +5218,8 @@ snapshots:
       playwright-core: 1.49.0
     optionalDependencies:
       fsevents: 2.3.2
+
+  pnpm@10.4.1: {}
 
   polished@4.3.1:
     dependencies:
