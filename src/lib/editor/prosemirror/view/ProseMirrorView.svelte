@@ -10,7 +10,7 @@
 	import { dent, setTextAlignment, toggleTextMark } from './actions.js';
 	import TabState from '../../state/tab-state.svelte.js';
 
-	let { index, id, plugins = [] }: { index: number; id: string; plugins?: Plugin[] } = $props();
+	let { id, plugins = [] }: { index: number; id: string; plugins?: Plugin[] } = $props();
 
 	let el: HTMLElement;
 	let state: EditorState;

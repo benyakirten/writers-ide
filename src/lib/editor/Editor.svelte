@@ -9,7 +9,6 @@
 	import VerticalBaseBar from './bars/VerticalBaseBar.svelte';
 	import FloaterState from './state/floater-state.svelte.js';
 	import HorizontalBaseBar from './bars/HorizontalBaseBar.svelte';
-	import TabState from './state/tab-state.svelte.js';
 
 	function resize(e: MouseEvent) {
 		VerticalBarState.resize(e);
@@ -41,9 +40,7 @@
 		</HorizontalSlice>
 	{/each}
 	<div class="main-container">
-		{#if false}
-			<VerticalBaseBar />
-		{/if}
+		<VerticalBaseBar />
 		{#each VerticalBarState.inlineStart as bar, index (bar.id)}
 			<VerticalSlice {bar} position={VerticalBarPosition.InlineStart} {index}>
 				Inline Bar Start #{index + 1}

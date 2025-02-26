@@ -1,6 +1,4 @@
 <script lang="ts">
-	import type { EditorView } from 'prosemirror-view';
-
 	import BasicMenu from '$lib/editor/prosemirror/menu/BasicMenu.svelte';
 </script>
 

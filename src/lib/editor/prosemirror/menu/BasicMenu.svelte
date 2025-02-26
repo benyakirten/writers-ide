@@ -262,7 +262,6 @@
 			</IconButton>
 		{/each}
 	</div>
-	<Icon src={TextOverline} size="16px" />
 </div>
 
 <style>
