@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, test } from 'vitest';
-import { FloaterState } from './floater-state.svelte';
+import { FloaterBarState } from './floater-state.svelte';
 
-describe('FloaterState', () => {
-	let floaterState: FloaterState;
+describe('FloaterBarState', () => {
+	let floaterState: FloaterBarState;
 
 	beforeEach(() => {
-		floaterState = new FloaterState();
+		floaterState = new FloaterBarState();
 	});
 
 	function createRoot(width: number, height: number) {

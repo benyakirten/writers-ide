@@ -2,13 +2,29 @@ import { type Snippet } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import type { ActionUtilities } from '../prosemirror/view/actions.js';
 import type { SelectionUtilies } from '../prosemirror/view/selection.js';
+import type { ProseMirrorEventBus } from './event-bus.svelte.js';
+import type { VerticalBarState } from './vertical-bar-state.svelte.js';
+import type { HorizontalBarState } from './horizontal-bar-state.svelte.js';
+import type { FloaterBarState } from './floater-state.svelte.js';
+import type { TabState } from './tab-state.svelte.js';
+import type { schema } from '../prosemirror/view/schema.js';
 
-type UtilFunctions = {
-	actions: typeof ActionUtilities;
-	selections: typeof SelectionUtilies;
+type BarStates = {
+	vertical: VerticalBarState;
+	horizontal: HorizontalBarState;
+	floater: FloaterBarState;
 };
+type ProseMirrorUtils = {
+	actions: ActionUtilities;
+	selections: SelectionUtilies;
+	eventBus: ProseMirrorEventBus;
+	schema: typeof schema;
+};
+
 export type BarItemComponentProps = {
-	utils: UtilFunctions;
+	proseMirror: ProseMirrorUtils;
+	bars: BarStates;
+	tabs: TabState;
 };
 
 export type BarItem = {

@@ -7,7 +7,7 @@
 	import { baseKeymap } from 'prosemirror-commands';
 
 	import { schema } from './schema.js';
-	import { Actions } from './actions.js';
+	import { ActionUtilities } from './actions.js';
 	import TabState from '../../state/tab-state.svelte.js';
 
 	let { id, plugins = [] }: { index: number; id: string; plugins?: Plugin[] } = $props();
@@ -34,26 +34,31 @@
 				history(),
 				keymap({
 					'Ctrl-Shift-+': (state, dispatch, view) =>
-						Actions.toggleTextMark('superscript', state, dispatch, view, 'subscript'),
+						ActionUtilities.toggleTextMark('superscript', state, dispatch, view, 'subscript'),
 					'Ctrl-Shift-_': (state, dispatch, view) =>
-						Actions.toggleTextMark('subscript', state, dispatch, view, 'superscript'),
+						ActionUtilities.toggleTextMark('subscript', state, dispatch, view, 'superscript'),
 					'Mod-Shift-X': (state, dispatch, view) =>
-						Actions.toggleTextMark('strikethrough', state, dispatch, view),
-					'Mod-Shift-{': (state, dispatch) => Actions.setTextAlignment('left', state, dispatch),
-					'Mod-Shift-}': (state, dispatch) => Actions.setTextAlignment('right', state, dispatch),
-					'Mod-Shift-:': (state, dispatch) => Actions.setTextAlignment('center', state, dispatch),
-					'Mod-Shift-"': (state, dispatch) => Actions.setTextAlignment('justify', state, dispatch),
+						ActionUtilities.toggleTextMark('strikethrough', state, dispatch, view),
+					'Mod-Shift-{': (state, dispatch) =>
+						ActionUtilities.setTextAlignment('left', state, dispatch),
+					'Mod-Shift-}': (state, dispatch) =>
+						ActionUtilities.setTextAlignment('right', state, dispatch),
+					'Mod-Shift-:': (state, dispatch) =>
+						ActionUtilities.setTextAlignment('center', state, dispatch),
+					'Mod-Shift-"': (state, dispatch) =>
+						ActionUtilities.setTextAlignment('justify', state, dispatch),
 					'Mod-z': undo,
 					'Mod-y': redo,
-					'Mod-b': (state, dispatch, view) => Actions.toggleTextMark('bold', state, dispatch, view),
+					'Mod-b': (state, dispatch, view) =>
+						ActionUtilities.toggleTextMark('bold', state, dispatch, view),
 					'Mod-i': (state, dispatch, view) =>
-						Actions.toggleTextMark('italic', state, dispatch, view),
-					'Mod-[': (state, dispatch) => Actions.dent('dedent', state, dispatch),
-					'Mod-]': (state, dispatch) => Actions.dent('indent', state, dispatch),
+						ActionUtilities.toggleTextMark('italic', state, dispatch, view),
+					'Mod-[': (state, dispatch) => ActionUtilities.dent('dedent', state, dispatch),
+					'Mod-]': (state, dispatch) => ActionUtilities.dent('indent', state, dispatch),
 					'Mod-u': (state, dispatch, view) =>
-						Actions.toggleTextMark('underline', state, dispatch, view),
+						ActionUtilities.toggleTextMark('underline', state, dispatch, view),
 					'Mod-j': (state, dispatch, view) =>
-						Actions.toggleTextMark('overline', state, dispatch, view)
+						ActionUtilities.toggleTextMark('overline', state, dispatch, view)
 				}),
 				keymap(baseKeymap),
 				...plugins

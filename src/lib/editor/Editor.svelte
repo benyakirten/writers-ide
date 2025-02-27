@@ -7,7 +7,7 @@
 	import { HorizontalBarPosition } from './state/horizontal-bar-state.svelte.js';
 	import FloaterBar from './bars/floater/FloaterBar.svelte';
 	import VerticalBaseBar from './bars/VerticalBaseBar.svelte';
-	import FloaterState from './state/floater-state.svelte.js';
+	import FloaterBarState from './state/floater-state.svelte.js';
 	import HorizontalBaseBar from './bars/HorizontalBaseBar.svelte';
 
 	function resize(e: MouseEvent) {
@@ -18,18 +18,18 @@
 	function endResize() {
 		VerticalBarState.endResize();
 		HorizontalBarState.endResize();
-		FloaterState.stopDragging();
+		FloaterBarState.stopDragging();
 	}
 </script>
 
 <div
-	bind:this={FloaterState.root}
+	bind:this={FloaterBarState.root}
 	class="overlay"
 	onmouseupcapture={() => endResize()}
 	onmousemovecapture={(event) => resize(event)}
 >
 	<HorizontalBaseBar />
-	{#each FloaterState.visibleBars as bar, index (bar.id)}
+	{#each FloaterBarState.visibleBars as bar, index (bar.id)}
 		<FloaterBar {bar} {index}>
 			Floater Bar #{index + 1}
 		</FloaterBar>

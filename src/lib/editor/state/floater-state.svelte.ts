@@ -16,7 +16,7 @@ export type FloatingBar = {
 	minimized: boolean;
 };
 
-export class FloaterState {
+export class FloaterBarState {
 	readonly TOLERANCE = 8;
 	readonly OFFSET = 2;
 	readonly MIN_WIDTH_PX = 200;
@@ -358,5 +358,5 @@ export class FloaterState {
 	}
 }
 
-const floaterState = new FloaterState();
-export default floaterState;
+const floaterBarState = new FloaterBarState();
+export default floaterBarState;
