@@ -18,8 +18,9 @@
 	import type { Selection } from 'prosemirror-state';
 	import type { Node } from 'prosemirror-model';
 
-	import { dent, setTextAlignment, toggleTextMark } from '$lib/editor/prosemirror/view/actions.js';
+	import { ActionUtilities } from '$lib/editor/prosemirror/view/actions.js';
 	import { TextOverline } from '$lib/icons.js';
+	import { SelectionUtilies, type TextMarkPresence } from '../view/selection.js';
 
 	type TextMenuIcon = {
 		iconSrc: IconSource;
@@ -35,7 +36,7 @@
 				}
 
 				const { state, dispatch } = view;
-				toggleTextMark('bold', state, dispatch, view);
+				ActionUtilities.toggleTextMark('bold', state, dispatch, view);
 				view.focus();
 			},
 			markName: 'bold'
@@ -46,7 +47,7 @@
 				if (!view) {
 					return;
 				}
-				toggleTextMark('italic', view.state, view.dispatch, view);
+				ActionUtilities.toggleTextMark('italic', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'italic'
@@ -57,7 +58,7 @@
 				if (!view) {
 					return;
 				}
-				toggleTextMark('superscript', view.state, view.dispatch, view, 'subscript');
+				ActionUtilities.toggleTextMark('superscript', view.state, view.dispatch, view, 'subscript');
 				view.focus();
 			},
 			markName: 'superscript'
@@ -68,7 +69,7 @@
 				if (!view) {
 					return;
 				}
-				toggleTextMark('subscript', view.state, view.dispatch, view, 'superscript');
+				ActionUtilities.toggleTextMark('subscript', view.state, view.dispatch, view, 'superscript');
 				view.focus();
 			},
 			markName: 'subscript'
@@ -79,7 +80,7 @@
 				if (!view) {
 					return;
 				}
-				toggleTextMark('underline', view.state, view.dispatch, view);
+				ActionUtilities.toggleTextMark('underline', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'underline'
@@ -90,7 +91,7 @@
 				if (!view) {
 					return;
 				}
-				toggleTextMark('overline', view.state, view.dispatch, view);
+				ActionUtilities.toggleTextMark('overline', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'overline'
@@ -101,7 +102,7 @@
 				if (!view) {
 					return;
 				}
-				toggleTextMark('strikethrough', view.state, view.dispatch, view);
+				ActionUtilities.toggleTextMark('strikethrough', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'strikethrough'
@@ -122,11 +123,11 @@
 				if (!view) {
 					return;
 				}
-				dent('indent', view.state, view.dispatch);
+				ActionUtilities.dent('indent', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) => {
-				const ratio = getIndentRatio(selection, doc);
+				const ratio = SelectionUtilies.getIndentRatio(selection, doc);
 				return ratio ?? 0;
 			}
 		},
@@ -137,11 +138,11 @@
 				if (!view) {
 					return;
 				}
-				dent('dedent', view.state, view.dispatch);
+				ActionUtilities.dent('dedent', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) => {
-				const ratio = getIndentRatio(selection, doc);
+				const ratio = SelectionUtilies.getIndentRatio(selection, doc);
 				return ratio === null ? 0 : 1 - ratio;
 			}
 		},
@@ -152,11 +153,11 @@
 				if (!view) {
 					return;
 				}
-				setTextAlignment('left', view.state, view.dispatch);
+				ActionUtilities.setTextAlignment('left', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) =>
-				getBlockAttributeRatio(
+				SelectionUtilies.getBlockAttributeRatio(
 					selection,
 					doc,
 					'align',
@@ -171,11 +172,11 @@
 				if (!view) {
 					return;
 				}
-				setTextAlignment('center', view.state, view.dispatch);
+				ActionUtilities.setTextAlignment('center', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) =>
-				getBlockAttributeRatio(selection, doc, 'align', 'center')
+				SelectionUtilies.getBlockAttributeRatio(selection, doc, 'align', 'center')
 		},
 		{
 			label: 'Align text right.',
@@ -184,11 +185,11 @@
 				if (!view) {
 					return;
 				}
-				setTextAlignment('right', view.state, view.dispatch);
+				ActionUtilities.setTextAlignment('right', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) =>
-				getBlockAttributeRatio(
+				SelectionUtilies.getBlockAttributeRatio(
 					selection,
 					doc,
 					'align',
@@ -202,11 +203,11 @@
 				if (!view) {
 					return;
 				}
-				setTextAlignment('justify', view.state, view.dispatch);
+				ActionUtilities.setTextAlignment('justify', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) =>
-				getBlockAttributeRatio(selection, doc, 'align', 'justify')
+				SelectionUtilies.getBlockAttributeRatio(selection, doc, 'align', 'justify')
 		}
 	];
 </script>
@@ -216,12 +217,6 @@
 
 	import ProseMirrorEventBus from '$lib/editor/state/event-bus.svelte.js';
 	import IconButton from '$lib/components/IconButton.svelte';
-	import {
-		findTextMarks,
-		getBlockAttributeRatio,
-		getIndentRatio,
-		type TextMarkPresence
-	} from '../view/selection.js';
 
 	let activeCodeMarks = $state<TextMarkPresence>();
 	let editorView = $state<EditorView | null>(null);
@@ -229,7 +224,7 @@
 
 	onMount(() => {
 		const unsub = ProseMirrorEventBus.subscribe(({ view }) => {
-			const marks = view && findTextMarks(view.state.selection, view.state.doc);
+			const marks = view && SelectionUtilies.findTextMarks(view.state.selection, view.state.doc);
 			editorView = view;
 			activeCodeMarks = marks;
 			selection = view.state.selection;

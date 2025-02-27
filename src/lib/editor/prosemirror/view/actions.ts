@@ -2,95 +2,96 @@ import type { EditorView } from 'prosemirror-view';
 import { type EditorState, type Transaction } from 'prosemirror-state';
 
 import { clamp } from '$lib/utils/numbers.js';
-import { doesSelectionHaveTextMark } from './selection.js';
+import { SelectionUtilies } from './selection.js';
 import { INDENT_MAX, INDENT_MIN } from './constants.js';
 import type { marks } from './marks.js';
 
 type UseableMarkName = keyof typeof marks;
+export type TextAlignment = 'start' | 'end' | 'left' | 'center' | 'right' | 'justify';
+export class ActionUtilities {
+	static toggleTextMark(
+		mark: UseableMarkName,
+		state: EditorState,
+		dispatch?: (tr: Transaction) => void,
+		view?: EditorView,
+		exclusiveWith?: UseableMarkName
+	) {
+		if (!view || !dispatch) {
+			return false;
+		}
 
-export function toggleTextMark(
-	mark: UseableMarkName,
-	state: EditorState,
-	dispatch?: (tr: Transaction) => void,
-	view?: EditorView,
-	exclusiveWith?: UseableMarkName
-) {
-	if (!view || !dispatch) {
-		return false;
-	}
+		const { tr } = view.state;
+		const { from, to } = tr.selection;
+		if (from === to) {
+			return false;
+		}
 
-	const { tr } = view.state;
-	const { from, to } = tr.selection;
-	if (from === to) {
-		return false;
-	}
+		if (SelectionUtilies.doesSelectionHaveTextMark(tr.selection, tr.doc, mark)) {
+			tr.removeMark(from, to, state.schema.marks[mark]);
+			dispatch(tr);
+			return true;
+		}
 
-	if (doesSelectionHaveTextMark(tr.selection, tr.doc, mark)) {
-		tr.removeMark(from, to, state.schema.marks[mark]);
+		tr.addMark(from, to, state.schema.marks[mark].create());
+		if (exclusiveWith) {
+			tr.removeMark(from, to, state.schema.marks[exclusiveWith]);
+		}
+
 		dispatch(tr);
 		return true;
 	}
 
-	tr.addMark(from, to, state.schema.marks[mark].create());
-	if (exclusiveWith) {
-		tr.removeMark(from, to, state.schema.marks[exclusiveWith]);
-	}
-
-	dispatch(tr);
-	return true;
-}
-
-export function dent(
-	direction: 'indent' | 'dedent',
-	state: EditorState,
-	dispatch?: (tr: Transaction) => void
-) {
-	if (!dispatch) {
-		return false;
-	}
-	const { from, to } = state.selection;
-	const tr = state.tr;
-
-	state.doc.nodesBetween(from, to, (node, pos) => {
-		if (node.type.name === 'paragraph') {
-			const newIndent =
-				direction === 'dedent'
-					? (node.attrs.indent || 0) - 1
-					: (node.attrs.indent || INDENT_MIN) + 1;
-			tr.setNodeMarkup(pos, undefined, {
-				...node.attrs,
-				indent: clamp(newIndent, INDENT_MIN, INDENT_MAX)
-			});
+	static dent(
+		direction: 'indent' | 'dedent',
+		state: EditorState,
+		dispatch?: (tr: Transaction) => void
+	) {
+		if (!dispatch) {
+			return false;
 		}
-	});
+		const { from, to } = state.selection;
+		const tr = state.tr;
 
-	if (tr.docChanged) {
-		dispatch(tr);
-	}
-	return true;
-}
+		state.doc.nodesBetween(from, to, (node, pos) => {
+			if (node.type.name === 'paragraph') {
+				const newIndent =
+					direction === 'dedent'
+						? (node.attrs.indent || 0) - 1
+						: (node.attrs.indent || INDENT_MIN) + 1;
+				tr.setNodeMarkup(pos, undefined, {
+					...node.attrs,
+					indent: clamp(newIndent, INDENT_MIN, INDENT_MAX)
+				});
+			}
+		});
 
-export type TextAlignment = 'start' | 'end' | 'left' | 'center' | 'right' | 'justify';
-export function setTextAlignment(
-	alignment: TextAlignment,
-	state: EditorState,
-	dispatch?: (tr: Transaction) => void
-) {
-	if (!dispatch) {
-		return false;
-	}
-
-	const { from, to } = state.selection;
-	const tr = state.tr;
-
-	state.doc.nodesBetween(from, to, (node, pos) => {
-		if (node.type.name === 'paragraph') {
-			tr.setNodeMarkup(pos, undefined, { ...node.attrs, align: alignment });
+		if (tr.docChanged) {
+			dispatch(tr);
 		}
-	});
-
-	if (tr.docChanged) {
-		dispatch(tr);
+		return true;
 	}
-	return true;
+
+	static setTextAlignment(
+		alignment: TextAlignment,
+		state: EditorState,
+		dispatch?: (tr: Transaction) => void
+	) {
+		if (!dispatch) {
+			return false;
+		}
+
+		const { from, to } = state.selection;
+		const tr = state.tr;
+
+		state.doc.nodesBetween(from, to, (node, pos) => {
+			if (node.type.name === 'paragraph') {
+				tr.setNodeMarkup(pos, undefined, { ...node.attrs, align: alignment });
+			}
+		});
+
+		if (tr.docChanged) {
+			dispatch(tr);
+		}
+		return true;
+	}
 }
