@@ -27,10 +27,14 @@ export type BarItemComponentProps = {
 	tabs: TabState;
 };
 
-export type BarItem = {
+export type BarItemSection = {
+	Component: Snippet<[BarItemComponentProps]>;
 	size: 1 | 2 | 3;
-	Vertical: Snippet<[BarItemComponentProps]>;
-	Horizontal: Snippet<[BarItemComponentProps]>;
+};
+
+export type BarItem = {
+	vertical: BarItemSection;
+	horizontal: BarItemSection;
 };
 export class BarItemRegistry {
 	items = $state<SvelteMap<string, BarItem>>(new SvelteMap());
