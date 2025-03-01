@@ -34,7 +34,7 @@ describe('HorizontalBarState', () => {
 	describe('bars', () => {
 		it('should return the list of window start bars if the position is WindowBlockStart', () => {
 			const windowStartBar: HorizontalBar = {
-				data: null,
+				data: [null],
 				id: 'window-start-1',
 				visible: true,
 				height: 100
@@ -47,7 +47,7 @@ describe('HorizontalBarState', () => {
 
 		it('should return the list of window end bars if the position is WindowBlockEnd', () => {
 			const windowEndBar: HorizontalBar = {
-				data: null,
+				data: [null],
 				id: 'window-end-1',
 				visible: true,
 				height: 100
@@ -60,7 +60,7 @@ describe('HorizontalBarState', () => {
 
 		it('should return the list of editor start bars if the position is EditorBlockStart', () => {
 			const editorStartBar: HorizontalBar = {
-				data: null,
+				data: [null],
 				id: 'editor-start-1',
 				visible: true,
 				height: 100
@@ -73,7 +73,7 @@ describe('HorizontalBarState', () => {
 
 		it('should return the list of editor end bars if the position is EditorBlockEnd', () => {
 			const editorEndBar: HorizontalBar = {
-				data: null,
+				data: [null],
 				id: 'editor-end-1',
 				visible: true,
 				height: 100

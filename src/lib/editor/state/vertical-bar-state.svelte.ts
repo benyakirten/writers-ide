@@ -6,7 +6,7 @@ export type VerticalBar = {
 	width: number;
 	visible: boolean;
 	id: string;
-	data?: null;
+	data?: (null | string)[];
 };
 
 export enum HorizontalTextDirection {
@@ -39,12 +39,7 @@ export class VerticalBarState {
 	}
 
 	add(
-		{
-			width = this.minSize,
-			id = crypto.randomUUID(),
-			visible = true,
-			data = null
-		}: Partial<VerticalBar>,
+		{ width = this.minSize, id = crypto.randomUUID(), visible = true, data }: Partial<VerticalBar>,
 		position: VerticalBarPosition
 	): VerticalBar {
 		const bars = this.bars(position);

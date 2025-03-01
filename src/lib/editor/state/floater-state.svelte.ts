@@ -9,7 +9,7 @@ export type FloatingPosition = {
 
 export type FloatingBar = {
 	position: FloatingPosition;
-	data?: null;
+	data?: (null | string)[];
 	z: number;
 	id: string;
 	title: string;
@@ -183,7 +183,7 @@ export class FloaterBarState {
 			width?: number;
 			height?: number;
 			z?: number;
-			data?: null;
+			data?: (null | string)[];
 			id?: string;
 			minimized?: boolean;
 			title?: string;
