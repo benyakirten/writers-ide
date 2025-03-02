@@ -47,7 +47,7 @@ export class BarItemRegistry {
 		this.items.delete(id);
 	}
 
-	size(id: string | undefined, isVertical: boolean): number {
+	size(id: string | null, isVertical: boolean): number {
 		if (!id) {
 			return 1;
 		}
