@@ -21,6 +21,37 @@ export class BarItems<T extends { id: string }> {
 		return true;
 	}
 
+	swap(index1: number, index2: number): boolean {
+		if (
+			index1 < 0 ||
+			index1 >= this.#items.length ||
+			index2 < 0 ||
+			index2 >= this.#items.length ||
+			index1 === index2
+		) {
+			return false;
+		}
+
+		[this.#items[index1], this.#items[index2]] = [this.#items[index2], this.#items[index1]];
+		return true;
+	}
+
+	moveTo(id: string | number, toIndex: number): boolean {
+		const fromIndex =
+			typeof id === 'string' ? this.#items.findIndex((item) => item?.id === id) : id;
+		if (
+			fromIndex === -1 ||
+			fromIndex > this.#items.length - 1 ||
+			toIndex < 0 ||
+			toIndex > this.#items.length - 1 ||
+			fromIndex === toIndex
+		) {
+			return false;
+		}
+
+		return this.swap(fromIndex, toIndex);
+	}
+
 	remove(id: string): boolean {
 		const index = this.#items.findIndex((item) => item?.id === id);
 		if (index === -1) {
