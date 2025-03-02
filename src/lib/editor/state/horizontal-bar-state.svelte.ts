@@ -1,6 +1,7 @@
 import * as m from '$lib/paraglide/messages.js';
 
 import { capitalize } from '$lib/utils/strings.js';
+import { BarItems } from './bar-items.svelte.js';
 
 export enum HorizontalBarPosition {
 	WindowBlockStart = 'WINDOW_BLOCK_START',
@@ -13,7 +14,7 @@ export type HorizontalBar = {
 	height: number;
 	visible: boolean;
 	id: string;
-	data?: (null | string)[];
+	data: BarItems;
 };
 
 export class HorizontalBarState {
@@ -35,7 +36,12 @@ export class HorizontalBarState {
 	} | null = $state(null);
 
 	add(
-		{ height, id = crypto.randomUUID(), visible = true, data }: Partial<HorizontalBar>,
+		{
+			height,
+			id = crypto.randomUUID(),
+			visible = true,
+			data
+		}: Partial<Omit<HorizontalBar, 'data'>> & { data?: (string | null)[] },
 		position: HorizontalBarPosition
 	): HorizontalBar {
 		const bars = this.bars(position);
@@ -45,7 +51,10 @@ export class HorizontalBarState {
 		}
 
 		height = height ?? this.minSize(position);
-		const bar = { height, id, visible, data };
+
+		const barData = new BarItems(false, 3, data);
+		const bar = { height, id, visible, data: barData };
+
 		bars.push(bar);
 		return bar;
 	}

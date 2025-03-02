@@ -1,12 +1,13 @@
 import * as m from '$lib/paraglide/messages.js';
 
 import { capitalize } from '$lib/utils/strings.js';
+import { BarItems } from './bar-items.svelte.js';
 
 export type VerticalBar = {
 	width: number;
 	visible: boolean;
 	id: string;
-	data?: (null | string)[];
+	data: BarItems;
 };
 
 export enum HorizontalTextDirection {
@@ -39,7 +40,12 @@ export class VerticalBarState {
 	}
 
 	add(
-		{ width = this.minSize, id = crypto.randomUUID(), visible = true, data }: Partial<VerticalBar>,
+		{
+			width = this.minSize,
+			id = crypto.randomUUID(),
+			visible = true,
+			data
+		}: Partial<Omit<VerticalBar, 'data'>> & { data?: (string | null)[] },
 		position: VerticalBarPosition
 	): VerticalBar {
 		const bars = this.bars(position);
@@ -48,7 +54,9 @@ export class VerticalBarState {
 			return existingBar;
 		}
 
-		const bar = { width, id, visible, data };
+		const barData = new BarItems(true, 3, data);
+		const bar = { width, id, visible, data: barData };
+
 		bars.push(bar);
 		return bar;
 	}

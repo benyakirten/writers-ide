@@ -3,8 +3,11 @@ import Registry from './bar-item-registry.svelte.js';
 export class BarItems {
 	constructor(
 		public isVertical: boolean,
-		readonly maxSize = 3
-	) {}
+		readonly maxSize = 3,
+		items: (string | null)[] = []
+	) {
+		this.#ids = this.#ids.concat(items);
+	}
 
 	#ids = $state<(string | null)[]>([]);
 	items = $derived(
