@@ -6,8 +6,9 @@ export class BarItems {
 		readonly maxSize = 3
 	) {}
 
-	get items() {
-		return this.#ids.map((id) => {
+	#ids = $state<(string | null)[]>([]);
+	items = $derived(
+		this.#ids.map((id) => {
 			if (id === null) {
 				return null;
 			}
@@ -18,9 +19,8 @@ export class BarItems {
 			}
 
 			return this.isVertical ? item.vertical.Component : item.horizontal.Component;
-		});
-	}
-	#ids = $state<(string | null)[]>([]);
+		})
+	);
 
 	index(id: string | number): number {
 		return typeof id === 'string' ? this.#ids.findIndex((_id) => _id === id) : id;
