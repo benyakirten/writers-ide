@@ -46,6 +46,19 @@ export class BarItemRegistry {
 	deregister(id: string) {
 		this.items.delete(id);
 	}
+
+	size(id: string | undefined, isVertical: boolean): number {
+		if (!id) {
+			return 1;
+		}
+
+		const item = this.items.get(id);
+		if (!item) {
+			return 1;
+		}
+
+		return isVertical ? item.vertical.size : item.horizontal.size;
+	}
 }
 
 const Registry = new BarItemRegistry();

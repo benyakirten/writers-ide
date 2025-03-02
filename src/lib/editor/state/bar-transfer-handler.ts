@@ -1,4 +1,4 @@
-import Registry, { BarItemRegistry } from './bar-item-registry.svelte.js';
+import Registry from './bar-item-registry.svelte.js';
 import FloatingBarState, { type FloatingBar } from './floater-state.svelte.js';
 import HorizontalBarState, {
 	HorizontalBarPosition,
@@ -81,7 +81,8 @@ export class BarTransferHandler {
 		return true;
 	}
 
-	remove(from: BarTransfer): boolean {
+	remove(from: BarTransfer, bars?: Bars): boolean {
+		bars ??= this.#bars(from.location);
 		return true;
 	}
 
