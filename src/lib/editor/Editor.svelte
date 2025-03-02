@@ -5,7 +5,7 @@
 	import VerticalSlice from './bars/VerticalSlice.svelte';
 	import HorizontalSlice from './bars/HorizontalSlice.svelte';
 	import { HorizontalBarPosition } from './state/horizontal-bar-state.svelte.js';
-	import FloaterBar from './bars/floater/FloaterBar.svelte';
+	import FloaterBar from './bars/FloaterBar.svelte';
 	import VerticalBaseBar from './bars/VerticalBaseBar.svelte';
 	import FloaterBarState from './state/floater-state.svelte.js';
 	import HorizontalBaseBar from './bars/HorizontalBaseBar.svelte';

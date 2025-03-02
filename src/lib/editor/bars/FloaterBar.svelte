@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
-	import { X, Minus } from '@steeze-ui/phosphor-icons';
-	import { Icon } from '@steeze-ui/svelte-icon';
 
 	import FloaterState, { type FloatingBar } from '$lib/editor/state/floater-state.svelte.js';
 	import FloaterBarTitle from './FloaterBarTitle.svelte';
+	import BarMenu from './BarMenu.svelte';
 
 	let { bar, children, index }: { bar: FloatingBar; children: Snippet; index: number } = $props();
 
@@ -76,20 +75,11 @@
 		role="button"
 	>
 		<FloaterBarTitle {index} title={bar.title} id={bar.id} />
-		<div class="buttons">
-			<button
-				onclickcapture={() => FloaterState.update(index, 'minimized', true)}
-				aria-label={`Minimize bar #${index + 1}`}
-			>
-				<Icon src={Minus} size="16px" />
-			</button>
-			<button
-				aria-label={`Close bar #${index + 1}`}
-				onclickcapture={() => FloaterState.remove(index)}
-			>
-				<Icon src={X} size="16px" />
-			</button>
-		</div>
+		<BarMenu
+			onMinimize={() => FloaterState.update(index, 'minimized', true)}
+			onClose={() => FloaterState.remove(index)}
+			{index}
+		/>
 	</div>
 	{@render children()}
 </div>
@@ -108,11 +98,6 @@
 		display: flex;
 		gap: 8px;
 		justify-content: space-between;
-		align-items: center;
-	}
-
-	.buttons {
-		display: flex;
 		align-items: center;
 	}
 </style>

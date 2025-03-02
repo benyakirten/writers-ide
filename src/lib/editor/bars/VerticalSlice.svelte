@@ -1,10 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { X, Minus } from '@steeze-ui/phosphor-icons';
-	import { Icon } from '@steeze-ui/svelte-icon';
 
 	import { VerticalBarPosition, type VerticalBar } from '../state/vertical-bar-state.svelte.js';
 	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
+	import BarMenu from './BarMenu.svelte';
 
 	let {
 		bar,
@@ -40,20 +39,11 @@
 		style:width={`${width}px`}
 		style:overflow={width === 0 ? 'hidden' : 'auto'}
 	>
-		<div class="menu">
-			<button
-				aria-label={`Minimize bar #${index + 1}`}
-				onclick={() => VerticalBarState.toggle(index, position)}
-			>
-				<Icon src={Minus} size="16px" />
-			</button>
-			<button
-				aria-label={`Close bar #${index + 1}`}
-				onclick={() => VerticalBarState.remove(index, position)}
-			>
-				<Icon src={X} size="16px" />
-			</button>
-		</div>
+		<BarMenu
+			onMinimize={() => VerticalBarState.toggle(index, position)}
+			onClose={() => VerticalBarState.remove(index, position)}
+			{index}
+		/>
 		<div>
 			{@render children()}
 		</div>
@@ -76,11 +66,6 @@
 		outline: none;
 		border: none;
 		background-color: #bbb;
-	}
-
-	.menu {
-		display: flex;
-		justify-content: flex-end;
 	}
 
 	.vertical-slice {

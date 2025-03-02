@@ -19,7 +19,7 @@
 <button
 	style:--inversion={`${Math.floor(inversion * 100)}%`}
 	aria-label={label}
-	onclick={onClick}
+	onclickcapture={onClick}
 	bind:this={buttonEl}
 >
 	{@render icon()}
