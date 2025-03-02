@@ -3,10 +3,10 @@ import * as m from '$lib/paraglide/messages.js';
 import { capitalize } from '$lib/utils/strings.js';
 
 export enum HorizontalBarPosition {
-	WindowBlockStart = 'WINDOW_START',
-	WindowBlockEnd = 'WINDOW_END',
-	EditorBlockStart = 'EDITOR_START',
-	EditorBlockEnd = 'EDITOR_END'
+	WindowBlockStart = 'WINDOW_BLOCK_START',
+	WindowBlockEnd = 'WINDOW_BLOCK_END',
+	EditorBlockStart = 'EDITOR_BLOCK_START',
+	EditorBlockEnd = 'EDITOR_BLOCK_END'
 }
 
 export type HorizontalBar = {

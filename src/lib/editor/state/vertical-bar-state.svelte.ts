@@ -15,8 +15,8 @@ export enum HorizontalTextDirection {
 }
 
 export enum VerticalBarPosition {
-	InlineStart = 'START',
-	InlineEnd = 'END'
+	InlineStart = 'INLINE_START',
+	InlineEnd = 'INLINE_END'
 }
 
 export class VerticalBarState {
