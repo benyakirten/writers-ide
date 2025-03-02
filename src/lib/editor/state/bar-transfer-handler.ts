@@ -1,3 +1,4 @@
+import Registry, { BarItemRegistry } from './bar-item-registry.svelte.js';
 import FloatingBarState, { type FloatingBar } from './floater-state.svelte.js';
 import HorizontalBarState, {
 	HorizontalBarPosition,
@@ -18,6 +19,8 @@ type BarTransfer = {
 };
 
 export class BarTransferHandler {
+	// TODO: We may need to revisit this.
+	MAX_SIZE = 3;
 	#bars(location: BarTransferLocation): Bars {
 		switch (location) {
 			case HorizontalBarPosition.EditorBlockEnd:
@@ -41,6 +44,12 @@ export class BarTransferHandler {
 		return bars.findIndex((bar) => bar.id === id);
 	}
 
+	#isVertical(location: BarTransferLocation): boolean {
+		return (
+			location === VerticalBarPosition.InlineStart || location === VerticalBarPosition.InlineEnd
+		);
+	}
+
 	move(from: BarTransfer, to: BarTransfer): boolean {
 		const fromBars = this.#bars(from.location);
 		const toBars = this.#bars(to.location);
@@ -50,16 +59,15 @@ export class BarTransferHandler {
 			return false;
 		}
 
-		const toIndex = this.#index(toBars, to.id);
-		if (toIndex === undefined) {
-			return false;
-		}
-
 		if (from.location === to.location) {
+			const toIndex = this.#index(toBars, to.id);
+			if (toIndex === undefined) {
+				return false;
+			}
 			return this.swap(fromBars, fromIndex, toIndex);
 		}
 
-		if (!this.isAvailable(to)) {
+		if (!this.isAvailable(toBars, to.location, to.id)) {
 			return false;
 		}
 
@@ -81,18 +89,50 @@ export class BarTransferHandler {
 		return true;
 	}
 
+	sizeRemaining(location: BarTransferLocation, bars: Bars): number {
+		const isVertical = this.#isVertical(location);
+		const sizeUsed = bars.reduce((acc, bar) => {
+			const id = bar.id;
+			if (id === null) {
+				return acc + 1;
+			}
+
+			const item = Registry.items.get(id);
+			if (!item) {
+				return acc + 1;
+			}
+
+			const size = isVertical ? item.vertical.size : item.horizontal.size;
+			return acc + size;
+		}, 0);
+
+		return Math.max(this.MAX_SIZE - sizeUsed, 0);
+	}
+
 	/**
 	 * Check if the transfer if available.
 	 * The from parameter means that the transfer is from the
 	 */
-	isAvailable(to: BarTransfer): boolean {
-		return true;
+	isAvailable(bars: Bars, location: BarTransferLocation, id: string): boolean {
+		const sizeRemaining = this.sizeRemaining(location, bars);
+		if (sizeRemaining === 0) {
+			return false;
+		}
+
+		const item = Registry.items.get(id);
+		let size = 1;
+		if (item) {
+			size = this.#isVertical(location) ? item.vertical.size : item.horizontal.size;
+		}
+
+		return size <= sizeRemaining;
 	}
 
 	/**
 	 * Swap the two items on the same bar, which should always be possible.
 	 */
-	swap(bars, index1: number, index2: number): boolean {
+	swap(bars: Bars, index1: number, index2: number): boolean {
+		[bars[index1], bars[index2]] = [bars[index2], bars[index1]];
 		return true;
 	}
 }
