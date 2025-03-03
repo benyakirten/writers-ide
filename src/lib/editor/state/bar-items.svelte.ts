@@ -28,8 +28,9 @@ export class BarItems {
 
 			const part = this.isVertical ? item.vertical : item.horizontal;
 			return {
-				...part,
-				id
+				id,
+				Component: part.Component,
+				size: part.size
 			};
 		})
 	);
