@@ -1,5 +1,7 @@
 import { type Snippet } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
+import * as m from '$lib/paraglide/messages.js';
+
 import type { ActionUtilities } from '../prosemirror/view/actions.js';
 import type { SelectionUtilies } from '../prosemirror/view/selection.js';
 import type { ProseMirrorEventBus } from './event-bus.svelte.js';
@@ -14,6 +16,7 @@ type BarStates = {
 	horizontal: HorizontalBarState;
 	floater: FloaterBarState;
 };
+
 type ProseMirrorUtils = {
 	actions: ActionUtilities;
 	selections: SelectionUtilies;
@@ -21,10 +24,15 @@ type ProseMirrorUtils = {
 	schema: typeof schema;
 };
 
+type InternationlizationUtils = {
+	translation: typeof m;
+};
+
 export type BarItemComponentProps = {
 	proseMirror: ProseMirrorUtils;
 	bars: BarStates;
 	tabs: TabState;
+	internationalization: InternationlizationUtils;
 };
 
 export type BarItemSection = {

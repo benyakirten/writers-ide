@@ -1,4 +1,5 @@
 import { clamp } from '$lib/utils/numbers.js';
+import { BarItems } from './bar-items.svelte.js';
 
 export type FloatingPosition = {
 	top: number;
@@ -9,7 +10,7 @@ export type FloatingPosition = {
 
 export type FloatingBar = {
 	position: FloatingPosition;
-	data?: (null | string)[];
+	data: BarItems;
 	z: number;
 	id: string;
 	title: string;
@@ -200,6 +201,7 @@ export class FloaterBarState {
 			startingInformation.height
 		);
 
+		const barData = new BarItems(true, startingInformation.data);
 		const bar: FloatingBar = {
 			position: {
 				...position,
@@ -207,7 +209,7 @@ export class FloaterBarState {
 				height
 			},
 			z,
-			data: startingInformation.data,
+			data: barData,
 			id: startingInformation.id ?? crypto.randomUUID(),
 			minimized: !!startingInformation.minimized,
 			title: startingInformation.title ?? 'New Bar'

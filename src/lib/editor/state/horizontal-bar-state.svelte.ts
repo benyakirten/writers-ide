@@ -52,7 +52,7 @@ export class HorizontalBarState {
 
 		height = height ?? this.minSize(position);
 
-		const barData = new BarItems(false, 3, data);
+		const barData = new BarItems(false, data);
 		const bar = { height, id, visible, data: barData };
 
 		bars.push(bar);

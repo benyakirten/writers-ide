@@ -54,7 +54,7 @@ export class VerticalBarState {
 			return existingBar;
 		}
 
-		const barData = new BarItems(true, 3, data);
+		const barData = new BarItems(true, data);
 		const bar = { width, id, visible, data: barData };
 
 		bars.push(bar);
