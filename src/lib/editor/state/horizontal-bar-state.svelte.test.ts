@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-	HorizontalBarState,
-	HorizontalBarPosition,
-	type HorizontalBar
-} from './horizontal-bar-state.svelte';
+import { HorizontalBarState, HorizontalBarPosition } from './horizontal-bar-state.svelte';
+import { BarItems } from './bar-items.svelte.js';
 
 describe('HorizontalBarState', () => {
 	let state: HorizontalBarState;
@@ -33,8 +30,7 @@ describe('HorizontalBarState', () => {
 
 	describe('bars', () => {
 		it('should return the list of window start bars if the position is WindowBlockStart', () => {
-			const windowStartBar: HorizontalBar = {
-				data: [null],
+			const windowStartBar = {
 				id: 'window-start-1',
 				visible: true,
 				height: 100
@@ -42,12 +38,11 @@ describe('HorizontalBarState', () => {
 
 			state.add(windowStartBar, HorizontalBarPosition.WindowBlockStart);
 			const bars = state.bars(HorizontalBarPosition.WindowBlockStart);
-			expect(bars).toEqual([windowStartBar]);
+			expect(bars).toEqual([expect.objectContaining(windowStartBar)]);
 		});
 
 		it('should return the list of window end bars if the position is WindowBlockEnd', () => {
-			const windowEndBar: HorizontalBar = {
-				data: [null],
+			const windowEndBar = {
 				id: 'window-end-1',
 				visible: true,
 				height: 100
@@ -55,12 +50,11 @@ describe('HorizontalBarState', () => {
 
 			state.add(windowEndBar, HorizontalBarPosition.WindowBlockEnd);
 			const bars = state.bars(HorizontalBarPosition.WindowBlockEnd);
-			expect(bars).toEqual([windowEndBar]);
+			expect(bars).toEqual([expect.objectContaining(windowEndBar)]);
 		});
 
 		it('should return the list of editor start bars if the position is EditorBlockStart', () => {
-			const editorStartBar: HorizontalBar = {
-				data: [null],
+			const editorStartBar = {
 				id: 'editor-start-1',
 				visible: true,
 				height: 100
@@ -68,12 +62,11 @@ describe('HorizontalBarState', () => {
 
 			state.add(editorStartBar, HorizontalBarPosition.EditorBlockStart);
 			const bars = state.bars(HorizontalBarPosition.EditorBlockStart);
-			expect(bars).toEqual([editorStartBar]);
+			expect(bars).toEqual([expect.objectContaining(editorStartBar)]);
 		});
 
 		it('should return the list of editor end bars if the position is EditorBlockEnd', () => {
-			const editorEndBar: HorizontalBar = {
-				data: [null],
+			const editorEndBar = {
 				id: 'editor-end-1',
 				visible: true,
 				height: 100
@@ -81,7 +74,7 @@ describe('HorizontalBarState', () => {
 
 			state.add(editorEndBar, HorizontalBarPosition.EditorBlockEnd);
 			const bars = state.bars(HorizontalBarPosition.EditorBlockEnd);
-			expect(bars).toEqual([editorEndBar]);
+			expect(bars).toEqual([expect.objectContaining(editorEndBar)]);
 		});
 	});
 
@@ -144,6 +137,7 @@ describe('HorizontalBarState', () => {
 	describe('height', () => {
 		it("should return the height of a bar if it's visible and the height is over the minimum size", () => {
 			const bar = {
+				data: new BarItems(false),
 				height: 100,
 				id: 'window-start-1',
 				visible: true
@@ -155,6 +149,7 @@ describe('HorizontalBarState', () => {
 
 		it('should return 0 if the bar is not visible', () => {
 			const bar = {
+				data: new BarItems(false),
 				height: 100,
 				id: 'window-start-1',
 				visible: false
@@ -165,7 +160,12 @@ describe('HorizontalBarState', () => {
 		});
 
 		it('should return 0 if the bar is visible but the height is below the minimum size', () => {
-			const bar = { height: WINDOW_MIN_SIZE / 2, id: 'window-start-1', visible: true };
+			const bar = {
+				height: WINDOW_MIN_SIZE / 2,
+				id: 'window-start-1',
+				visible: true,
+				data: new BarItems(false)
+			};
 			const got = state.height(bar, HorizontalBarPosition.WindowBlockStart);
 			expect(got).toBe(0);
 		});
@@ -187,6 +187,7 @@ describe('HorizontalBarState', () => {
 
 		it("should set the bar's height to the minimum size if the bar is being toggled to visible", () => {
 			const bar = {
+				data: new BarItems(false),
 				height: 0,
 				id: 'window-start-1',
 				visible: false
