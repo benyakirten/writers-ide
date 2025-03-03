@@ -4,6 +4,7 @@ import {
 	VerticalBarPosition,
 	type VerticalBar
 } from './vertical-bar-state.svelte';
+import { BarItems } from './bar-items.svelte.js';
 
 describe('VerticalBarState', () => {
 	let state: VerticalBarState;
@@ -33,11 +34,13 @@ describe('VerticalBarState', () => {
 	describe('bars', () => {
 		const inlineStartBars: VerticalBar[] = [
 			{
+				data: new BarItems(true),
 				id: 'inline-start-1',
 				visible: true,
 				width: 200
 			},
 			{
+				data: new BarItems(true),
 				id: 'inline-start-2',
 				visible: true,
 				width: 200
@@ -45,6 +48,7 @@ describe('VerticalBarState', () => {
 		];
 		const inlineEndBars: VerticalBar[] = [
 			{
+				data: new BarItems(true),
 				id: 'inline-end-1',
 				visible: true,
 				width: 200
