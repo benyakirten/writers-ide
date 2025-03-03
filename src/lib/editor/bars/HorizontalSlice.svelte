@@ -1,23 +1,22 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
-
 	import {
 		HorizontalBarPosition,
 		type HorizontalBar
 	} from '../state/horizontal-bar-state.svelte.js';
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
 	import BarMenu from './BarMenu.svelte';
+	import type { BarItemData } from '../state/bar-items.svelte.js';
 
 	let {
 		bar,
 		position,
 		index,
-		children
+		items
 	}: {
 		bar: HorizontalBar;
 		position: HorizontalBarPosition;
 		index: number;
-		children: Snippet;
+		items: BarItemData[];
 	} = $props();
 
 	let shouldInvert = HorizontalBarState.shouldInvert(position);
@@ -47,9 +46,7 @@
 			onClose={() => HorizontalBarState.remove(index, position)}
 			{index}
 		/>
-		<div>
-			{@render children()}
-		</div>
+		<!-- Render items -->
 	</div>
 	{#if !shouldInvert}
 		{@render resizeBar()}

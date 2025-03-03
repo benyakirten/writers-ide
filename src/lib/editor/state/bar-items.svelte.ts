@@ -1,5 +1,6 @@
-import Registry from './bar-item-registry.svelte.js';
+import Registry, { type BarItemSection } from './bar-item-registry.svelte.js';
 
+export type BarItemData = (BarItemSection & { id: string }) | null;
 export class BarItems {
 	constructor(
 		public isVertical: boolean,
@@ -14,7 +15,7 @@ export class BarItems {
 		return this.#ids;
 	}
 
-	items = $derived(
+	items: BarItemData[] = $derived(
 		this.#ids.map((id) => {
 			if (id === null) {
 				return null;
@@ -25,7 +26,11 @@ export class BarItems {
 				return null;
 			}
 
-			return this.isVertical ? item.vertical.Component : item.horizontal.Component;
+			const part = this.isVertical ? item.vertical : item.horizontal;
+			return {
+				...part,
+				id
+			};
 		})
 	);
 

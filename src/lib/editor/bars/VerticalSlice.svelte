@@ -4,17 +4,18 @@
 	import { VerticalBarPosition, type VerticalBar } from '../state/vertical-bar-state.svelte.js';
 	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
 	import BarMenu from './BarMenu.svelte';
+	import type { BarItemData } from '../state/bar-items.svelte.js';
 
 	let {
 		bar,
 		position,
 		index,
-		children
+		items
 	}: {
 		bar: VerticalBar;
 		position: VerticalBarPosition;
 		index: number;
-		children: Snippet;
+		items: BarItemData[];
 	} = $props();
 
 	let shouldInvert = VerticalBarState.shouldInvert(position);
@@ -44,9 +45,7 @@
 			onClose={() => VerticalBarState.remove(index, position)}
 			{index}
 		/>
-		<div>
-			{@render children()}
-		</div>
+		<!-- Render items -->
 	</div>
 	{#if !shouldInvert}
 		{@render resizeBar()}

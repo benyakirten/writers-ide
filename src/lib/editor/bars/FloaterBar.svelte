@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { onMount, type Snippet } from 'svelte';
+	import { onMount } from 'svelte';
 
 	import FloaterState, { type FloatingBar } from '$lib/editor/state/floater-state.svelte.js';
 	import FloaterBarTitle from './FloaterBarTitle.svelte';
 	import BarMenu from './BarMenu.svelte';
+	import type { BarItemData } from '../state/bar-items.svelte.js';
 
-	let { bar, children, index }: { bar: FloatingBar; children: Snippet; index: number } = $props();
+	let { bar, items, index }: { bar: FloatingBar; items: BarItemData[]; index: number } = $props();
 
 	let floater: HTMLElement;
 	let mutationObserver: MutationObserver;
@@ -81,7 +82,7 @@
 			{index}
 		/>
 	</div>
-	{@render children()}
+	<!-- Render items -->
 </div>
 
 <style>
