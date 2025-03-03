@@ -44,6 +44,7 @@ export type BarItem = {
 	vertical: BarItemSection;
 	horizontal: BarItemSection;
 };
+
 export class BarItemRegistry {
 	items = $state<SvelteMap<string, BarItem>>(new SvelteMap());
 	register(item: BarItem, id: string = crypto.randomUUID()): [string, () => void] {
