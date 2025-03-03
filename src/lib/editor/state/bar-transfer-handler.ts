@@ -1,4 +1,4 @@
-import Registry from './bar-item-registry.svelte.js';
+import type { BarItems } from './bar-items.svelte.js';
 import FloatingBarState, { type FloatingBar } from './floater-state.svelte.js';
 import HorizontalBarState, {
 	HorizontalBarPosition,
@@ -16,11 +16,10 @@ type BarTransfer = {
 	location: BarTransferLocation;
 	id: string;
 	slot: PossibleSlot;
+	dataId: string | null;
 };
 
 export class BarTransferHandler {
-	// TODO: We may need to revisit this.
-	MAX_SIZE = 3;
 	#bars(location: BarTransferLocation): Bars {
 		switch (location) {
 			case HorizontalBarPosition.EditorBlockEnd:
@@ -40,100 +39,58 @@ export class BarTransferHandler {
 		}
 	}
 
-	#index(bars: Bars, id: string): number | undefined {
-		return bars.findIndex((bar) => bar.id === id);
+	#items(location: BarTransferLocation, id: string): BarItems | undefined {
+		const bars = this.#bars(location);
+		return bars.find((bar) => bar.id === id)?.data;
 	}
 
-	#isVertical(location: BarTransferLocation): boolean {
-		return (
-			location === VerticalBarPosition.InlineStart || location === VerticalBarPosition.InlineEnd
-		);
-	}
-
-	move(from: BarTransfer, to: BarTransfer): boolean {
-		const fromBars = this.#bars(from.location);
-		const toBars = this.#bars(to.location);
-
-		const fromIndex = this.#index(fromBars, from.id);
-		if (fromIndex === undefined) {
+	move(from: BarTransfer, to: Omit<BarTransfer, 'dataId'>): boolean {
+		const items = this.barItems(from, to);
+		if (!items) {
 			return false;
 		}
 
-		if (from.location === to.location) {
-			const toIndex = this.#index(toBars, to.id);
-			if (toIndex === undefined) {
-				return false;
-			}
-			return this.swap(fromBars, fromIndex, toIndex);
+		const [fromItems, toItems] = items;
+
+		if (fromItems === toItems) {
+			return fromItems.swap(from.slot, to.slot);
 		}
 
-		if (!this.isAvailable(toBars, to.location, to.id)) {
+		fromItems.remove(from.slot);
+		toItems.insert(from.dataId, to.slot);
+
+		return true;
+	}
+
+	barItems(from: BarTransfer, to: Omit<BarTransfer, 'dataId'>): [BarItems, BarItems] | null {
+		const fromItems = this.#items(from.location, from.id);
+		const toItems = this.#items(to.location, to.id);
+
+		if (!fromItems || !toItems) {
+			return null;
+		}
+
+		if (from.slot > fromItems.ids.length || to.slot > toItems.ids.length) {
+			return null;
+		}
+
+		if (fromItems === toItems && !fromItems.canSwap(from.slot, to.slot)) {
+			return null;
+		}
+
+		if (!fromItems.has(from.dataId) || toItems.has(from.dataId)) {
+			return null;
+		}
+
+		return [fromItems, toItems];
+	}
+
+	insert(dataId: string | null, to: BarTransfer): boolean {
+		const toItems = this.#items(to.location, to.id);
+		if (!toItems) {
 			return false;
 		}
 
-		this.remove(from);
-		this.insert(to);
-
-		return true;
-	}
-
-	copy(from: BarTransfer, to: BarTransfer): boolean {
-		return true;
-	}
-
-	remove(from: BarTransfer, bars?: Bars): boolean {
-		bars ??= this.#bars(from.location);
-		return true;
-	}
-
-	insert(to: BarTransfer): boolean {
-		return true;
-	}
-
-	sizeRemaining(location: BarTransferLocation, bars: Bars): number {
-		const isVertical = this.#isVertical(location);
-		const sizeUsed = bars.reduce((acc, bar) => {
-			const id = bar.id;
-			if (id === null) {
-				return acc + 1;
-			}
-
-			const item = Registry.items.get(id);
-			if (!item) {
-				return acc + 1;
-			}
-
-			const size = isVertical ? item.vertical.size : item.horizontal.size;
-			return acc + size;
-		}, 0);
-
-		return Math.max(this.MAX_SIZE - sizeUsed, 0);
-	}
-
-	/**
-	 * Check if the transfer if available.
-	 * The from parameter means that the transfer is from the
-	 */
-	isAvailable(bars: Bars, location: BarTransferLocation, id: string): boolean {
-		const sizeRemaining = this.sizeRemaining(location, bars);
-		if (sizeRemaining === 0) {
-			return false;
-		}
-
-		const item = Registry.items.get(id);
-		let size = 1;
-		if (item) {
-			size = this.#isVertical(location) ? item.vertical.size : item.horizontal.size;
-		}
-
-		return size <= sizeRemaining;
-	}
-
-	/**
-	 * Swap the two items on the same bar, which should always be possible.
-	 */
-	swap(bars: Bars, index1: number, index2: number): boolean {
-		[bars[index1], bars[index2]] = [bars[index2], bars[index1]];
-		return true;
+		return toItems.insert(dataId, to.slot);
 	}
 }

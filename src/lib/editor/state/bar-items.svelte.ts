@@ -6,10 +6,14 @@ export class BarItems {
 		items: (string | null)[] = [],
 		public readonly maxSize = 3
 	) {
-		this.#ids = this.#ids.concat(items);
+		items.forEach((id) => this.append(id));
 	}
 
 	#ids = $state<(string | null)[]>([]);
+	get ids() {
+		return this.#ids;
+	}
+
 	items = $derived(
 		this.#ids.map((id) => {
 			if (id === null) {
@@ -25,13 +29,24 @@ export class BarItems {
 		})
 	);
 
+	has(id: string | null): boolean {
+		if (id === null) {
+			return false;
+		}
+		return this.#ids.includes(id);
+	}
+
 	index(id: string | number): number {
 		return typeof id === 'string' ? this.#ids.findIndex((_id) => _id === id) : id;
 	}
 
 	append(id: string | null): boolean {
 		const availableSpace = this.availableSpace;
-		if (availableSpace === 0 || Registry.size(id, this.isVertical) > availableSpace) {
+		if (
+			this.has(id) ||
+			!Registry.isAllowed(id) ||
+			Registry.size(id, this.isVertical) > availableSpace
+		) {
 			return false;
 		}
 
@@ -39,18 +54,37 @@ export class BarItems {
 		return true;
 	}
 
-	swap(index1: number, index2: number): boolean {
-		if (
+	canSwap(index1: number, index2: number): boolean {
+		return !(
 			index1 < 0 ||
 			index1 >= this.#ids.length ||
 			index2 < 0 ||
 			index2 >= this.#ids.length ||
 			index1 === index2
-		) {
+		);
+	}
+
+	swap(index1: number, index2: number): boolean {
+		if (!this.canSwap(index1, index2)) {
 			return false;
 		}
 
 		[this.#ids[index1], this.#ids[index2]] = [this.#ids[index2], this.#ids[index1]];
+		return true;
+	}
+
+	insert(id: string | null, at: number): boolean {
+		if (
+			this.has(id) ||
+			!Registry.isAllowed(id) ||
+			at < 0 ||
+			Registry.size(id, this.isVertical) > this.availableSpace
+		) {
+			return false;
+		}
+
+		const index = Math.min(at, this.#ids.length);
+		this.#ids.splice(index, 0, id);
 		return true;
 	}
 

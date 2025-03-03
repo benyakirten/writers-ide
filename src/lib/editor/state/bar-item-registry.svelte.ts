@@ -55,7 +55,7 @@ export class BarItemRegistry {
 		this.items.delete(id);
 	}
 
-	size(id: string | null, isVertical: boolean): number {
+	size(id: string | null, isVertical: boolean): 1 | 2 | 3 {
 		if (!id) {
 			return 1;
 		}
@@ -66,6 +66,14 @@ export class BarItemRegistry {
 		}
 
 		return isVertical ? item.vertical.size : item.horizontal.size;
+	}
+
+	isAllowed(id: string | null): boolean {
+		if (!id) {
+			return true;
+		}
+
+		return this.items.has(id);
 	}
 }
 
