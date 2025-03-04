@@ -30,45 +30,61 @@
 >
 	<HorizontalBaseBar />
 	{#each FloaterBarState.visibleBars as bar, index (bar.id)}
-		<FloaterBar {bar} {index}>
-			Floater Bar #{index + 1}
-		</FloaterBar>
+		<FloaterBar {bar} {index} items={bar.data.items} />
 	{/each}
 	{#each HorizontalBarState.windowBlockStart as bar, index (bar.id)}
-		<HorizontalSlice {bar} position={HorizontalBarPosition.WindowBlockStart} {index}>
-			Window Block Start Bar #{index + 1}
-		</HorizontalSlice>
+		<HorizontalSlice
+			{bar}
+			position={HorizontalBarPosition.WindowBlockStart}
+			{index}
+			items={bar.data.items}
+		/>
 	{/each}
 	<div class="main-container">
 		<VerticalBaseBar />
 		{#each VerticalBarState.inlineStart as bar, index (bar.id)}
-			<VerticalSlice {bar} position={VerticalBarPosition.InlineStart} {index}>
-				Inline Bar Start #{index + 1}
-			</VerticalSlice>
+			<VerticalSlice
+				{bar}
+				position={VerticalBarPosition.InlineStart}
+				{index}
+				items={bar.data.items}
+			/>
 		{/each}
 		<main class="main">
 			{#each HorizontalBarState.editorBlockStart as bar, index (bar.id)}
-				<HorizontalSlice {bar} position={HorizontalBarPosition.EditorBlockStart} {index}>
-					Editor Block Start Bar #{index + 1}
-				</HorizontalSlice>
+				<HorizontalSlice
+					{bar}
+					position={HorizontalBarPosition.EditorBlockStart}
+					{index}
+					items={bar.data.items}
+				/>
 			{/each}
 			<MainView />
 			{#each HorizontalBarState.editorBlockEnd as bar, index (bar.id)}
-				<HorizontalSlice {bar} position={HorizontalBarPosition.EditorBlockEnd} {index}>
-					Editor Block End Bar #{index + 1}
-				</HorizontalSlice>
+				<HorizontalSlice
+					{bar}
+					position={HorizontalBarPosition.EditorBlockEnd}
+					{index}
+					items={bar.data.items}
+				/>
 			{/each}
 		</main>
 		{#each VerticalBarState.inlineEnd as bar, index (bar.id)}
-			<VerticalSlice {bar} position={VerticalBarPosition.InlineEnd} {index}>
-				Inline Bar End #{index + 1}
-			</VerticalSlice>
+			<VerticalSlice
+				{bar}
+				position={VerticalBarPosition.InlineEnd}
+				{index}
+				items={bar.data.items}
+			/>
 		{/each}
 	</div>
 	{#each HorizontalBarState.windowBlockEnd as bar, index (bar.id)}
-		<HorizontalSlice {bar} position={HorizontalBarPosition.WindowBlockEnd} {index}>
-			Window Block End Bar #{index + 1}
-		</HorizontalSlice>
+		<HorizontalSlice
+			{bar}
+			position={HorizontalBarPosition.WindowBlockEnd}
+			{index}
+			items={bar.data.items}
+		/>
 	{/each}
 </div>
 
