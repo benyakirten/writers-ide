@@ -1,4 +1,4 @@
-import { type Snippet } from 'svelte';
+import { type Component } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import * as m from '$lib/paraglide/messages.js';
 
@@ -36,7 +36,7 @@ export type BarItemComponentProps = {
 };
 
 export type BarItemSection = {
-	Component: Snippet<[BarItemComponentProps]>;
+	Component: Component<BarItemComponentProps>;
 	size: 1 | 2 | 3;
 };
 
