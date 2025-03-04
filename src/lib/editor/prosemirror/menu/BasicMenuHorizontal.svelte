@@ -215,18 +215,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	import ProseMirrorEventBus from '$lib/editor/state/event-bus.svelte.js';
 	import IconButton from '$lib/components/IconButton.svelte';
+	import type { BarItemComponentProps } from '$lib/editor/state/bar-item-registry.svelte.js';
 
 	let activeCodeMarks = $state<TextMarkPresence>();
 	let editorView = $state<EditorView | null>(null);
 	let selection = $state<Selection | null>(null);
 
+	let props: BarItemComponentProps = $props();
+
 	onMount(() => {
-		const unsub = ProseMirrorEventBus.subscribe(({ view }) => {
+		const unsub = props.proseMirror.eventBus.subscribe(({ view }) => {
 			const marks = view && SelectionUtilies.findTextMarks(view.state.selection, view.state.doc);
-			editorView = view;
 			activeCodeMarks = marks;
+			editorView = view;
 			selection = view.state.selection;
 		});
 

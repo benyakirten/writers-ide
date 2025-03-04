@@ -1,9 +1,19 @@
 <script lang="ts">
-	import BasicMenu from '$lib/editor/prosemirror/menu/BasicMenu.svelte';
+	import FloaterBarState from '../state/floater-state.svelte.js';
+	import HorizontalBarState, {
+		HorizontalBarPosition
+	} from '../state/horizontal-bar-state.svelte.js';
+	import VerticalBarState, { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
 </script>
 
 <div class="base-bar">
-	<BasicMenu />
+	<button onclick={() => HorizontalBarState.add({}, HorizontalBarPosition.EditorBlockStart)}
+		>Add horizontal bar</button
+	>
+	<button onclick={() => VerticalBarState.add({}, VerticalBarPosition.InlineStart)}
+		>Add vertical bar</button
+	>
+	<button onclick={() => FloaterBarState.add()}>Add floater bar</button>
 </div>
 
 <style>

@@ -1,7 +1,35 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages.js';
 
-	import FloaterState, { type FloatingBar } from '$lib/editor/state/floater-state.svelte.js';
+	import type { BarItemComponentProps } from '../state/bar-item-registry.svelte.js';
+	import TabState from '../state/tab-state.svelte.js';
+	import { schema } from '../prosemirror/view/schema.js';
+	import ProseMirrorEventBus from '../state/event-bus.svelte.js';
+	import { SelectionUtilies } from '../prosemirror/view/selection.js';
+	import { ActionUtilities } from '../prosemirror/view/actions.js';
+	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
+	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
+
+	let itemProps: BarItemComponentProps = {
+		proseMirror: {
+			actions: ActionUtilities,
+			selections: SelectionUtilies,
+			eventBus: ProseMirrorEventBus,
+			schema
+		},
+		bars: {
+			vertical: VerticalBarState,
+			horizontal: HorizontalBarState,
+			floater: FloaterBarState
+		},
+		tabs: TabState,
+		internationalization: {
+			translation: m
+		}
+	};
+
+	import FloaterBarState, { type FloatingBar } from '$lib/editor/state/floater-state.svelte.js';
 	import FloaterBarTitle from './FloaterBarTitle.svelte';
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
@@ -14,7 +42,7 @@
 
 	onMount(() => {
 		mutationObserver = new MutationObserver(() => {
-			FloaterState.updateMeasurements(bar.id, floater.clientWidth, floater.clientHeight);
+			FloaterBarState.updateMeasurements(bar.id, floater.clientWidth, floater.clientHeight);
 		});
 		mutationObserver.observe(floater, { attributes: true });
 
@@ -24,26 +52,26 @@
 	});
 
 	function handleMousedown(e: MouseEvent) {
-		FloaterState.focus(index);
+		FloaterBarState.focus(index);
 		if (!(e.target instanceof HTMLElement) || !menu.contains(e.target)) {
 			return;
 		}
-		FloaterState.startDragging(index, e);
+		FloaterBarState.startDragging(index, e);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
 		switch (e.key) {
 			case 'ArrowLeft':
-				FloaterState.nudge(index, 'left');
+				FloaterBarState.nudge(index, 'left');
 				break;
 			case 'ArrowRight':
-				FloaterState.nudge(index, 'right');
+				FloaterBarState.nudge(index, 'right');
 				break;
 			case 'ArrowUp':
-				FloaterState.nudge(index, 'up');
+				FloaterBarState.nudge(index, 'up');
 				break;
 			case 'ArrowDown':
-				FloaterState.nudge(index, 'down');
+				FloaterBarState.nudge(index, 'down');
 				break;
 		}
 	}
@@ -57,18 +85,18 @@
 	style:height={`${bar.position.height}px`}
 	style:top={`${bar.position.top}px`}
 	style:left={`${bar.position.left}px`}
-	style:min-width={`${FloaterState.MIN_WIDTH_PX}px`}
-	style:min-height={`${FloaterState.MIN_HEIGHT_PX}px`}
-	style:max-width={`${FloaterState.MAX_WIDTH_PX}px`}
-	style:max-height={`${FloaterState.MAX_HEIGHT_PERCENT}%`}
-	onfocusin={() => FloaterState.focus(index)}
+	style:min-width={`${FloaterBarState.MIN_WIDTH_PX}px`}
+	style:min-height={`${FloaterBarState.MIN_HEIGHT_PX}px`}
+	style:max-width={`${FloaterBarState.MAX_WIDTH_PX}px`}
+	style:max-height={`${FloaterBarState.MAX_HEIGHT_PERCENT}%`}
+	onfocusin={() => FloaterBarState.focus(index)}
 	onkeydown={(e) => handleKeydown(e)}
-	onmousemove={(e) => FloaterState.move(e)}
+	onmousemove={(e) => FloaterBarState.move(e)}
 	tabindex="0"
 	role="button"
 >
 	<div
-		style:cursor={FloaterState.dragging?.id === bar.id ? 'grabbing' : 'grab'}
+		style:cursor={FloaterBarState.dragging?.id === bar.id ? 'grabbing' : 'grab'}
 		class="menu"
 		bind:this={menu}
 		onmousedown={(e) => handleMousedown(e)}
@@ -77,8 +105,8 @@
 	>
 		<FloaterBarTitle {index} title={bar.title} id={bar.id} />
 		<BarMenu
-			onMinimize={() => FloaterState.update(index, 'minimized', true)}
-			onClose={() => FloaterState.remove(index)}
+			onMinimize={() => FloaterBarState.update(index, 'minimized', true)}
+			onClose={() => FloaterBarState.remove(index)}
 			{index}
 		/>
 	</div>
