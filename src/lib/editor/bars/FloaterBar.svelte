@@ -81,14 +81,14 @@
 	bind:this={floater}
 	class="floater"
 	style:z-index={bar.z}
-	style:width={`${bar.position.width}px`}
-	style:height={`${bar.position.height}px`}
-	style:top={`${bar.position.top}px`}
-	style:left={`${bar.position.left}px`}
-	style:min-width={`${FloaterBarState.MIN_WIDTH_PX}px`}
-	style:min-height={`${FloaterBarState.MIN_HEIGHT_PX}px`}
-	style:max-width={`${FloaterBarState.MAX_WIDTH_PX}px`}
-	style:max-height={`${FloaterBarState.MAX_HEIGHT_PERCENT}%`}
+	style:width="{bar.position.width}px"
+	style:height="{bar.position.height}px"
+	style:top="{bar.position.top}px"
+	style:left="{bar.position.left}px"
+	style:min-width="{FloaterBarState.MIN_WIDTH_PX}px"
+	style:min-height="{FloaterBarState.MIN_HEIGHT_PX}px"
+	style:max-width="{FloaterBarState.MAX_WIDTH_PX}px"
+	style:max-height="{FloaterBarState.MAX_HEIGHT_PERCENT}%"
 	onfocusin={() => FloaterBarState.focus(index)}
 	onkeydown={(e) => handleKeydown(e)}
 	onmousemove={(e) => FloaterBarState.move(e)}

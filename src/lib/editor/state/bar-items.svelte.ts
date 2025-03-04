@@ -1,6 +1,15 @@
-import Registry, { type BarItemSection } from './bar-item-registry.svelte.js';
+import type { Component } from 'svelte';
 
-export type BarItemData = (BarItemSection & { id: string }) | null;
+import Registry, {
+	type BarItemComponentProps,
+	type BarItemSection
+} from './bar-item-registry.svelte.js';
+
+export type BarItemData = {
+	id: string;
+	Component: Component<BarItemComponentProps> | null;
+	size: BarItemSection['size'];
+};
 export class BarItems {
 	constructor(
 		public isVertical: boolean,
@@ -17,21 +26,24 @@ export class BarItems {
 
 	items: BarItemData[] = $derived(
 		this.#ids.map((id) => {
-			if (id === null) {
-				return null;
+			const _id = id ?? crypto.randomUUID();
+			let Component: BarItemData['Component'] = null;
+			let size: BarItemData['size'] = 1;
+			if (id !== null) {
+				const item = Registry.items.get(id);
+				if (item) {
+					Component = this.isVertical ? item.vertical.Component : item.horizontal.Component;
+					size = this.isVertical ? item.vertical.size : item.horizontal.size;
+				}
 			}
 
-			const item = Registry.items.get(id);
-			if (!item) {
-				return null;
-			}
-
-			const part = this.isVertical ? item.vertical : item.horizontal;
-			return {
-				id,
-				Component: part.Component,
-				size: part.size
+			const data: BarItemData = {
+				id: _id,
+				Component,
+				size
 			};
+
+			return data;
 		})
 	);
 

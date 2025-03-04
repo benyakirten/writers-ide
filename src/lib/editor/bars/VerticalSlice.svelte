@@ -44,8 +44,8 @@
 			onClose={() => VerticalBarState.remove(index, position)}
 			{index}
 		/>
-		{#each items as item (item?.id ?? crypto.randomUUID())}
-			<ItemRenderer Item={item?.Component} />
+		{#each items as item (item.id)}
+			<ItemRenderer Component={item.Component} size={item.size} />
 		{/each}
 	</div>
 	{#if !shouldInvert}
