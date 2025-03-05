@@ -9,18 +9,18 @@ import VerticalBarState, {
 	type VerticalBar
 } from './vertical-bar-state.svelte.js';
 
-type PossibleSlot = 0 | 1 | 2;
-type BarTransferLocation = HorizontalBarPosition | VerticalBarPosition | 'floating';
-type Bars = HorizontalBar[] | VerticalBar[] | FloatingBar[];
-type BarTransfer = {
+export type PossibleSlot = 0 | 1 | 2;
+export type BarTransferLocation = HorizontalBarPosition | VerticalBarPosition | 'floating';
+export type Bars = HorizontalBar[] | VerticalBar[] | FloatingBar[];
+export type BarTransfer = {
 	location: BarTransferLocation;
-	id: string;
+	id: string | number;
 	slot: PossibleSlot;
 	dataId: string | null;
 };
 
 export class BarTransferHandler {
-	#bars(location: BarTransferLocation): Bars {
+	static #bars(location: BarTransferLocation): Bars {
 		switch (location) {
 			case HorizontalBarPosition.EditorBlockEnd:
 				return HorizontalBarState.editorBlockEnd;
@@ -39,12 +39,13 @@ export class BarTransferHandler {
 		}
 	}
 
-	#items(location: BarTransferLocation, id: string): BarItems | undefined {
+	static #items(location: BarTransferLocation, id: string | number): BarItems | undefined {
 		const bars = this.#bars(location);
-		return bars.find((bar) => bar.id === id)?.data;
+		const bar = typeof id === 'string' ? bars.find((bar) => bar.id === id) : bars.at(id);
+		return bar?.data;
 	}
 
-	move(from: BarTransfer, to: Omit<BarTransfer, 'dataId'>): boolean {
+	static move(from: BarTransfer, to: Omit<BarTransfer, 'dataId'>): boolean {
 		const items = this.barItems(from, to);
 		if (!items) {
 			return false;
@@ -62,7 +63,7 @@ export class BarTransferHandler {
 		return true;
 	}
 
-	barItems(from: BarTransfer, to: Omit<BarTransfer, 'dataId'>): [BarItems, BarItems] | null {
+	static barItems(from: BarTransfer, to: Omit<BarTransfer, 'dataId'>): [BarItems, BarItems] | null {
 		const fromItems = this.#items(from.location, from.id);
 		const toItems = this.#items(to.location, to.id);
 
@@ -85,12 +86,12 @@ export class BarTransferHandler {
 		return [fromItems, toItems];
 	}
 
-	insert(dataId: string | null, to: BarTransfer): boolean {
+	static insert(to: BarTransfer): boolean {
 		const toItems = this.#items(to.location, to.id);
 		if (!toItems) {
 			return false;
 		}
 
-		return toItems.insert(dataId, to.slot);
+		return toItems.insert(to.dataId, to.slot);
 	}
 }

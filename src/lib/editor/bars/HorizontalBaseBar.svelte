@@ -7,7 +7,7 @@
 </script>
 
 <div class="base-bar">
-	<button onclick={() => HorizontalBarState.add({}, HorizontalBarPosition.EditorBlockStart)}
+	<button onclick={() => HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart)}
 		>Add horizontal bar</button
 	>
 	<button onclick={() => VerticalBarState.add({}, VerticalBarPosition.InlineStart)}

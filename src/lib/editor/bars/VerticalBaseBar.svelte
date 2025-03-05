@@ -1,48 +1,54 @@
 <script lang="ts">
-	// TODO: Add state handler
-	import FloaterState from '$lib/editor/state/floater-state.svelte.js';
+	import { BarTransferHandler, type BarTransferLocation } from '../state/bar-transfer-handler.js';
+	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte.js';
+	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
 
-	function addFloatingBar(e: SubmitEvent & { currentTarget: EventTarget & HTMLFormElement }) {
-		e.preventDefault();
-		const formData = new FormData(e.currentTarget);
-		const _width = formData.get('width');
-		const _height = formData.get('height');
-		const _top = formData.get('top');
-		const _left = formData.get('left');
+	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'floating';
 
-		if (!_width || !_height || !_top || !_left) {
-			return;
+	function getBarPosition(): BarTransferLocation {
+		switch (selectValue) {
+			case 'vertical':
+				return VerticalBarPosition.InlineStart;
+			case 'horizontal':
+				return HorizontalBarPosition.WindowBlockStart;
+			case 'floating':
+				return 'floating';
 		}
+	}
 
-		const width = parseInt(_width as string);
-		const height = parseInt(_height as string);
-		const top = parseInt(_top as string);
-		const left = parseInt(_left as string);
+	function addNullToBar() {
+		const location = getBarPosition();
+		BarTransferHandler.insert({
+			location,
+			slot: 0,
+			dataId: null,
+			id: 0
+		});
+	}
 
-		FloaterState.add({
-			width,
-			height,
-			top,
-			left
+	function addBasicMenuToBar() {
+		const location = getBarPosition();
+		BarTransferHandler.insert({
+			location,
+			slot: 0,
+			dataId: 'basic-menu',
+			id: 0
 		});
 	}
 </script>
 
 <div class="base-bar">
-	Base Vertical Bar
-	<button onclick={() => FloaterState.add()}>Add Floating Bar</button>
-	<form onsubmit={addFloatingBar}>
-		<input required type="number" name="width" placeholder="Width" />
-		<input required type="number" name="height" placeholder="Height" />
-		<input required type="number" name="top" placeholder="Top" />
-		<input required type="number" name="left" placeholder="Left" />
-		<button type="submit">Add Floating Bar With Specifications</button>
-	</form>
+	<select bind:value={selectValue}>
+		<option value="vertical">Vertical Bar</option>
+		<option value="horizontal">Horizontal Bar</option>
+		<option value="floating">Floating Bar</option>
+	</select>
+	<button onclick={() => addNullToBar()}>Add null to bar</button>
+	<button onclick={() => addBasicMenuToBar()}>Add basic menu to bar</button>
 </div>
 
 <style>
 	.base-bar {
-		border-right: 1px solid greenyellow;
 		width: min-content;
 	}
 </style>

@@ -1,9 +1,9 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { CheckCircle } from '@steeze-ui/phosphor-icons';
 	import { Icon } from '@steeze-ui/svelte-icon';
 
 	import FloaterState from '$lib/editor/state/floater-state.svelte.js';
-	import { tick } from 'svelte';
 
 	let { title, id }: { index: number; title: string; id: string } = $props();
 
@@ -31,6 +31,7 @@
 	}
 
 	async function startEditing() {
+		// TODO: Don't start editing if the floater is being dragged.
 		isEditing = true;
 		await tick();
 		inputRef?.focus();
