@@ -25,8 +25,8 @@ export class BarItems {
 	}
 
 	items: BarItemData[] = $derived(
-		this.#ids.map((id) => {
-			const _id = id ?? crypto.randomUUID();
+		this.#ids.map((id, i) => {
+			const _id = id ?? `__null_${i}__`;
 			let Component: BarItemData['Component'] = null;
 			let size: BarItemData['size'] = 1;
 			if (id !== null) {

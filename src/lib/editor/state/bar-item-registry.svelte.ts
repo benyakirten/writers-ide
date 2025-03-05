@@ -80,14 +80,17 @@ export class BarItemRegistry {
 }
 
 const Registry = new BarItemRegistry();
-Registry.register({
-	vertical: {
-		Component: BasicMenu,
-		size: 2
+Registry.register(
+	{
+		vertical: {
+			Component: BasicMenu,
+			size: 2
+		},
+		horizontal: {
+			Component: BasicMenu,
+			size: 2
+		}
 	},
-	horizontal: {
-		Component: BasicMenu,
-		size: 2
-	}
-});
+	'basic-menu'
+);
 export default Registry;

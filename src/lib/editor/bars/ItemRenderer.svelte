@@ -30,18 +30,28 @@
 		}
 	};
 
-	let { Component, size }: { Component: BarItemData['Component']; size: BarItemData['size'] } =
+	let {
+		Component,
+		size,
+		isVertical
+	}: { Component: BarItemData['Component']; size: BarItemData['size']; isVertical: boolean } =
 		$props();
 </script>
 
-<div style:flex={size} class="renderer">
+<div style:--size={size} class:vertical={isVertical} class:horizontal={!isVertical}>
 	{#if Component}
 		<Component {...itemProps} />
 	{/if}
 </div>
 
 <style>
-	.renderer {
-		flex: 1;
+	.vertical {
+		height: calc(var(--size) * 33%);
+		width: 100%;
+	}
+
+	.horizontal {
+		width: calc(var(--size) * 33%);
+		height: 100%;
 	}
 </style>
