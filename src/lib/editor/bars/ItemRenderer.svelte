@@ -50,7 +50,7 @@
 
 <div class="renderer" draggable style:--size={size} class:vertical>
 	<div class="menu">
-		<p>{title}afajksfkasnfznmvjxcviuqwroiqwrioqwoiroqwrzxmvnxnvzxbnvbnxz</p>
+		<p>{title}</p>
 		<IconButton onclick={onremove} label="Remove item">
 			{#snippet icon()}
 				<Icon src={X} size="14px" />

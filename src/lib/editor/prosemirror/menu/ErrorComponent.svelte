@@ -5,3 +5,9 @@
 </script>
 
 <div>Component could not be found.</div>
+
+<style>
+	div {
+		padding: 10px;
+	}
+</style>

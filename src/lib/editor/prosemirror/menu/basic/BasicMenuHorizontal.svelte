@@ -20,7 +20,7 @@
 
 	import type { ActionUtilities } from '$lib/editor/prosemirror/view/actions.js';
 	import { TextOverline } from '$lib/icons.js';
-	import { SelectionUtilies, type TextMarkPresence } from '../view/selection.js';
+	import { SelectionUtilies, type TextMarkPresence } from '../../view/selection.js';
 
 	type TextMenuIcon = {
 		iconSrc: IconSource;
