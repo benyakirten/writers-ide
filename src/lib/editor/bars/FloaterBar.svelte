@@ -105,11 +105,17 @@
 
 		display: grid;
 		grid-template-rows: auto 1fr;
+		/* TODO: Is there a better solution to limiting child lengths? */
+		grid-template-columns: 100%;
 	}
 
 	.menu {
 		display: flex;
 		gap: 8px;
 		justify-content: space-between;
+	}
+
+	.items {
+		width: 100%;
 	}
 </style>

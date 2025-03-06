@@ -1,5 +1,7 @@
 <script lang="ts">
 	import * as m from '$lib/paraglide/messages.js';
+	import { X } from '@steeze-ui/phosphor-icons';
+	import { Icon } from '@steeze-ui/svelte-icon';
 
 	import type { BarItemComponentProps } from '../state/bar-item-registry.svelte.js';
 	import TabState from '../state/tab-state.svelte.js';
@@ -11,6 +13,7 @@
 	import FloaterBarState from '../state/floater-state.svelte.js';
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
+	import IconButton from '$lib/components/IconButton.svelte';
 
 	let itemProps: BarItemComponentProps = {
 		proseMirror: {
@@ -47,17 +50,23 @@
 
 <div class="renderer" draggable style:--size={size} class:vertical>
 	<div class="menu">
-		<p>{title}</p>
+		<p>{title}afajksfkasnfznmvjxcviuqwroiqwrioqwoiroqwrzxmvnxnvzxbnvbnxz</p>
+		<IconButton onclick={onremove} label="Remove item">
+			{#snippet icon()}
+				<Icon src={X} size="14px" />
+			{/snippet}
+		</IconButton>
 	</div>
-	{#if Component}
-		<Component {...itemProps} />
-	{/if}
+	<div class="component">
+		{#if Component}
+			<Component {...itemProps} />
+		{/if}
+	</div>
 </div>
 
 <style>
 	.renderer {
-		border-top: 1px solid black;
-		margin-bottom: 8px;
+		margin: 20px 0;
 		&:last-child {
 			margin-bottom: 0;
 		}
@@ -68,8 +77,39 @@
 		}
 	}
 
+	.menu {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+
+		width: 80%;
+		padding: 4px 8px;
+		margin-left: 4px;
+
+		border: 1px solid black;
+		border-bottom: none;
+
+		border-top-left-radius: 4px;
+		border-top-right-radius: 4px;
+
+		p {
+			max-width: 80%;
+			text-overflow: ellipsis;
+			font-size: 12px;
+			overflow: hidden;
+			text-wrap: nowrap;
+			white-space: nowrap;
+		}
+	}
+
 	.vertical {
 		height: calc(var(--size) * 33%);
 		width: 100%;
+	}
+
+	.component {
+		height: 100%;
+		border-top: 1px solid black;
+		border-bottom: 1px solid black;
 	}
 </style>

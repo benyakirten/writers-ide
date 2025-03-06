@@ -6,12 +6,12 @@
 	let {
 		icon,
 		label,
-		onClick,
+		onclick,
 		inversion = 0
 	}: {
 		icon: Snippet;
 		label: string;
-		onClick: () => void;
+		onclick: () => void;
 		inversion?: number;
 	} = $props();
 </script>
@@ -19,7 +19,7 @@
 <button
 	style:--inversion={`${Math.floor(inversion * 100)}%`}
 	aria-label={label}
-	onclickcapture={onClick}
+	onclickcapture={onclick}
 	bind:this={buttonEl}
 >
 	{@render icon()}

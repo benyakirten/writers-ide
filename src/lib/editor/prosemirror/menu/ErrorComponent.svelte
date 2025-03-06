@@ -4,4 +4,4 @@
 	let {}: BarItemComponentProps = $props();
 </script>
 
-<div>Component could not be found.s</div>
+<div>Component could not be found.</div>

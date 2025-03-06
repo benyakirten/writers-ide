@@ -11,12 +11,12 @@
 </script>
 
 <div class="menu">
-	<IconButton onClick={() => onMinimize()} label="Minimize bar #{index}">
+	<IconButton onclick={() => onMinimize()} label="Minimize bar #{index}">
 		{#snippet icon()}
 			<Icon src={Minus} size="16px" />
 		{/snippet}
 	</IconButton>
-	<IconButton onClick={() => onClose()} label="Close bar #{index}">
+	<IconButton onclick={() => onClose()} label="Close bar #{index}">
 		{#snippet icon()}
 			<Icon src={X} size="16px" />
 		{/snippet}

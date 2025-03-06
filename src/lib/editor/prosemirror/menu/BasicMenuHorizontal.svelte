@@ -24,13 +24,13 @@
 
 	type TextMenuIcon = {
 		iconSrc: IconSource;
-		onClick: (view: EditorView | null) => void;
+		onclick: (view: EditorView | null) => void;
 		markName: string;
 	};
 	const textMarks: TextMenuIcon[] = [
 		{
 			iconSrc: TextB,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -43,7 +43,7 @@
 		},
 		{
 			iconSrc: TextItalic,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -54,7 +54,7 @@
 		},
 		{
 			iconSrc: TextSuperscript,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -65,7 +65,7 @@
 		},
 		{
 			iconSrc: TextSubscript,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -76,7 +76,7 @@
 		},
 		{
 			iconSrc: TextUnderline,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -87,7 +87,7 @@
 		},
 		{
 			iconSrc: TextOverline,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -98,7 +98,7 @@
 		},
 		{
 			iconSrc: TextStrikethrough,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -112,14 +112,14 @@
 	type BlockMenuIcon = {
 		label: string;
 		iconSrc: IconSource;
-		onClick: (view: EditorView | null) => void;
+		onclick: (view: EditorView | null) => void;
 		determineInversion: (selection: Selection, doc: Node) => number;
 	};
 	const blockMarks: BlockMenuIcon[] = [
 		{
 			label: 'Indent text more.',
 			iconSrc: TextIndent,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -134,7 +134,7 @@
 		{
 			label: 'Indent text less.',
 			iconSrc: TextOutdent,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -149,7 +149,7 @@
 		{
 			label: 'Align text left.',
 			iconSrc: TextAlignLeft,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -168,7 +168,7 @@
 		{
 			label: 'Align text center.',
 			iconSrc: TextAlignCenter,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -181,7 +181,7 @@
 		{
 			label: 'Align text right.',
 			iconSrc: TextAlignRight,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -199,7 +199,7 @@
 		{
 			label: 'Justify text.',
 			iconSrc: TextAlignJustify,
-			onClick: (view) => {
+			onclick: (view) => {
 				if (!view) {
 					return;
 				}
@@ -238,10 +238,10 @@
 
 <div class="menu">
 	<div class="grouping">
-		{#each textMarks as { iconSrc, onClick, markName } (markName)}
+		{#each textMarks as { iconSrc, onclick, markName } (markName)}
 			{@const inversion = activeCodeMarks?.get(markName) ?? 0}
 			{@const label = inversion === 1 ? `Remove ${markName} from text.` : `Make text ${markName}.`}
-			<IconButton {inversion} {label} onClick={() => onClick(editorView)}>
+			<IconButton {inversion} {label} onclick={() => onclick(editorView)}>
 				{#snippet icon()}
 					<Icon src={iconSrc} title={label} size="16px" />
 				{/snippet}
@@ -249,10 +249,10 @@
 		{/each}
 	</div>
 	<div class="grouping">
-		{#each blockMarks as { label, iconSrc, onClick, determineInversion } (label)}
+		{#each blockMarks as { label, iconSrc, onclick, determineInversion } (label)}
 			{@const inversion =
 				editorView && selection ? determineInversion(selection, editorView.state.doc) : 0}
-			<IconButton {inversion} {label} onClick={() => onClick(editorView)}>
+			<IconButton {inversion} {label} onclick={() => onclick(editorView)}>
 				{#snippet icon()}
 					<Icon src={iconSrc} title={label} size="16px" />
 				{/snippet}
