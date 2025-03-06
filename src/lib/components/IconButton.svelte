@@ -29,6 +29,7 @@
 	button {
 		appearance: none;
 		position: relative;
+		cursor: pointer;
 
 		&::before {
 			content: '';

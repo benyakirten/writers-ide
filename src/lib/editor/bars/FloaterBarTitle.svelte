@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { CheckCircle } from '@steeze-ui/phosphor-icons';
+	import { CheckCircle, X } from '@steeze-ui/phosphor-icons';
 	import { Icon } from '@steeze-ui/svelte-icon';
 
-	import FloaterState from '$lib/editor/state/floater-state.svelte.js';
+	import FloaterBarState from '$lib/editor/state/floater-state.svelte.js';
 
 	let { title, id }: { index: number; title: string; id: string } = $props();
 
@@ -19,7 +19,7 @@
 		const formData = new FormData(event.currentTarget);
 		const newTitle = formData.get('title');
 		if (newTitle !== null && newTitle !== title) {
-			FloaterState.update(id, 'title', newTitle.toString());
+			FloaterBarState.update(id, 'title', newTitle.toString());
 		}
 	}
 
@@ -45,9 +45,11 @@
 			isEditing = false;
 		}
 	}
+
+	$inspect(FloaterBarState.titleNumbers.get(id));
 </script>
 
-<div class="container">
+<div>
 	{#if isEditing}
 		<form
 			bind:this={formRef}
@@ -56,17 +58,20 @@
 			onkeydowncapture={(e) => handleKeydown(e)}
 		>
 			<input bind:this={inputRef} type="text" value={title} name="title" />
+			<button onclickcapture={() => (isEditing = false)} aria-label="Keep Title" type="button">
+				<Icon src={X} size="16px" />
+			</button>
 			<button aria-label="Change Title" type="submit">
 				<Icon src={CheckCircle} size="16px" />
 			</button>
 		</form>
 	{:else}
-		{@const titleNumber = FloaterState.titleNumbers.get(id) ?? 0}
-		<button onclick={() => startEditing()}>
+		{@const titleNumber = FloaterBarState.titleNumbers.get(id) ?? 0}
+		<button class="title" onclick={() => startEditing()}>
 			<p>
-				{title}
+				{title || 'Untitled'}
 			</p>
-			{#if titleNumber > 1}
+			{#if titleNumber > 0}
 				<span>({titleNumber})</span>
 			{/if}
 		</button>
@@ -74,36 +79,38 @@
 </div>
 
 <style>
-	.container {
-		flex: 1;
-		padding-block: 2px;
-	}
-
-	p {
-		margin: 0;
-		display: inline;
-	}
-
 	form {
 		position: relative;
+		display: flex;
 		background-color: white;
 		border: 1px solid black;
+		border-top: none;
+		border-left: none;
+		height: 100%;
 
 		&:focus {
 			outline: 1px solid blue;
 		}
 
 		& > input {
-			width: 80%;
+			width: calc(100% - 40px);
 			background: none;
 			border: none;
 			outline: none;
+			padding-left: 4px;
 		}
 
 		& > button {
+			&:nth-of-type(1) {
+				right: 18px;
+			}
+
+			&:nth-of-type(2) {
+				right: 2px;
+			}
+
 			cursor: pointer;
 			position: absolute;
-			right: 2px;
 			top: 50%;
 			transform: translateY(-50%);
 			width: fit-content;
@@ -111,6 +118,7 @@
 			height: min-content;
 		}
 	}
+
 	button {
 		appearance: none;
 		border: none;
@@ -119,5 +127,15 @@
 		background: none;
 		display: flex;
 		justify-content: start;
+		cursor: inherit;
+	}
+
+	span {
+		margin-block: auto;
+		margin-inline: 2px;
+	}
+	p {
+		margin-block: auto;
+		display: inline;
 	}
 </style>

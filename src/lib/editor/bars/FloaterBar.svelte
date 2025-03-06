@@ -100,10 +100,8 @@
 	}
 
 	.menu {
-		padding-inline: 2px;
 		display: flex;
 		gap: 8px;
 		justify-content: space-between;
-		align-items: center;
 	}
 </style>
