@@ -45,8 +45,6 @@
 			isEditing = false;
 		}
 	}
-
-	$inspect(FloaterBarState.titleNumbers.get(id));
 </script>
 
 <div>

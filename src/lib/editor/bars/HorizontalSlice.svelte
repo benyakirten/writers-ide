@@ -35,6 +35,7 @@
 	} from '../state/horizontal-bar-state.svelte.js';
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
+	import ItemRenderer from './ItemRenderer.svelte';
 
 	let {
 		bar,
@@ -75,7 +76,11 @@
 			onClose={() => HorizontalBarState.remove(index, position)}
 			{index}
 		/>
-		<!-- Render items -->
+		<div>
+			{#each items as item (item.id)}
+				<ItemRenderer Component={item.Component} size={item.size} />
+			{/each}
+		</div>
 	</div>
 	{#if !shouldInvert}
 		{@render resizeBar()}

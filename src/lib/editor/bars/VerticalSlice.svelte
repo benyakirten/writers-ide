@@ -44,9 +44,9 @@
 			onClose={() => VerticalBarState.remove(index, position)}
 			{index}
 		/>
-		<div class="items">
+		<div>
 			{#each items as item (item.id)}
-				<ItemRenderer isVertical Component={item.Component} size={item.size} />
+				<ItemRenderer vertical Component={item.Component} size={item.size} />
 			{/each}
 		</div>
 	</div>
@@ -75,10 +75,5 @@
 		border: 1px solid black;
 		position: relative;
 		overflow: hidden;
-	}
-
-	.items {
-		display: flex;
-		flex-direction: row;
 	}
 </style>

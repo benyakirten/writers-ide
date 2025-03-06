@@ -131,8 +131,8 @@ export class BarItems {
 		return true;
 	}
 
-	get availableSpace(): number {
+	availableSpace = $derived.by(() => {
 		const usedSpace = this.#ids.reduce((acc, id) => acc + Registry.size(id, this.isVertical), 0);
 		return Math.max(0, this.maxSize - usedSpace);
-	}
+	});
 }

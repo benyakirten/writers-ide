@@ -33,25 +33,32 @@
 	let {
 		Component,
 		size,
-		isVertical
-	}: { Component: BarItemData['Component']; size: BarItemData['size']; isVertical: boolean } =
-		$props();
+		vertical = false
+	}: {
+		Component: BarItemData['Component'];
+		size: BarItemData['size'];
+		vertical?: boolean;
+	} = $props();
 </script>
 
-<div style:--size={size} class:vertical={isVertical} class:horizontal={!isVertical}>
+<div class="renderer" draggable style:--size={size} class:vertical>
 	{#if Component}
 		<Component {...itemProps} />
 	{/if}
 </div>
 
 <style>
+	.renderer {
+		border: 1px solid black;
+
+		&:not(.vertical) {
+			width: calc(var(--size) * 33%);
+			height: 100%;
+		}
+	}
+
 	.vertical {
 		height: calc(var(--size) * 33%);
 		width: 100%;
-	}
-
-	.horizontal {
-		width: calc(var(--size) * 33%);
-		height: 100%;
 	}
 </style>

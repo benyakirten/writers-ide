@@ -43,7 +43,6 @@ export class FloaterBarState {
 		for (const { title, id } of this.bars) {
 			const _title = title.toLowerCase().trim();
 			const existingTitleOccurrences = existingTitles.get(_title) ?? 0;
-			console.log(title, id, existingTitleOccurrences);
 			titles.set(id, existingTitleOccurrences);
 
 			existingTitles.set(_title, existingTitleOccurrences + 1);

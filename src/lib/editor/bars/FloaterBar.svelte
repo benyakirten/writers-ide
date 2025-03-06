@@ -85,7 +85,7 @@
 	</div>
 	<div>
 		{#each items as item (item.id)}
-			<ItemRenderer isVertical Component={item.Component} size={item.size} />
+			<ItemRenderer vertical Component={item.Component} size={item.size} />
 		{/each}
 	</div>
 </div>
@@ -97,6 +97,9 @@
 		border: 1px solid black;
 		overflow: auto;
 		resize: both;
+
+		display: grid;
+		grid-template-rows: auto 1fr;
 	}
 
 	.menu {
