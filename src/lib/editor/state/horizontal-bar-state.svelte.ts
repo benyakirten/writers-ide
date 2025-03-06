@@ -41,7 +41,7 @@ export class HorizontalBarState {
 			id = crypto.randomUUID(),
 			visible = true,
 			data
-		}: Partial<Omit<HorizontalBar, 'data'>> & { data?: (string | null)[] },
+		}: Partial<Omit<HorizontalBar, 'data'>> & { data?: string[] },
 		position: HorizontalBarPosition
 	): HorizontalBar {
 		const bars = this.bars(position);

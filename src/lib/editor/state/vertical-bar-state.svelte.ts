@@ -45,7 +45,7 @@ export class VerticalBarState {
 			id = crypto.randomUUID(),
 			visible = true,
 			data
-		}: Partial<Omit<VerticalBar, 'data'>> & { data?: (string | null)[] },
+		}: Partial<Omit<VerticalBar, 'data'>> & { data?: string[] },
 		position: VerticalBarPosition
 	): VerticalBar {
 		const bars = this.bars(position);

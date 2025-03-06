@@ -39,14 +39,33 @@ export class BarTransferHandler {
 		}
 	}
 
+	static #createEmptyBar(location: BarTransferLocation): string {
+		switch (location) {
+			case HorizontalBarPosition.EditorBlockEnd:
+			case HorizontalBarPosition.EditorBlockStart:
+			case HorizontalBarPosition.WindowBlockEnd:
+			case HorizontalBarPosition.WindowBlockStart:
+				return HorizontalBarState.add({}, location).id;
+			case VerticalBarPosition.InlineEnd:
+			case VerticalBarPosition.InlineStart:
+				return VerticalBarState.add({}, location).id;
+			case 'floating':
+				return FloatingBarState.add({}).id;
+		}
+	}
+
 	static #items(location: BarTransferLocation, id: string | number): BarItems | undefined {
 		const bars = this.#bars(location);
 		const bar = typeof id === 'string' ? bars.find((bar) => bar.id === id) : bars.at(id);
 		return bar?.data;
 	}
 
-	static move(from: BarTransfer, to: Omit<BarTransfer, 'itemId'>): boolean {
-		const items = this.barItems(from, to);
+	static move(
+		from: BarTransfer,
+		to: Omit<BarTransfer, 'itemId'>,
+		createToBarIfMissing: boolean = true
+	): boolean {
+		const items = this.barItems(from, to, createToBarIfMissing);
 		if (!items) {
 			return false;
 		}
@@ -63,9 +82,21 @@ export class BarTransferHandler {
 		return true;
 	}
 
-	static barItems(from: BarTransfer, to: Omit<BarTransfer, 'itemId'>): [BarItems, BarItems] | null {
+	static barItems(
+		from: BarTransfer,
+		to: Omit<BarTransfer, 'itemId'>,
+		createToBarIfMissing: boolean = true
+	): [BarItems, BarItems] | null {
 		const fromItems = this.#items(from.location, from.barId);
 		const toItems = this.#items(to.location, to.barId);
+		if (!toItems) {
+			const bars = this.#bars(to.location);
+			if (bars.length === 0 && createToBarIfMissing) {
+				const id = this.#createEmptyBar(to.location);
+				to.barId = id;
+				return this.barItems(from, to);
+			}
+		}
 
 		if (!fromItems || !toItems) {
 			return null;

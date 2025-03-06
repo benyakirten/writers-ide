@@ -184,7 +184,7 @@ export class FloaterBarState {
 			width?: number;
 			height?: number;
 			z?: number;
-			data?: (null | string)[];
+			data?: string[];
 			id?: string;
 			minimized?: boolean;
 			title?: string;
