@@ -33,15 +33,22 @@
 	let {
 		Component,
 		size,
-		vertical = false
+		vertical = false,
+		title,
+		onremove
 	}: {
 		Component: BarItemData['Component'];
 		size: BarItemData['size'];
 		vertical?: boolean;
+		title: string;
+		onremove: () => void;
 	} = $props();
 </script>
 
 <div class="renderer" draggable style:--size={size} class:vertical>
+	<div class="menu">
+		<p>{title}</p>
+	</div>
 	{#if Component}
 		<Component {...itemProps} />
 	{/if}
@@ -49,7 +56,11 @@
 
 <style>
 	.renderer {
-		border: 1px solid black;
+		border-top: 1px solid black;
+		margin-bottom: 8px;
+		&:last-child {
+			margin-bottom: 0;
+		}
 
 		&:not(.vertical) {
 			width: calc(var(--size) * 33%);

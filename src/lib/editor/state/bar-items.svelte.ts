@@ -4,43 +4,46 @@ import Registry, {
 	type BarItemComponentProps,
 	type BarItemSection
 } from './bar-item-registry.svelte.js';
+import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
 
 export type BarItemData = {
 	id: string;
-	Component: Component<BarItemComponentProps> | null;
+	Component: Component<BarItemComponentProps>;
 	size: BarItemSection['size'];
+	title: string;
 };
 export class BarItems {
 	constructor(
 		public isVertical: boolean,
-		items: (string | null)[] = [],
+		items: string[] = [],
 		public readonly maxSize = 3
 	) {
 		items.forEach((id) => this.append(id));
 	}
 
-	#ids = $state<(string | null)[]>([]);
+	#ids = $state<string[]>([]);
 	get ids() {
 		return this.#ids;
 	}
 
 	items: BarItemData[] = $derived(
-		this.#ids.map((id, i) => {
-			const _id = id ?? `__null_${i}__`;
-			let Component: BarItemData['Component'] = null;
+		this.#ids.map((id) => {
+			let Component: BarItemData['Component'] = ErrorComponent;
 			let size: BarItemData['size'] = 1;
-			if (id !== null) {
-				const item = Registry.items.get(id);
-				if (item) {
-					Component = this.isVertical ? item.vertical.Component : item.horizontal.Component;
-					size = this.isVertical ? item.vertical.size : item.horizontal.size;
-				}
+			let title = 'Unknown Menu';
+
+			const item = Registry.items.get(id);
+			if (item) {
+				Component = this.isVertical ? item.vertical.Component : item.horizontal.Component;
+				size = this.isVertical ? item.vertical.size : item.horizontal.size;
+				title = item.title;
 			}
 
 			const data: BarItemData = {
-				id: _id,
+				id,
 				Component,
-				size
+				size,
+				title
 			};
 
 			return data;
@@ -58,13 +61,9 @@ export class BarItems {
 		return typeof id === 'string' ? this.#ids.findIndex((_id) => _id === id) : id;
 	}
 
-	append(id: string | null): boolean {
+	append(id: string): boolean {
 		const availableSpace = this.availableSpace;
-		if (
-			this.has(id) ||
-			!Registry.isAllowed(id) ||
-			Registry.size(id, this.isVertical) > availableSpace
-		) {
+		if (this.has(id) || Registry.size(id, this.isVertical) > availableSpace) {
 			return false;
 		}
 
@@ -91,13 +90,8 @@ export class BarItems {
 		return true;
 	}
 
-	insert(id: string | null, at: number): boolean {
-		if (
-			this.has(id) ||
-			!Registry.isAllowed(id) ||
-			at < 0 ||
-			Registry.size(id, this.isVertical) > this.availableSpace
-		) {
+	insert(id: string, at: number): boolean {
+		if (this.has(id) || at < 0 || Registry.size(id, this.isVertical) > this.availableSpace) {
 			return false;
 		}
 

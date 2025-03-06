@@ -50,20 +50,4 @@ describe('BarItemRegistry', () => {
 			expect(registry.size('non-existent-id', true)).toBe(1);
 		});
 	});
-
-	describe('isAllowed', () => {
-		it('should return true if the id is null', () => {
-			const got = registry.isAllowed(null);
-			expect(got).toBe(true);
-		});
-
-		it('should return true if the item is registered', () => {
-			const [id] = registry.register(mockItem);
-			expect(registry.isAllowed(id)).toBe(true);
-		});
-
-		it('should not allow an item if id is not registered', () => {
-			expect(registry.isAllowed('non-existent-id')).toBe(false);
-		});
-	});
 });

@@ -42,6 +42,7 @@ export type BarItemSection = {
 };
 
 export type BarItem = {
+	title: string;
 	vertical: BarItemSection;
 	horizontal: BarItemSection;
 };
@@ -69,19 +70,12 @@ export class BarItemRegistry {
 
 		return isVertical ? item.vertical.size : item.horizontal.size;
 	}
-
-	isAllowed(id: string | null): boolean {
-		if (!id) {
-			return true;
-		}
-
-		return this.items.has(id);
-	}
 }
 
 const Registry = new BarItemRegistry();
 Registry.register(
 	{
+		title: 'Basic Menu',
 		vertical: {
 			Component: BasicMenu,
 			size: 2

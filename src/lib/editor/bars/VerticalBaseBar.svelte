@@ -21,8 +21,8 @@
 		BarTransferHandler.insert({
 			location,
 			slot: 0,
-			dataId: null,
-			id: 0
+			itemId: Math.random().toString(),
+			barId: 0
 		});
 	}
 
@@ -31,8 +31,8 @@
 		BarTransferHandler.insert({
 			location,
 			slot: 0,
-			dataId: 'basic-menu',
-			id: 0
+			itemId: 'basic-menu',
+			barId: 0
 		});
 	}
 </script>

@@ -14,9 +14,9 @@ export type BarTransferLocation = HorizontalBarPosition | VerticalBarPosition | 
 export type Bars = HorizontalBar[] | VerticalBar[] | FloatingBar[];
 export type BarTransfer = {
 	location: BarTransferLocation;
-	id: string | number;
+	barId: string | number;
 	slot: PossibleSlot;
-	dataId: string | null;
+	itemId: string;
 };
 
 export class BarTransferHandler {
@@ -45,7 +45,7 @@ export class BarTransferHandler {
 		return bar?.data;
 	}
 
-	static move(from: BarTransfer, to: Omit<BarTransfer, 'dataId'>): boolean {
+	static move(from: BarTransfer, to: Omit<BarTransfer, 'itemId'>): boolean {
 		const items = this.barItems(from, to);
 		if (!items) {
 			return false;
@@ -58,14 +58,14 @@ export class BarTransferHandler {
 		}
 
 		fromItems.remove(from.slot);
-		toItems.insert(from.dataId, to.slot);
+		toItems.insert(from.itemId, to.slot);
 
 		return true;
 	}
 
-	static barItems(from: BarTransfer, to: Omit<BarTransfer, 'dataId'>): [BarItems, BarItems] | null {
-		const fromItems = this.#items(from.location, from.id);
-		const toItems = this.#items(to.location, to.id);
+	static barItems(from: BarTransfer, to: Omit<BarTransfer, 'itemId'>): [BarItems, BarItems] | null {
+		const fromItems = this.#items(from.location, from.barId);
+		const toItems = this.#items(to.location, to.barId);
 
 		if (!fromItems || !toItems) {
 			return null;
@@ -79,7 +79,7 @@ export class BarTransferHandler {
 			return null;
 		}
 
-		if (!fromItems.has(from.dataId) || toItems.has(from.dataId)) {
+		if (!fromItems.has(from.itemId) || toItems.has(from.itemId)) {
 			return null;
 		}
 
@@ -87,11 +87,20 @@ export class BarTransferHandler {
 	}
 
 	static insert(to: BarTransfer): boolean {
-		const toItems = this.#items(to.location, to.id);
+		const toItems = this.#items(to.location, to.barId);
 		if (!toItems) {
 			return false;
 		}
 
-		return toItems.insert(to.dataId, to.slot);
+		return toItems.insert(to.itemId, to.slot);
+	}
+
+	static remove(location: BarTransferLocation, id: string | number, itemId: string): boolean {
+		const items = this.#items(location, id);
+		if (!items) {
+			return false;
+		}
+
+		return items.remove(itemId);
 	}
 }
