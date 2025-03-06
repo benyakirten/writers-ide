@@ -18,91 +18,91 @@
 	import type { Selection } from 'prosemirror-state';
 	import type { Node } from 'prosemirror-model';
 
-	import { ActionUtilities } from '$lib/editor/prosemirror/view/actions.js';
+	import type { ActionUtilities } from '$lib/editor/prosemirror/view/actions.js';
 	import { TextOverline } from '$lib/icons.js';
 	import { SelectionUtilies, type TextMarkPresence } from '../view/selection.js';
 
 	type TextMenuIcon = {
 		iconSrc: IconSource;
-		onclick: (view: EditorView | null) => void;
+		onclick: (view: EditorView | null, utils: typeof ActionUtilities) => void;
 		markName: string;
 	};
 	const textMarks: TextMenuIcon[] = [
 		{
 			iconSrc: TextB,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
 
 				const { state, dispatch } = view;
-				ActionUtilities.toggleTextMark('bold', state, dispatch, view);
+				utils.toggleTextMark('bold', state, dispatch, view);
 				view.focus();
 			},
 			markName: 'bold'
 		},
 		{
 			iconSrc: TextItalic,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.toggleTextMark('italic', view.state, view.dispatch, view);
+				utils.toggleTextMark('italic', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'italic'
 		},
 		{
 			iconSrc: TextSuperscript,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.toggleTextMark('superscript', view.state, view.dispatch, view, 'subscript');
+				utils.toggleTextMark('superscript', view.state, view.dispatch, view, 'subscript');
 				view.focus();
 			},
 			markName: 'superscript'
 		},
 		{
 			iconSrc: TextSubscript,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.toggleTextMark('subscript', view.state, view.dispatch, view, 'superscript');
+				utils.toggleTextMark('subscript', view.state, view.dispatch, view, 'superscript');
 				view.focus();
 			},
 			markName: 'subscript'
 		},
 		{
 			iconSrc: TextUnderline,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.toggleTextMark('underline', view.state, view.dispatch, view);
+				utils.toggleTextMark('underline', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'underline'
 		},
 		{
 			iconSrc: TextOverline,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.toggleTextMark('overline', view.state, view.dispatch, view);
+				utils.toggleTextMark('overline', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'overline'
 		},
 		{
 			iconSrc: TextStrikethrough,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.toggleTextMark('strikethrough', view.state, view.dispatch, view);
+				utils.toggleTextMark('strikethrough', view.state, view.dispatch, view);
 				view.focus();
 			},
 			markName: 'strikethrough'
@@ -112,18 +112,18 @@
 	type BlockMenuIcon = {
 		label: string;
 		iconSrc: IconSource;
-		onclick: (view: EditorView | null) => void;
+		onclick: (view: EditorView | null, utils: typeof ActionUtilities) => void;
 		determineInversion: (selection: Selection, doc: Node) => number;
 	};
 	const blockMarks: BlockMenuIcon[] = [
 		{
 			label: 'Indent text more.',
 			iconSrc: TextIndent,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.dent('indent', view.state, view.dispatch);
+				utils.dent('indent', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) => {
@@ -134,11 +134,11 @@
 		{
 			label: 'Indent text less.',
 			iconSrc: TextOutdent,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.dent('dedent', view.state, view.dispatch);
+				utils.dent('dedent', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) => {
@@ -149,11 +149,11 @@
 		{
 			label: 'Align text left.',
 			iconSrc: TextAlignLeft,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.setTextAlignment('left', view.state, view.dispatch);
+				utils.setTextAlignment('left', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) =>
@@ -168,11 +168,11 @@
 		{
 			label: 'Align text center.',
 			iconSrc: TextAlignCenter,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.setTextAlignment('center', view.state, view.dispatch);
+				utils.setTextAlignment('center', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) =>
@@ -181,11 +181,11 @@
 		{
 			label: 'Align text right.',
 			iconSrc: TextAlignRight,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.setTextAlignment('right', view.state, view.dispatch);
+				utils.setTextAlignment('right', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) =>
@@ -199,11 +199,11 @@
 		{
 			label: 'Justify text.',
 			iconSrc: TextAlignJustify,
-			onclick: (view) => {
+			onclick: (view, utils) => {
 				if (!view) {
 					return;
 				}
-				ActionUtilities.setTextAlignment('justify', view.state, view.dispatch);
+				utils.setTextAlignment('justify', view.state, view.dispatch);
 				view.focus();
 			},
 			determineInversion: (selection, doc) =>
@@ -241,7 +241,11 @@
 		{#each textMarks as { iconSrc, onclick, markName } (markName)}
 			{@const inversion = activeCodeMarks?.get(markName) ?? 0}
 			{@const label = inversion === 1 ? `Remove ${markName} from text.` : `Make text ${markName}.`}
-			<IconButton {inversion} {label} onclick={() => onclick(editorView)}>
+			<IconButton
+				{inversion}
+				{label}
+				onclick={() => onclick(editorView, props.proseMirror.actions)}
+			>
 				{#snippet icon()}
 					<Icon src={iconSrc} title={label} size="16px" />
 				{/snippet}
@@ -252,7 +256,11 @@
 		{#each blockMarks as { label, iconSrc, onclick, determineInversion } (label)}
 			{@const inversion =
 				editorView && selection ? determineInversion(selection, editorView.state.doc) : 0}
-			<IconButton {inversion} {label} onclick={() => onclick(editorView)}>
+			<IconButton
+				{inversion}
+				{label}
+				onclick={() => onclick(editorView, props.proseMirror.actions)}
+			>
 				{#snippet icon()}
 					<Icon src={iconSrc} title={label} size="16px" />
 				{/snippet}

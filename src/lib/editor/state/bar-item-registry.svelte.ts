@@ -19,8 +19,8 @@ type BarStates = {
 };
 
 type ProseMirrorUtils = {
-	actions: ActionUtilities;
-	selections: SelectionUtilies;
+	actions: typeof ActionUtilities;
+	selections: typeof SelectionUtilies;
 	eventBus: ProseMirrorEventBus;
 	schema: typeof schema;
 };
