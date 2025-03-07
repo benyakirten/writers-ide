@@ -7,7 +7,12 @@ export default defineConfig({
 		sveltekit(),
 		paraglide({
 			project: './project.inlang',
-			outdir: './src/lib/paraglide'
+			outdir: './src/lib/paraglide',
+			// TODO: With Tauri or Electron, what is the best internationalizaiton strategy?
+			// We could route things based on a user settings - but should it come from the OS or the app?
+			// Should the user be able to override OS settings?
+			// @ts-expect-error This is a valid config option
+			strategy: ['preferredLanguage']
 		})
 	],
 
