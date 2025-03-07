@@ -6,7 +6,7 @@ import { SelectionUtilies } from './selection.js';
 import { INDENT_MAX, INDENT_MIN } from './constants.js';
 import type { marks } from './marks.js';
 
-type UseableMarkName = keyof typeof marks;
+export type UseableMarkName = keyof typeof marks;
 export type TextAlignment = 'start' | 'end' | 'left' | 'center' | 'right' | 'justify';
 export class ActionUtilities {
 	static toggleTextMark(

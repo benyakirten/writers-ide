@@ -1,222 +1,16 @@
-<script module lang="ts">
-	import { Icon, type IconSource } from '@steeze-ui/svelte-icon';
-	import {
-		TextB,
-		TextItalic,
-		TextSuperscript,
-		TextSubscript,
-		TextIndent,
-		TextOutdent,
-		TextUnderline,
-		TextStrikethrough,
-		TextAlignLeft,
-		TextAlignCenter,
-		TextAlignRight,
-		TextAlignJustify
-	} from '@steeze-ui/phosphor-icons';
-	import type { EditorView } from 'prosemirror-view';
-	import type { Selection } from 'prosemirror-state';
-	import type { Node } from 'prosemirror-model';
-
-	import type { ActionUtilities } from '$lib/editor/prosemirror/view/actions.js';
-	import { TextOverline } from '$lib/icons.js';
-	import { SelectionUtilies, type TextMarkPresence } from '../../view/selection.js';
-
-	type TextMenuIcon = {
-		iconSrc: IconSource;
-		onclick: (view: EditorView | null, utils: typeof ActionUtilities) => void;
-		markName: string;
-	};
-	const textMarks: TextMenuIcon[] = [
-		{
-			iconSrc: TextB,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-
-				const { state, dispatch } = view;
-				utils.toggleTextMark('bold', state, dispatch, view);
-				view.focus();
-			},
-			markName: 'bold'
-		},
-		{
-			iconSrc: TextItalic,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('italic', view.state, view.dispatch, view);
-				view.focus();
-			},
-			markName: 'italic'
-		},
-		{
-			iconSrc: TextSuperscript,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('superscript', view.state, view.dispatch, view, 'subscript');
-				view.focus();
-			},
-			markName: 'superscript'
-		},
-		{
-			iconSrc: TextSubscript,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('subscript', view.state, view.dispatch, view, 'superscript');
-				view.focus();
-			},
-			markName: 'subscript'
-		},
-		{
-			iconSrc: TextUnderline,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('underline', view.state, view.dispatch, view);
-				view.focus();
-			},
-			markName: 'underline'
-		},
-		{
-			iconSrc: TextOverline,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('overline', view.state, view.dispatch, view);
-				view.focus();
-			},
-			markName: 'overline'
-		},
-		{
-			iconSrc: TextStrikethrough,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('strikethrough', view.state, view.dispatch, view);
-				view.focus();
-			},
-			markName: 'strikethrough'
-		}
-	];
-
-	type BlockMenuIcon = {
-		label: string;
-		iconSrc: IconSource;
-		onclick: (view: EditorView | null, utils: typeof ActionUtilities) => void;
-		determineInversion: (selection: Selection, doc: Node) => number;
-	};
-	const blockMarks: BlockMenuIcon[] = [
-		{
-			label: 'Indent text more.',
-			iconSrc: TextIndent,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.dent('indent', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc) => {
-				const ratio = SelectionUtilies.getIndentRatio(selection, doc);
-				return ratio ?? 0;
-			}
-		},
-		{
-			label: 'Indent text less.',
-			iconSrc: TextOutdent,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.dent('dedent', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc) => {
-				const ratio = SelectionUtilies.getIndentRatio(selection, doc);
-				return ratio === null ? 0 : 1 - ratio;
-			}
-		},
-		{
-			label: 'Align text left.',
-			iconSrc: TextAlignLeft,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.setTextAlignment('left', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc) =>
-				SelectionUtilies.getBlockAttributeRatio(
-					selection,
-					doc,
-					'align',
-					// TODO: Add method to detect default alignment value
-					(value) => value === 'left' || value === 'start'
-				)
-		},
-		{
-			label: 'Align text center.',
-			iconSrc: TextAlignCenter,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.setTextAlignment('center', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc) =>
-				SelectionUtilies.getBlockAttributeRatio(selection, doc, 'align', 'center')
-		},
-		{
-			label: 'Align text right.',
-			iconSrc: TextAlignRight,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.setTextAlignment('right', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc) =>
-				SelectionUtilies.getBlockAttributeRatio(
-					selection,
-					doc,
-					'align',
-					(value) => value === 'right' || value === 'end'
-				)
-		},
-		{
-			label: 'Justify text.',
-			iconSrc: TextAlignJustify,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.setTextAlignment('justify', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc) =>
-				SelectionUtilies.getBlockAttributeRatio(selection, doc, 'align', 'justify')
-		}
-	];
-</script>
-
 <script lang="ts">
 	import { onMount } from 'svelte';
 
 	import IconButton from '$lib/components/IconButton.svelte';
 	import type { BarItemComponentProps } from '$lib/editor/state/bar-item-registry.svelte.js';
+	import type { EditorView } from 'prosemirror-view';
+	import type { Selection } from 'prosemirror-state';
+
+	import { capitalize } from '$lib/utils/strings.js';
+	import type { TextMarkPresence } from '../../view/selection.js';
+
+	import { blockMarks, textMarks } from './buttons.js';
+	import { Icon } from '@steeze-ui/svelte-icon';
 
 	let activeCodeMarks = $state<TextMarkPresence>();
 	let editorView = $state<EditorView | null>(null);
@@ -226,7 +20,8 @@
 
 	onMount(() => {
 		const unsub = props.proseMirror.eventBus.subscribe(({ view }) => {
-			const marks = view && SelectionUtilies.findTextMarks(view.state.selection, view.state.doc);
+			const marks =
+				view && props.proseMirror.selections.findTextMarks(view.state.selection, view.state.doc);
 			activeCodeMarks = marks;
 			editorView = view;
 			selection = view.state.selection;
@@ -238,12 +33,16 @@
 
 <div class="menu">
 	<div class="grouping">
-		{#each textMarks as { iconSrc, onclick, markName } (markName)}
+		{#each textMarks as { iconSrc, onclick, markName, translateMark } (markName)}
 			{@const inversion = activeCodeMarks?.get(markName) ?? 0}
-			{@const label = inversion === 1 ? `Remove ${markName} from text.` : `Make text ${markName}.`}
+			{@const translatedMark = translateMark(props.internationalization.translation)}
+			{@const label =
+				inversion === 1
+					? props.internationalization.translation.remove_mark_from_text({ mark: translatedMark })
+					: props.internationalization.translation.add_mark_to_text({ mark: translatedMark })}
 			<IconButton
 				{inversion}
-				{label}
+				label="{capitalize(label)}."
 				onclick={() => onclick(editorView, props.proseMirror.actions)}
 			>
 				{#snippet icon()}
@@ -253,9 +52,10 @@
 		{/each}
 	</div>
 	<div class="grouping">
-		{#each blockMarks as { label, iconSrc, onclick, determineInversion } (label)}
+		{#each blockMarks as { id, generateLabel, iconSrc, onclick, determineInversion } (id)}
 			{@const inversion =
 				editorView && selection ? determineInversion(selection, editorView.state.doc) : 0}
+			{@const label = generateLabel(props.internationalization.translation)}
 			<IconButton
 				{inversion}
 				{label}
