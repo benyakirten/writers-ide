@@ -50,5 +50,9 @@
 <style>
 	.base-bar {
 		width: min-content;
+		display: grid;
+		gap: 8px;
+		padding: 8px 4px;
+		align-content: baseline;
 	}
 </style>

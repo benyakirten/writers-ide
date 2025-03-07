@@ -72,11 +72,13 @@
 		style:height={`${height}px`}
 		style:overflow={height === 0 ? 'hidden' : 'auto'}
 	>
-		<BarMenu
-			onMinimize={() => HorizontalBarState.toggle(index, position)}
-			onClose={() => HorizontalBarState.remove(index, position)}
-			{index}
-		/>
+		<div class="bar-title">
+			<BarMenu
+				onMinimize={() => HorizontalBarState.toggle(index, position)}
+				onClose={() => HorizontalBarState.remove(index, position)}
+				{index}
+			/>
+		</div>
 		<div class="items">
 			{#each items as item (item.id)}
 				<ItemRenderer
@@ -93,8 +95,15 @@
 
 <style>
 	.horizontal-container {
+		position: relative;
 		display: grid;
 		width: 100%;
+		overflow: hidden;
+	}
+	.bar-title {
+		position: absolute;
+		top: 4px;
+		right: 4px;
 	}
 	.resize {
 		cursor: row-resize;
