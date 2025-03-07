@@ -1,7 +1,7 @@
 import { type Component } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
-import * as m from '$lib/paraglide/messages.js';
 
+import type { Internationalizator } from '../types.js';
 import type { ActionUtilities } from '../prosemirror/view/actions.js';
 import type { SelectionUtilies } from '../prosemirror/view/selection.js';
 import type { ProseMirrorEventBus } from './event-bus.svelte.js';
@@ -26,7 +26,7 @@ type ProseMirrorUtils = {
 };
 
 type InternationlizationUtils = {
-	translation: typeof m;
+	translation: Internationalizator;
 };
 
 export type BarItemComponentProps = {

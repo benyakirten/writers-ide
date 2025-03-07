@@ -1,5 +1,3 @@
-import type * as m from '$lib/paraglide/messages.js';
-
 import { type IconSource } from '@steeze-ui/svelte-icon';
 import {
 	TextB,
@@ -21,13 +19,14 @@ import type { Node } from 'prosemirror-model';
 
 import type { ActionUtilities, UseableMarkName } from '$lib/editor/prosemirror/view/actions.js';
 import { TextOverline } from '$lib/icons.js';
-import { SelectionUtilies } from '../../view/selection.js';
+import type { Internationalizator } from '$lib/editor/types.js';
+import type { SelectionUtilies } from '../../view/selection.js';
 
-type TextMenuIcon = {
+export type TextMenuIcon = {
 	iconSrc: IconSource;
 	onclick: (view: EditorView | null, utils: typeof ActionUtilities) => void;
 	markName: UseableMarkName;
-	translateMark: (t: typeof m) => string;
+	translateMark: (t: Internationalizator) => string;
 };
 
 export const textMarks: TextMenuIcon[] = [
@@ -119,12 +118,12 @@ export const textMarks: TextMenuIcon[] = [
 	}
 ] as const;
 
-type BlockMenuIcon = {
+export type BlockMenuIcon = {
 	id: string;
-	generateLabel: (t: typeof m) => string;
+	generateLabel: (t: Internationalizator) => string;
 	iconSrc: IconSource;
 	onclick: (view: EditorView | null, utils: typeof ActionUtilities) => void;
-	determineInversion: (selection: Selection, doc: Node) => number;
+	determineInversion: (selection: Selection, doc: Node, utils: typeof SelectionUtilies) => number;
 };
 
 export const blockMarks: BlockMenuIcon[] = [
@@ -139,8 +138,8 @@ export const blockMarks: BlockMenuIcon[] = [
 			utils.dent('indent', view.state, view.dispatch);
 			view.focus();
 		},
-		determineInversion: (selection, doc) => {
-			const ratio = SelectionUtilies.getIndentRatio(selection, doc);
+		determineInversion: (selection, doc, utils) => {
+			const ratio = utils.getIndentRatio(selection, doc);
 			return ratio ?? 0;
 		}
 	},
@@ -155,8 +154,8 @@ export const blockMarks: BlockMenuIcon[] = [
 			utils.dent('dedent', view.state, view.dispatch);
 			view.focus();
 		},
-		determineInversion: (selection, doc) => {
-			const ratio = SelectionUtilies.getIndentRatio(selection, doc);
+		determineInversion: (selection, doc, utils) => {
+			const ratio = utils.getIndentRatio(selection, doc);
 			return ratio === null ? 0 : 1 - ratio;
 		}
 	},
@@ -171,8 +170,8 @@ export const blockMarks: BlockMenuIcon[] = [
 			utils.setTextAlignment('left', view.state, view.dispatch);
 			view.focus();
 		},
-		determineInversion: (selection, doc) =>
-			SelectionUtilies.getBlockAttributeRatio(
+		determineInversion: (selection, doc, utils) =>
+			utils.getBlockAttributeRatio(
 				selection,
 				doc,
 				'align',
@@ -191,8 +190,8 @@ export const blockMarks: BlockMenuIcon[] = [
 			utils.setTextAlignment('center', view.state, view.dispatch);
 			view.focus();
 		},
-		determineInversion: (selection, doc) =>
-			SelectionUtilies.getBlockAttributeRatio(selection, doc, 'align', 'center')
+		determineInversion: (selection, doc, utils) =>
+			utils.getBlockAttributeRatio(selection, doc, 'align', 'center')
 	},
 	{
 		id: 'align_right',
@@ -205,8 +204,8 @@ export const blockMarks: BlockMenuIcon[] = [
 			utils.setTextAlignment('right', view.state, view.dispatch);
 			view.focus();
 		},
-		determineInversion: (selection, doc) =>
-			SelectionUtilies.getBlockAttributeRatio(
+		determineInversion: (selection, doc, utils) =>
+			utils.getBlockAttributeRatio(
 				selection,
 				doc,
 				'align',
@@ -224,7 +223,7 @@ export const blockMarks: BlockMenuIcon[] = [
 			utils.setTextAlignment('justify', view.state, view.dispatch);
 			view.focus();
 		},
-		determineInversion: (selection, doc) =>
-			SelectionUtilies.getBlockAttributeRatio(selection, doc, 'align', 'justify')
+		determineInversion: (selection, doc, utils) =>
+			utils.getBlockAttributeRatio(selection, doc, 'align', 'justify')
 	}
 ];
