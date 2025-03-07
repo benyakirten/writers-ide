@@ -77,7 +77,7 @@
 			onClose={() => HorizontalBarState.remove(index, position)}
 			{index}
 		/>
-		<div>
+		<div class="items">
 			{#each items as item (item.id)}
 				<ItemRenderer
 					onremove={() => BarTransferHandler.remove(position, bar.id, item.id)}
@@ -113,5 +113,10 @@
 		position: relative;
 		overflow: hidden;
 		width: 100%;
+	}
+
+	.items {
+		margin-top: 4px;
+		display: flex;
 	}
 </style>

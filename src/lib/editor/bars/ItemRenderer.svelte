@@ -66,7 +66,6 @@
 
 <style>
 	.renderer {
-		margin: 20px 0;
 		&:last-child {
 			margin-bottom: 0;
 		}
@@ -103,6 +102,7 @@
 	}
 
 	.vertical {
+		margin: 20px 0;
 		height: calc(var(--size) * 33%);
 		width: 100%;
 	}
@@ -110,6 +110,5 @@
 	.component {
 		height: 100%;
 		border-top: 1px solid black;
-		border-bottom: 1px solid black;
 	}
 </style>

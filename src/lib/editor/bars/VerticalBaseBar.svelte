@@ -3,7 +3,7 @@
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte.js';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
 
-	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'floating';
+	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'horizontal';
 
 	function getBarPosition(): BarTransferLocation {
 		switch (selectValue) {
