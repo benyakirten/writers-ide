@@ -1,14 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	import IconButton from '$lib/components/IconButton.svelte';
 	import type { BarItemComponentProps } from '$lib/editor/state/bar-item-registry.svelte.js';
 	import type { EditorView } from 'prosemirror-view';
 	import type { Selection } from 'prosemirror-state';
 
 	import type { TextMarkPresence } from '../../view/selection.js';
-
-	import { blockMarks, textMarks } from './buttons.js';
 	import { blockMarkButtons, textMarkButtons } from './Snippets.svelte';
 
 	let activeCodeMarks = $state<TextMarkPresence>();
@@ -33,7 +30,6 @@
 <div class="menu">
 	<div class="grouping">
 		{@render textMarkButtons(
-			textMarks,
 			activeCodeMarks,
 			props.internationalization.translation,
 			editorView,
@@ -42,7 +38,6 @@
 	</div>
 	<div class="grouping">
 		{@render blockMarkButtons(
-			blockMarks,
 			editorView,
 			selection,
 			props.internationalization.translation,
