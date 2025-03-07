@@ -36,19 +36,17 @@
 	let {
 		Component,
 		size,
-		vertical = false,
 		title,
 		onremove
 	}: {
 		Component: BarItemData['Component'];
 		size: BarItemData['size'];
-		vertical?: boolean;
 		title: string;
 		onremove: () => void;
 	} = $props();
 </script>
 
-<div class="renderer" draggable style:--size={size} class:vertical>
+<div class="renderer" draggable style:--size={size}>
 	<div class="menu">
 		<p>{title}</p>
 		<IconButton onclick={onremove} label="Remove item">
@@ -66,13 +64,12 @@
 
 <style>
 	.renderer {
+		margin: 20px 0;
+		height: calc(var(--size) * 33%);
+		width: 100%;
+
 		&:last-child {
 			margin-bottom: 0;
-		}
-
-		&:not(.vertical) {
-			width: calc(var(--size) * 33%);
-			height: 100%;
 		}
 	}
 
@@ -99,12 +96,6 @@
 			text-wrap: nowrap;
 			white-space: nowrap;
 		}
-	}
-
-	.vertical {
-		margin: 20px 0;
-		height: calc(var(--size) * 33%);
-		width: 100%;
 	}
 
 	.component {

@@ -5,7 +5,7 @@
 	import FloaterBarTitle from './FloaterBarTitle.svelte';
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
-	import ItemRenderer from './ItemRenderer.svelte';
+	import VerticalItemRenderer from './VerticalItemRenderer.svelte';
 	import { BarTransferHandler } from '../state/bar-transfer-handler.js';
 
 	let { bar, items, index }: { bar: FloatingBar; items: BarItemData[]; index: number } = $props();
@@ -85,9 +85,8 @@
 		/>
 	</div>
 	<div class="items">
-		{#each items as item, i (item.id)}
-			<ItemRenderer
-				vertical
+		{#each items as item (item.id)}
+			<VerticalItemRenderer
 				{...item}
 				onremove={() => BarTransferHandler.remove('floating', bar.id, item.id)}
 			/>
