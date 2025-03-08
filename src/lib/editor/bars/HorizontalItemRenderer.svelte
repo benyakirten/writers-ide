@@ -1,7 +1,5 @@
 <script lang="ts">
 	import * as m from '$lib/paraglide/messages.js';
-	import { DotsSixVertical, X } from '@steeze-ui/phosphor-icons';
-	import { Icon } from '@steeze-ui/svelte-icon';
 
 	import type { BarItemComponentProps } from '../state/bar-item-registry.svelte.js';
 	import TabState from '../state/tab-state.svelte.js';
@@ -13,8 +11,8 @@
 	import FloaterBarState from '../state/floater-state.svelte.js';
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
-	import IconButton from '$lib/components/IconButton.svelte';
 	import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
+	import ItemRendererMenu from './ItemRendererMenu.svelte';
 
 	let itemProps: BarItemComponentProps = {
 		proseMirror: {
@@ -48,19 +46,7 @@
 </script>
 
 <div class="renderer" draggable style:--size={size}>
-	<div class="menu">
-		<p>{title}</p>
-		<div class="buttons">
-			<div style:cursor="grab" class="drag-icon">
-				<Icon src={DotsSixVertical} size="20px" />
-			</div>
-			<IconButton onclick={onremove} label="Remove item">
-				{#snippet icon()}
-					<Icon src={X} size="14px" />
-				{/snippet}
-			</IconButton>
-		</div>
-	</div>
+	<ItemRendererMenu {title} {onremove} />
 	<div class="component">
 		{#if Component}
 			<Component {...itemProps} />
@@ -82,43 +68,6 @@
 		&:last-child {
 			margin-bottom: 0;
 		}
-	}
-
-	.menu {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-
-		width: 80%;
-		padding: 4px 8px;
-		margin-left: 4px;
-
-		border: 1px solid black;
-		border-bottom: none;
-
-		border-top-left-radius: 4px;
-		border-top-right-radius: 4px;
-
-		p {
-			max-width: 80%;
-			text-overflow: ellipsis;
-			font-size: 12px;
-			overflow: hidden;
-			text-wrap: nowrap;
-			white-space: nowrap;
-		}
-	}
-
-	.buttons {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-	}
-
-	.drag-icon {
-		height: 100%;
-		display: flex;
-		align-items: center;
 	}
 
 	.component {
