@@ -50,11 +50,13 @@
 <div class="renderer" draggable style:--size={size}>
 	<div class="menu">
 		<p>{title}</p>
-		<IconButton onclick={onremove} label="Remove item">
-			{#snippet icon()}
-				<Icon src={X} size="14px" />
-			{/snippet}
-		</IconButton>
+		<div class="buttons">
+			<IconButton onclick={onremove} label="Remove item">
+				{#snippet icon()}
+					<Icon src={X} size="14px" />
+				{/snippet}
+			</IconButton>
+		</div>
 	</div>
 	<div class="component">
 		{#if Component}
