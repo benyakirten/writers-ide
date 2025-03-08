@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as m from '$lib/paraglide/messages.js';
-	import { X } from '@steeze-ui/phosphor-icons';
+	import { DotsSix, X } from '@steeze-ui/phosphor-icons';
 	import { Icon } from '@steeze-ui/svelte-icon';
 
 	import type { BarItemComponentProps } from '../state/bar-item-registry.svelte.js';
@@ -51,6 +51,9 @@
 	<div class="menu">
 		<p>{title}</p>
 		<div class="buttons">
+			<div style:cursor="grab" class="drag-icon">
+				<Icon src={DotsSix} size="18px" />
+			</div>
 			<IconButton onclick={onremove} label="Remove item">
 				{#snippet icon()}
 					<Icon src={X} size="14px" />
@@ -101,6 +104,18 @@
 			text-wrap: nowrap;
 			white-space: nowrap;
 		}
+	}
+
+	.buttons {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.drag-icon {
+		height: 100%;
+		display: flex;
+		align-items: center;
 	}
 
 	.component {

@@ -84,12 +84,6 @@
 		}
 	}
 
-	.drag-icon {
-		height: 100%;
-		display: flex;
-		align-items: center;
-	}
-
 	.menu {
 		display: flex;
 		justify-content: space-between;
@@ -119,6 +113,12 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
+	}
+
+	.drag-icon {
+		height: 100%;
+		display: flex;
+		align-items: center;
 	}
 
 	.component {

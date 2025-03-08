@@ -31,7 +31,7 @@ export class VerticalBarState {
 	} | null = $state(null);
 
 	constructor(
-		public readonly minSize = 100,
+		public readonly minSize = 200,
 		inlineStart: VerticalBar[] = [],
 		inlineEnd: VerticalBar[] = []
 	) {
