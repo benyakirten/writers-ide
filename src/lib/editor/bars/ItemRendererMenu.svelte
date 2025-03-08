@@ -6,14 +6,15 @@
 	let {
 		title,
 		onremove,
-		isVertical = false
-	}: { title: String; onremove: () => void; isVertical?: boolean } = $props();
+		isVertical = false,
+		isDragging = false
+	}: { title: String; onremove: () => void; isVertical?: boolean; isDragging?: boolean } = $props();
 </script>
 
 <div class="menu">
 	<p>{title}</p>
 	<div class="buttons">
-		<div style:cursor="grab" class="drag-icon">
+		<div style:cursor={isDragging ? 'grab' : 'grabbing'} class="drag-icon">
 			{#if isVertical}
 				<Icon src={DotsSix} size="18px" />
 			{:else}
