@@ -67,9 +67,12 @@
 
 <style>
 	.renderer {
-		margin: 20px 0;
-		height: calc(var(--size) * 33%);
-		width: 100%;
+		--mr: 9px;
+		margin-right: var(--mr);
+		width: calc(var(--size) * 33% - var(--mr));
+		height: 100%;
+
+		position: relative;
 
 		&:last-child {
 			margin-bottom: 0;

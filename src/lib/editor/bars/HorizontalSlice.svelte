@@ -76,6 +76,7 @@
 		top: 4px;
 		right: 4px;
 	}
+
 	.resize {
 		cursor: row-resize;
 		z-index: 1;
@@ -96,6 +97,7 @@
 	}
 
 	.items {
+		height: 100%;
 		margin-top: 4px;
 		display: flex;
 	}

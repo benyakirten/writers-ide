@@ -19,8 +19,8 @@ export type HorizontalBar = {
 
 export class HorizontalBarState {
 	constructor(
-		public readonly windowMinSize = 50,
-		public readonly editorMinSize = 30
+		public readonly windowMinSize = 100,
+		public readonly editorMinSize = 80
 	) {}
 
 	windowBlockStart = $state<HorizontalBar[]>([]);
