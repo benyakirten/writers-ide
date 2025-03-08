@@ -28,5 +28,7 @@
 	"link": "link",
 	"code": "code",
 	"number": "#{count}",
-	"unknown": "Unknown"
+	"unknown": "Unknown",
+	"menu_not_found": "Component not found.",
+	"unknown_menu_title": "Unknown component"
 }

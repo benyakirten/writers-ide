@@ -1,14 +1,14 @@
 import type { Component } from 'svelte';
 
+import * as m from '$lib/paraglide/messages.js';
 import Registry, {
 	type BarItemComponentProps,
 	type BarItemSection
 } from './bar-item-registry.svelte.js';
-import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
 
 export type BarItemData = {
 	id: string;
-	Component: Component<BarItemComponentProps>;
+	Component: Component<BarItemComponentProps> | null;
 	size: BarItemSection['size'];
 	title: string;
 };
@@ -28,9 +28,9 @@ export class BarItems {
 
 	items: BarItemData[] = $derived(
 		this.#ids.map((id) => {
-			let Component: BarItemData['Component'] = ErrorComponent;
+			let Component: BarItemData['Component'] = null;
 			let size: BarItemData['size'] = 1;
-			let title = 'Unknown Menu';
+			let title = m.unknown_menu_title();
 
 			const item = Registry.items.get(id);
 			if (item) {

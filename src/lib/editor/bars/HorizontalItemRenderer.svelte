@@ -14,6 +14,7 @@
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
 	import IconButton from '$lib/components/IconButton.svelte';
+	import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
 
 	let itemProps: BarItemComponentProps = {
 		proseMirror: {
@@ -58,6 +59,8 @@
 	<div class="component">
 		{#if Component}
 			<Component {...itemProps} />
+		{:else}
+			<ErrorComponent />
 		{/if}
 	</div>
 </div>

@@ -1,10 +1,8 @@
 <script lang="ts">
-	import type { BarItemComponentProps } from '$lib/editor/state/bar-item-registry.svelte.js';
-
-	let {}: BarItemComponentProps = $props();
+	import * as m from '$lib/paraglide/messages.js';
 </script>
 
-<div>Component could not be found.</div>
+<div>{m.menu_not_found()}</div>
 
 <style>
 	div {
