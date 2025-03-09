@@ -1,8 +1,5 @@
 <script lang="ts">
-	import * as m from '$lib/paraglide/messages.js';
-	import { DotsSix, X } from '@steeze-ui/phosphor-icons';
-	import { Icon } from '@steeze-ui/svelte-icon';
-
+	import LocaleManager from '../state/locale-manager.state.js';
 	import type { BarItemComponentProps } from '../state/bar-item-registry.svelte.js';
 	import TabState from '../state/tab-state.svelte.js';
 	import { schema } from '../prosemirror/view/schema.js';
@@ -13,7 +10,6 @@
 	import FloaterBarState from '../state/floater-state.svelte.js';
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
-	import IconButton from '$lib/components/IconButton.svelte';
 	import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
 	import ItemRendererMenu from './ItemRendererMenu.svelte';
 
@@ -30,9 +26,7 @@
 			floater: FloaterBarState
 		},
 		tabs: TabState,
-		internationalization: {
-			translation: m
-		}
+		locale: LocaleManager.locale
 	};
 
 	let {

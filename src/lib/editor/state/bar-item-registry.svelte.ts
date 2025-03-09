@@ -1,7 +1,6 @@
 import { type Component } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
-import type { Internationalizator } from '../types.js';
 import type { ActionUtilities } from '../prosemirror/view/actions.js';
 import type { SelectionUtilies } from '../prosemirror/view/selection.js';
 import type { ProseMirrorEventBus } from './event-bus.svelte.js';
@@ -25,15 +24,11 @@ type ProseMirrorUtils = {
 	schema: typeof schema;
 };
 
-type InternationlizationUtils = {
-	translation: Internationalizator;
-};
-
 export type BarItemComponentProps = {
 	proseMirror: ProseMirrorUtils;
 	bars: BarStates;
 	tabs: TabState;
-	internationalization: InternationlizationUtils;
+	locale: string;
 };
 
 export type BarItemSection = {

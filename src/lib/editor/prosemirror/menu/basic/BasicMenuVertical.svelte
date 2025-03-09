@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-
-	import type { BarItemComponentProps } from '$lib/editor/state/bar-item-registry.svelte.js';
+	import * as m from '$lib/paraglide/messages.js';
 	import type { EditorView } from 'prosemirror-view';
 	import type { Selection } from 'prosemirror-state';
 
+	import type { BarItemComponentProps } from '$lib/editor/state/bar-item-registry.svelte.js';
 	import type { TextMarkPresence } from '../../view/selection.js';
 	import { blockMarkButtons, textMarkButtons } from './Snippets.svelte';
 
@@ -31,12 +31,7 @@
 	<div class="section">
 		<p>Text Settings</p>
 		<div class="grouping">
-			{@render textMarkButtons(
-				activeCodeMarks,
-				props.internationalization.translation,
-				editorView,
-				props.proseMirror.actions
-			)}
+			{@render textMarkButtons(activeCodeMarks, m, editorView, props.proseMirror.actions)}
 		</div>
 	</div>
 	<div class="section">
@@ -45,7 +40,7 @@
 			{@render blockMarkButtons(
 				editorView,
 				selection,
-				props.internationalization.translation,
+				m,
 				props.proseMirror.actions,
 				props.proseMirror.selections
 			)}

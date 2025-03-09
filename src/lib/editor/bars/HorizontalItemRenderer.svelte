@@ -1,6 +1,4 @@
 <script lang="ts">
-	import * as m from '$lib/paraglide/messages.js';
-
 	import type { BarItemComponentProps } from '../state/bar-item-registry.svelte.js';
 	import TabState from '../state/tab-state.svelte.js';
 	import { schema } from '../prosemirror/view/schema.js';
@@ -13,6 +11,7 @@
 	import type { BarItemData } from '../state/bar-items.svelte.js';
 	import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
 	import ItemRendererMenu from './ItemRendererMenu.svelte';
+	import LocaleManager from '../state/locale-manager.state.js';
 
 	let itemProps: BarItemComponentProps = {
 		proseMirror: {
@@ -27,9 +26,7 @@
 			floater: FloaterBarState
 		},
 		tabs: TabState,
-		internationalization: {
-			translation: m
-		}
+		locale: LocaleManager.locale
 	};
 
 	let {
