@@ -1,5 +1,7 @@
 <script lang="ts">
-	import LocaleManager from '../state/locale-manager.state.js';
+	import { onMount } from 'svelte';
+
+	import LocaleManager from '../state/locale-manager.svelte.js';
 	import type { BarItemComponentProps } from '../state/bar-item-registry.svelte.js';
 	import TabState from '../state/tab-state.svelte.js';
 	import { schema } from '../prosemirror/view/schema.js';
@@ -13,7 +15,8 @@
 	import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
 	import ItemRendererMenu from './ItemRendererMenu.svelte';
 
-	let itemProps: BarItemComponentProps = {
+	let locale = $state(LocaleManager.data);
+	let itemProps: Omit<BarItemComponentProps, 'locale'> = {
 		proseMirror: {
 			actions: ActionUtilities,
 			selections: SelectionUtilies,
@@ -25,9 +28,16 @@
 			horizontal: HorizontalBarState,
 			floater: FloaterBarState
 		},
-		tabs: TabState,
-		locale: LocaleManager.locale
+		tabs: TabState
 	};
+
+	onMount(() => {
+		const unsub = LocaleManager.subscribe((value) => {
+			locale = value;
+		});
+
+		return () => unsub();
+	});
 
 	let {
 		Component,
@@ -46,7 +56,7 @@
 	<ItemRendererMenu {title} {onremove} isVertical />
 	<div class="component">
 		{#if Component}
-			<Component {...itemProps} />
+			<Component {...itemProps} {locale} />
 		{:else}
 			<ErrorComponent />
 		{/if}

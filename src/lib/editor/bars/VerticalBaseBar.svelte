@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { BarTransferHandler, type BarTransferLocation } from '../state/bar-transfer-handler.js';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte.js';
+	import LocaleManager from '../state/locale-manager.svelte.js';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
 
-	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'vertical';
+	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'floating';
 
 	function getBarPosition(): BarTransferLocation {
 		switch (selectValue) {
@@ -45,6 +46,11 @@
 	</select>
 	<button onclick={() => addNullToBar()}>Add null to bar</button>
 	<button onclick={() => addBasicMenuToBar()}>Add basic menu to bar</button>
+	<button
+		onclick={() =>
+			LocaleManager.data === 'en' ? (LocaleManager.data = 'fr') : (LocaleManager.data = 'en')}
+		>Change locale</button
+	>
 </div>
 
 <style>

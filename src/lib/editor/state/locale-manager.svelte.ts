@@ -1,10 +1,11 @@
 import { onSetLanguageTag, sourceLanguageTag } from '$lib/paraglide/runtime.js';
+import { RequiredObservable } from '$lib/utils/observable.js';
 
-export class LocaleKeeperState {
-	locale = $state<string>(sourceLanguageTag);
+export class LocaleKeeperState extends RequiredObservable<string> {
 	constructor() {
+		super(sourceLanguageTag);
 		onSetLanguageTag((tag) => {
-			this.locale = tag;
+			this.data = tag;
 		});
 	}
 }
