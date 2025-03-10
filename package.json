@@ -71,6 +71,7 @@
 	},
 	"dependencies": {
 		"@dnd-kit-svelte/core": "^0.0.8",
+		"@dnd-kit-svelte/utilities": "^0.0.8",
 		"@inlang/paraglide-sveltekit": "^0.11.1",
 		"@steeze-ui/phosphor-icons": "^2.1.1",
 		"@steeze-ui/svelte-icon": "^1.6.2",
