@@ -1,8 +1,9 @@
 <script lang="ts" generics="T extends Record<string, unknown>">
+	import type { Snippet } from 'svelte';
 	import { useDraggable } from '@dnd-kit-svelte/core';
 	import { CSS } from '@dnd-kit-svelte/utilities';
 
-	let { id, data }: { id: string; data: T } = $props();
+	let { id, data, children }: { id: string; data: T; children: Snippet } = $props();
 
 	const { transform, listeners, attributes, node } = useDraggable({ id, data });
 
@@ -11,4 +12,6 @@
 	);
 </script>
 
-<div {style} bind:this={node.current} {...listeners.current} {...attributes.current}>Drag me</div>
+<div {style} bind:this={node.current} {...listeners.current} {...attributes.current}>
+	{@render children()}
+</div>
