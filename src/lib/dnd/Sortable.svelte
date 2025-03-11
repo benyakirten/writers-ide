@@ -10,7 +10,9 @@
 	}: {
 		id: string;
 		data: T;
-		children: Snippet<[isDragging: boolean, isSorting: boolean, isOver: boolean]>;
+		children: Snippet<
+			[isDragging: boolean, isSorting: boolean, isOver: boolean, activatorNode: HTMLElement]
+		>;
 	} = $props();
 
 	const {
@@ -44,7 +46,7 @@
 	{...listeners.current}
 	{...attributes.current}
 >
-	{@render children(isDragging.current, isSorting.current, isOver.current)}
+	{@render children(isDragging.current, isSorting.current, isOver.current, activatorNode.current)}
 </div>
 
 <style>
