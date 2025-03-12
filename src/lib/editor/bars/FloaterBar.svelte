@@ -81,6 +81,8 @@
 		<BarMenu
 			onMinimize={() => FloaterBarState.update(index, 'minimized', true)}
 			onClose={() => FloaterBarState.remove(index)}
+			isDragging={false}
+			isVertical
 			{index}
 		/>
 	</div>

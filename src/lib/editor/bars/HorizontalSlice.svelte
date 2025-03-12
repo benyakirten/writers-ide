@@ -45,6 +45,8 @@
 	>
 		<div class="bar-title">
 			<BarMenu
+				isDragging={false}
+				isVertical={false}
 				onMinimize={() => HorizontalBarState.toggle(index, position)}
 				onClose={() => HorizontalBarState.remove(index, position)}
 				{index}

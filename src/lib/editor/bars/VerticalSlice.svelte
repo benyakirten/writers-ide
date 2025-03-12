@@ -43,6 +43,8 @@
 		<BarMenu
 			onMinimize={() => VerticalBarState.toggle(index, position)}
 			onClose={() => VerticalBarState.remove(index, position)}
+			isDragging={false}
+			isVertical
 			{index}
 		/>
 		<div>
