@@ -5,7 +5,7 @@
 	} from '../state/horizontal-bar-state.svelte.js';
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
-	import { BarTransferHandler } from '../state/bar-transfer-handler.js';
+	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
 	import HorizontalItemRenderer from './HorizontalItemRenderer.svelte';
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
 
@@ -53,7 +53,7 @@
 		<div class="items">
 			{#each items as item (item.id)}
 				<HorizontalItemRenderer
-					onremove={() => BarTransferHandler.remove(position, bar.id, item.id)}
+					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
 					{...item}
 				/>
 			{/each}

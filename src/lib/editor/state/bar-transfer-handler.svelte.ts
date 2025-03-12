@@ -19,8 +19,31 @@ export type BarTransfer = {
 	itemId: string;
 };
 
+export type MenuTransferInProgress = {
+	type: 'menu';
+	barId: string;
+	location: BarTransferLocation;
+	itemId: string;
+};
+
+export type BarTransferInProgress = {
+	type: 'bar';
+	id: string;
+	location: BarTransferLocation;
+};
+
 export class BarTransferHandler {
-	static #bars(location: BarTransferLocation): Bars {
+	transfer: MenuTransferInProgress | BarTransferInProgress | null = $state(null);
+
+	startTransfer(transfer: MenuTransferInProgress | BarTransferInProgress): void {
+		this.transfer = transfer;
+	}
+
+	endTransfer(): void {
+		this.transfer = null;
+	}
+
+	#bars(location: BarTransferLocation): Bars {
 		switch (location) {
 			case HorizontalBarPosition.EditorBlockEnd:
 				return HorizontalBarState.editorBlockEnd;
@@ -39,7 +62,7 @@ export class BarTransferHandler {
 		}
 	}
 
-	static #createEmptyBar(location: BarTransferLocation): string {
+	#createEmptyBar(location: BarTransferLocation): string {
 		switch (location) {
 			case HorizontalBarPosition.EditorBlockEnd:
 			case HorizontalBarPosition.EditorBlockStart:
@@ -54,13 +77,13 @@ export class BarTransferHandler {
 		}
 	}
 
-	static #items(location: BarTransferLocation, id: string | number): BarItems | undefined {
+	#items(location: BarTransferLocation, id: string | number): BarItems | undefined {
 		const bars = this.#bars(location);
 		const bar = typeof id === 'string' ? bars.find((bar) => bar.id === id) : bars.at(id);
 		return bar?.data;
 	}
 
-	static move(
+	move(
 		from: BarTransfer,
 		to: Omit<BarTransfer, 'itemId'>,
 		createToBarIfMissing: boolean = true
@@ -82,7 +105,7 @@ export class BarTransferHandler {
 		return true;
 	}
 
-	static barItems(
+	barItems(
 		from: BarTransfer,
 		to: Omit<BarTransfer, 'itemId'>,
 		createToBarIfMissing: boolean = true
@@ -117,7 +140,7 @@ export class BarTransferHandler {
 		return [fromItems, toItems];
 	}
 
-	static insert(to: BarTransfer): boolean {
+	insert(to: BarTransfer): boolean {
 		const toItems = this.#items(to.location, to.barId);
 		if (!toItems) {
 			return false;
@@ -126,7 +149,7 @@ export class BarTransferHandler {
 		return toItems.insert(to.itemId, to.slot);
 	}
 
-	static remove(location: BarTransferLocation, id: string | number, itemId: string): boolean {
+	remove(location: BarTransferLocation, id: string | number, itemId: string): boolean {
 		const items = this.#items(location, id);
 		if (!items) {
 			return false;
@@ -135,3 +158,6 @@ export class BarTransferHandler {
 		return items.remove(itemId);
 	}
 }
+
+const TransferHandler = new BarTransferHandler();
+export default TransferHandler;

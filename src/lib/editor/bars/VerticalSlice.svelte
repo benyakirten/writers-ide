@@ -4,7 +4,7 @@
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
 	import VerticalItemRenderer from './VerticalItemRenderer.svelte';
-	import { BarTransferHandler } from '../state/bar-transfer-handler.js';
+	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
 
 	let {
 		bar,
@@ -48,7 +48,7 @@
 		<div>
 			{#each items as item (item.id)}
 				<VerticalItemRenderer
-					onremove={() => BarTransferHandler.remove(position, bar.id, item.id)}
+					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
 					{...item}
 				/>
 			{/each}

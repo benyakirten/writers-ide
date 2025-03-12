@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { BarTransferHandler, type BarTransferLocation } from '../state/bar-transfer-handler.js';
+	import TransferHandler, {
+		type BarTransferLocation
+	} from '../state/bar-transfer-handler.svelte.js';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte.js';
 	import LocaleManager from '../state/locale-manager.svelte.js';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
@@ -19,7 +21,7 @@
 
 	function addNullToBar() {
 		const location = getBarPosition();
-		BarTransferHandler.insert({
+		TransferHandler.insert({
 			location,
 			slot: 0,
 			itemId: Math.random().toString(),
@@ -29,7 +31,7 @@
 
 	function addBasicMenuToBar() {
 		const location = getBarPosition();
-		BarTransferHandler.insert({
+		TransferHandler.insert({
 			location,
 			slot: 0,
 			itemId: 'basic-menu',
