@@ -52,7 +52,7 @@
 	} = $props();
 </script>
 
-<div class="renderer" draggable style:--size={size}>
+<div class="renderer" style:--size={size}>
 	<ItemRendererMenu {title} {onremove} />
 	<div class="component">
 		{#if Component}

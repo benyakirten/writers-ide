@@ -6,7 +6,8 @@
 		TouchSensor,
 		useSensor,
 		useSensors,
-		type DragEndEvent
+		type DragEndEvent,
+		type DragStartEvent
 	} from '@dnd-kit-svelte/core';
 
 	import VerticalBarState, { VerticalBarPosition } from './state/vertical-bar-state.svelte.js';
@@ -20,6 +21,7 @@
 	import FloaterBar from './bars/FloaterBar.svelte';
 	import VerticalBaseBar from './bars/VerticalBaseBar.svelte';
 	import HorizontalBaseBar from './bars/HorizontalBaseBar.svelte';
+	import { SortableContext } from '@dnd-kit-svelte/sortable';
 
 	function resize(e: MouseEvent) {
 		VerticalBarState.resize(e);
@@ -39,11 +41,17 @@
 	);
 
 	function handleDragEnd(e: DragEndEvent) {
+		console.log('DRAG END');
+		console.log(e);
+	}
+
+	function handleDragStart(e: DragStartEvent) {
+		console.log('DRAG START');
 		console.log(e);
 	}
 </script>
 
-<DndContext {sensors} onDragEnd={handleDragEnd}>
+<DndContext {sensors} onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
 	<div
 		bind:this={FloaterBarState.root}
 		class="overlay"
@@ -51,63 +59,77 @@
 		onmousemovecapture={(event) => resize(event)}
 	>
 		<HorizontalBaseBar />
-		{#each FloaterBarState.visibleBars as bar, index (bar.id)}
-			<FloaterBar {bar} {index} items={bar.data.items} />
-		{/each}
+		<SortableContext items={FloaterBarState.visibleBars.map((bar) => bar.id)}>
+			{#each FloaterBarState.visibleBars as bar, index (bar.id)}
+				<FloaterBar {bar} {index} items={bar.data.items} />
+			{/each}
+		</SortableContext>
 		{#each HorizontalBarState.windowBlockStart as bar, index (bar.id)}
-			<HorizontalSlice
-				{bar}
-				position={HorizontalBarPosition.WindowBlockStart}
-				{index}
-				items={bar.data.items}
-			/>
+			<SortableContext items={HorizontalBarState.windowBlockStart.map((bar) => bar.id)}>
+				<HorizontalSlice
+					{bar}
+					position={HorizontalBarPosition.WindowBlockStart}
+					{index}
+					items={bar.data.items}
+				/>
+			</SortableContext>
 		{/each}
 		<div class="main-container">
 			<VerticalBaseBar />
-			{#each VerticalBarState.inlineStart as bar, index (bar.id)}
-				<VerticalSlice
-					{bar}
-					position={VerticalBarPosition.InlineStart}
-					{index}
-					items={bar.data.items}
-				/>
-			{/each}
+			<SortableContext items={VerticalBarState.inlineStart.map((bar) => bar.id)}>
+				{#each VerticalBarState.inlineStart as bar, index (bar.id)}
+					<VerticalSlice
+						{bar}
+						position={VerticalBarPosition.InlineStart}
+						{index}
+						items={bar.data.items}
+					/>
+				{/each}
+			</SortableContext>
 			<main class="main">
-				{#each HorizontalBarState.editorBlockStart as bar, index (bar.id)}
-					<HorizontalSlice
-						{bar}
-						position={HorizontalBarPosition.EditorBlockStart}
-						{index}
-						items={bar.data.items}
-					/>
-				{/each}
+				<SortableContext items={HorizontalBarState.editorBlockStart.map((bar) => bar.id)}>
+					{#each HorizontalBarState.editorBlockStart as bar, index (bar.id)}
+						<HorizontalSlice
+							{bar}
+							position={HorizontalBarPosition.EditorBlockStart}
+							{index}
+							items={bar.data.items}
+						/>
+					{/each}
+				</SortableContext>
 				<MainView />
-				{#each HorizontalBarState.editorBlockEnd as bar, index (bar.id)}
-					<HorizontalSlice
+				<SortableContext items={HorizontalBarState.editorBlockEnd.map((bar) => bar.id)}>
+					{#each HorizontalBarState.editorBlockEnd as bar, index (bar.id)}
+						<HorizontalSlice
+							{bar}
+							position={HorizontalBarPosition.EditorBlockEnd}
+							{index}
+							items={bar.data.items}
+						/>
+					{/each}
+				</SortableContext>
+			</main>
+			<SortableContext items={VerticalBarState.inlineEnd.map((bar) => bar.id)}>
+				{#each VerticalBarState.inlineEnd as bar, index (bar.id)}
+					<VerticalSlice
 						{bar}
-						position={HorizontalBarPosition.EditorBlockEnd}
+						position={VerticalBarPosition.InlineEnd}
 						{index}
 						items={bar.data.items}
 					/>
 				{/each}
-			</main>
-			{#each VerticalBarState.inlineEnd as bar, index (bar.id)}
-				<VerticalSlice
+			</SortableContext>
+		</div>
+		<SortableContext items={HorizontalBarState.windowBlockEnd.map((bar) => bar.id)}>
+			{#each HorizontalBarState.windowBlockEnd as bar, index (bar.id)}
+				<HorizontalSlice
 					{bar}
-					position={VerticalBarPosition.InlineEnd}
+					position={HorizontalBarPosition.WindowBlockEnd}
 					{index}
 					items={bar.data.items}
 				/>
 			{/each}
-		</div>
-		{#each HorizontalBarState.windowBlockEnd as bar, index (bar.id)}
-			<HorizontalSlice
-				{bar}
-				position={HorizontalBarPosition.WindowBlockEnd}
-				{index}
-				items={bar.data.items}
-			/>
-		{/each}
+		</SortableContext>
 	</div>
 </DndContext>
 
