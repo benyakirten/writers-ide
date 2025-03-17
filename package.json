@@ -11,6 +11,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"tauri": "tauri",
+		"test": "false && pnpm test:unit:ci && pnpm test:e2e",
+		"test:e2e": "playwright test",
 		"test:unit:ci": "vitest --run",
 		"test:unit": "vitest",
 		"lint": "prettier --check . && eslint .",
