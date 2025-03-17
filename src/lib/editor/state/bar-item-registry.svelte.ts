@@ -9,7 +9,6 @@ import type { HorizontalBarState } from './horizontal-bar-state.svelte.js';
 import type { FloaterBarState } from './floater-state.svelte.js';
 import type { TabState } from './tab-state.svelte.js';
 import type { schema } from '../prosemirror/view/schema.js';
-import { MenuItem } from '../prosemirror/menu/basic/menu.js';
 
 type BarStates = {
 	vertical: VerticalBarState;
@@ -68,5 +67,4 @@ export class BarItemRegistry {
 }
 
 const Registry = new BarItemRegistry();
-Registry.register(MenuItem.item, MenuItem.id);
 export default Registry;

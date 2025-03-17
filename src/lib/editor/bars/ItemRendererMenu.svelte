@@ -8,7 +8,12 @@
 		onremove,
 		isVertical = false,
 		isDragging = false
-	}: { title: string; onremove: () => void; isVertical?: boolean; isDragging?: boolean } = $props();
+	}: {
+		title: string;
+		onremove: () => void;
+		isVertical?: boolean;
+		isDragging?: boolean;
+	} = $props();
 </script>
 
 <div class="menu">

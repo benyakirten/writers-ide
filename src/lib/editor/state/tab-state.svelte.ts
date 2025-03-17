@@ -17,6 +17,7 @@ export class TabState {
 	active = $derived.by(
 		() => this.windows.find((window) => window.id === this.#active)?.view ?? null
 	);
+
 	activate = (id: string | number): boolean => {
 		if (typeof id === 'number') {
 			if (id > this.windows.length) {
