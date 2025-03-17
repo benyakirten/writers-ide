@@ -13,3 +13,26 @@ export class Observable<Data> {
 		}
 	}
 }
+
+export class RequiredObservable<Data> extends Observable<Data> {
+	protected _data: Data;
+
+	constructor(data: Data) {
+		super();
+		this._data = data;
+	}
+
+	get data() {
+		return this._data;
+	}
+
+	set data(data: Data) {
+		this._data = data;
+		this.update(data);
+	}
+
+	subscribe(callback: (data: Data) => void | Promise<void>): () => void {
+		callback(this._data);
+		return super.subscribe(callback);
+	}
+}

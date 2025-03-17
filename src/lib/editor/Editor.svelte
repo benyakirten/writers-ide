@@ -1,15 +1,27 @@
 <script lang="ts">
-	import MainView from './MainView.svelte';
-	import HorizontalBarState from './state/horizontal-bar-state.svelte.js';
+	import {
+		DndContext,
+		KeyboardSensor,
+		MouseSensor,
+		TouchSensor,
+		useSensor,
+		useSensors,
+		type DragEndEvent,
+		type DragStartEvent
+	} from '@dnd-kit-svelte/core';
+
 	import VerticalBarState, { VerticalBarPosition } from './state/vertical-bar-state.svelte.js';
+	import HorizontalBarState from './state/horizontal-bar-state.svelte.js';
+	import { HorizontalBarPosition } from './state/horizontal-bar-state.svelte.js';
+	import FloaterBarState from './state/floater-state.svelte.js';
+
+	import MainView from './MainView.svelte';
 	import VerticalSlice from './bars/VerticalSlice.svelte';
 	import HorizontalSlice from './bars/HorizontalSlice.svelte';
-	import { HorizontalBarPosition } from './state/horizontal-bar-state.svelte.js';
-	import FloaterBar from './bars/floater/FloaterBar.svelte';
+	import FloaterBar from './bars/FloaterBar.svelte';
 	import VerticalBaseBar from './bars/VerticalBaseBar.svelte';
-	import FloaterState from './state/floater-state.svelte.js';
 	import HorizontalBaseBar from './bars/HorizontalBaseBar.svelte';
-	import TabState from './state/tab-state.svelte.js';
+	import { SortableContext } from '@dnd-kit-svelte/sortable';
 
 	function resize(e: MouseEvent) {
 		VerticalBarState.resize(e);
@@ -19,61 +31,107 @@
 	function endResize() {
 		VerticalBarState.endResize();
 		HorizontalBarState.endResize();
-		FloaterState.stopDragging();
+		FloaterBarState.stopDragging();
+	}
+
+	const sensors = useSensors(
+		useSensor(TouchSensor),
+		useSensor(KeyboardSensor),
+		useSensor(MouseSensor)
+	);
+
+	function handleDragEnd(e: DragEndEvent) {
+		console.log('DRAG END');
+		console.log(e);
+	}
+
+	function handleDragStart(e: DragStartEvent) {
+		console.log('DRAG START');
+		console.log(e);
 	}
 </script>
 
-<div
-	bind:this={FloaterState.root}
-	class="overlay"
-	onmouseupcapture={() => endResize()}
-	onmousemovecapture={(event) => resize(event)}
->
-	<HorizontalBaseBar />
-	{#each FloaterState.visibleBars as bar, index (bar.id)}
-		<FloaterBar {bar} {index}>
-			Floater Bar #{index + 1}
-		</FloaterBar>
-	{/each}
-	{#each HorizontalBarState.windowBlockStart as bar, index (bar.id)}
-		<HorizontalSlice {bar} position={HorizontalBarPosition.WindowBlockStart} {index}>
-			Window Block Start Bar #{index + 1}
-		</HorizontalSlice>
-	{/each}
-	<div class="main-container">
-		{#if false}
+<DndContext {sensors} onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
+	<div
+		bind:this={FloaterBarState.root}
+		class="overlay"
+		onmouseupcapture={() => endResize()}
+		onmousemovecapture={(event) => resize(event)}
+	>
+		<HorizontalBaseBar />
+		<SortableContext items={FloaterBarState.visibleBars.map((bar) => bar.id)}>
+			{#each FloaterBarState.visibleBars as bar, index (bar.id)}
+				<FloaterBar {bar} {index} items={bar.data.items} />
+			{/each}
+		</SortableContext>
+		{#each HorizontalBarState.windowBlockStart as bar, index (bar.id)}
+			<SortableContext items={HorizontalBarState.windowBlockStart.map((bar) => bar.id)}>
+				<HorizontalSlice
+					{bar}
+					position={HorizontalBarPosition.WindowBlockStart}
+					{index}
+					items={bar.data.items}
+				/>
+			</SortableContext>
+		{/each}
+		<div class="main-container">
 			<VerticalBaseBar />
-		{/if}
-		{#each VerticalBarState.inlineStart as bar, index (bar.id)}
-			<VerticalSlice {bar} position={VerticalBarPosition.InlineStart} {index}>
-				Inline Bar Start #{index + 1}
-			</VerticalSlice>
-		{/each}
-		<main class="main">
-			{#each HorizontalBarState.editorBlockStart as bar, index (bar.id)}
-				<HorizontalSlice {bar} position={HorizontalBarPosition.EditorBlockStart} {index}>
-					Editor Block Start Bar #{index + 1}
-				</HorizontalSlice>
+			<SortableContext items={VerticalBarState.inlineStart.map((bar) => bar.id)}>
+				{#each VerticalBarState.inlineStart as bar, index (bar.id)}
+					<VerticalSlice
+						{bar}
+						position={VerticalBarPosition.InlineStart}
+						{index}
+						items={bar.data.items}
+					/>
+				{/each}
+			</SortableContext>
+			<main class="main">
+				<SortableContext items={HorizontalBarState.editorBlockStart.map((bar) => bar.id)}>
+					{#each HorizontalBarState.editorBlockStart as bar, index (bar.id)}
+						<HorizontalSlice
+							{bar}
+							position={HorizontalBarPosition.EditorBlockStart}
+							{index}
+							items={bar.data.items}
+						/>
+					{/each}
+				</SortableContext>
+				<MainView />
+				<SortableContext items={HorizontalBarState.editorBlockEnd.map((bar) => bar.id)}>
+					{#each HorizontalBarState.editorBlockEnd as bar, index (bar.id)}
+						<HorizontalSlice
+							{bar}
+							position={HorizontalBarPosition.EditorBlockEnd}
+							{index}
+							items={bar.data.items}
+						/>
+					{/each}
+				</SortableContext>
+			</main>
+			<SortableContext items={VerticalBarState.inlineEnd.map((bar) => bar.id)}>
+				{#each VerticalBarState.inlineEnd as bar, index (bar.id)}
+					<VerticalSlice
+						{bar}
+						position={VerticalBarPosition.InlineEnd}
+						{index}
+						items={bar.data.items}
+					/>
+				{/each}
+			</SortableContext>
+		</div>
+		<SortableContext items={HorizontalBarState.windowBlockEnd.map((bar) => bar.id)}>
+			{#each HorizontalBarState.windowBlockEnd as bar, index (bar.id)}
+				<HorizontalSlice
+					{bar}
+					position={HorizontalBarPosition.WindowBlockEnd}
+					{index}
+					items={bar.data.items}
+				/>
 			{/each}
-			<MainView />
-			{#each HorizontalBarState.editorBlockEnd as bar, index (bar.id)}
-				<HorizontalSlice {bar} position={HorizontalBarPosition.EditorBlockEnd} {index}>
-					Editor Block End Bar #{index + 1}
-				</HorizontalSlice>
-			{/each}
-		</main>
-		{#each VerticalBarState.inlineEnd as bar, index (bar.id)}
-			<VerticalSlice {bar} position={VerticalBarPosition.InlineEnd} {index}>
-				Inline Bar End #{index + 1}
-			</VerticalSlice>
-		{/each}
+		</SortableContext>
 	</div>
-	{#each HorizontalBarState.windowBlockEnd as bar, index (bar.id)}
-		<HorizontalSlice {bar} position={HorizontalBarPosition.WindowBlockEnd} {index}>
-			Window Block End Bar #{index + 1}
-		</HorizontalSlice>
-	{/each}
-</div>
+</DndContext>
 
 <style>
 	.overlay {
@@ -82,6 +140,7 @@
 		display: flex;
 		flex-direction: column;
 		position: relative;
+		overflow: hidden;
 	}
 
 	.main-container {

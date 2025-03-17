@@ -1,24 +1,24 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
-	import { X, Minus } from '@steeze-ui/phosphor-icons';
-	import { Icon } from '@steeze-ui/svelte-icon';
-
 	import {
 		HorizontalBarPosition,
 		type HorizontalBar
 	} from '../state/horizontal-bar-state.svelte.js';
+	import BarMenu from './BarMenu.svelte';
+	import type { BarItemData } from '../state/bar-items.svelte.js';
+	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
+	import HorizontalItemRenderer from './HorizontalItemRenderer.svelte';
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
 
 	let {
 		bar,
 		position,
 		index,
-		children
+		items
 	}: {
 		bar: HorizontalBar;
 		position: HorizontalBarPosition;
 		index: number;
-		children: Snippet;
+		items: BarItemData[];
 	} = $props();
 
 	let shouldInvert = HorizontalBarState.shouldInvert(position);
@@ -43,22 +43,22 @@
 		style:height={`${height}px`}
 		style:overflow={height === 0 ? 'hidden' : 'auto'}
 	>
-		<div class="menu">
-			<button
-				aria-label={`Minimize bar #${index + 1}`}
-				onclick={() => HorizontalBarState.toggle(index, position)}
-			>
-				<Icon src={Minus} size="16px" />
-			</button>
-			<button
-				aria-label={`Close bar #${index + 1}`}
-				onclick={() => HorizontalBarState.remove(index, position)}
-			>
-				<Icon src={X} size="16px" />
-			</button>
+		<div class="bar-title">
+			<BarMenu
+				isDragging={false}
+				isVertical={false}
+				onMinimize={() => HorizontalBarState.toggle(index, position)}
+				onClose={() => HorizontalBarState.remove(index, position)}
+				{index}
+			/>
 		</div>
-		<div>
-			{@render children()}
+		<div class="items">
+			{#each items as item (item.id)}
+				<HorizontalItemRenderer
+					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
+					{...item}
+				/>
+			{/each}
 		</div>
 	</div>
 	{#if !shouldInvert}
@@ -68,9 +68,17 @@
 
 <style>
 	.horizontal-container {
+		position: relative;
 		display: grid;
 		width: 100%;
+		overflow: hidden;
 	}
+	.bar-title {
+		position: absolute;
+		top: 4px;
+		right: 4px;
+	}
+
 	.resize {
 		cursor: row-resize;
 		z-index: 1;
@@ -82,16 +90,17 @@
 		background-color: #bbb;
 	}
 
-	.menu {
-		display: flex;
-		justify-content: flex-end;
-	}
-
 	.horizontal-slice {
 		background-color: #f0f0f0;
 		border: 1px solid black;
 		position: relative;
 		overflow: hidden;
 		width: 100%;
+	}
+
+	.items {
+		height: 100%;
+		margin-top: 4px;
+		display: flex;
 	}
 </style>

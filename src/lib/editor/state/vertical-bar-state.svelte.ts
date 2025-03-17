@@ -1,12 +1,13 @@
 import * as m from '$lib/paraglide/messages.js';
 
 import { capitalize } from '$lib/utils/strings.js';
+import { BarItems } from './bar-items.svelte.js';
 
 export type VerticalBar = {
 	width: number;
 	visible: boolean;
 	id: string;
-	data?: null;
+	data: BarItems;
 };
 
 export enum HorizontalTextDirection {
@@ -15,8 +16,8 @@ export enum HorizontalTextDirection {
 }
 
 export enum VerticalBarPosition {
-	InlineStart = 'START',
-	InlineEnd = 'END'
+	InlineStart = 'INLINE_START',
+	InlineEnd = 'INLINE_END'
 }
 
 export class VerticalBarState {
@@ -30,7 +31,7 @@ export class VerticalBarState {
 	} | null = $state(null);
 
 	constructor(
-		public readonly minSize = 100,
+		public readonly minSize = 200,
 		inlineStart: VerticalBar[] = [],
 		inlineEnd: VerticalBar[] = []
 	) {
@@ -43,8 +44,8 @@ export class VerticalBarState {
 			width = this.minSize,
 			id = crypto.randomUUID(),
 			visible = true,
-			data = null
-		}: Partial<VerticalBar>,
+			data
+		}: Partial<Omit<VerticalBar, 'data'>> & { data?: string[] },
 		position: VerticalBarPosition
 	): VerticalBar {
 		const bars = this.bars(position);
@@ -53,7 +54,9 @@ export class VerticalBarState {
 			return existingBar;
 		}
 
-		const bar = { width, id, visible, data };
+		const barData = new BarItems(true, data);
+		const bar = { width, id, visible, data: barData };
+
 		bars.push(bar);
 		return bar;
 	}

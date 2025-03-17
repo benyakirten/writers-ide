@@ -19,6 +19,7 @@ export interface SvelteNodeViewProps<A extends Attrs> {
 	innerDecorations: DecorationSource;
 }
 
+// TODO: https://github.com/benyakirten/svelte-multimodal-editor/issues/18
 export class SvelteNodeView<A extends Attrs> implements NodeView {
 	component?: typeof SvelteComponent<SvelteNodeViewProps<A>>;
 	dom: Node = document.createElement('div');

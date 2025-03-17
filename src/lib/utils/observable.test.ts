@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterAll, beforeAll } from 'vitest';
 
 import { Observable } from './observable.js';
+import { RequiredObservable } from './observable.js';
 
 describe('Observable', () => {
 	beforeAll(() => {
@@ -69,5 +70,66 @@ describe('Observable', () => {
 
 		observable.update(100);
 		expect(mock).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('RequiredObservable', () => {
+	it('should call subscribers as soon as they are registered with the current data', () => {
+		const initialData = 10;
+		const observable = new RequiredObservable<number>(initialData);
+		const callback = vi.fn();
+
+		const unsubscribe = observable.subscribe(callback);
+
+		expect(callback).toHaveBeenCalledOnce();
+		expect(callback).toHaveBeenCalledWith(initialData);
+		unsubscribe();
+	});
+
+	it('should update data and notify subscribers when the data is changed', () => {
+		const initialData = 10;
+		const observable = new RequiredObservable<number>(initialData);
+		const callback = vi.fn();
+
+		const unsubscribe = observable.subscribe(callback);
+		observable.data = 20;
+
+		expect(callback).toHaveBeenCalledWith(20);
+		unsubscribe();
+
+		observable.data = 30;
+		expect(callback).toHaveBeenCalledTimes(2);
+	});
+
+	it("should only call the new subscriber's callback with the current data when they subscribe", () => {
+		const initialData = 10;
+		const observable = new RequiredObservable<number>(initialData);
+		const callback1 = vi.fn();
+
+		const unsubscribe = observable.subscribe(callback1);
+		expect(callback1).toHaveBeenCalledOnce();
+
+		const callback2 = vi.fn();
+		const unsubscribe2 = observable.subscribe(callback2);
+		expect(callback1).toHaveBeenCalledOnce();
+		expect(callback2).toHaveBeenCalledOnce();
+
+		unsubscribe();
+		unsubscribe2();
+	});
+
+	it("should get the current value's data without calling subscribers if the current value is accessed", () => {
+		const initialData = 10;
+		const observable = new RequiredObservable<number>(initialData);
+		const callback = vi.fn();
+
+		const unsubscribe = observable.subscribe(callback);
+		expect(callback).toHaveBeenCalledTimes(1);
+
+		const data = observable.data;
+		expect(data).toBe(initialData);
+		expect(callback).toHaveBeenCalledTimes(1);
+
+		unsubscribe();
 	});
 });

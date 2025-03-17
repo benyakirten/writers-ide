@@ -1,25 +1,26 @@
 import * as m from '$lib/paraglide/messages.js';
 
 import { capitalize } from '$lib/utils/strings.js';
+import { BarItems } from './bar-items.svelte.js';
 
 export enum HorizontalBarPosition {
-	WindowBlockStart = 'WINDOW_START',
-	WindowBlockEnd = 'WINDOW_END',
-	EditorBlockStart = 'EDITOR_START',
-	EditorBlockEnd = 'EDITOR_END'
+	WindowBlockStart = 'WINDOW_BLOCK_START',
+	WindowBlockEnd = 'WINDOW_BLOCK_END',
+	EditorBlockStart = 'EDITOR_BLOCK_START',
+	EditorBlockEnd = 'EDITOR_BLOCK_END'
 }
 
 export type HorizontalBar = {
 	height: number;
 	visible: boolean;
 	id: string;
-	data?: null;
+	data: BarItems;
 };
 
 export class HorizontalBarState {
 	constructor(
-		public readonly windowMinSize = 50,
-		public readonly editorMinSize = 30
+		public readonly windowMinSize = 100,
+		public readonly editorMinSize = 100
 	) {}
 
 	windowBlockStart = $state<HorizontalBar[]>([]);
@@ -35,7 +36,12 @@ export class HorizontalBarState {
 	} | null = $state(null);
 
 	add(
-		{ height, id = crypto.randomUUID(), visible = true, data = null }: Partial<HorizontalBar>,
+		{
+			height,
+			id = crypto.randomUUID(),
+			visible = true,
+			data
+		}: Partial<Omit<HorizontalBar, 'data'>> & { data?: string[] },
 		position: HorizontalBarPosition
 	): HorizontalBar {
 		const bars = this.bars(position);
@@ -45,7 +51,10 @@ export class HorizontalBarState {
 		}
 
 		height = height ?? this.minSize(position);
-		const bar = { height, id, visible, data };
+
+		const barData = new BarItems(false, data);
+		const bar = { height, id, visible, data: barData };
+
 		bars.push(bar);
 		return bar;
 	}

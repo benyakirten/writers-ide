@@ -3,9 +3,7 @@ import { EditorState, TextSelection } from 'prosemirror-state';
 import { Schema, Node } from 'prosemirror-model';
 import { EditorView } from 'prosemirror-view';
 
-import { findTextMarks, getBlockAttributeRatio } from './selection.js';
-import { doesSelectionHaveTextMark } from './selection.js';
-import { getIndentRatio } from './selection.js';
+import { SelectionUtilies } from './selection.js';
 import { INDENT_MAX } from './constants.js';
 import { schema as realSchema } from './schema.js';
 
@@ -53,7 +51,7 @@ describe('findTextMarks', () => {
 			schema
 		);
 
-		const got = findTextMarks(view.state.selection, view.state.doc);
+		const got = SelectionUtilies.findTextMarks(view.state.selection, view.state.doc);
 
 		expect(got.size).toBe(2);
 		expect(got.get('bold')).toBe(10 / 21);
@@ -71,7 +69,7 @@ describe('findTextMarks', () => {
 			],
 			schema
 		);
-		const got = findTextMarks(view.state.selection, view.state.doc);
+		const got = SelectionUtilies.findTextMarks(view.state.selection, view.state.doc);
 
 		expect(got.size).toBe(2);
 		expect(got.get('bold')).toBe(10 / 31);
@@ -84,7 +82,7 @@ describe('findTextMarks', () => {
 			schema
 		);
 
-		const got = findTextMarks(view.state.selection, view.state.doc);
+		const got = SelectionUtilies.findTextMarks(view.state.selection, view.state.doc);
 		expect(got.size).toBe(1);
 		expect(got.get('bold')).toBe(1);
 	});
@@ -98,7 +96,7 @@ describe('findTextMarks', () => {
 			schema
 		);
 
-		const got = findTextMarks(view.state.selection, view.state.doc);
+		const got = SelectionUtilies.findTextMarks(view.state.selection, view.state.doc);
 		expect(got.size).toBe(1);
 		expect(got.get('bold')).toEqual(1);
 	});
@@ -114,7 +112,7 @@ describe('findTextMarks', () => {
 			schema
 		);
 
-		const got = findTextMarks(view.state.selection, view.state.doc);
+		const got = SelectionUtilies.findTextMarks(view.state.selection, view.state.doc);
 		expect(got.size).toBe(2);
 		expect(got.get('bold')).toEqual(1);
 		expect(got.get('italic')).toEqual(11 / 21);
@@ -130,7 +128,7 @@ describe('findTextMarks', () => {
 			schema,
 			{ start: 3 }
 		);
-		const got = findTextMarks(view.state.selection, view.state.doc);
+		const got = SelectionUtilies.findTextMarks(view.state.selection, view.state.doc);
 		expect(got.size).toBe(2);
 		expect(got.get('bold')).toBe(8 / 29);
 		expect(got.get('italic')).toBe(11 / 29);
@@ -151,7 +149,7 @@ describe('findTextMarks', () => {
 			}
 		);
 
-		const got = findTextMarks(view.state.selection, view.state.doc);
+		const got = SelectionUtilies.findTextMarks(view.state.selection, view.state.doc);
 		expect(got.size).toBe(0);
 	});
 });
@@ -168,7 +166,11 @@ describe('doesSelectionHaveTextMark', () => {
 			schema
 		);
 
-		const result = doesSelectionHaveTextMark(view.state.selection, view.state.doc, 'BoLD');
+		const result = SelectionUtilies.doesSelectionHaveTextMark(
+			view.state.selection,
+			view.state.doc,
+			'BoLD'
+		);
 		expect(result).toBe(true);
 	});
 
@@ -178,7 +180,11 @@ describe('doesSelectionHaveTextMark', () => {
 			schema
 		);
 
-		const result = doesSelectionHaveTextMark(view.state.selection, view.state.doc, 'BOLD');
+		const result = SelectionUtilies.doesSelectionHaveTextMark(
+			view.state.selection,
+			view.state.doc,
+			'BOLD'
+		);
 		expect(result).toBe(false);
 	});
 
@@ -193,7 +199,11 @@ describe('doesSelectionHaveTextMark', () => {
 			schema
 		);
 
-		const result = doesSelectionHaveTextMark(view.state.selection, view.state.doc, 'bolD');
+		const result = SelectionUtilies.doesSelectionHaveTextMark(
+			view.state.selection,
+			view.state.doc,
+			'bolD'
+		);
 		expect(result).toBe(false);
 	});
 
@@ -204,7 +214,11 @@ describe('doesSelectionHaveTextMark', () => {
 			{ start: 1, end: 4 }
 		);
 
-		const result = doesSelectionHaveTextMark(view.state.selection, view.state.doc, 'bold');
+		const result = SelectionUtilies.doesSelectionHaveTextMark(
+			view.state.selection,
+			view.state.doc,
+			'bold'
+		);
 		expect(result).toBe(true);
 	});
 
@@ -215,7 +229,11 @@ describe('doesSelectionHaveTextMark', () => {
 			{ start: 0, end: 0 }
 		);
 
-		const result = doesSelectionHaveTextMark(view.state.selection, view.state.doc, 'beLD');
+		const result = SelectionUtilies.doesSelectionHaveTextMark(
+			view.state.selection,
+			view.state.doc,
+			'beLD'
+		);
 		expect(result).toBe(false);
 	});
 });
@@ -226,7 +244,7 @@ describe('getIndentRatio', () => {
 			[realSchema.node('codeBlock', null, [realSchema.text('First paragraph')])],
 			realSchema
 		);
-		const result = getIndentRatio(view.state.selection, view.state.doc);
+		const result = SelectionUtilies.getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBeNull();
 	});
 
@@ -238,7 +256,7 @@ describe('getIndentRatio', () => {
 			],
 			realSchema
 		);
-		const result = getIndentRatio(view.state.selection, view.state.doc);
+		const result = SelectionUtilies.getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe(0);
 	});
 
@@ -250,7 +268,7 @@ describe('getIndentRatio', () => {
 			],
 			realSchema
 		);
-		const result = getIndentRatio(view.state.selection, view.state.doc);
+		const result = SelectionUtilies.getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe((2 + 1) / (INDENT_MAX * 2));
 	});
 
@@ -263,7 +281,7 @@ describe('getIndentRatio', () => {
 			],
 			realSchema
 		);
-		const result = getIndentRatio(view.state.selection, view.state.doc);
+		const result = SelectionUtilies.getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe((2 + 1) / (INDENT_MAX * 3));
 	});
 
@@ -277,7 +295,7 @@ describe('getIndentRatio', () => {
 			realSchema,
 			{ start: 0, end: 2 }
 		);
-		const result = getIndentRatio(view.state.selection, view.state.doc);
+		const result = SelectionUtilies.getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe(2 / INDENT_MAX);
 	});
 });
@@ -288,7 +306,12 @@ describe('getBlockAttributeRatio', () => {
 			[realSchema.node('codeBlock', null, [realSchema.text('Code block text')])],
 			realSchema
 		);
-		const result = getBlockAttributeRatio(view.state.selection, view.state.doc, 'align', 'center');
+		const result = SelectionUtilies.getBlockAttributeRatio(
+			view.state.selection,
+			view.state.doc,
+			'align',
+			'center'
+		);
 		expect(result).toBe(0);
 	});
 
@@ -300,7 +323,12 @@ describe('getBlockAttributeRatio', () => {
 			],
 			realSchema
 		);
-		const result = getBlockAttributeRatio(view.state.selection, view.state.doc, 'align', 'center');
+		const result = SelectionUtilies.getBlockAttributeRatio(
+			view.state.selection,
+			view.state.doc,
+			'align',
+			'center'
+		);
 		expect(result).toBe(0);
 	});
 
@@ -313,7 +341,12 @@ describe('getBlockAttributeRatio', () => {
 			],
 			realSchema
 		);
-		const result = getBlockAttributeRatio(view.state.selection, view.state.doc, 'align', 'center');
+		const result = SelectionUtilies.getBlockAttributeRatio(
+			view.state.selection,
+			view.state.doc,
+			'align',
+			'center'
+		);
 		expect(result).toBe(2 / 3);
 	});
 
@@ -326,7 +359,12 @@ describe('getBlockAttributeRatio', () => {
 			],
 			realSchema
 		);
-		const result = getBlockAttributeRatio(view.state.selection, view.state.doc, 'align', 'center');
+		const result = SelectionUtilies.getBlockAttributeRatio(
+			view.state.selection,
+			view.state.doc,
+			'align',
+			'center'
+		);
 		expect(result).toBe(2 / 3);
 	});
 
@@ -340,7 +378,12 @@ describe('getBlockAttributeRatio', () => {
 			realSchema,
 			{ start: 0, end: 2 }
 		);
-		const result = getBlockAttributeRatio(view.state.selection, view.state.doc, 'align', 'center');
+		const result = SelectionUtilies.getBlockAttributeRatio(
+			view.state.selection,
+			view.state.doc,
+			'align',
+			'center'
+		);
 		expect(result).toBe(1);
 	});
 
@@ -353,7 +396,7 @@ describe('getBlockAttributeRatio', () => {
 			],
 			realSchema
 		);
-		const result = getBlockAttributeRatio(
+		const result = SelectionUtilies.getBlockAttributeRatio(
 			view.state.selection,
 			view.state.doc,
 			'align',

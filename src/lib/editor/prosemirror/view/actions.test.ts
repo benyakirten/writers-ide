@@ -4,10 +4,8 @@ import { EditorView } from 'prosemirror-view';
 import type { Schema, Node } from 'prosemirror-model';
 
 import { schema } from './schema.js';
-import { toggleTextMark } from './actions.js';
-import { dent } from './actions.js';
+import { ActionUtilities } from './actions.js';
 import { INDENT_MIN, INDENT_MAX } from './constants.js';
-import { setTextAlignment } from './actions.js';
 
 function createEditorView(
 	nodes: Node[],
@@ -35,7 +33,7 @@ describe('toggleTextMark', () => {
 			schema
 		);
 
-		const got = toggleTextMark('bold', view.state);
+		const got = ActionUtilities.toggleTextMark('bold', view.state);
 		expect(got).toBe(false);
 
 		const text1 = view.state.doc.content.content[0].content.content[0];
@@ -60,7 +58,7 @@ describe('toggleTextMark', () => {
 			}
 		);
 
-		const got = toggleTextMark('bold', view.state, view.dispatch, view);
+		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
 		expect(got).toBe(false);
 
 		const text1 = view.state.doc.content.content[0].content.content[0];
@@ -83,7 +81,7 @@ describe('toggleTextMark', () => {
 			schema
 		);
 
-		const got = toggleTextMark('bold', view.state, view.dispatch, view);
+		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
 		expect(got).toBe(true);
 
 		const text1 = view.state.doc.content.content[0].content.content[0];
@@ -103,7 +101,7 @@ describe('toggleTextMark', () => {
 			schema
 		);
 
-		const got = toggleTextMark('bold', view.state, view.dispatch, view);
+		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
 		expect(got).toBe(true);
 
 		const text1 = view.state.doc.content.content[0].content.content[0];
@@ -125,7 +123,7 @@ describe('toggleTextMark', () => {
 			schema
 		);
 
-		const got = toggleTextMark('bold', view.state, view.dispatch, view);
+		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
 		expect(got).toBe(true);
 
 		const text1 = view.state.doc.content.content[0].content.content[0];
@@ -147,7 +145,7 @@ describe('toggleTextMark', () => {
 			schema
 		);
 
-		const got = toggleTextMark('bold', view.state, view.dispatch, view, 'italic');
+		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view, 'italic');
 		expect(got).toBe(true);
 
 		const text1 = view.state.doc.content.content[0].content.content[0];
@@ -170,7 +168,7 @@ describe('toggleTextMark', () => {
 			schema
 		);
 
-		const got = toggleTextMark('bold', view.state, view.dispatch, view, 'italic');
+		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view, 'italic');
 		expect(got).toBe(true);
 
 		const text1 = view.state.doc.content.content[0].content.content[0];
@@ -192,7 +190,7 @@ describe('dent', () => {
 			schema
 		);
 
-		const got = dent('indent', view.state);
+		const got = ActionUtilities.dent('indent', view.state);
 		expect(got).toBe(false);
 
 		const paragraph1 = view.state.doc.content.content[0];
@@ -211,7 +209,7 @@ describe('dent', () => {
 			schema
 		);
 
-		const got = dent('indent', view.state, view.dispatch);
+		const got = ActionUtilities.dent('indent', view.state, view.dispatch);
 		expect(got).toBe(true);
 
 		const paragraph1 = view.state.doc.content.content[0];
@@ -230,7 +228,7 @@ describe('dent', () => {
 			schema
 		);
 
-		const got = dent('dedent', view.state, view.dispatch);
+		const got = ActionUtilities.dent('dedent', view.state, view.dispatch);
 		expect(got).toBe(true);
 
 		const paragraph1 = view.state.doc.content.content[0];
@@ -249,7 +247,7 @@ describe('dent', () => {
 			schema
 		);
 
-		const got = dent('dedent', view.state, view.dispatch);
+		const got = ActionUtilities.dent('dedent', view.state, view.dispatch);
 		expect(got).toBe(true);
 
 		const paragraph1 = view.state.doc.content.content[0];
@@ -268,7 +266,7 @@ describe('dent', () => {
 			schema
 		);
 
-		const got = dent('indent', view.state, view.dispatch);
+		const got = ActionUtilities.dent('indent', view.state, view.dispatch);
 		expect(got).toBe(true);
 
 		const paragraph1 = view.state.doc.content.content[0];
@@ -289,7 +287,7 @@ describe('setTextAlignment', () => {
 			schema
 		);
 
-		const got = setTextAlignment('center', view.state);
+		const got = ActionUtilities.setTextAlignment('center', view.state);
 		expect(got).toBe(false);
 
 		const paragraph1 = view.state.doc.content.content[0];
@@ -308,7 +306,7 @@ describe('setTextAlignment', () => {
 			schema
 		);
 
-		const got = setTextAlignment('center', view.state, view.dispatch);
+		const got = ActionUtilities.setTextAlignment('center', view.state, view.dispatch);
 		expect(got).toBe(true);
 
 		const paragraph1 = view.state.doc.content.content[0];
@@ -331,7 +329,7 @@ describe('setTextAlignment', () => {
 			}
 		);
 
-		const got = setTextAlignment('center', view.state, view.dispatch);
+		const got = ActionUtilities.setTextAlignment('center', view.state, view.dispatch);
 		expect(got).toBe(true);
 
 		const paragraph = view.state.doc.content.content[1];

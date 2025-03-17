@@ -1,21 +1,21 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
-	import { X, Minus } from '@steeze-ui/phosphor-icons';
-	import { Icon } from '@steeze-ui/svelte-icon';
-
-	import { VerticalBarPosition, type VerticalBar } from '../state/vertical-bar-state.svelte.js';
 	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
+	import { VerticalBarPosition, type VerticalBar } from '../state/vertical-bar-state.svelte.js';
+	import BarMenu from './BarMenu.svelte';
+	import type { BarItemData } from '../state/bar-items.svelte.js';
+	import VerticalItemRenderer from './VerticalItemRenderer.svelte';
+	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
 
 	let {
 		bar,
 		position,
 		index,
-		children
+		items
 	}: {
 		bar: VerticalBar;
 		position: VerticalBarPosition;
 		index: number;
-		children: Snippet;
+		items: BarItemData[];
 	} = $props();
 
 	let shouldInvert = VerticalBarState.shouldInvert(position);
@@ -40,22 +40,20 @@
 		style:width={`${width}px`}
 		style:overflow={width === 0 ? 'hidden' : 'auto'}
 	>
-		<div class="menu">
-			<button
-				aria-label={`Minimize bar #${index + 1}`}
-				onclick={() => VerticalBarState.toggle(index, position)}
-			>
-				<Icon src={Minus} size="16px" />
-			</button>
-			<button
-				aria-label={`Close bar #${index + 1}`}
-				onclick={() => VerticalBarState.remove(index, position)}
-			>
-				<Icon src={X} size="16px" />
-			</button>
-		</div>
+		<BarMenu
+			onMinimize={() => VerticalBarState.toggle(index, position)}
+			onClose={() => VerticalBarState.remove(index, position)}
+			isDragging={false}
+			isVertical
+			{index}
+		/>
 		<div>
-			{@render children()}
+			{#each items as item (item.id)}
+				<VerticalItemRenderer
+					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
+					{...item}
+				/>
+			{/each}
 		</div>
 	</div>
 	{#if !shouldInvert}
@@ -76,11 +74,6 @@
 		outline: none;
 		border: none;
 		background-color: #bbb;
-	}
-
-	.menu {
-		display: flex;
-		justify-content: flex-end;
 	}
 
 	.vertical-slice {
