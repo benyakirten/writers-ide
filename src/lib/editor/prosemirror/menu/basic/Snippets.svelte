@@ -1,14 +1,8 @@
 <script lang="ts" module>
 	import { EditorView } from 'prosemirror-view';
 	import type { Selection } from 'prosemirror-state';
+	import type { Node } from 'prosemirror-model';
 	import { Icon } from '@steeze-ui/svelte-icon';
-
-	import IconButton from '$lib/components/IconButton.svelte';
-	import { type Internationalizator } from '$lib/editor/types.js';
-	import { type SelectionUtilies, type TextMarkPresence } from '../../view/selection.js';
-	import { type ActionUtilities } from '../../view/actions.js';
-	import { capitalize } from '$lib/utils/strings.js';
-
 	import { type IconSource } from '@steeze-ui/svelte-icon';
 	import {
 		TextB,
@@ -24,7 +18,12 @@
 		TextAlignRight,
 		TextAlignJustify
 	} from '@steeze-ui/phosphor-icons';
-	import type { Node } from 'prosemirror-model';
+
+	import IconButton from '$lib/components/IconButton.svelte';
+	import { type Internationalizator } from '$lib/editor/types.js';
+	import { type SelectionUtilies, type TextMarkPresence } from '../../view/selection.js';
+	import { type ActionUtilities } from '../../view/actions.js';
+	import { capitalize } from '$lib/utils/strings.js';
 
 	import type { UseableMarkName } from '$lib/editor/prosemirror/view/actions.js';
 	import { TextOverline } from '$lib/icons.js';

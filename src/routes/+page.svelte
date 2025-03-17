@@ -6,17 +6,3 @@
 </script>
 
 <Editor />
-
-<style>
-	:global(body) {
-		margin: 0;
-	}
-
-	:global(*) {
-		margin: 0;
-	}
-
-	:global(button) {
-		appearance: none;
-	}
-</style>
