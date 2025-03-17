@@ -1,4 +1,4 @@
-<script lang="ts" generics="T extends Record<string, unknown>">
+<script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { useSortable } from '@dnd-kit-svelte/sortable';
 	import { CSS, styleObjectToString } from '@dnd-kit-svelte/utilities';
@@ -9,7 +9,7 @@
 		children
 	}: {
 		id: string;
-		data: T;
+		data: Record<string, unknown>;
 		children: Snippet<
 			[isDragging: boolean, isSorting: boolean, isOver: boolean, activatorNode: HTMLElement]
 		>;
