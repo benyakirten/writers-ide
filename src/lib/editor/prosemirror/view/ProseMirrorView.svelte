@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { EditorState, Plugin, Transaction } from 'prosemirror-state';
+	import { EditorState, Plugin, type Transaction } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import { keymap } from 'prosemirror-keymap';
 	import { undo, redo, history } from 'prosemirror-history';

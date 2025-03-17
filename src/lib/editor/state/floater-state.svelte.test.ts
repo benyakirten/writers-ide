@@ -82,7 +82,10 @@ describe('FloaterBarState', () => {
 	describe('findNextOpenPosition', () => {
 		it("should return the default position if there isn't a root element", () => {
 			const got = floaterState.findNextOpenPosition();
-			expect(got).toEqual({ top: floaterState.DEFAULT_TOP_PX, left: floaterState.DEFAULT_LEFT_PX });
+			expect(got).toEqual({
+				top: floaterState.DEFAULT_TOP_PX,
+				left: floaterState.DEFAULT_LEFT_PX
+			});
 		});
 
 		it("should return the default's position multiplied by the default offset as a percent if the from parameter is not defined", () => {
@@ -211,7 +214,10 @@ describe('FloaterBarState', () => {
 
 		it('should provide default values if there is no root element', () => {
 			const got = floaterState.determineStartingMeasurements();
-			expect(got).toEqual({ width: floaterState.MIN_WIDTH_PX, height: floaterState.MIN_HEIGHT_PX });
+			expect(got).toEqual({
+				width: floaterState.MIN_WIDTH_PX,
+				height: floaterState.MIN_HEIGHT_PX
+			});
 		});
 
 		it("should provide the value of width and/or height if they are passed in and the other isn't", () => {
@@ -246,7 +252,10 @@ describe('FloaterBarState', () => {
 			floaterState.root = root;
 
 			const got = floaterState.determineStartingMeasurements();
-			expect(got).toEqual({ width: floaterState.MIN_WIDTH_PX, height: floaterState.MIN_HEIGHT_PX });
+			expect(got).toEqual({
+				width: floaterState.MIN_WIDTH_PX,
+				height: floaterState.MIN_HEIGHT_PX
+			});
 		});
 
 		it("should provide a maximum value fo width but not height if the root element's dimensions are too large", () => {
@@ -547,7 +556,12 @@ describe('FloaterBarState', () => {
 			const barWidth = 300;
 			const barHeight = 400;
 
-			const bar = floaterState.add({ left: 1500, top: 3000, height: barHeight, width: barWidth });
+			const bar = floaterState.add({
+				left: 1500,
+				top: 3000,
+				height: barHeight,
+				width: barWidth
+			});
 			const event1 = new MouseEvent('mousemove', { clientX: 1000, clientY: 1000 });
 
 			const got = floaterState.startDragging(bar.id, event1);

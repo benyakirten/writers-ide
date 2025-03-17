@@ -16,9 +16,10 @@
 
 	onMount(() => {
 		const unsub = props.proseMirror.eventBus.subscribe(({ view }) => {
-			const marks =
-				view && props.proseMirror.selections.findTextMarks(view.state.selection, view.state.doc);
-			activeCodeMarks = marks;
+			activeCodeMarks = props.proseMirror.selections.findTextMarks(
+				view.state.selection,
+				view.state.doc
+			);
 			editorView = view;
 			selection = view.state.selection;
 		});
