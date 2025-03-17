@@ -34,23 +34,6 @@ export type BarTransferInProgress = {
 
 export class BarTransferHandler {
 	transfer: MenuTransferInProgress | BarTransferInProgress | null = $state(null);
-	barIds = $derived.by(() => {
-		const ids = [];
-		for (const bars of [
-			HorizontalBarState.editorBlockEnd,
-			HorizontalBarState.editorBlockStart,
-			HorizontalBarState.windowBlockStart,
-			HorizontalBarState.windowBlockEnd,
-			VerticalBarState.inlineEnd,
-			VerticalBarState.inlineStart,
-			FloatingBarState.bars
-		]) {
-			for (const bar of bars) {
-				ids.push(bar.id);
-			}
-		}
-		return ids;
-	});
 
 	startTransfer(transfer: MenuTransferInProgress | BarTransferInProgress): void {
 		this.transfer = transfer;
