@@ -151,6 +151,47 @@ export class BarTransferHandler {
 
 		return items.remove(itemId);
 	}
+
+	moveMenu(from: BarTransferLocation, id: string | number, to: BarTransferLocation): boolean {
+		if (from === to) {
+			return false;
+		}
+
+		const fromItems = this.#items(from, id)?.ids;
+		if (!fromItems) {
+			return false;
+		}
+
+		if (from === 'floating') {
+			if (!FloatingBarState.remove(id)) {
+				return false;
+			}
+		} else if (
+			from === HorizontalBarPosition.WindowBlockStart ||
+			from === HorizontalBarPosition.WindowBlockEnd
+		) {
+			if (!HorizontalBarState.remove(id, from)) {
+				return false;
+			}
+		} else {
+			if (!VerticalBarState.remove(id, from)) {
+				return false;
+			}
+		}
+
+		if (to === 'floating') {
+			FloatingBarState.add({ data: fromItems });
+		} else if (
+			to === HorizontalBarPosition.WindowBlockStart ||
+			to === HorizontalBarPosition.WindowBlockEnd
+		) {
+			HorizontalBarState.add({ data: fromItems }, to);
+		} else {
+			VerticalBarState.add({ data: fromItems }, to);
+		}
+
+		return true;
+	}
 }
 
 const TransferHandler = new BarTransferHandler();

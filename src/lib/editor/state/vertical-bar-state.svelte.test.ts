@@ -350,4 +350,8 @@ describe('VerticalBarState', () => {
 			expect(state.resizedSection).toBeNull();
 		});
 	});
+
+	describe.todo('remove', () => {
+		// TODO: Implement this test
+	});
 });

@@ -1,74 +1,97 @@
 <script lang="ts">
 	import { Icon } from '@steeze-ui/svelte-icon';
-	import { X, Minus, DotsSix, DotsSixVertical, DotsThree } from '@steeze-ui/phosphor-icons';
+	import {
+		X,
+		Minus,
+		DotsSix,
+		DotsSixVertical,
+		AlignTopSimple,
+		AlignBottomSimple,
+		AlignLeftSimple,
+		AlignRightSimple,
+		PictureInPicture
+	} from '@steeze-ui/phosphor-icons';
 
 	import IconButton from '$lib/components/IconButton.svelte';
-	import NestableMenu, { type MenuItem } from '$lib/components/NestableMenu.svelte';
+	import * as m from '$lib/paraglide/messages';
+	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte';
+	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
+	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
 
 	let {
 		onminimize,
 		onclose,
-		isVertical,
 		draggable,
-		index
+		index,
+		position
 	}: {
 		onminimize: () => void;
 		draggable: boolean;
-		isVertical: boolean;
 		onclose: () => void;
 		index: number;
+		position: BarTransferLocation;
+		onmove: (to: BarTransferLocation) => void;
 	} = $props();
-
-	let menuOpen = $state(false);
-	const dropdownMenu: MenuItem[] = [
-		{
-			id: 'move',
-			title: 'Move',
-			content: [
-				{
-					id: 'move-up',
-					title: 'Move Up',
-					content: () => {
-						// Handle move up action
-					}
-				},
-				{
-					id: 'move-down',
-					title: 'Move Down',
-					content: () => {
-						// Handle move up action
-					}
-				}
-			]
-		}
-	];
 </script>
 
 <div class="menu">
 	<div class="initial-buttons">
-		<div class="dropdown">
-			<IconButton onclick={() => (menuOpen = !menuOpen)} label="Show menu">
-				{#snippet icon()}
-					<Icon src={DotsThree} size="16px" />
-				{/snippet}
-			</IconButton>
-			{#if menuOpen}
-				<div class="dropdown-menu">
-					<NestableMenu menu={dropdownMenu} onclose={() => (menuOpen = false)} />
-				</div>
-			{/if}
-		</div>
+		<IconButton
+			disabled={position === HorizontalBarPosition.WindowBlockStart}
+			onclick={() => {}}
+			label={m.move_menu_to_window_block_end()}
+		>
+			{#snippet icon()}
+				<Icon src={AlignTopSimple} size="16px" />
+			{/snippet}
+		</IconButton>
+		<IconButton
+			disabled={position === HorizontalBarPosition.WindowBlockEnd}
+			onclick={() => {}}
+			label={m.move_menu_to_window_block_end()}
+		>
+			{#snippet icon()}
+				<Icon src={AlignBottomSimple} size="16px" />
+			{/snippet}
+		</IconButton>
+		<IconButton
+			disabled={position === VerticalBarPosition.InlineStart}
+			onclick={() => {}}
+			label={m.move_menu_to_window_inline_start_bar()}
+		>
+			{#snippet icon()}
+				<Icon src={AlignLeftSimple} size="16px" />
+			{/snippet}
+		</IconButton>
+		<IconButton
+			disabled={position === VerticalBarPosition.InlineEnd}
+			onclick={() => {}}
+			label={m.move_menu_to_window_inline_end_bar()}
+		>
+			{#snippet icon()}
+				<Icon src={AlignRightSimple} size="16px" />
+			{/snippet}
+		</IconButton>
+		<IconButton
+			disabled={position === 'floating'}
+			onclick={() => {}}
+			label={m.move_menu_to_window_floating()}
+		>
+			{#snippet icon()}
+				<Icon src={PictureInPicture} size="16px" />
+			{/snippet}
+		</IconButton>
+	</div>
+	<div class="latter-buttons">
 		{#if draggable}
 			<div style:cursor="grab" class="drag-icon">
-				{#if isVertical}
+				{#if position === VerticalBarPosition.InlineStart || position === VerticalBarPosition.InlineEnd || position === 'floating'}
 					<Icon src={DotsSix} size="18px" />
 				{:else}
 					<Icon src={DotsSixVertical} size="20px" />
 				{/if}
 			</div>
 		{/if}
-	</div>
-	<div class="latter-buttons">
 		<IconButton onclick={onminimize} label="Minimize bar #{index}">
 			{#snippet icon()}
 				<Icon src={Minus} size="16px" />
@@ -93,6 +116,7 @@
 	.initial-buttons {
 		display: flex;
 		align-items: center;
+		gap: 2px;
 	}
 
 	.latter-buttons {
@@ -106,15 +130,5 @@
 		align-items: center;
 		justify-content: center;
 		padding-inline: 4px;
-	}
-
-	.dropdown {
-		position: relative;
-	}
-
-	.dropdown-menu {
-		position: absolute;
-		top: 100%;
-		left: 0;
 	}
 </style>

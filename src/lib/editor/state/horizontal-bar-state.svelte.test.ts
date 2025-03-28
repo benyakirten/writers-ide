@@ -365,4 +365,8 @@ describe('HorizontalBarState', () => {
 			expect(description).toBe('Unknown window block start');
 		});
 	});
+
+	describe.todo('remove', () => {
+		// TODO: Implement this test
+	});
 });

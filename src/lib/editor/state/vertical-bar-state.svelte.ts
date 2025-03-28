@@ -61,10 +61,15 @@ export class VerticalBarState {
 		return bar;
 	}
 
-	remove(id: string | number, position: VerticalBarPosition) {
+	remove(id: string | number, position: VerticalBarPosition): boolean {
 		const bars = position === VerticalBarPosition.InlineStart ? this.inlineStart : this.inlineEnd;
 		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
+		if (index === -1) {
+			return false;
+		}
+
 		bars.splice(index, 1);
+		return true;
 	}
 
 	bars(position: VerticalBarPosition): VerticalBar[] {

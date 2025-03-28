@@ -5,7 +5,7 @@
 	} from '../state/horizontal-bar-state.svelte.js';
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
-	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
+	import TransferHandler, { BarTransferHandler } from '../state/bar-transfer-handler.svelte.js';
 	import HorizontalItemRenderer from './HorizontalItemRenderer.svelte';
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
 
@@ -45,10 +45,11 @@
 	>
 		<div class="bar-title">
 			<BarMenu
-				draggable
-				isVertical={false}
 				onminimize={() => HorizontalBarState.toggle(index, position)}
 				onclose={() => HorizontalBarState.remove(index, position)}
+				onmove={(to) => TransferHandler.moveMenu(position, index, to)}
+				draggable
+				{position}
 				{index}
 			/>
 		</div>

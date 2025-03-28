@@ -7,11 +7,13 @@
 		icon,
 		label,
 		onclick,
-		inversion = 0
+		inversion = 0,
+		disabled = false
 	}: {
 		icon: Snippet;
 		label: string;
 		onclick: () => void;
+		disabled?: boolean;
 		inversion?: number;
 	} = $props();
 </script>
@@ -21,6 +23,7 @@
 	aria-label={label}
 	onclickcapture={onclick}
 	bind:this={buttonEl}
+	{disabled}
 >
 	{@render icon()}
 </button>
@@ -29,6 +32,11 @@
 	button {
 		position: relative;
 		cursor: pointer;
+
+		&:disabled {
+			cursor: not-allowed;
+			opacity: 0.5;
+		}
 
 		&::before {
 			content: '';
