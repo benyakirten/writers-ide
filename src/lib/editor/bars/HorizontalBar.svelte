@@ -84,7 +84,6 @@
 		z-index: 1;
 		height: 4px;
 		padding: 0;
-		appearance: none;
 		outline: none;
 		border: none;
 		background-color: #bbb;

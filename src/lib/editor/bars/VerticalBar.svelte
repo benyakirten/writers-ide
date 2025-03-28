@@ -70,7 +70,6 @@
 		z-index: 1;
 		width: 4px;
 		padding: 0;
-		appearance: none;
 		outline: none;
 		border: none;
 		background-color: #bbb;

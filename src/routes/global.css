@@ -4,4 +4,8 @@
 
 button {
 	appearance: none;
+	padding: 0;
+	border: none;
+	cursor: pointer;
+	background: inherit;
 }

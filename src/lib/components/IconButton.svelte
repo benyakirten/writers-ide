@@ -27,7 +27,6 @@
 
 <style>
 	button {
-		appearance: none;
 		position: relative;
 		cursor: pointer;
 
