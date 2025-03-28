@@ -47,7 +47,6 @@
 			<BarMenu
 				onminimize={() => HorizontalBarState.toggle(index, position)}
 				onclose={() => HorizontalBarState.remove(index, position)}
-				onmove={(to) => TransferHandler.moveMenu(position, index, to)}
 				draggable
 				{position}
 				{index}

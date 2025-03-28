@@ -17,6 +17,7 @@
 	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
+	import TransferHandler from '../state/bar-transfer-handler.svelte';
 
 	let {
 		onminimize,
@@ -30,15 +31,15 @@
 		onclose: () => void;
 		index: number;
 		position: BarTransferLocation;
-		onmove: (to: BarTransferLocation) => void;
 	} = $props();
 </script>
 
 <div class="menu">
 	<div class="initial-buttons">
 		<IconButton
-			disabled={position === HorizontalBarPosition.WindowBlockStart}
-			onclick={() => {}}
+			disabled={position === HorizontalBarPosition.WindowBlockStart && index === 0}
+			onclick={() =>
+				TransferHandler.moveMenu(position, index, HorizontalBarPosition.WindowBlockStart)}
 			label={m.move_menu_to_window_block_end()}
 		>
 			{#snippet icon()}
@@ -46,8 +47,9 @@
 			{/snippet}
 		</IconButton>
 		<IconButton
-			disabled={position === HorizontalBarPosition.WindowBlockEnd}
-			onclick={() => {}}
+			disabled={position === HorizontalBarPosition.WindowBlockEnd && index === 0}
+			onclick={() =>
+				TransferHandler.moveMenu(position, index, HorizontalBarPosition.WindowBlockEnd)}
 			label={m.move_menu_to_window_block_end()}
 		>
 			{#snippet icon()}
@@ -55,18 +57,18 @@
 			{/snippet}
 		</IconButton>
 		<IconButton
-			disabled={position === VerticalBarPosition.InlineStart}
-			onclick={() => {}}
-			label={m.move_menu_to_window_inline_start_bar()}
+			disabled={position === VerticalBarPosition.InlineStart && index === 0}
+			onclick={() => TransferHandler.moveMenu(position, index, VerticalBarPosition.InlineStart)}
+			label={m.move_menu_to_window_inline_start()}
 		>
 			{#snippet icon()}
 				<Icon src={AlignLeftSimple} size="16px" />
 			{/snippet}
 		</IconButton>
 		<IconButton
-			disabled={position === VerticalBarPosition.InlineEnd}
-			onclick={() => {}}
-			label={m.move_menu_to_window_inline_end_bar()}
+			disabled={position === VerticalBarPosition.InlineEnd && index === 0}
+			onclick={() => TransferHandler.moveMenu(position, index, VerticalBarPosition.InlineEnd)}
+			label={m.move_menu_to_window_inline_end()}
 		>
 			{#snippet icon()}
 				<Icon src={AlignRightSimple} size="16px" />
@@ -74,7 +76,7 @@
 		</IconButton>
 		<IconButton
 			disabled={position === 'floating'}
-			onclick={() => {}}
+			onclick={() => TransferHandler.moveMenu(position, index, 'floating')}
 			label={m.move_menu_to_window_floating()}
 		>
 			{#snippet icon()}
@@ -92,12 +94,12 @@
 				{/if}
 			</div>
 		{/if}
-		<IconButton onclick={onminimize} label="Minimize bar #{index}">
+		<IconButton onclick={onminimize} label={m.minimize_bar({ num: index + 1 })}>
 			{#snippet icon()}
 				<Icon src={Minus} size="16px" />
 			{/snippet}
 		</IconButton>
-		<IconButton onclick={onclose} label="Close bar #{index}">
+		<IconButton onclick={onclose} label={m.close_bar({ num: index + 1 })}>
 			{#snippet icon()}
 				<Icon src={X} size="16px" />
 			{/snippet}

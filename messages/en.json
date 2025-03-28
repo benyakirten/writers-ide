@@ -31,7 +31,9 @@
 	"unknown_menu_title": "Unknown component",
 	"move_menu_to_window_block_start": "Move menu to window block start",
 	"move_menu_to_window_block_end": "Move menu to window block end",
-	"move_menu_to_window_inline_start_bar": "Move menu to inline start",
-	"move_menu_to_window_inline_end_bar": "Move menu to inline end",
-	"move_menu_to_window_floating": "Move menu to floating position"
+	"move_menu_to_window_inline_start": "Move menu to inline start",
+	"move_menu_to_window_inline_end": "Move menu to inline end",
+	"move_menu_to_window_floating": "Move menu to floating position",
+	"minimize_bar": "Minimize bar #{num}",
+	"close_bar": "Close bar #{num}"
 }

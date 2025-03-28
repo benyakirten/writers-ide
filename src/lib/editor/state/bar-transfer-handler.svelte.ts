@@ -154,6 +154,7 @@ export class BarTransferHandler {
 
 	moveMenu(from: BarTransferLocation, id: string | number, to: BarTransferLocation): boolean {
 		if (from === to) {
+			// TODO: Handle moving bar versus beginning/end
 			return false;
 		}
 

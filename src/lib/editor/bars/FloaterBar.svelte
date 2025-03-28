@@ -81,7 +81,6 @@
 		<BarMenu
 			onminimize={() => FloaterBarState.update(index, 'minimized', true)}
 			onclose={() => FloaterBarState.remove(index)}
-			onmove={(to) => TransferHandler.moveMenu('floating', index, to)}
 			draggable={false}
 			position="floating"
 			{index}
