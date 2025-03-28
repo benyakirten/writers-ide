@@ -47,8 +47,8 @@
 			<BarMenu
 				draggable
 				isVertical={false}
-				onMinimize={() => HorizontalBarState.toggle(index, position)}
-				onClose={() => HorizontalBarState.remove(index, position)}
+				onminimize={() => HorizontalBarState.toggle(index, position)}
+				onclose={() => HorizontalBarState.remove(index, position)}
 				{index}
 			/>
 		</div>

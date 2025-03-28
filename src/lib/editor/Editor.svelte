@@ -10,7 +10,7 @@
 		type DragOverEvent,
 		type DragStartEvent
 	} from '@dnd-kit-svelte/core';
-	import { SortableContext, arrayMove } from '@dnd-kit-svelte/sortable';
+	import { SortableContext } from '@dnd-kit-svelte/sortable';
 
 	import VerticalBarState, { VerticalBarPosition } from './state/vertical-bar-state.svelte.js';
 	import HorizontalBarState from './state/horizontal-bar-state.svelte.js';
@@ -96,27 +96,7 @@
 				{/each}
 			</SortableContext>
 			<main class="main">
-				<SortableContext items={HorizontalBarState.editorBlockStart.map((bar) => bar.id)}>
-					{#each HorizontalBarState.editorBlockStart as bar, index (bar.id)}
-						<HorizontalBar
-							{bar}
-							position={HorizontalBarPosition.EditorBlockStart}
-							{index}
-							items={bar.data.items}
-						/>
-					{/each}
-				</SortableContext>
 				<MainView />
-				<SortableContext items={HorizontalBarState.editorBlockEnd.map((bar) => bar.id)}>
-					{#each HorizontalBarState.editorBlockEnd as bar, index (bar.id)}
-						<HorizontalBar
-							{bar}
-							position={HorizontalBarPosition.EditorBlockEnd}
-							{index}
-							items={bar.data.items}
-						/>
-					{/each}
-				</SortableContext>
 			</main>
 			<SortableContext items={VerticalBarState.inlineEnd.map((bar) => bar.id)}>
 				{#each VerticalBarState.inlineEnd as bar, index (bar.id)}

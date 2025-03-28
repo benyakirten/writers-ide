@@ -5,9 +5,7 @@ import { BarItems } from './bar-items.svelte.js';
 
 export enum HorizontalBarPosition {
 	WindowBlockStart = 'WINDOW_BLOCK_START',
-	WindowBlockEnd = 'WINDOW_BLOCK_END',
-	EditorBlockStart = 'EDITOR_BLOCK_START',
-	EditorBlockEnd = 'EDITOR_BLOCK_END'
+	WindowBlockEnd = 'WINDOW_BLOCK_END'
 }
 
 export type HorizontalBar = {
@@ -25,8 +23,6 @@ export class HorizontalBarState {
 
 	windowBlockStart = $state<HorizontalBar[]>([]);
 	windowBlockEnd = $state<HorizontalBar[]>([]);
-	editorBlockStart = $state<HorizontalBar[]>([]);
-	editorBlockEnd = $state<HorizontalBar[]>([]);
 
 	resizedSection: {
 		id: string;
@@ -76,10 +72,6 @@ export class HorizontalBarState {
 				return this.windowBlockStart;
 			case HorizontalBarPosition.WindowBlockEnd:
 				return this.windowBlockEnd;
-			case HorizontalBarPosition.EditorBlockStart:
-				return this.editorBlockStart;
-			case HorizontalBarPosition.EditorBlockEnd:
-				return this.editorBlockEnd;
 		}
 	}
 
@@ -167,10 +159,7 @@ export class HorizontalBarState {
 	}
 
 	shouldInvert(position: HorizontalBarPosition): boolean {
-		return (
-			position === HorizontalBarPosition.WindowBlockEnd ||
-			position === HorizontalBarPosition.EditorBlockEnd
-		);
+		return position === HorizontalBarPosition.WindowBlockEnd;
 	}
 
 	async endResize(): Promise<void> {
@@ -193,12 +182,6 @@ export class HorizontalBarState {
 				break;
 			case HorizontalBarPosition.WindowBlockEnd:
 				description = m.window_block_end();
-				break;
-			case HorizontalBarPosition.EditorBlockStart:
-				description = m.editor_block_start();
-				break;
-			case HorizontalBarPosition.EditorBlockEnd:
-				description = m.editor_block_end();
 				break;
 		}
 

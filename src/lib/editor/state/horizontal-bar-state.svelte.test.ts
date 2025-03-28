@@ -52,30 +52,6 @@ describe('HorizontalBarState', () => {
 			const bars = state.bars(HorizontalBarPosition.WindowBlockEnd);
 			expect(bars).toEqual([expect.objectContaining(windowEndBar)]);
 		});
-
-		it('should return the list of editor start bars if the position is EditorBlockStart', () => {
-			const editorStartBar = {
-				id: 'editor-start-1',
-				visible: true,
-				height: 100
-			};
-
-			state.add(editorStartBar, HorizontalBarPosition.EditorBlockStart);
-			const bars = state.bars(HorizontalBarPosition.EditorBlockStart);
-			expect(bars).toEqual([expect.objectContaining(editorStartBar)]);
-		});
-
-		it('should return the list of editor end bars if the position is EditorBlockEnd', () => {
-			const editorEndBar = {
-				id: 'editor-end-1',
-				visible: true,
-				height: 100
-			};
-
-			state.add(editorEndBar, HorizontalBarPosition.EditorBlockEnd);
-			const bars = state.bars(HorizontalBarPosition.EditorBlockEnd);
-			expect(bars).toEqual([expect.objectContaining(editorEndBar)]);
-		});
 	});
 
 	describe('add', () => {
@@ -93,22 +69,6 @@ describe('HorizontalBarState', () => {
 				HorizontalBarPosition.WindowBlockEnd
 			);
 			expect(state.windowBlockEnd).toEqual([bar]);
-		});
-
-		it('should add a bar to the editor start list if the position is EditorBlockStart', () => {
-			const bar = state.add(
-				{ height: 100, id: 'editor-start-1' },
-				HorizontalBarPosition.EditorBlockStart
-			);
-			expect(state.editorBlockStart).toEqual([bar]);
-		});
-
-		it('should add a bar to the editor end list if the position is EditorBlockEnd', () => {
-			const bar = state.add(
-				{ height: 100, id: 'editor-end-1' },
-				HorizontalBarPosition.EditorBlockEnd
-			);
-			expect(state.editorBlockEnd).toEqual([bar]);
 		});
 	});
 
@@ -373,8 +333,6 @@ describe('HorizontalBarState', () => {
 		beforeEach(() => {
 			state.add({ id: 'window-start-1', visible: true }, HorizontalBarPosition.WindowBlockStart);
 			state.add({ id: 'window-end-1', visible: true }, HorizontalBarPosition.WindowBlockEnd);
-			state.add({ id: 'editor-start-1', visible: true }, HorizontalBarPosition.EditorBlockStart);
-			state.add({ id: 'editor-end-1', visible: true }, HorizontalBarPosition.EditorBlockEnd);
 		});
 
 		it('should return the humanized description for a window start bar by index', () => {
@@ -387,16 +345,6 @@ describe('HorizontalBarState', () => {
 			expect(description).toBe('Window block end #1');
 		});
 
-		it('should return the humanized description for an editor start bar by index', () => {
-			const description = state.humanize(0, HorizontalBarPosition.EditorBlockStart);
-			expect(description).toBe('Editor block start #1');
-		});
-
-		it('should return the humanized description for an editor end bar by index', () => {
-			const description = state.humanize(0, HorizontalBarPosition.EditorBlockEnd);
-			expect(description).toBe('Editor block end #1');
-		});
-
 		it('should return the humanized description for a window start bar by id', () => {
 			const description = state.humanize('window-start-1', HorizontalBarPosition.WindowBlockStart);
 			expect(description).toBe('Window block start #1');
@@ -405,16 +353,6 @@ describe('HorizontalBarState', () => {
 		it('should return the humanized description for a window end bar by id', () => {
 			const description = state.humanize('window-end-1', HorizontalBarPosition.WindowBlockEnd);
 			expect(description).toBe('Window block end #1');
-		});
-
-		it('should return the humanized description for an editor start bar by id', () => {
-			const description = state.humanize('editor-start-1', HorizontalBarPosition.EditorBlockStart);
-			expect(description).toBe('Editor block start #1');
-		});
-
-		it('should return the humanized description for an editor end bar by id', () => {
-			const description = state.humanize('editor-end-1', HorizontalBarPosition.EditorBlockEnd);
-			expect(description).toBe('Editor block end #1');
 		});
 
 		it('should return unknown description if the bar does not exist by index', () => {

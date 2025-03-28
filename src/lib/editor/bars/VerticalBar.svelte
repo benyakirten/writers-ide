@@ -41,8 +41,8 @@
 		style:overflow={width === 0 ? 'hidden' : 'auto'}
 	>
 		<BarMenu
-			onMinimize={() => VerticalBarState.toggle(index, position)}
-			onClose={() => VerticalBarState.remove(index, position)}
+			onminimize={() => VerticalBarState.toggle(index, position)}
+			onclose={() => VerticalBarState.remove(index, position)}
 			draggable
 			isVertical
 			{index}

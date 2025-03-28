@@ -6,16 +6,16 @@
 	import NestableMenu, { type MenuItem } from '$lib/components/NestableMenu.svelte';
 
 	let {
-		onMinimize,
-		onClose,
+		onminimize,
+		onclose,
 		isVertical,
 		draggable,
 		index
 	}: {
-		onMinimize: () => void;
+		onminimize: () => void;
 		draggable: boolean;
 		isVertical: boolean;
-		onClose: () => void;
+		onclose: () => void;
 		index: number;
 	} = $props();
 
@@ -54,7 +54,7 @@
 			</IconButton>
 			{#if menuOpen}
 				<div class="dropdown-menu">
-					<NestableMenu menu={dropdownMenu} />
+					<NestableMenu menu={dropdownMenu} onclose={() => (menuOpen = false)} />
 				</div>
 			{/if}
 		</div>
@@ -69,12 +69,12 @@
 		{/if}
 	</div>
 	<div class="latter-buttons">
-		<IconButton onclick={onMinimize} label="Minimize bar #{index}">
+		<IconButton onclick={onminimize} label="Minimize bar #{index}">
 			{#snippet icon()}
 				<Icon src={Minus} size="16px" />
 			{/snippet}
 		</IconButton>
-		<IconButton onclick={onClose} label="Close bar #{index}">
+		<IconButton onclick={onclose} label="Close bar #{index}">
 			{#snippet icon()}
 				<Icon src={X} size="16px" />
 			{/snippet}

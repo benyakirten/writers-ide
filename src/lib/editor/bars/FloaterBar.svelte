@@ -79,8 +79,8 @@
 	>
 		<FloaterBarTitle {index} title={bar.title} id={bar.id} />
 		<BarMenu
-			onMinimize={() => FloaterBarState.update(index, 'minimized', true)}
-			onClose={() => FloaterBarState.remove(index)}
+			onminimize={() => FloaterBarState.update(index, 'minimized', true)}
+			onclose={() => FloaterBarState.remove(index)}
 			draggable={false}
 			isVertical
 			{index}

@@ -1,4 +1,5 @@
 <script lang="ts" module>
+	// NOTE: This menu is incomplete and needs to have accessibiltiy implemented.
 	import type { Snippet } from 'svelte';
 	export type MenuItem = {
 		id: string;
@@ -12,44 +13,72 @@
 	import { Icon } from '@steeze-ui/svelte-icon';
 
 	import NestableMenu from './NestableMenu.svelte';
+	import { Debouncer } from '$lib/utils/debounce';
+	import { SvelteSet } from 'svelte/reactivity';
 
-	let { menu }: { menu: MenuItem[] } = $props();
+	let { menu, onclose }: { menu: MenuItem[]; onclose: () => void } = $props();
 
-	let openItem = $state<string | null>(null);
+	let hoveredItems = $state(new SvelteSet<string>());
+	let clickedItems = $state(new SvelteSet<string>());
+
+	const hoverDebouncer = new Debouncer<string>((id) => {
+		hoveredItems.add(id);
+	});
+
 	function handleClick({ content, id }: MenuItem) {
 		if (typeof content === 'function') {
 			content();
+			onclose();
 		} else {
-			openItem = id;
+			if (clickedItems.has(id)) {
+				clickedItems.delete(id);
+			} else {
+				clickedItems.add(id);
+			}
 		}
+	}
+
+	function handleMouseEnter(id: string) {
+		hoverDebouncer.update(id);
+	}
+
+	function handleMouseExit(id: string) {
+		hoverDebouncer.cancel();
+		hoveredItems.delete(id);
 	}
 </script>
 
+<svelte:window onkeydowncapture={(e) => e.key === 'Escape' && onclose()} />
 <div class="menu">
 	{#each menu as item (item.id)}
-		{@render menuItem(openItem === item.id, () => handleClick(item), item)}
+		{@render menuItem(item)}
 	{/each}
 </div>
 
-{#snippet menuItem(open: boolean, onclick: () => void, { title, content }: MenuItem)}
-	<div class="item">
-		<button class="title" {onclick}>
+{#snippet menuItem(item: MenuItem)}
+	<div
+		class="item"
+		onmouseenter={() => handleMouseEnter(item.id)}
+		onmouseleave={() => handleMouseExit(item.id)}
+		role="none"
+	>
+		<button class="title" onclick={() => handleClick(item)}>
 			<div style:flex="1">
-				{#if typeof title === 'string'}
-					<span class="title-string">{title}</span>
+				{#if typeof item.title === 'string'}
+					<span class="title-string">{item.title}</span>
 				{:else}
-					{@render title()}
+					{@render item.title()}
 				{/if}
 			</div>
-			{#if typeof content !== 'function'}
+			{#if typeof item.content !== 'function'}
 				<div class="icon">
 					<Icon src={CaretRight} size="16px" />
 				</div>
 			{/if}
 		</button>
-		{#if open && typeof content !== 'function'}
+		{#if (clickedItems.has(item.id) || hoveredItems.has(item.id)) && typeof item.content !== 'function'}
 			<div class="submenu">
-				<NestableMenu menu={content} />
+				<NestableMenu menu={item.content} {onclose} />
 			</div>
 		{/if}
 	</div>
@@ -95,6 +124,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		margin-right: -8px;
 	}
 
 	.submenu {

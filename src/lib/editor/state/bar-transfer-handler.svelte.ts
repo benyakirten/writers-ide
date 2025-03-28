@@ -45,10 +45,6 @@ export class BarTransferHandler {
 
 	#bars(location: BarTransferLocation): Bars {
 		switch (location) {
-			case HorizontalBarPosition.EditorBlockEnd:
-				return HorizontalBarState.editorBlockEnd;
-			case HorizontalBarPosition.EditorBlockStart:
-				return HorizontalBarState.editorBlockStart;
 			case HorizontalBarPosition.WindowBlockEnd:
 				return HorizontalBarState.windowBlockEnd;
 			case HorizontalBarPosition.WindowBlockStart:
@@ -64,8 +60,6 @@ export class BarTransferHandler {
 
 	#createEmptyBar(location: BarTransferLocation): string {
 		switch (location) {
-			case HorizontalBarPosition.EditorBlockEnd:
-			case HorizontalBarPosition.EditorBlockStart:
 			case HorizontalBarPosition.WindowBlockEnd:
 			case HorizontalBarPosition.WindowBlockStart:
 				return HorizontalBarState.add({}, location).id;
