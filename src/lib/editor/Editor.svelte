@@ -7,8 +7,10 @@
 		useSensor,
 		useSensors,
 		type DragEndEvent,
+		type DragOverEvent,
 		type DragStartEvent
 	} from '@dnd-kit-svelte/core';
+	import { SortableContext, arrayMove } from '@dnd-kit-svelte/sortable';
 
 	import VerticalBarState, { VerticalBarPosition } from './state/vertical-bar-state.svelte.js';
 	import HorizontalBarState from './state/horizontal-bar-state.svelte.js';
@@ -16,12 +18,11 @@
 	import FloaterBarState from './state/floater-state.svelte.js';
 
 	import MainView from './MainView.svelte';
-	import VerticalSlice from './bars/VerticalSlice.svelte';
-	import HorizontalSlice from './bars/HorizontalSlice.svelte';
+	import VerticalBar from './bars/VerticalBar.svelte';
+	import HorizontalBar from './bars/HorizontalBar.svelte';
 	import FloaterBar from './bars/FloaterBar.svelte';
 	import VerticalBaseBar from './bars/VerticalBaseBar.svelte';
 	import HorizontalBaseBar from './bars/HorizontalBaseBar.svelte';
-	import { SortableContext } from '@dnd-kit-svelte/sortable';
 
 	function resize(e: MouseEvent) {
 		VerticalBarState.resize(e);
@@ -49,9 +50,19 @@
 		console.log('DRAG START');
 		console.log(e);
 	}
+
+	function handleDragOver(e: DragOverEvent) {
+		console.log('DRAG OVER');
+		console.log(e);
+	}
 </script>
 
-<DndContext {sensors} onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
+<DndContext
+	{sensors}
+	onDragEnd={handleDragEnd}
+	onDragStart={handleDragStart}
+	onDragOver={handleDragOver}
+>
 	<div
 		bind:this={FloaterBarState.root}
 		class="overlay"
@@ -59,14 +70,12 @@
 		onmousemovecapture={(event) => resize(event)}
 	>
 		<HorizontalBaseBar />
-		<SortableContext items={FloaterBarState.visibleBars.map((bar) => bar.id)}>
-			{#each FloaterBarState.visibleBars as bar, index (bar.id)}
-				<FloaterBar {bar} {index} items={bar.data.items} />
-			{/each}
-		</SortableContext>
+		{#each FloaterBarState.visibleBars as bar, index (bar.id)}
+			<FloaterBar {bar} {index} items={bar.data.items} />
+		{/each}
 		{#each HorizontalBarState.windowBlockStart as bar, index (bar.id)}
 			<SortableContext items={HorizontalBarState.windowBlockStart.map((bar) => bar.id)}>
-				<HorizontalSlice
+				<HorizontalBar
 					{bar}
 					position={HorizontalBarPosition.WindowBlockStart}
 					{index}
@@ -78,7 +87,7 @@
 			<VerticalBaseBar />
 			<SortableContext items={VerticalBarState.inlineStart.map((bar) => bar.id)}>
 				{#each VerticalBarState.inlineStart as bar, index (bar.id)}
-					<VerticalSlice
+					<VerticalBar
 						{bar}
 						position={VerticalBarPosition.InlineStart}
 						{index}
@@ -89,7 +98,7 @@
 			<main class="main">
 				<SortableContext items={HorizontalBarState.editorBlockStart.map((bar) => bar.id)}>
 					{#each HorizontalBarState.editorBlockStart as bar, index (bar.id)}
-						<HorizontalSlice
+						<HorizontalBar
 							{bar}
 							position={HorizontalBarPosition.EditorBlockStart}
 							{index}
@@ -100,7 +109,7 @@
 				<MainView />
 				<SortableContext items={HorizontalBarState.editorBlockEnd.map((bar) => bar.id)}>
 					{#each HorizontalBarState.editorBlockEnd as bar, index (bar.id)}
-						<HorizontalSlice
+						<HorizontalBar
 							{bar}
 							position={HorizontalBarPosition.EditorBlockEnd}
 							{index}
@@ -111,7 +120,7 @@
 			</main>
 			<SortableContext items={VerticalBarState.inlineEnd.map((bar) => bar.id)}>
 				{#each VerticalBarState.inlineEnd as bar, index (bar.id)}
-					<VerticalSlice
+					<VerticalBar
 						{bar}
 						position={VerticalBarPosition.InlineEnd}
 						{index}
@@ -122,7 +131,7 @@
 		</div>
 		<SortableContext items={HorizontalBarState.windowBlockEnd.map((bar) => bar.id)}>
 			{#each HorizontalBarState.windowBlockEnd as bar, index (bar.id)}
-				<HorizontalSlice
+				<HorizontalBar
 					{bar}
 					position={HorizontalBarPosition.WindowBlockEnd}
 					{index}

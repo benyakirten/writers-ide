@@ -6,7 +6,7 @@
 	import LocaleManager from '../state/locale-manager.svelte.js';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
 
-	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'floating';
+	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'vertical';
 
 	function getBarPosition(): BarTransferLocation {
 		switch (selectValue) {

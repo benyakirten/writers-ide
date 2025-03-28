@@ -4,8 +4,8 @@
 	"description": "",
 	"type": "module",
 	"scripts": {
-		"dev": "tauri dev",
-		"dev:vite": "vite dev",
+		"dev": "vite dev",
+		"dev:tauri": "tauri dev",
 		"build": "vite build",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
