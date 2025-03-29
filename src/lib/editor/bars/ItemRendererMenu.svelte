@@ -2,25 +2,27 @@
 	import IconButton from '$lib/components/IconButton.svelte';
 	import { DotsSix, DotsSixVertical, X } from '@steeze-ui/phosphor-icons';
 	import { Icon } from '@steeze-ui/svelte-icon';
+	import BarLocation from './BarLocation.svelte';
+	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte';
+	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 
 	let {
 		title,
-		onremove,
-		isVertical = false,
-		isDragging = false
+		position,
+		onremove
 	}: {
 		title: string;
+		position: BarTransferLocation;
 		onremove: () => void;
-		isVertical?: boolean;
-		isDragging?: boolean;
 	} = $props();
 </script>
 
 <div class="menu">
 	<p>{title}</p>
 	<div class="buttons">
-		<div style:cursor={isDragging ? 'grab' : 'grabbing'} class="drag-icon">
-			{#if isVertical}
+		<BarLocation {position} onmove={console.log} />
+		<div style:cursor={'grab'} class="drag-icon">
+			{#if position === HorizontalBarPosition.WindowBlockEnd || position === HorizontalBarPosition.WindowBlockStart}
 				<Icon src={DotsSix} size="18px" />
 			{:else}
 				<Icon src={DotsSixVertical} size="20px" />

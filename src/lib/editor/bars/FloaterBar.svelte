@@ -92,6 +92,7 @@
 			<VerticalItemRenderer
 				{...item}
 				onremove={() => TransferHandler.remove('floating', bar.id, item.id)}
+				position="floating"
 			/>
 		{/each}
 	</div>

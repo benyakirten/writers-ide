@@ -65,6 +65,7 @@
 		<div class="items">
 			{#each items as item (item.id)}
 				<HorizontalItemRenderer
+					{position}
 					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
 					{...item}
 				/>

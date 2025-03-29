@@ -14,6 +14,7 @@
 	import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
 	import ItemRendererMenu from './ItemRendererMenu.svelte';
 	import LocaleManager from '../state/locale-manager.svelte.js';
+	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte.js';
 
 	let locale = $state(LocaleManager.data);
 	let itemProps: Omit<BarItemComponentProps, 'locale'> = {
@@ -43,17 +44,19 @@
 		Component,
 		size,
 		title,
+		position,
 		onremove
 	}: {
 		Component: BarItemData['Component'];
 		size: BarItemData['size'];
 		title: string;
+		position: BarTransferLocation;
 		onremove: () => void;
 	} = $props();
 </script>
 
 <div class="renderer" style:--size={size}>
-	<ItemRendererMenu {title} {onremove} />
+	<ItemRendererMenu {position} {title} {onremove} />
 	<div class="component">
 		{#if Component}
 			<Component {...itemProps} {locale} />

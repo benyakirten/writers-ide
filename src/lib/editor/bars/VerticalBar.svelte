@@ -59,6 +59,7 @@
 		<div>
 			{#each items as item (item.id)}
 				<VerticalItemRenderer
+					{position}
 					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
 					{...item}
 				/>

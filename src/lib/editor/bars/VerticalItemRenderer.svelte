@@ -14,6 +14,7 @@
 	import type { BarItemData } from '../state/bar-items.svelte.js';
 	import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
 	import ItemRendererMenu from './ItemRendererMenu.svelte';
+	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte.js';
 
 	let locale = $state(LocaleManager.data);
 	let itemProps: Omit<BarItemComponentProps, 'locale'> = {
@@ -43,17 +44,19 @@
 		Component,
 		size,
 		title,
+		position,
 		onremove
 	}: {
 		Component: BarItemData['Component'];
 		size: BarItemData['size'];
 		title: string;
+		position: BarTransferLocation;
 		onremove: () => void;
 	} = $props();
 </script>
 
 <div class="renderer" draggable style:--size={size}>
-	<ItemRendererMenu {title} {onremove} isVertical />
+	<ItemRendererMenu {title} {onremove} {position} />
 	<div class="component">
 		{#if Component}
 			<Component {...itemProps} {locale} />
