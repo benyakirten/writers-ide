@@ -55,13 +55,6 @@
 		console.log('DRAG OVER');
 		console.log(e);
 	}
-
-	$inspect(
-		VerticalBarState.inlineStart.length,
-		VerticalBarState.inlineEnd.length,
-		HorizontalBarState.windowBlockStart.length,
-		HorizontalBarState.windowBlockEnd.length
-	);
 </script>
 
 <DndContext

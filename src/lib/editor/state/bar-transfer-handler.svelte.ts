@@ -74,6 +74,7 @@ export class BarTransferHandler {
 
 	#items(location: BarTransferLocation, id: string | number): BarItems | undefined {
 		const bars = this.#bars(location);
+		console.log(bars);
 		const bar = typeof id === 'string' ? bars.find((bar) => bar.id === id) : bars.at(id);
 		return bar?.data;
 	}
@@ -158,11 +159,13 @@ export class BarTransferHandler {
 			return false;
 		}
 
+		console.log('HERE 1');
 		const fromItems = this.#items(from, id)?.ids;
 		if (!fromItems) {
 			return false;
 		}
 
+		console.log('HERE 2');
 		if (from === 'floating') {
 			if (!FloatingBarState.remove(id)) {
 				return false;
@@ -179,6 +182,7 @@ export class BarTransferHandler {
 				return false;
 			}
 		}
+		console.log('HERE 3');
 
 		if (to === 'floating') {
 			FloatingBarState.add({ data: fromItems });
