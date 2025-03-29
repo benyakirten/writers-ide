@@ -74,7 +74,6 @@ export class BarTransferHandler {
 
 	#items(location: BarTransferLocation, id: string | number): BarItems | undefined {
 		const bars = this.#bars(location);
-		console.log(bars);
 		const bar = typeof id === 'string' ? bars.find((bar) => bar.id === id) : bars.at(id);
 		return bar?.data;
 	}

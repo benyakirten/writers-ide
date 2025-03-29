@@ -11,7 +11,9 @@
 		AlignRightSimple,
 		PictureInPicture,
 		ArrowLeft,
-		ArrowRight
+		ArrowRight,
+		ArrowUp,
+		ArrowDown
 	} from '@steeze-ui/phosphor-icons';
 
 	import IconButton from '$lib/components/IconButton.svelte';
@@ -44,7 +46,7 @@
 			disabled={position === HorizontalBarPosition.WindowBlockStart}
 			onclick={() =>
 				TransferHandler.moveMenu(position, index, HorizontalBarPosition.WindowBlockStart)}
-			label={m.move_menu_to_window_block_end()}
+			label={m.move_to_window_block_end()}
 		>
 			{#snippet icon()}
 				<Icon src={AlignTopSimple} size="16px" />
@@ -54,7 +56,7 @@
 			disabled={position === HorizontalBarPosition.WindowBlockEnd}
 			onclick={() =>
 				TransferHandler.moveMenu(position, index, HorizontalBarPosition.WindowBlockEnd)}
-			label={m.move_menu_to_window_block_end()}
+			label={m.move_to_window_block_end()}
 		>
 			{#snippet icon()}
 				<Icon src={AlignBottomSimple} size="16px" />
@@ -63,7 +65,7 @@
 		<IconButton
 			disabled={position === VerticalBarPosition.InlineStart}
 			onclick={() => TransferHandler.moveMenu(position, index, VerticalBarPosition.InlineStart)}
-			label={m.move_menu_to_window_inline_start()}
+			label={m.move_to_window_inline_start()}
 		>
 			{#snippet icon()}
 				<Icon src={AlignLeftSimple} size="16px" />
@@ -72,7 +74,7 @@
 		<IconButton
 			disabled={position === VerticalBarPosition.InlineEnd}
 			onclick={() => TransferHandler.moveMenu(position, index, VerticalBarPosition.InlineEnd)}
-			label={m.move_menu_to_window_inline_end()}
+			label={m.move_to_window_inline_end()}
 		>
 			{#snippet icon()}
 				<Icon src={AlignRightSimple} size="16px" />
@@ -81,29 +83,31 @@
 		<IconButton
 			disabled={position === 'floating'}
 			onclick={() => TransferHandler.moveMenu(position, index, 'floating')}
-			label={m.move_menu_to_window_floating()}
+			label={m.move_to_window_floating()}
 		>
 			{#snippet icon()}
 				<Icon src={PictureInPicture} size="16px" />
 			{/snippet}
 		</IconButton>
 		{#if position !== 'floating'}
+			{@const isHorizontal =
+				position === VerticalBarPosition.InlineStart || position === VerticalBarPosition.InlineEnd}
 			<IconButton
 				disabled={index === 0}
 				onclick={() => TransferHandler.swapBarPosition(index, position, index - 1)}
-				label={m.move_menu_backward()}
+				label={isHorizontal ? m.move_backward() : m.move_up()}
 			>
 				{#snippet icon()}
-					<Icon src={ArrowLeft} size="16px" />
+					<Icon src={isHorizontal ? ArrowLeft : ArrowUp} size="16px" />
 				{/snippet}
 			</IconButton>
 			<IconButton
 				disabled={!canMoveForward}
 				onclick={() => TransferHandler.swapBarPosition(index, position, index + 1)}
-				label={m.move_menu_forward()}
+				label={isHorizontal ? m.move_forward() : m.move_down()}
 			>
 				{#snippet icon()}
-					<Icon src={ArrowRight} size="16px" />
+					<Icon src={isHorizontal ? ArrowRight : ArrowDown} size="16px" />
 				{/snippet}
 			</IconButton>
 		{/if}

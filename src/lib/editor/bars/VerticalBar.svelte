@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
 	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
 	import { VerticalBarPosition, type VerticalBar } from '../state/vertical-bar-state.svelte.js';
 	import BarMenu from './BarMenu.svelte';
@@ -22,11 +23,16 @@
 
 	let shouldInvert = VerticalBarState.shouldInvert(position);
 	let width = $derived(VerticalBarState.width(bar));
+	let resizeLabel = $derived.by(() =>
+		position === VerticalBarPosition.InlineStart
+			? m.resize_inline_start_bar({ num: index + 1 })
+			: m.resize_inline_end_bar({ num: index + 1 })
+	);
 </script>
 
 {#snippet resizeBar()}
 	<button
-		aria-label={VerticalBarState.humanize(index, position)}
+		aria-label={resizeLabel}
 		class="resize"
 		onclick={() => VerticalBarState.toggle(index, position)}
 		onmousedowncapture={(event) => VerticalBarState.startResize(bar.id, position, event.clientX)}

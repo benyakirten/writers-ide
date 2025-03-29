@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
+
 	import {
 		HorizontalBarPosition,
 		type HorizontalBar
@@ -25,11 +27,16 @@
 
 	let shouldInvert = HorizontalBarState.shouldInvert(position);
 	let height = $derived(HorizontalBarState.height(bar, position));
+	let resizeLabel = $derived.by(() =>
+		position === HorizontalBarPosition.WindowBlockStart
+			? m.resize_block_start_bar({ num: index + 1 })
+			: m.resize_block_end_bar({ num: index + 1 })
+	);
 </script>
 
 {#snippet resizeBar()}
 	<button
-		aria-label={HorizontalBarState.humanize(index, position)}
+		aria-label={resizeLabel}
 		class="resize"
 		onclick={() => HorizontalBarState.toggle(index, position)}
 		onmousedowncapture={(event) => HorizontalBarState.startResize(bar.id, position, event.clientY)}

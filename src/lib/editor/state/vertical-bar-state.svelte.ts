@@ -1,6 +1,3 @@
-import * as m from '$lib/paraglide/messages.js';
-
-import { capitalize } from '$lib/utils/strings.js';
 import { BarItems } from './bar-items.svelte.js';
 
 export type VerticalBar = {
@@ -187,20 +184,6 @@ export class VerticalBarState {
 				resolve(true);
 			});
 		});
-	}
-
-	humanize(id: string | number, position: VerticalBarPosition): string {
-		const bars = this.bars(position);
-		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
-		const description =
-			position === VerticalBarPosition.InlineStart ? m.inline_start_bar() : m.inline_end_bar();
-
-		const message =
-			index === -1 || index >= bars.length
-				? `${m.unknown()} ${description}`
-				: `${description} ${m.number({ count: index + 1 })}`;
-
-		return capitalize(message);
 	}
 }
 

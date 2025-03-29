@@ -1,6 +1,3 @@
-import * as m from '$lib/paraglide/messages.js';
-
-import { capitalize } from '$lib/utils/strings.js';
 import { BarItems } from './bar-items.svelte.js';
 
 export enum HorizontalBarPosition {
@@ -170,27 +167,6 @@ export class HorizontalBarState {
 				resolve(true);
 			});
 		});
-	}
-
-	humanize(id: string | number, bar: HorizontalBarPosition): string {
-		const bars = this.bars(bar);
-		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
-		let description: string;
-		switch (bar) {
-			case HorizontalBarPosition.WindowBlockStart:
-				description = m.window_block_start();
-				break;
-			case HorizontalBarPosition.WindowBlockEnd:
-				description = m.window_block_end();
-				break;
-		}
-
-		const message =
-			index === -1 || index >= bars.length
-				? `${m.unknown()} ${description}`
-				: `${description} ${m.number({ count: index + 1 })}`;
-
-		return capitalize(message);
 	}
 
 	remove(id: string | number, position: HorizontalBarPosition): boolean {
