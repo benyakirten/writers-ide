@@ -159,13 +159,11 @@ export class BarTransferHandler {
 			return false;
 		}
 
-		console.log('HERE 1');
 		const fromItems = this.#items(from, id)?.ids;
 		if (!fromItems) {
 			return false;
 		}
 
-		console.log('HERE 2');
 		if (from === 'floating') {
 			if (!FloatingBarState.remove(id)) {
 				return false;
@@ -182,7 +180,6 @@ export class BarTransferHandler {
 				return false;
 			}
 		}
-		console.log('HERE 3');
 
 		if (to === 'floating') {
 			FloatingBarState.add({ data: fromItems });
@@ -198,19 +195,29 @@ export class BarTransferHandler {
 		return true;
 	}
 
-	swapBarPosition(id: string | number, position: BarTransferLocation, to: number): boolean {
+	/**
+	 * Swaps bars between two locations in the same location.
+	 */
+	swapBarPosition(
+		fromId: string | number,
+		position: BarTransferLocation,
+		toId: string | number
+	): boolean {
 		if (position === 'floating') {
 			return false;
 		}
 
 		const bars = this.#bars(position);
-		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
-		if (index === -1 || index >= bars.length || to < 0 || to >= bars.length) {
+		const fromIndex =
+			typeof fromId === 'string' ? bars.findIndex((bar) => bar.id === fromId) : fromId;
+		const toIndex = typeof toId === 'string' ? bars.findIndex((bar) => bar.id === toId) : toId;
+
+		if (fromIndex === -1 || fromIndex >= bars.length || toIndex < 0 || toIndex >= bars.length) {
 			return false;
 		}
 
 		// @ts-expect-error: The type of array doesn't matter.
-		swap(bars, index, to);
+		swap(bars, fromIndex, toIndex);
 		return true;
 	}
 }

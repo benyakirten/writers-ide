@@ -55,4 +55,55 @@ describe('BarTransferHandler', () => {
 			expect(VerticalBarState.inlineStart[2].data.ids).toEqual(horizontalBar.data.ids);
 		});
 	});
+
+	describe('swapBarPosition', () => {
+		it('should return false if the position is floating', () => {
+			const bar1 = FloatingBarState.add();
+			const bar2 = FloatingBarState.add();
+			const result = TransferHandler.swapBarPosition(bar1.id, 'floating', bar2.id);
+
+			expect(result).toBe(false);
+			expect(FloatingBarState.bars[0].id).toBe(bar1.id);
+			expect(FloatingBarState.bars[1].id).toBe(bar2.id);
+		});
+
+		it("should return false if either the from or to bar doesn't exist", () => {
+			const bar1 = HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart);
+			const bar2 = HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart);
+
+			const result = TransferHandler.swapBarPosition(
+				bar1.id,
+				HorizontalBarPosition.WindowBlockStart,
+				'nonexistent'
+			);
+			expect(result).toBe(false);
+
+			expect(HorizontalBarState.windowBlockStart[0].id).toBe(bar1.id);
+			expect(HorizontalBarState.windowBlockStart[1].id).toBe(bar2.id);
+
+			const result2 = TransferHandler.swapBarPosition(
+				'nonexistent',
+				HorizontalBarPosition.WindowBlockStart,
+				bar2.id
+			);
+			expect(result2).toBe(false);
+			expect(HorizontalBarState.windowBlockStart[0].id).toBe(bar1.id);
+			expect(HorizontalBarState.windowBlockStart[1].id).toBe(bar2.id);
+		});
+
+		it('should return true and swap the bar positions on the same bar', () => {
+			const bar1 = HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart);
+			const bar2 = HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart);
+
+			const result = TransferHandler.swapBarPosition(
+				bar1.id,
+				HorizontalBarPosition.WindowBlockStart,
+				bar2.id
+			);
+			expect(result).toBe(true);
+
+			expect(HorizontalBarState.windowBlockStart[0].id).toBe(bar2.id);
+			expect(HorizontalBarState.windowBlockStart[1].id).toBe(bar1.id);
+		});
+	});
 });
