@@ -329,43 +329,6 @@ describe('HorizontalBarState', () => {
 		});
 	});
 
-	describe('humanize', () => {
-		beforeEach(() => {
-			state.add({ id: 'window-start-1', visible: true }, HorizontalBarPosition.WindowBlockStart);
-			state.add({ id: 'window-end-1', visible: true }, HorizontalBarPosition.WindowBlockEnd);
-		});
-
-		it('should return the humanized description for a window start bar by index', () => {
-			const description = state.humanize(0, HorizontalBarPosition.WindowBlockStart);
-			expect(description).toBe('Window block start #1');
-		});
-
-		it('should return the humanized description for a window end bar by index', () => {
-			const description = state.humanize(0, HorizontalBarPosition.WindowBlockEnd);
-			expect(description).toBe('Window block end #1');
-		});
-
-		it('should return the humanized description for a window start bar by id', () => {
-			const description = state.humanize('window-start-1', HorizontalBarPosition.WindowBlockStart);
-			expect(description).toBe('Window block start #1');
-		});
-
-		it('should return the humanized description for a window end bar by id', () => {
-			const description = state.humanize('window-end-1', HorizontalBarPosition.WindowBlockEnd);
-			expect(description).toBe('Window block end #1');
-		});
-
-		it('should return unknown description if the bar does not exist by index', () => {
-			const description = state.humanize(999, HorizontalBarPosition.WindowBlockStart);
-			expect(description).toBe('Unknown window block start');
-		});
-
-		it('should return unknown description if the bar does not exist by id', () => {
-			const description = state.humanize('non-existent', HorizontalBarPosition.WindowBlockStart);
-			expect(description).toBe('Unknown window block start');
-		});
-	});
-
 	describe('remove', () => {
 		it('should return false if the bar does not exist', () => {
 			const result = state.remove('non-existent', HorizontalBarPosition.WindowBlockStart);

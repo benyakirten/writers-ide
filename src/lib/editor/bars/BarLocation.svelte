@@ -7,8 +7,8 @@
 
 	let {
 		onmove,
-		current
-	}: { onmove: (direction: BarTransferLocation) => void; current: BarTransferLocation } = $props();
+		position
+	}: { onmove: (to: BarTransferLocation) => void; position: BarTransferLocation } = $props();
 
 	function handleChange(
 		event: Event & {
@@ -21,10 +21,21 @@
 	}
 </script>
 
-<select value={current} onchange={handleChange}>
+<select
+	class:vertical={position === VerticalBarPosition.InlineStart ||
+		position === VerticalBarPosition.InlineEnd}
+	value={position}
+	onchange={handleChange}
+>
 	<option value={HorizontalBarPosition.WindowBlockStart}>{m.move_to_window_block_start()}</option>
 	<option value={HorizontalBarPosition.WindowBlockEnd}>{m.move_to_window_block_end()}</option>
 	<option value={VerticalBarPosition.InlineStart}>{m.move_to_window_inline_start()}</option>
 	<option value={VerticalBarPosition.InlineEnd}>{m.move_to_window_inline_end()}</option>
 	<option value={'floating'}>{m.move_to_window_floating()}</option>
 </select>
+
+<style>
+	.vertical {
+		width: 8ch;
+	}
+</style>

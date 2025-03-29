@@ -22,6 +22,7 @@
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
 	import TransferHandler from '../state/bar-transfer-handler.svelte';
+	import BarLocation from './BarLocation.svelte';
 
 	let {
 		onminimize,
@@ -42,53 +43,7 @@
 
 <div class="menu">
 	<div class="initial-buttons">
-		<IconButton
-			disabled={position === HorizontalBarPosition.WindowBlockStart}
-			onclick={() =>
-				TransferHandler.moveMenu(position, index, HorizontalBarPosition.WindowBlockStart)}
-			label={m.move_to_window_block_end()}
-		>
-			{#snippet icon()}
-				<Icon src={AlignTopSimple} size="16px" />
-			{/snippet}
-		</IconButton>
-		<IconButton
-			disabled={position === HorizontalBarPosition.WindowBlockEnd}
-			onclick={() =>
-				TransferHandler.moveMenu(position, index, HorizontalBarPosition.WindowBlockEnd)}
-			label={m.move_to_window_block_end()}
-		>
-			{#snippet icon()}
-				<Icon src={AlignBottomSimple} size="16px" />
-			{/snippet}
-		</IconButton>
-		<IconButton
-			disabled={position === VerticalBarPosition.InlineStart}
-			onclick={() => TransferHandler.moveMenu(position, index, VerticalBarPosition.InlineStart)}
-			label={m.move_to_window_inline_start()}
-		>
-			{#snippet icon()}
-				<Icon src={AlignLeftSimple} size="16px" />
-			{/snippet}
-		</IconButton>
-		<IconButton
-			disabled={position === VerticalBarPosition.InlineEnd}
-			onclick={() => TransferHandler.moveMenu(position, index, VerticalBarPosition.InlineEnd)}
-			label={m.move_to_window_inline_end()}
-		>
-			{#snippet icon()}
-				<Icon src={AlignRightSimple} size="16px" />
-			{/snippet}
-		</IconButton>
-		<IconButton
-			disabled={position === 'floating'}
-			onclick={() => TransferHandler.moveMenu(position, index, 'floating')}
-			label={m.move_to_window_floating()}
-		>
-			{#snippet icon()}
-				<Icon src={PictureInPicture} size="16px" />
-			{/snippet}
-		</IconButton>
+		<BarLocation {position} onmove={(to) => TransferHandler.moveMenu(position, index, to)} />
 		{#if position !== 'floating'}
 			{@const isHorizontal =
 				position === VerticalBarPosition.InlineStart || position === VerticalBarPosition.InlineEnd}
@@ -137,6 +92,7 @@
 
 <style>
 	.menu {
+		position: relative;
 		z-index: 10;
 		display: flex;
 		justify-content: space-between;
