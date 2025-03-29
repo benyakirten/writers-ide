@@ -5,7 +5,7 @@
 	} from '../state/horizontal-bar-state.svelte.js';
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
-	import TransferHandler, { BarTransferHandler } from '../state/bar-transfer-handler.svelte.js';
+	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
 	import HorizontalItemRenderer from './HorizontalItemRenderer.svelte';
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
 
@@ -13,12 +13,14 @@
 		bar,
 		position,
 		index,
-		items
+		items,
+		canMoveForward
 	}: {
 		bar: HorizontalBar;
 		position: HorizontalBarPosition;
 		index: number;
 		items: BarItemData[];
+		canMoveForward: boolean;
 	} = $props();
 
 	let shouldInvert = HorizontalBarState.shouldInvert(position);
@@ -50,6 +52,7 @@
 				draggable
 				{position}
 				{index}
+				{canMoveForward}
 			/>
 		</div>
 		<div class="items">

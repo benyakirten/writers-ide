@@ -55,6 +55,13 @@
 		console.log('DRAG OVER');
 		console.log(e);
 	}
+
+	$inspect(
+		VerticalBarState.inlineStart.length,
+		VerticalBarState.inlineEnd.length,
+		HorizontalBarState.windowBlockStart.length,
+		HorizontalBarState.windowBlockEnd.length
+	);
 </script>
 
 <DndContext
@@ -80,6 +87,7 @@
 					position={HorizontalBarPosition.WindowBlockStart}
 					{index}
 					items={bar.data.items}
+					canMoveForward={index !== HorizontalBarState.windowBlockStart.length - 1}
 				/>
 			</SortableContext>
 		{/each}
@@ -92,6 +100,7 @@
 						position={VerticalBarPosition.InlineStart}
 						{index}
 						items={bar.data.items}
+						canMoveForward={index !== VerticalBarState.inlineStart.length - 1}
 					/>
 				{/each}
 			</SortableContext>
@@ -105,6 +114,7 @@
 						position={VerticalBarPosition.InlineEnd}
 						{index}
 						items={bar.data.items}
+						canMoveForward={index !== VerticalBarState.inlineEnd.length - 1}
 					/>
 				{/each}
 			</SortableContext>
@@ -116,6 +126,7 @@
 					position={HorizontalBarPosition.WindowBlockEnd}
 					{index}
 					items={bar.data.items}
+					canMoveForward={index !== HorizontalBarState.windowBlockEnd.length - 1}
 				/>
 			{/each}
 		</SortableContext>

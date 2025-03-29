@@ -10,12 +10,14 @@
 		bar,
 		position,
 		index,
-		items
+		items,
+		canMoveForward
 	}: {
 		bar: VerticalBar;
 		position: VerticalBarPosition;
 		index: number;
 		items: BarItemData[];
+		canMoveForward: boolean;
 	} = $props();
 
 	let shouldInvert = VerticalBarState.shouldInvert(position);
@@ -46,6 +48,7 @@
 			draggable
 			{position}
 			{index}
+			{canMoveForward}
 		/>
 		<div>
 			{#each items as item (item.id)}

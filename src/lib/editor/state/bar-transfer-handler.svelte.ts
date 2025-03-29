@@ -1,3 +1,4 @@
+import { swap } from '$lib/utils/arrays.js';
 import type { BarItems } from './bar-items.svelte.js';
 import FloatingBarState, { type FloatingBar } from './floater-state.svelte.js';
 import HorizontalBarState, {
@@ -154,7 +155,6 @@ export class BarTransferHandler {
 
 	moveMenu(from: BarTransferLocation, id: string | number, to: BarTransferLocation): boolean {
 		if (from === to) {
-			// TODO: Handle moving bar versus beginning/end
 			return false;
 		}
 
@@ -191,6 +191,22 @@ export class BarTransferHandler {
 			VerticalBarState.add({ data: fromItems }, to);
 		}
 
+		return true;
+	}
+
+	swapBarPosition(id: string | number, position: BarTransferLocation, to: number): boolean {
+		if (position === 'floating') {
+			return false;
+		}
+
+		const bars = this.#bars(position);
+		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
+		if (index === -1 || index >= bars.length || to < 0 || to >= bars.length) {
+			return false;
+		}
+
+		// @ts-expect-error: The type of array doesn't matter.
+		swap(bars, index, to);
 		return true;
 	}
 }

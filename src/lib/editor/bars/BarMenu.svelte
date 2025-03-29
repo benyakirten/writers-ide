@@ -9,7 +9,9 @@
 		AlignBottomSimple,
 		AlignLeftSimple,
 		AlignRightSimple,
-		PictureInPicture
+		PictureInPicture,
+		ArrowLeft,
+		ArrowRight
 	} from '@steeze-ui/phosphor-icons';
 
 	import IconButton from '$lib/components/IconButton.svelte';
@@ -22,13 +24,15 @@
 	let {
 		onminimize,
 		onclose,
+		canMoveForward,
 		draggable,
 		index,
 		position
 	}: {
 		onminimize: () => void;
-		draggable: boolean;
 		onclose: () => void;
+		canMoveForward: boolean;
+		draggable: boolean;
 		index: number;
 		position: BarTransferLocation;
 	} = $props();
@@ -37,7 +41,7 @@
 <div class="menu">
 	<div class="initial-buttons">
 		<IconButton
-			disabled={position === HorizontalBarPosition.WindowBlockStart && index === 0}
+			disabled={position === HorizontalBarPosition.WindowBlockStart}
 			onclick={() =>
 				TransferHandler.moveMenu(position, index, HorizontalBarPosition.WindowBlockStart)}
 			label={m.move_menu_to_window_block_end()}
@@ -47,7 +51,7 @@
 			{/snippet}
 		</IconButton>
 		<IconButton
-			disabled={position === HorizontalBarPosition.WindowBlockEnd && index === 0}
+			disabled={position === HorizontalBarPosition.WindowBlockEnd}
 			onclick={() =>
 				TransferHandler.moveMenu(position, index, HorizontalBarPosition.WindowBlockEnd)}
 			label={m.move_menu_to_window_block_end()}
@@ -57,7 +61,7 @@
 			{/snippet}
 		</IconButton>
 		<IconButton
-			disabled={position === VerticalBarPosition.InlineStart && index === 0}
+			disabled={position === VerticalBarPosition.InlineStart}
 			onclick={() => TransferHandler.moveMenu(position, index, VerticalBarPosition.InlineStart)}
 			label={m.move_menu_to_window_inline_start()}
 		>
@@ -66,7 +70,7 @@
 			{/snippet}
 		</IconButton>
 		<IconButton
-			disabled={position === VerticalBarPosition.InlineEnd && index === 0}
+			disabled={position === VerticalBarPosition.InlineEnd}
 			onclick={() => TransferHandler.moveMenu(position, index, VerticalBarPosition.InlineEnd)}
 			label={m.move_menu_to_window_inline_end()}
 		>
@@ -83,6 +87,26 @@
 				<Icon src={PictureInPicture} size="16px" />
 			{/snippet}
 		</IconButton>
+		{#if position !== 'floating'}
+			<IconButton
+				disabled={index === 0}
+				onclick={() => TransferHandler.swapBarPosition(index, position, index - 1)}
+				label={m.move_menu_backward()}
+			>
+				{#snippet icon()}
+					<Icon src={ArrowLeft} size="16px" />
+				{/snippet}
+			</IconButton>
+			<IconButton
+				disabled={!canMoveForward}
+				onclick={() => TransferHandler.swapBarPosition(index, position, index + 1)}
+				label={m.move_menu_forward()}
+			>
+				{#snippet icon()}
+					<Icon src={ArrowRight} size="16px" />
+				{/snippet}
+			</IconButton>
+		{/if}
 	</div>
 	<div class="latter-buttons">
 		{#if draggable}

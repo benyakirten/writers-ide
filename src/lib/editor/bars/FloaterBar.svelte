@@ -83,6 +83,7 @@
 			onclose={() => FloaterBarState.remove(index)}
 			draggable={false}
 			position="floating"
+			canMoveForward={false}
 			{index}
 		/>
 	</div>
