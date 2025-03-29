@@ -351,7 +351,20 @@ describe('VerticalBarState', () => {
 		});
 	});
 
-	describe.todo('remove', () => {
-		// TODO: Implement this test
+	describe('remove', () => {
+		it('should return false if the bar does not exist', () => {
+			const result = state.remove('non-existent', VerticalBarPosition.InlineStart);
+			expect(result).toBe(false);
+		});
+
+		it('should remove the bar if it exists', () => {
+			const bar1 = state.add({}, VerticalBarPosition.InlineStart);
+			const bar2 = state.add({}, VerticalBarPosition.InlineStart);
+			const bar3 = state.add({}, VerticalBarPosition.InlineStart);
+
+			const result = state.remove(bar2.id, VerticalBarPosition.InlineStart);
+			expect(result).toBe(true);
+			expect(state.inlineStart).toEqual([bar1, bar3]);
+		});
 	});
 });

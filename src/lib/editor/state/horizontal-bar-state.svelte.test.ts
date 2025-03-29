@@ -366,7 +366,20 @@ describe('HorizontalBarState', () => {
 		});
 	});
 
-	describe.todo('remove', () => {
-		// TODO: Implement this test
+	describe('remove', () => {
+		it('should return false if the bar does not exist', () => {
+			const result = state.remove('non-existent', HorizontalBarPosition.WindowBlockStart);
+			expect(result).toBe(false);
+		});
+
+		it('should remove the bar if it exists', () => {
+			const bar1 = state.add({}, HorizontalBarPosition.WindowBlockStart);
+			const bar2 = state.add({}, HorizontalBarPosition.WindowBlockStart);
+			const bar3 = state.add({}, HorizontalBarPosition.WindowBlockStart);
+
+			const result = state.remove(bar2.id, HorizontalBarPosition.WindowBlockStart);
+			expect(result).toBe(true);
+			expect(state.windowBlockStart).toEqual([bar1, bar3]);
+		});
 	});
 });
