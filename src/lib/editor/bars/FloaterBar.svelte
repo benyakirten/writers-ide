@@ -108,7 +108,8 @@
 	.floater {
 		position: absolute;
 		background-color: whitesmoke;
-		border: 1px solid black;
+		outline: 1px solid black;
+		outline-offset: 0px;
 		overflow: hidden;
 		resize: both;
 

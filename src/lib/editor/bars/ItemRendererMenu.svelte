@@ -10,19 +10,23 @@
 		title,
 		position,
 		moveDetails,
-		onremove
+		onremove,
+		onrelocate,
+		onmove
 	}: {
 		title: string;
 		position: BarTransferLocation;
 		moveDetails: MoveDetails;
 		onremove: () => void;
+		onrelocate: (to: BarTransferLocation) => void;
+		onmove: (direction: 'up' | 'down' | 'left' | 'right') => void;
 	} = $props();
 </script>
 
 <div class="menu">
 	<p>{title}</p>
 	<div class="buttons">
-		<BarLocation {moveDetails} {position} onmove={console.log} onrelocate={console.log} />
+		<BarLocation {moveDetails} {position} {onrelocate} {onmove} />
 		<div style:cursor={'grab'} class="drag-icon">
 			{#if position === HorizontalBarPosition.WindowBlockEnd || position === HorizontalBarPosition.WindowBlockStart}
 				<Icon src={DotsSix} size="18px" />
