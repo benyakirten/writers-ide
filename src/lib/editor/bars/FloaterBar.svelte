@@ -69,6 +69,25 @@
 			to
 		);
 	}
+
+	function handleItemMove(
+		direction: 'up' | 'down' | 'left' | 'right',
+		itemId: string,
+		index: number
+	) {
+		if (direction === 'left' || direction === 'right') {
+			return;
+		}
+
+		TransferHandler.swap(
+			{
+				location: 'floating',
+				barId: index,
+				itemId
+			},
+			direction === 'up' ? index - 1 : index + 1
+		);
+	}
 </script>
 
 <div
@@ -108,13 +127,13 @@
 		/>
 	</div>
 	<div class="items">
-		{#each items as item (item.id)}
+		{#each items as item, itemIndex (item.id)}
 			<VerticalItemRenderer
 				{...item}
 				onremove={() => TransferHandler.remove('floating', bar.id, item.id)}
 				position="floating"
 				moveDetails={{ up: null, down: null, left: null, right: null }}
-				onmove={() => {}}
+				onmove={(direction) => handleItemMove(direction, item.id, itemIndex)}
 				onrelocate={(to) => handleItemRelocate(to, item.id)}
 			/>
 		{/each}

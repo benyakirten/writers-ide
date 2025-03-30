@@ -60,6 +60,32 @@
 			to
 		);
 	}
+
+	function handleItemMove(
+		direction: 'up' | 'down' | 'left' | 'right',
+		itemId: string,
+		index: number
+	) {
+		if (direction === 'left' || direction === 'right') {
+			TransferHandler.swap(
+				{
+					location: position,
+					barId: index,
+					itemId
+				},
+				direction === 'left' ? index - 1 : index + 1
+			);
+		} else {
+			TransferHandler.nudge(
+				{
+					location: position,
+					barId: index,
+					itemId
+				},
+				direction === 'up' ? -1 : 1
+			);
+		}
+	}
 </script>
 
 {#snippet resizeBar()}
@@ -98,7 +124,7 @@
 					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
 					{moveDetails}
 					onrelocate={(to) => handleItemRelocate(to, item.id)}
-					onmove={() => {}}
+					onmove={(direction) => handleItemMove(direction, item.id, itemIndex)}
 					{...item}
 				/>
 			{/each}
