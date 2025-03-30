@@ -144,6 +144,15 @@ export class BarTransferHandler {
 		return toItems.insert(to.itemId, to.slot);
 	}
 
+	append(to: BarTransferLocation, id: string | number, itemId: string): boolean {
+		const items = this.#items(to, id);
+		if (!items) {
+			return false;
+		}
+
+		return items.append(itemId);
+	}
+
 	remove(location: BarTransferLocation, id: string | number, itemId: string): boolean {
 		const items = this.#items(location, id);
 		if (!items) {
