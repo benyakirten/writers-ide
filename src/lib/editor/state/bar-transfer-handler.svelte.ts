@@ -79,47 +79,11 @@ export class BarTransferHandler {
 		return bar?.data;
 	}
 
-	#findNextAvailableSlot(bars: Bars, from: number, id: string, direction: -1 | 1): number {
-		if (direction === 1) {
-			for (let i = from + 1; i < bars.length; i++) {
-				const bar = bars[i];
-				if (bar.data.canFit(id)) {
-					return i;
-				}
-			}
-		} else {
-			for (let i = from - 1; i >= 0; i--) {
-				const bar = bars[i];
-				if (bar.data.canFit(id)) {
-					return i;
-				}
-			}
-		}
-
-		return -1;
-	}
-
-	#locateTransfer(transfer: BarTransfer) {
-		if (transfer.location === 'floating') {
-			return null;
-		}
-
-		const bars = this.#bars(transfer.location);
-		const barIndex =
-			typeof transfer.barId === 'string'
-				? bars.findIndex((bar) => bar.id === transfer.barId)
-				: transfer.barId;
-		const bar = bars[barIndex];
-
-		if (!bar || !bar.data.has(transfer.itemId) || bars.length < 2) {
-			return null;
-		}
-
-		return { bars, barIndex, bar };
-	}
-
 	/**
-	 * Remove the item from the origin bar and add it to the destination bars.
+	 * Remove the item from a group of bars bar and add it to a different group bars.
+	 * If you are looking for a method to move the item from one bar to another
+	 * in the same group of bars, see `nudge`.
+	 *
 	 * It will append the item to the last bar. If there are no bars or
 	 * the item can't fit in the last bar, it will create a new bar.
 	 */
@@ -145,41 +109,66 @@ export class BarTransferHandler {
 		return true;
 	}
 
+	/**
+	 * Move the item from one bar to another among a the same group of bars.
+	 * If you are looking for the method to move the item from to a different group of bars,
+	 * see `relocateItem`.
+	 *
+	 * If there is no available slot in the next bar, it will create a new bar on the other side.
+	 * E.g. if you are moving to the right and there is no available slot in any bar to the right, it will create a new bar on the left.
+	 */
 	nudge(from: BarTransfer, direction: 1 | -1): boolean {
-		const transferLocation = this.#locateTransfer(from);
-		if (!transferLocation) {
+		if (from.location === 'floating') {
 			return false;
 		}
 
-		const { bars, barIndex, bar } = transferLocation;
+		const bars = this.#bars(from.location);
+		const barIndex =
+			typeof from.barId === 'string' ? bars.findIndex((bar) => bar.id === from.barId) : from.barId;
+		const bar = bars[barIndex];
+
+		if (!bar || !bar.data.has(from.itemId) || bars.length < 2) {
+			return false;
+		}
 
 		// Making this into a separate if check to make it a little cleaner - checking for invalid movement types.
 		if ((barIndex === 0 && direction === -1) || (barIndex === bars.length - 1 && direction === 1)) {
 			return false;
 		}
 
-		let slot = this.#findNextAvailableSlot(bars, barIndex, from.itemId, direction);
-		if (slot === -1) {
-			// If we can't find a slot, we need to create one - move one bar over.
-			const state =
+		let nextBar = bars.at(barIndex + direction);
+		if (!nextBar || !nextBar.data.canFit(from.itemId)) {
+			const newIndex = clamp(barIndex + 2 * direction, 0, bars.length);
+			if (
 				from.location === HorizontalBarPosition.WindowBlockStart ||
 				from.location === HorizontalBarPosition.WindowBlockEnd
-					? HorizontalBarState
-					: VerticalBarState;
-			slot = clamp(barIndex + 2 * direction, 0, bars.length - 1);
-			// @ts-expect-error: The location should b appropriate to the state
-			state.add({}, from.location, slot);
+			) {
+				nextBar = HorizontalBarState.add({}, from.location, newIndex);
+			} else {
+				nextBar = VerticalBarState.add({}, from.location, newIndex);
+			}
 		}
 
-		const nextBar = bars.at(slot);
 		if (!nextBar) {
 			return false;
 		}
 
-		if (!bar.data.remove(from.itemId)) {
+		if (!this.remove(from.location, from.barId, from.itemId)) {
 			return false;
 		}
 		return nextBar.data.append(from.itemId);
+	}
+
+	swap(from: BarTransfer, to: string | number): boolean {
+		const items = this.#items(from.location, from.barId);
+		if (!items) {
+			return false;
+		}
+
+		const item1Index = items.ids.findIndex((id) => id === from.itemId);
+		const item2Index = typeof to === 'string' ? items.ids.findIndex((id) => id === to) : to;
+
+		return items.swap(item1Index, item2Index);
 	}
 
 	insert(to: BarTransfer, slot: PossibleSlot): boolean {
