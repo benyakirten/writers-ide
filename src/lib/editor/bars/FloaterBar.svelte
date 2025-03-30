@@ -15,8 +15,13 @@
 	let menu: HTMLElement;
 
 	onMount(() => {
-		mutationObserver = new MutationObserver(() => {
-			FloaterBarState.updateMeasurements(bar.id, floater.clientWidth, floater.clientHeight);
+		mutationObserver = new MutationObserver(([item]) => {
+			if (!(item.target instanceof HTMLElement)) {
+				return;
+			}
+			const { clientWidth, clientHeight } = item.target;
+			console.log('UPDATE MEASUREMENTS', clientWidth, clientHeight);
+			FloaterBarState.updateMeasurements(bar.id, clientWidth, clientHeight);
 		});
 		mutationObserver.observe(floater, { attributes: true });
 
@@ -49,6 +54,10 @@
 				break;
 		}
 	}
+
+	$effect(() => {
+		console.log('CURRENT MEASUREMENTS', bar.position.width, bar.position.height);
+	});
 </script>
 
 <div
@@ -88,13 +97,12 @@
 		/>
 	</div>
 	<div class="items">
-		{#each items as item, index (item.id)}
+		{#each items as item (item.id)}
 			<VerticalItemRenderer
 				{...item}
 				onremove={() => TransferHandler.remove('floating', bar.id, item.id)}
 				position="floating"
-				canMoveBackward={index > 0}
-				canMoveForward={index < items.length - 1}
+				moveDetails={{ up: null, down: null, left: null, right: null }}
 			/>
 		{/each}
 	</div>
