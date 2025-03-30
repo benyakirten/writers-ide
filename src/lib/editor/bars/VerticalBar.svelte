@@ -5,7 +5,9 @@
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
 	import VerticalItemRenderer from './VerticalItemRenderer.svelte';
-	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
+	import TransferHandler, {
+		type BarTransferLocation
+	} from '../state/bar-transfer-handler.svelte.js';
 	import type { MoveDetails } from './BarLocation.svelte';
 
 	let {
@@ -43,6 +45,17 @@
 			right: canMoveForward
 		};
 	}
+
+	function handleItemRelocate(to: BarTransferLocation, itemId: string) {
+		TransferHandler.relocateItem(
+			{
+				location: position,
+				barId: index,
+				itemId
+			},
+			to
+		);
+	}
 </script>
 
 {#snippet resizeBar()}
@@ -79,7 +92,7 @@
 					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
 					{moveDetails}
 					onmove={() => {}}
-					onrelocate={() => {}}
+					onrelocate={(to) => handleItemRelocate(to, item.id)}
 					{...item}
 				/>
 			{/each}

@@ -20,6 +20,10 @@
 		"ondblclickcapture",
 		"oncontextmenu",
 		"onminimize",
-		"paraglide"
+		"paraglide",
+		"onmove",
+		"onrelocate",
+		"prosemirror",
+		"unsub"
 	]
 }

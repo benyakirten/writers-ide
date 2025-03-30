@@ -122,7 +122,10 @@ export class BarTransferHandler {
 	 * It will append the item to the last bar. If there are no bars or
 	 * the item can't fit in the last bar, it will create a new bar.
 	 */
-	moveItemToBar(from: BarTransfer, to: BarTransferLocation): boolean {
+	relocateItem(from: BarTransfer, to: BarTransferLocation): boolean {
+		if (from.location === to) {
+			return false;
+		}
 		const toBars = this.#bars(to);
 
 		// Put on the last bar

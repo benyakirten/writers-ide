@@ -7,7 +7,9 @@
 	} from '../state/horizontal-bar-state.svelte.js';
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
-	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
+	import TransferHandler, {
+		type BarTransferLocation
+	} from '../state/bar-transfer-handler.svelte.js';
 	import HorizontalItemRenderer from './HorizontalItemRenderer.svelte';
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
 	import type { MoveDetails } from './BarLocation.svelte';
@@ -47,6 +49,17 @@
 			right: itemIndex < numItems - 1
 		};
 	}
+
+	function handleItemRelocate(to: BarTransferLocation, itemId: string) {
+		TransferHandler.relocateItem(
+			{
+				location: position,
+				barId: index,
+				itemId
+			},
+			to
+		);
+	}
 </script>
 
 {#snippet resizeBar()}
@@ -84,6 +97,8 @@
 					{position}
 					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
 					{moveDetails}
+					onrelocate={(to) => handleItemRelocate(to, item.id)}
+					onmove={() => {}}
 					{...item}
 				/>
 			{/each}

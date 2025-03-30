@@ -6,7 +6,9 @@
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
 	import VerticalItemRenderer from './VerticalItemRenderer.svelte';
-	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
+	import TransferHandler, {
+		type BarTransferLocation
+	} from '../state/bar-transfer-handler.svelte.js';
 
 	let { bar, items, index }: { bar: FloatingBar; items: BarItemData[]; index: number } = $props();
 
@@ -56,6 +58,17 @@
 				break;
 		}
 	}
+
+	function handleItemRelocate(to: BarTransferLocation, itemId: string) {
+		TransferHandler.relocateItem(
+			{
+				location: 'floating',
+				barId: index,
+				itemId
+			},
+			to
+		);
+	}
 </script>
 
 <div
@@ -102,7 +115,7 @@
 				position="floating"
 				moveDetails={{ up: null, down: null, left: null, right: null }}
 				onmove={() => {}}
-				onrelocate={() => {}}
+				onrelocate={(to) => handleItemRelocate(to, item.id)}
 			/>
 		{/each}
 	</div>
