@@ -30,24 +30,18 @@
 			: m.resize_inline_end_bar({ num: index + 1 })
 	);
 
-	function determineMoveDetials(itemIndex: number): MoveDetails {
-		const base: MoveDetails = {
-			up: null,
-			down: null,
-			left: null,
-			right: null
+	function determineMoveDetails(
+		itemIndex: number,
+		numItems: number,
+		barIndex: number,
+		canMoveForward: boolean
+	): MoveDetails {
+		return {
+			up: itemIndex > 0,
+			down: itemIndex < numItems - 1,
+			left: barIndex > 0,
+			right: canMoveForward
 		};
-		if (
-			position === VerticalBarPosition.InlineStart ||
-			position === VerticalBarPosition.InlineEnd
-		) {
-			base.up = itemIndex > 0;
-			base.down = itemIndex < items.length - 1;
-		} else {
-			base.left = itemIndex > 0;
-			base.right = itemIndex < items.length - 1;
-		}
-		return base;
 	}
 </script>
 
@@ -78,12 +72,14 @@
 			{canMoveForward}
 		/>
 		<div>
-			{#each items as item, index (item.id)}
-				{@const moveDetails = determineMoveDetials(index)}
+			{#each items as item, itemIndex (item.id)}
+				{@const moveDetails = determineMoveDetails(itemIndex, items.length, index, canMoveForward)}
 				<VerticalItemRenderer
 					{position}
 					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
 					{moveDetails}
+					onmove={() => {}}
+					onrelocate={() => {}}
 					{...item}
 				/>
 			{/each}

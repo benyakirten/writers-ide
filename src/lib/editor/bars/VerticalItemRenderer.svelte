@@ -47,7 +47,9 @@
 		title,
 		position,
 		moveDetails,
-		onremove
+		onremove,
+		onmove,
+		onrelocate
 	}: {
 		Component: BarItemData['Component'];
 		size: BarItemData['size'];
@@ -55,11 +57,13 @@
 		position: BarTransferLocation;
 		moveDetails: MoveDetails;
 		onremove: () => void;
+		onrelocate: (to: BarTransferLocation) => void;
+		onmove: (direction: 'up' | 'down' | 'left' | 'right') => void;
 	} = $props();
 </script>
 
 <div class="renderer" draggable style:--size={size}>
-	<ItemRendererMenu {moveDetails} {title} {onremove} {position} />
+	<ItemRendererMenu {moveDetails} {title} {onremove} {position} {onmove} {onrelocate} />
 	<div class="component">
 		{#if Component}
 			<Component {...itemProps} {locale} />

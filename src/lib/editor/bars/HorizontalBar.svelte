@@ -34,15 +34,18 @@
 			: m.resize_block_end_bar({ num: index + 1 })
 	);
 
-	function determineMoveDetials(itemIndex: number): MoveDetails {
-		const base: MoveDetails = {
-			up: null,
-			down: null,
-			left: null,
-			right: null
+	function determineMoveDetails(
+		itemIndex: number,
+		numItems: number,
+		barIndex: number,
+		canMoveForward: boolean
+	): MoveDetails {
+		return {
+			up: barIndex > 0,
+			down: canMoveForward,
+			left: itemIndex > 0,
+			right: itemIndex < numItems - 1
 		};
-
-		return base;
 	}
 </script>
 
@@ -75,8 +78,8 @@
 			/>
 		</div>
 		<div class="items">
-			{#each items as item, index (item.id)}
-				{@const moveDetails = determineMoveDetials(index)}
+			{#each items as item, itemIndex (item.id)}
+				{@const moveDetails = determineMoveDetails(itemIndex, items.length, index, canMoveForward)}
 				<HorizontalItemRenderer
 					{position}
 					onremove={() => TransferHandler.remove(position, bar.id, item.id)}

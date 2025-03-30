@@ -23,7 +23,9 @@
 			FloaterBarState.updateMeasurements(bar.id, clientWidth, clientHeight);
 		});
 
-		resizeObserver.observe(floater);
+		// Changing the box doesn't seem to work.
+		// TODO: Figure out why a border is a problem but not an outline.
+		resizeObserver.observe(floater, { box: 'border-box' });
 
 		return () => {
 			resizeObserver.disconnect();
