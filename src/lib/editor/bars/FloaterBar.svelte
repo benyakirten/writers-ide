@@ -81,6 +81,8 @@
 		<BarMenu
 			onminimize={() => FloaterBarState.update(index, 'minimized', true)}
 			onclose={() => FloaterBarState.remove(index)}
+			onrelocate={(to) => TransferHandler.moveMenu('floating', index, to)}
+			onmove={() => {}}
 			draggable={false}
 			position="floating"
 			canMoveForward={false}
@@ -88,11 +90,13 @@
 		/>
 	</div>
 	<div class="items">
-		{#each items as item (item.id)}
+		{#each items as item, index (item.id)}
 			<VerticalItemRenderer
 				{...item}
 				onremove={() => TransferHandler.remove('floating', bar.id, item.id)}
 				position="floating"
+				canMoveBackward={index > 0}
+				canMoveForward={index < items.length - 1}
 			/>
 		{/each}
 	</div>

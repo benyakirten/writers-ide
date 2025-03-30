@@ -56,6 +56,8 @@
 			<BarMenu
 				onminimize={() => HorizontalBarState.toggle(index, position)}
 				onclose={() => HorizontalBarState.remove(index, position)}
+				onrelocate={(to) => TransferHandler.moveMenu(position, index, to)}
+				onmove={() => {}}
 				draggable
 				{position}
 				{index}
@@ -63,11 +65,13 @@
 			/>
 		</div>
 		<div class="items">
-			{#each items as item (item.id)}
+			{#each items as item, index (item.id)}
 				<HorizontalItemRenderer
 					{position}
 					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
 					{...item}
+					canMoveBackward={index > 0}
+					canMoveForward={index < items.length - 1}
 				/>
 			{/each}
 		</div>

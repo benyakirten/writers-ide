@@ -9,10 +9,14 @@
 	let {
 		title,
 		position,
+		canMoveBackward,
+		canMoveForward,
 		onremove
 	}: {
 		title: string;
 		position: BarTransferLocation;
+		canMoveBackward: boolean;
+		canMoveForward: boolean;
 		onremove: () => void;
 	} = $props();
 </script>
@@ -20,7 +24,13 @@
 <div class="menu">
 	<p>{title}</p>
 	<div class="buttons">
-		<BarLocation {position} onmove={console.log} />
+		<BarLocation
+			{canMoveBackward}
+			{canMoveForward}
+			{position}
+			onmove={console.log}
+			onrelocate={console.log}
+		/>
 		<div style:cursor={'grab'} class="drag-icon">
 			{#if position === HorizontalBarPosition.WindowBlockEnd || position === HorizontalBarPosition.WindowBlockStart}
 				<Icon src={DotsSix} size="18px" />

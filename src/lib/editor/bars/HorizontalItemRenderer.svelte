@@ -45,18 +45,22 @@
 		size,
 		title,
 		position,
+		canMoveBackward,
+		canMoveForward,
 		onremove
 	}: {
 		Component: BarItemData['Component'];
 		size: BarItemData['size'];
 		title: string;
 		position: BarTransferLocation;
+		canMoveBackward: boolean;
+		canMoveForward: boolean;
 		onremove: () => void;
 	} = $props();
 </script>
 
 <div class="renderer" style:--size={size}>
-	<ItemRendererMenu {position} {title} {onremove} />
+	<ItemRendererMenu {canMoveBackward} {canMoveForward} {position} {title} {onremove} />
 	<div class="component">
 		{#if Component}
 			<Component {...itemProps} {locale} />

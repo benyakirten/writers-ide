@@ -219,6 +219,16 @@ export class BarTransferHandler {
 		swap(bars, fromIndex, toIndex);
 		return true;
 	}
+
+	isBarLocation(val: string): val is BarTransferLocation {
+		return (
+			val === HorizontalBarPosition.WindowBlockEnd ||
+			val === HorizontalBarPosition.WindowBlockStart ||
+			val === VerticalBarPosition.InlineEnd ||
+			val === VerticalBarPosition.InlineStart ||
+			val === 'floating'
+		);
+	}
 }
 
 const TransferHandler = new BarTransferHandler();
