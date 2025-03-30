@@ -2,21 +2,19 @@
 	import IconButton from '$lib/components/IconButton.svelte';
 	import { DotsSix, DotsSixVertical, X } from '@steeze-ui/phosphor-icons';
 	import { Icon } from '@steeze-ui/svelte-icon';
-	import BarLocation from './BarLocation.svelte';
+	import BarLocation, { type MoveDetails } from './BarLocation.svelte';
 	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 
 	let {
 		title,
 		position,
-		canMoveBackward,
-		canMoveForward,
+		moveDetails,
 		onremove
 	}: {
 		title: string;
 		position: BarTransferLocation;
-		canMoveBackward: boolean;
-		canMoveForward: boolean;
+		moveDetails: MoveDetails;
 		onremove: () => void;
 	} = $props();
 </script>
@@ -24,13 +22,7 @@
 <div class="menu">
 	<p>{title}</p>
 	<div class="buttons">
-		<BarLocation
-			{canMoveBackward}
-			{canMoveForward}
-			{position}
-			onmove={console.log}
-			onrelocate={console.log}
-		/>
+		<BarLocation {moveDetails} {position} onmove={console.log} onrelocate={console.log} />
 		<div style:cursor={'grab'} class="drag-icon">
 			{#if position === HorizontalBarPosition.WindowBlockEnd || position === HorizontalBarPosition.WindowBlockStart}
 				<Icon src={DotsSix} size="18px" />

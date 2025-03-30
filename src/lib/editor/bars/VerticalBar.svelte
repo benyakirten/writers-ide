@@ -6,6 +6,7 @@
 	import type { BarItemData } from '../state/bar-items.svelte.js';
 	import VerticalItemRenderer from './VerticalItemRenderer.svelte';
 	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
+	import type { MoveDetails } from './BarLocation.svelte';
 
 	let {
 		bar,
@@ -28,6 +29,26 @@
 			? m.resize_inline_start_bar({ num: index + 1 })
 			: m.resize_inline_end_bar({ num: index + 1 })
 	);
+
+	function determineMoveDetials(itemIndex: number): MoveDetails {
+		const base: MoveDetails = {
+			up: null,
+			down: null,
+			left: null,
+			right: null
+		};
+		if (
+			position === VerticalBarPosition.InlineStart ||
+			position === VerticalBarPosition.InlineEnd
+		) {
+			base.up = itemIndex > 0;
+			base.down = itemIndex < items.length - 1;
+		} else {
+			base.left = itemIndex > 0;
+			base.right = itemIndex < items.length - 1;
+		}
+		return base;
+	}
 </script>
 
 {#snippet resizeBar()}
@@ -51,18 +72,18 @@
 		<BarMenu
 			onminimize={() => VerticalBarState.toggle(index, position)}
 			onclose={() => VerticalBarState.remove(index, position)}
-			onrelocate={(to) => TransferHandler.moveMenu(position, index, to)}
-			onmove={() => {}}
 			draggable
 			{position}
 			{index}
 			{canMoveForward}
 		/>
 		<div>
-			{#each items as item (item.id)}
+			{#each items as item, index (item.id)}
+				{@const moveDetails = determineMoveDetials(index)}
 				<VerticalItemRenderer
 					{position}
 					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
+					{moveDetails}
 					{...item}
 				/>
 			{/each}

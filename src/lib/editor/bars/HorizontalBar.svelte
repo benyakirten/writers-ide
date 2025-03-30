@@ -10,6 +10,7 @@
 	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
 	import HorizontalItemRenderer from './HorizontalItemRenderer.svelte';
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
+	import type { MoveDetails } from './BarLocation.svelte';
 
 	let {
 		bar,
@@ -32,6 +33,17 @@
 			? m.resize_block_start_bar({ num: index + 1 })
 			: m.resize_block_end_bar({ num: index + 1 })
 	);
+
+	function determineMoveDetials(itemIndex: number): MoveDetails {
+		const base: MoveDetails = {
+			up: null,
+			down: null,
+			left: null,
+			right: null
+		};
+
+		return base;
+	}
 </script>
 
 {#snippet resizeBar()}
@@ -56,8 +68,6 @@
 			<BarMenu
 				onminimize={() => HorizontalBarState.toggle(index, position)}
 				onclose={() => HorizontalBarState.remove(index, position)}
-				onrelocate={(to) => TransferHandler.moveMenu(position, index, to)}
-				onmove={() => {}}
 				draggable
 				{position}
 				{index}
@@ -66,12 +76,12 @@
 		</div>
 		<div class="items">
 			{#each items as item, index (item.id)}
+				{@const moveDetails = determineMoveDetials(index)}
 				<HorizontalItemRenderer
 					{position}
 					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
+					{moveDetails}
 					{...item}
-					canMoveBackward={index > 0}
-					canMoveForward={index < items.length - 1}
 				/>
 			{/each}
 		</div>

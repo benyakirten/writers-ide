@@ -1,3 +1,12 @@
+<script lang="ts" module>
+	export type MoveDetails = {
+		up: boolean | null;
+		down: boolean | null;
+		left: boolean | null;
+		right: boolean | null;
+	};
+</script>
+
 <script lang="ts">
 	import * as m from '$lib/paraglide/messages';
 
@@ -12,14 +21,12 @@
 	let {
 		onrelocate,
 		onmove,
-		canMoveBackward,
-		canMoveForward,
+		moveDetails,
 		position
 	}: {
 		onrelocate: (to: BarTransferLocation) => void;
-		onmove: (direction: 1 | -1) => void;
-		canMoveBackward: boolean;
-		canMoveForward: boolean;
+		onmove: (direction: 'up' | 'down' | 'left' | 'right') => void;
+		moveDetails: MoveDetails;
 		position: BarTransferLocation;
 	} = $props();
 

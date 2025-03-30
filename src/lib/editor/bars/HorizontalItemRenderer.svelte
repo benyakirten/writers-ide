@@ -15,6 +15,7 @@
 	import ItemRendererMenu from './ItemRendererMenu.svelte';
 	import LocaleManager from '../state/locale-manager.svelte.js';
 	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte.js';
+	import type { MoveDetails } from './BarLocation.svelte';
 
 	let locale = $state(LocaleManager.data);
 	let itemProps: Omit<BarItemComponentProps, 'locale'> = {
@@ -45,22 +46,20 @@
 		size,
 		title,
 		position,
-		canMoveBackward,
-		canMoveForward,
+		moveDetails,
 		onremove
 	}: {
 		Component: BarItemData['Component'];
 		size: BarItemData['size'];
 		title: string;
 		position: BarTransferLocation;
-		canMoveBackward: boolean;
-		canMoveForward: boolean;
+		moveDetails: MoveDetails;
 		onremove: () => void;
 	} = $props();
 </script>
 
 <div class="renderer" style:--size={size}>
-	<ItemRendererMenu {canMoveBackward} {canMoveForward} {position} {title} {onremove} />
+	<ItemRendererMenu {moveDetails} {position} {title} {onremove} />
 	<div class="component">
 		{#if Component}
 			<Component {...itemProps} {locale} />

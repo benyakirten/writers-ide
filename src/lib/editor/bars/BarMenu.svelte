@@ -6,7 +6,8 @@
 	import IconButton from '$lib/components/IconButton.svelte';
 	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
-	import BarLocation from './BarLocation.svelte';
+	import BarLocation, { type MoveDetails } from './BarLocation.svelte';
+	import TransferHandler from '../state/bar-transfer-handler.svelte';
 
 	let {
 		canMoveForward,
@@ -14,9 +15,7 @@
 		index,
 		position,
 		onminimize,
-		onclose,
-		onrelocate,
-		onmove
+		onclose
 	}: {
 		canMoveForward: boolean;
 		draggable: boolean;
@@ -24,9 +23,47 @@
 		position: BarTransferLocation;
 		onminimize: () => void;
 		onclose: () => void;
-		onrelocate: (to: BarTransferLocation) => void;
-		onmove: (direction: 1 | -1) => void;
 	} = $props();
+
+	let moveDetails = $derived.by(() => {
+		const base: MoveDetails = {
+			up: null,
+			down: null,
+			left: null,
+			right: null
+		};
+		if (
+			position === VerticalBarPosition.InlineStart ||
+			position === VerticalBarPosition.InlineEnd
+		) {
+			base.up = canMoveForward;
+			base.down = index > 0;
+		} else {
+			base.left = canMoveForward;
+			base.right = index > 0;
+		}
+
+		return base;
+	});
+
+	function handleMove(direction: 'up' | 'down' | 'left' | 'right') {
+		if (
+			position === VerticalBarPosition.InlineStart ||
+			position === VerticalBarPosition.InlineEnd
+		) {
+			if (direction === 'up') {
+				TransferHandler.swapBarPosition(index, position, index - 1);
+			} else if (direction === 'down') {
+				TransferHandler.swapBarPosition(index, position, index + 1);
+			}
+		} else {
+			if (direction === 'left') {
+				TransferHandler.swapBarPosition(index, position, index - 1);
+			} else if (direction === 'right') {
+				TransferHandler.swapBarPosition(index, position, index + 1);
+			}
+		}
+	}
 </script>
 
 <div class="menu">
@@ -39,7 +76,12 @@
 			{/if}
 		</div>
 	{/if}
-	<BarLocation canMoveBackward={index > 0} {canMoveForward} {position} {onrelocate} {onmove} />
+	<BarLocation
+		{moveDetails}
+		{position}
+		onrelocate={(to) => TransferHandler.moveMenu(position, index, to)}
+		onmove={handleMove}
+	/>
 	<IconButton onclick={onminimize} label={m.minimize_bar({ num: index + 1 })}>
 		{#snippet icon()}
 			<Icon src={Minus} size="16px" />
