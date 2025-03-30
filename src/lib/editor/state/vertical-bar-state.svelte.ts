@@ -43,7 +43,8 @@ export class VerticalBarState {
 			visible = true,
 			data
 		}: Partial<Omit<VerticalBar, 'data'>> & { data?: string[] },
-		position: VerticalBarPosition
+		position: VerticalBarPosition,
+		index: number = -1
 	): VerticalBar {
 		const bars = this.bars(position);
 		const existingBar = bars.find((bar) => bar.id === id);
@@ -54,7 +55,12 @@ export class VerticalBarState {
 		const barData = new BarItems(true, data);
 		const bar = { width, id, visible, data: barData };
 
-		bars.push(bar);
+		if (index < 0 || index >= bars.length) {
+			bars.push(bar);
+		} else {
+			bars.splice(index, 0, bar);
+		}
+
 		return bar;
 	}
 

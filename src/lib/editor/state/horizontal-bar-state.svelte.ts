@@ -35,7 +35,8 @@ export class HorizontalBarState {
 			visible = true,
 			data
 		}: Partial<Omit<HorizontalBar, 'data'>> & { data?: string[] },
-		position: HorizontalBarPosition
+		position: HorizontalBarPosition,
+		index: number = -1
 	): HorizontalBar {
 		const bars = this.bars(position);
 		const existingBar = bars.find((bar) => bar.id === id);
@@ -48,7 +49,12 @@ export class HorizontalBarState {
 		const barData = new BarItems(false, data);
 		const bar = { height, id, visible, data: barData };
 
-		bars.push(bar);
+		if (index < 0 || index >= bars.length) {
+			bars.push(bar);
+		} else {
+			bars.splice(index, 0, bar);
+		}
+
 		return bar;
 	}
 

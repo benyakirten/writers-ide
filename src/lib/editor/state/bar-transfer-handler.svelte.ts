@@ -100,6 +100,63 @@ export class BarTransferHandler {
 		return true;
 	}
 
+	#findNextAvailableSlot(bars: Bars, from: number, id: string, direction: -1 | 1): number {
+		if (direction === 1) {
+			for (let i = from + 1; i < bars.length; i++) {
+				const bar = bars[i];
+				if (bar.data.canFit(id)) {
+					return i;
+				}
+			}
+		} else {
+			for (let i = from - 1; i >= 0; i--) {
+				const bar = bars[i];
+				if (bar.data.canFit(id)) {
+					return i;
+				}
+			}
+		}
+
+		return -1;
+	}
+
+	nudge(from: Omit<BarTransfer, 'slot'>, direction: 1 | -1): boolean {
+		// Cannot nudge a floating bar.
+		if (from.location === 'floating') {
+			return false;
+		}
+
+		const bars = this.#bars(from.location);
+		const barIndex =
+			typeof from.barId === 'string' ? bars.findIndex((bar) => bar.id === from.barId) : from.barId;
+		const bar = bars[barIndex];
+
+		if (!bar || !bar.data.has(from.itemId) || bars.length < 2) {
+			return false;
+		}
+
+		// Making this into a separate if check to make it a little cleaner - checking for invalid movement types.
+		if ((barIndex === 0 && direction === -1) || (barIndex === bars.length - 1 && direction === 1)) {
+			return false;
+		}
+
+		const slot = this.#findNextAvailableSlot(bars, barIndex, from.itemId, direction);
+		if (slot === -1) {
+			// Create a bar on the other side of nearest bar and then move the item to it.
+			return true;
+		}
+
+		const nextBar = bars.at(slot);
+		if (!nextBar) {
+			return false;
+		}
+
+		if (!bar.data.remove(from.itemId)) {
+			return false;
+		}
+		return nextBar.data.append(from.itemId);
+	}
+
 	barItems(
 		from: BarTransfer,
 		to: Omit<BarTransfer, 'itemId'>,

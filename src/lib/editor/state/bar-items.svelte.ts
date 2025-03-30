@@ -129,4 +129,8 @@ export class BarItems {
 		const usedSpace = this.#ids.reduce((acc, id) => acc + Registry.size(id, this.isVertical), 0);
 		return Math.max(0, this.maxSize - usedSpace);
 	});
+
+	canFit(id: string): boolean {
+		return this.availableSpace >= Registry.size(id, this.isVertical);
+	}
 }
