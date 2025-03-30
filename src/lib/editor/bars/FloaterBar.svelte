@@ -101,6 +101,8 @@
 				onremove={() => TransferHandler.remove('floating', bar.id, item.id)}
 				position="floating"
 				moveDetails={{ up: null, down: null, left: null, right: null }}
+				onmove={() => {}}
+				onrelocate={() => {}}
 			/>
 		{/each}
 	</div>

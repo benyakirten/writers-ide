@@ -62,6 +62,7 @@ export class FloaterBarState {
 		}
 		return highestBar;
 	});
+
 	dragging: {
 		id: string;
 		x: number;

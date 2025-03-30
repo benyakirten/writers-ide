@@ -1,4 +1,5 @@
 import { swap } from '$lib/utils/arrays.js';
+import { clamp } from '@/utils/numbers.js';
 import type { BarItems } from './bar-items.svelte.js';
 import FloatingBarState, { type FloatingBar } from './floater-state.svelte.js';
 import HorizontalBarState, {
@@ -16,7 +17,6 @@ export type Bars = HorizontalBar[] | VerticalBar[] | FloatingBar[];
 export type BarTransfer = {
 	location: BarTransferLocation;
 	barId: string | number;
-	slot: PossibleSlot;
 	itemId: string;
 };
 
@@ -61,14 +61,14 @@ export class BarTransferHandler {
 
 	#createEmptyBar(location: BarTransferLocation): string {
 		switch (location) {
+			case 'floating':
+				return FloatingBarState.add().id;
 			case HorizontalBarPosition.WindowBlockEnd:
 			case HorizontalBarPosition.WindowBlockStart:
 				return HorizontalBarState.add({}, location).id;
-			case VerticalBarPosition.InlineEnd:
-			case VerticalBarPosition.InlineStart:
+
+			default:
 				return VerticalBarState.add({}, location).id;
-			case 'floating':
-				return FloatingBarState.add({}).id;
 		}
 	}
 
@@ -76,28 +76,6 @@ export class BarTransferHandler {
 		const bars = this.#bars(location);
 		const bar = typeof id === 'string' ? bars.find((bar) => bar.id === id) : bars.at(id);
 		return bar?.data;
-	}
-
-	move(
-		from: BarTransfer,
-		to: Omit<BarTransfer, 'itemId'>,
-		createToBarIfMissing: boolean = true
-	): boolean {
-		const items = this.barItems(from, to, createToBarIfMissing);
-		if (!items) {
-			return false;
-		}
-
-		const [fromItems, toItems] = items;
-
-		if (fromItems === toItems) {
-			return fromItems.swap(from.slot, to.slot);
-		}
-
-		fromItems.remove(from.slot);
-		toItems.insert(from.itemId, to.slot);
-
-		return true;
 	}
 
 	#findNextAvailableSlot(bars: Bars, from: number, id: string, direction: -1 | 1): number {
@@ -120,30 +98,73 @@ export class BarTransferHandler {
 		return -1;
 	}
 
-	nudge(from: Omit<BarTransfer, 'slot'>, direction: 1 | -1): boolean {
-		// Cannot nudge a floating bar.
-		if (from.location === 'floating') {
-			return false;
+	#locateTransfer(transfer: BarTransfer) {
+		if (transfer.location === 'floating') {
+			return null;
 		}
 
-		const bars = this.#bars(from.location);
+		const bars = this.#bars(transfer.location);
 		const barIndex =
-			typeof from.barId === 'string' ? bars.findIndex((bar) => bar.id === from.barId) : from.barId;
+			typeof transfer.barId === 'string'
+				? bars.findIndex((bar) => bar.id === transfer.barId)
+				: transfer.barId;
 		const bar = bars[barIndex];
 
-		if (!bar || !bar.data.has(from.itemId) || bars.length < 2) {
+		if (!bar || !bar.data.has(transfer.itemId) || bars.length < 2) {
+			return null;
+		}
+
+		return { bars, barIndex, bar };
+	}
+
+	/**
+	 * Remove the item from the origin bar and add it to the destination bars.
+	 * It will append the item to the last bar. If there are no bars or
+	 * the item can't fit in the last bar, it will create a new bar.
+	 */
+	moveItemToBar(from: BarTransfer, to: BarTransferLocation): boolean {
+		const toBars = this.#bars(to);
+
+		// Put on the last bar
+		const lastBar = toBars.at(toBars.length - 1);
+		if (!lastBar || !lastBar.data.canFit(from.itemId)) {
+			this.#createEmptyBar(to);
+		}
+
+		this.remove(from.location, from.barId, from.itemId);
+		this.append(to, toBars.length - 1, from.itemId);
+
+		if (to === 'floating') {
+			FloatingBarState.focus(toBars.length - 1);
+		}
+
+		return true;
+	}
+
+	nudge(from: BarTransfer, direction: 1 | -1): boolean {
+		const transferLocation = this.#locateTransfer(from);
+		if (!transferLocation) {
 			return false;
 		}
+
+		const { bars, barIndex, bar } = transferLocation;
 
 		// Making this into a separate if check to make it a little cleaner - checking for invalid movement types.
 		if ((barIndex === 0 && direction === -1) || (barIndex === bars.length - 1 && direction === 1)) {
 			return false;
 		}
 
-		const slot = this.#findNextAvailableSlot(bars, barIndex, from.itemId, direction);
+		let slot = this.#findNextAvailableSlot(bars, barIndex, from.itemId, direction);
 		if (slot === -1) {
-			// Create a bar on the other side of nearest bar and then move the item to it.
-			return true;
+			// If we can't find a slot, we need to create one - move one bar over.
+			const state =
+				from.location === HorizontalBarPosition.WindowBlockStart ||
+				from.location === HorizontalBarPosition.WindowBlockEnd
+					? HorizontalBarState
+					: VerticalBarState;
+			slot = clamp(barIndex + 2 * direction, 0, bars.length - 1);
+			// @ts-expect-error: The location should b appropriate to the state
+			state.add({}, from.location, slot);
 		}
 
 		const nextBar = bars.at(slot);
@@ -157,48 +178,13 @@ export class BarTransferHandler {
 		return nextBar.data.append(from.itemId);
 	}
 
-	barItems(
-		from: BarTransfer,
-		to: Omit<BarTransfer, 'itemId'>,
-		createToBarIfMissing: boolean = true
-	): [BarItems, BarItems] | null {
-		const fromItems = this.#items(from.location, from.barId);
-		const toItems = this.#items(to.location, to.barId);
-		if (!toItems) {
-			const bars = this.#bars(to.location);
-			if (bars.length === 0 && createToBarIfMissing) {
-				const id = this.#createEmptyBar(to.location);
-				to.barId = id;
-				return this.barItems(from, to);
-			}
-		}
-
-		if (!fromItems || !toItems) {
-			return null;
-		}
-
-		if (from.slot > fromItems.ids.length || to.slot > toItems.ids.length) {
-			return null;
-		}
-
-		if (fromItems === toItems && !fromItems.canSwap(from.slot, to.slot)) {
-			return null;
-		}
-
-		if (!fromItems.has(from.itemId) || toItems.has(from.itemId)) {
-			return null;
-		}
-
-		return [fromItems, toItems];
-	}
-
-	insert(to: BarTransfer): boolean {
+	insert(to: BarTransfer, slot: PossibleSlot): boolean {
 		const toItems = this.#items(to.location, to.barId);
 		if (!toItems) {
 			return false;
 		}
 
-		return toItems.insert(to.itemId, to.slot);
+		return toItems.insert(to.itemId, slot);
 	}
 
 	append(to: BarTransferLocation, id: string | number, itemId: string): boolean {
