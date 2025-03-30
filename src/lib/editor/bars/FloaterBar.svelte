@@ -11,22 +11,22 @@
 	let { bar, items, index }: { bar: FloatingBar; items: BarItemData[]; index: number } = $props();
 
 	let floater: HTMLElement;
-	let mutationObserver: MutationObserver;
+	let resizeObserver: ResizeObserver;
 	let menu: HTMLElement;
 
 	onMount(() => {
-		mutationObserver = new MutationObserver(([item]) => {
+		resizeObserver = new ResizeObserver(([item]) => {
 			if (!(item.target instanceof HTMLElement)) {
 				return;
 			}
 			const { clientWidth, clientHeight } = item.target;
-			console.log('UPDATE MEASUREMENTS', clientWidth, clientHeight);
 			FloaterBarState.updateMeasurements(bar.id, clientWidth, clientHeight);
 		});
-		mutationObserver.observe(floater, { attributes: true });
+
+		resizeObserver.observe(floater);
 
 		return () => {
-			mutationObserver.disconnect();
+			resizeObserver.disconnect();
 		};
 	});
 
@@ -54,10 +54,6 @@
 				break;
 		}
 	}
-
-	$effect(() => {
-		console.log('CURRENT MEASUREMENTS', bar.position.width, bar.position.height);
-	});
 </script>
 
 <div

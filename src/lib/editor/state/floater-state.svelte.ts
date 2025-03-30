@@ -253,6 +253,10 @@ export class FloaterBarState {
 			return null;
 		}
 
+		if (bar.position.width === width && bar.position.height === height) {
+			return null;
+		}
+
 		bar.position.width = clamp(width, this.MIN_WIDTH_PX, this.MAX_WIDTH_PX);
 
 		const newHeight =

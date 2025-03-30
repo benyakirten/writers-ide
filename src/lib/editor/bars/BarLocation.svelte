@@ -76,28 +76,30 @@
 				<DropdownMenu.Shortcut>⇧⌘F</DropdownMenu.Shortcut>
 			</DropdownMenu.RadioItem>
 		</DropdownMenu.RadioGroup>
-		<DropdownMenu.Separator />
-		<DropdownMenu.Group>
-			{#if moveDetails.up !== null}
-				<DropdownMenu.Item disabled={!moveDetails.up} on:click={() => onmove('up')}>
-					{m.move_up()}
-				</DropdownMenu.Item>
-			{/if}
-			{#if moveDetails.down !== null}
-				<DropdownMenu.Item disabled={!moveDetails.down} on:click={() => onmove('down')}>
-					{m.move_down()}
-				</DropdownMenu.Item>
-			{/if}
-			{#if moveDetails.left !== null}
-				<DropdownMenu.Item disabled={!moveDetails.left} on:click={() => onmove('left')}>
-					{m.move_left()}
-				</DropdownMenu.Item>
-			{/if}
-			{#if moveDetails.right !== null}
-				<DropdownMenu.Item disabled={!moveDetails.right} on:click={() => onmove('right')}>
-					{m.move_right()}
-				</DropdownMenu.Item>
-			{/if}
-		</DropdownMenu.Group>
+		{#if position !== 'floating'}
+			<DropdownMenu.Separator />
+			<DropdownMenu.Group>
+				{#if moveDetails.up !== null}
+					<DropdownMenu.Item disabled={!moveDetails.up} on:click={() => onmove('up')}>
+						{m.move_up()}
+					</DropdownMenu.Item>
+				{/if}
+				{#if moveDetails.down !== null}
+					<DropdownMenu.Item disabled={!moveDetails.down} on:click={() => onmove('down')}>
+						{m.move_down()}
+					</DropdownMenu.Item>
+				{/if}
+				{#if moveDetails.left !== null}
+					<DropdownMenu.Item disabled={!moveDetails.left} on:click={() => onmove('left')}>
+						{m.move_left()}
+					</DropdownMenu.Item>
+				{/if}
+				{#if moveDetails.right !== null}
+					<DropdownMenu.Item disabled={!moveDetails.right} on:click={() => onmove('right')}>
+						{m.move_right()}
+					</DropdownMenu.Item>
+				{/if}
+			</DropdownMenu.Group>
+		{/if}
 	</DropdownMenu.Content>
 </DropdownMenu.Root>
