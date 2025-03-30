@@ -36,33 +36,19 @@
 			position === VerticalBarPosition.InlineStart ||
 			position === VerticalBarPosition.InlineEnd
 		) {
-			base.up = canMoveForward;
-			base.down = index > 0;
+			base.left = index > 0;
+			base.right = canMoveForward;
 		} else {
-			base.left = canMoveForward;
-			base.right = index > 0;
+			base.up = index > 0;
+			base.down = canMoveForward;
 		}
 
 		return base;
 	});
 
 	function handleMove(direction: 'up' | 'down' | 'left' | 'right') {
-		if (
-			position === VerticalBarPosition.InlineStart ||
-			position === VerticalBarPosition.InlineEnd
-		) {
-			if (direction === 'up') {
-				TransferHandler.swapBarPosition(index, position, index - 1);
-			} else if (direction === 'down') {
-				TransferHandler.swapBarPosition(index, position, index + 1);
-			}
-		} else {
-			if (direction === 'left') {
-				TransferHandler.swapBarPosition(index, position, index - 1);
-			} else if (direction === 'right') {
-				TransferHandler.swapBarPosition(index, position, index + 1);
-			}
-		}
+		const newIndex = index + (direction === 'up' || direction === 'left' ? -1 : 1);
+		TransferHandler.swapBarPosition(index, position, newIndex);
 	}
 </script>
 

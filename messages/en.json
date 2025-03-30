@@ -37,8 +37,8 @@
 	"window_inline_start": "Inline start",
 	"window_inline_end": "Inline end",
 	"window_floating": "Floating position",
-	"move_forward": "Move forward",
-	"move_backward": "Move backward",
+	"move_left": "Move left",
+	"move_right": "Move right",
 	"move_up": "Move up",
 	"move_down": "Move down"
 }

@@ -78,29 +78,26 @@
 		</DropdownMenu.RadioGroup>
 		<DropdownMenu.Separator />
 		<DropdownMenu.Group>
-			<DropdownMenu.Item>
-				<span>Team</span>
-			</DropdownMenu.Item>
-			<DropdownMenu.Sub>
-				<DropdownMenu.SubTrigger>
-					<span>Invite users</span>
-				</DropdownMenu.SubTrigger>
-				<DropdownMenu.SubContent>
-					<DropdownMenu.Item>
-						<span>Email</span>
-					</DropdownMenu.Item>
-					<DropdownMenu.Item>
-						<span>Message</span>
-					</DropdownMenu.Item>
-					<DropdownMenu.Item>
-						<span>More...</span>
-					</DropdownMenu.Item>
-				</DropdownMenu.SubContent>
-			</DropdownMenu.Sub>
-			<DropdownMenu.Item>
-				<span>New Team</span>
-				<DropdownMenu.Shortcut>⌘+T</DropdownMenu.Shortcut>
-			</DropdownMenu.Item>
+			{#if moveDetails.up !== null}
+				<DropdownMenu.Item disabled={!moveDetails.up} on:click={() => onmove('up')}>
+					{m.move_up()}
+				</DropdownMenu.Item>
+			{/if}
+			{#if moveDetails.down !== null}
+				<DropdownMenu.Item disabled={!moveDetails.down} on:click={() => onmove('down')}>
+					{m.move_down()}
+				</DropdownMenu.Item>
+			{/if}
+			{#if moveDetails.left !== null}
+				<DropdownMenu.Item disabled={!moveDetails.left} on:click={() => onmove('left')}>
+					{m.move_left()}
+				</DropdownMenu.Item>
+			{/if}
+			{#if moveDetails.right !== null}
+				<DropdownMenu.Item disabled={!moveDetails.right} on:click={() => onmove('right')}>
+					{m.move_right()}
+				</DropdownMenu.Item>
+			{/if}
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>
