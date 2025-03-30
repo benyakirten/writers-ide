@@ -34,6 +34,7 @@ export type BarTransferInProgress = {
 };
 
 export class BarTransferHandler {
+	constructor(public deleteBarIfEmpty: boolean = true) {}
 	transfer: MenuTransferInProgress | BarTransferInProgress | null = $state(null);
 
 	startTransfer(transfer: MenuTransferInProgress | BarTransferInProgress): void {
@@ -205,7 +206,19 @@ export class BarTransferHandler {
 			return false;
 		}
 
-		return items.remove(itemId);
+		if (!items.remove(itemId)) {
+			return false;
+		}
+
+		if (this.deleteBarIfEmpty && items.ids.length === 0) {
+			const bars = this.#bars(location);
+			const barIndex = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
+			if (barIndex !== -1) {
+				bars.splice(barIndex, 1);
+			}
+		}
+
+		return true;
 	}
 
 	moveMenu(from: BarTransferLocation, id: string | number, to: BarTransferLocation): boolean {
