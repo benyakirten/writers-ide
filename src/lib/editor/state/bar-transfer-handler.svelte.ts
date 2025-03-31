@@ -123,7 +123,7 @@ export class BarTransferHandler {
 		}
 
 		const bars = this.#bars(from.location);
-		const barIndex =
+		let barIndex =
 			typeof from.barId === 'string' ? bars.findIndex((bar) => bar.id === from.barId) : from.barId;
 		const bar = bars[barIndex];
 
@@ -139,6 +139,12 @@ export class BarTransferHandler {
 		let nextBar = bars.at(barIndex + direction);
 		if (!nextBar || !nextBar.data.canFit(from.itemId)) {
 			const newIndex = clamp(barIndex + 2 * direction, 0, bars.length);
+
+			// If we insert a new bar, then the index of the item's current bar has increased by 1.
+			if (newIndex < barIndex) {
+				barIndex++;
+			}
+
 			if (
 				from.location === HorizontalBarPosition.WindowBlockStart ||
 				from.location === HorizontalBarPosition.WindowBlockEnd
@@ -153,9 +159,10 @@ export class BarTransferHandler {
 			return false;
 		}
 
-		if (!this.remove(from.location, from.barId, from.itemId)) {
+		if (!this.remove(from.location, barIndex, from.itemId)) {
 			return false;
 		}
+
 		return nextBar.data.append(from.itemId);
 	}
 

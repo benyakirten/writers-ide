@@ -60,8 +60,6 @@
 		onrelocate: (to: BarTransferLocation) => void;
 		onmove: (direction: 'up' | 'down' | 'left' | 'right') => void;
 	} = $props();
-
-	$inspect(moveDetails);
 </script>
 
 <div class="renderer" draggable style:--size={size}>
