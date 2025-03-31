@@ -376,6 +376,316 @@ describe('BarTransferHandler', () => {
 			expect(bar.data.ids[1]).toBe(item1Key);
 		});
 	});
-	// TODO: Test swap
-	// TODO: Test nudge
+
+	describe('swap', () => {
+		it("should return false if the bar doesn't exist", () => {
+			const result = TransferHandler.swap(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: 'nonexistent',
+					itemId: item1Key
+				},
+				item2Key
+			);
+			expect(result).toBe(false);
+		});
+
+		it("should return false if the item doesn't exist in the bar", () => {
+			const bar = HorizontalBarState.add(
+				{ data: [item1Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+
+			const result = TransferHandler.swap(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: bar.id,
+					itemId: 'nonexistent'
+				},
+				item2Key
+			);
+			expect(result).toBe(false);
+			expect(bar.data.ids).not.toContain(item2Key);
+		});
+
+		it('should swap the items in the bar', () => {
+			const bar = HorizontalBarState.add(
+				{ data: [item1Key, item2Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+
+			const result = TransferHandler.swap(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: bar.id,
+					itemId: item1Key
+				},
+				item2Key
+			);
+			expect(result).toBe(true);
+			expect(bar.data.ids[0]).toBe(item2Key);
+			expect(bar.data.ids[1]).toBe(item1Key);
+		});
+	});
+
+	describe('nudge', () => {
+		it('should return false if the location is floating', () => {
+			const bar = FloatingBarState.add();
+			FloatingBarState.add();
+			const result = TransferHandler.nudge(
+				{
+					location: 'floating',
+					barId: bar.id,
+					itemId: item1Key
+				},
+				1
+			);
+			expect(result).toBe(false);
+		});
+
+		it("should return false if the bar doesn't exist", () => {
+			HorizontalBarState.add({ data: [item1Key] }, HorizontalBarPosition.WindowBlockStart);
+			HorizontalBarState.add({ data: [item1Key] }, HorizontalBarPosition.WindowBlockStart);
+
+			const result = TransferHandler.nudge(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: 'nonexistent',
+					itemId: item1Key
+				},
+				1
+			);
+			expect(result).toBe(false);
+		});
+
+		it("should return false if the item doesn't exist in the bar", () => {
+			const bar = HorizontalBarState.add(
+				{ data: [item1Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+			HorizontalBarState.add({ data: [item1Key] }, HorizontalBarPosition.WindowBlockStart);
+
+			const result = TransferHandler.nudge(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: bar.id,
+					itemId: 'nonexistent'
+				},
+				1
+			);
+			expect(result).toBe(false);
+		});
+
+		it('should return false if there are less than 2 bars in the location', () => {
+			const bar = HorizontalBarState.add(
+				{ data: [item1Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+
+			const result = TransferHandler.nudge(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: bar.id,
+					itemId: item1Key
+				},
+				1
+			);
+			expect(result).toBe(false);
+		});
+
+		it('should return false if the item should be transferred before the first bar', () => {
+			const bar = HorizontalBarState.add(
+				{ data: [item1Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+			const bar2 = HorizontalBarState.add(
+				{ data: [item2Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+
+			const result = TransferHandler.nudge(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: bar.id,
+					itemId: item1Key
+				},
+				-1
+			);
+			expect(result).toBe(false);
+			expect(bar.data.ids).toContain(item1Key);
+			expect(bar2.data.ids).toContain(item2Key);
+		});
+
+		it('should return false if the item should be transferred after the last bar', () => {
+			const bar = HorizontalBarState.add(
+				{ data: [item1Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+			const bar2 = HorizontalBarState.add(
+				{ data: [item2Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+
+			const result = TransferHandler.nudge(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: bar2.id,
+					itemId: item1Key
+				},
+				1
+			);
+			expect(result).toBe(false);
+			expect(bar.data.ids).toContain(item1Key);
+			expect(bar2.data.ids).toContain(item2Key);
+		});
+
+		it('should create a new interstitial bar if the item already exists in the target bar', () => {
+			const bar = HorizontalBarState.add(
+				{ data: [item1Key, item2Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+			const bar2 = HorizontalBarState.add(
+				{ data: [item2Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+
+			const result = TransferHandler.nudge(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: bar.id,
+					itemId: item2Key
+				},
+				1
+			);
+
+			expect(result).toBe(true);
+
+			const bars = HorizontalBarState.bars(HorizontalBarPosition.WindowBlockStart);
+			expect(bars).toHaveLength(3);
+			expect(bars[0].id).toBe(bar.id);
+			expect(bars[1].id).toBe(bar2.id);
+			expect(bar.data.ids).toEqual([item1Key]);
+			expect(bars[2].data.ids).toEqual([item2Key]);
+			expect(bar2.data.ids).toEqual([item2Key]);
+		});
+
+		it('should remove the item from one bar and add it to the next bar in the case of a positive nudge', () => {
+			const bar = HorizontalBarState.add(
+				{ data: [item1Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+			const bar2 = HorizontalBarState.add(
+				{ data: [item2Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+
+			const result = TransferHandler.nudge(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: bar.id,
+					itemId: item1Key
+				},
+				1
+			);
+			expect(result).toBe(true);
+			expect(bar.data.ids).not.toContain(item1Key);
+			expect(bar2.data.ids).toContain(item1Key);
+		});
+
+		it('should remove the item from one bar and add it to the previous bar in the case of a negative nudge', () => {
+			const bar = HorizontalBarState.add(
+				{ data: [item1Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+			const bar2 = HorizontalBarState.add(
+				{ data: [item2Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+
+			const result = TransferHandler.nudge(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: bar2.id,
+					itemId: item2Key
+				},
+				-1
+			);
+
+			expect(result).toBe(true);
+			expect(bar2.data.ids).not.toContain(item2Key);
+			expect(bar.data.ids).toContain(item1Key);
+		});
+
+		it('should create a new bar in the positive direction after the current target if the item cannot fit', () => {
+			const bar = HorizontalBarState.add(
+				{ data: [item1Key, item2Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+			const bar2 = HorizontalBarState.add(
+				{ data: [item3Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+			const bar3 = HorizontalBarState.add(
+				{ data: [item2Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+
+			const result = TransferHandler.nudge(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: bar.id,
+					itemId: item1Key
+				},
+				1
+			);
+
+			expect(result).toBe(true);
+
+			const bars = HorizontalBarState.windowBlockStart;
+			expect(bars).toHaveLength(4);
+			expect(bars[0].id).toBe(bar.id);
+			expect(bars[1].id).toBe(bar2.id);
+			expect(bars[3].id).toBe(bar3.id);
+			expect(bar.data.ids).toEqual([item2Key]);
+			expect(bar2.data.ids).toEqual([item3Key]);
+			expect(bars[2].data.ids).toEqual([item1Key]);
+			expect(bars[3].data.ids).toEqual([item2Key]);
+		});
+
+		it('should create a new bar in the negative direction before the current target if the item cannot fit', () => {
+			const bar = HorizontalBarState.add(
+				{ data: [item1Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+			const bar2 = HorizontalBarState.add(
+				{ data: [item3Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+			const bar3 = HorizontalBarState.add(
+				{ data: [item1Key, item2Key] },
+				HorizontalBarPosition.WindowBlockStart
+			);
+
+			const result = TransferHandler.nudge(
+				{
+					location: HorizontalBarPosition.WindowBlockStart,
+					barId: bar3.id,
+					itemId: item1Key
+				},
+				-1
+			);
+
+			expect(result).toBe(true);
+
+			const bars = HorizontalBarState.windowBlockStart;
+			expect(bars).toHaveLength(4);
+			expect(bars[0].id).toEqual(bar.id);
+			expect(bars[2].id).toEqual(bar2.id);
+			expect(bars[3].id).toEqual(bar3.id);
+			expect(bars[0].data.ids).toEqual([item1Key]);
+			expect(bars[1].data.ids).toEqual([item1Key]);
+			expect(bars[2].data.ids).toEqual([item3Key]);
+			expect(bars[3].data.ids).toEqual([item2Key]);
+		});
+	});
 });

@@ -16,7 +16,7 @@
 		"test:unit:ci": "vitest --run",
 		"test:unit": "vitest",
 		"lint": "prettier --check . && eslint .",
-		"format": "prettier --write . && eslint . --fix",
+		"lint:fix": "prettier --write . && eslint . --fix",
 		"storybook": "storybook dev -p 6006",
 		"build-storybook": "storybook build"
 	},

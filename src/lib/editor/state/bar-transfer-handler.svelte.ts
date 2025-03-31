@@ -137,11 +137,15 @@ export class BarTransferHandler {
 		}
 
 		let nextBar = bars.at(barIndex + direction);
+		// Can fit will check if the item already exists in the next bar.
 		if (!nextBar || !nextBar.data.canFit(from.itemId)) {
-			const newIndex = clamp(barIndex + 2 * direction, 0, bars.length);
+			let newIndex = clamp(barIndex + 2 * direction, 0, bars.length);
 
-			// If we insert a new bar, then the index of the item's current bar has increased by 1.
-			if (newIndex < barIndex) {
+			if (direction === -1) {
+				// Because of how splice works, if we are going backwards, we actually want the inserted
+				// index to be 1 higher than the current index;
+				newIndex++;
+				// If we insert a new bar, then the index of the item's current bar has increased by 1.
 				barIndex++;
 			}
 
