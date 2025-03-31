@@ -21,7 +21,7 @@
 
 	import IconButton from '$lib/components/IconButton.svelte';
 	import { type Internationalizator } from '$lib/editor/types.js';
-	import { type SelectionUtilies, type TextMarkPresence } from '../../view/selection.js';
+	import { type SelectionUtilities, type TextMarkPresence } from '../../view/selection.js';
 	import { type ActionUtilities } from '../../view/actions.js';
 	import { capitalize } from '$lib/utils/strings.js';
 
@@ -129,7 +129,11 @@
 		generateLabel: (t: Internationalizator) => string;
 		iconSrc: IconSource;
 		onclick: (view: EditorView | null, utils: typeof ActionUtilities) => void;
-		determineInversion: (selection: Selection, doc: Node, utils: typeof SelectionUtilies) => number;
+		determineInversion: (
+			selection: Selection,
+			doc: Node,
+			utils: typeof SelectionUtilities
+		) => number;
 	};
 
 	const blockMarks: BlockMenuIcon[] = [
@@ -267,7 +271,7 @@
 	selection: Selection | null,
 	m: Internationalizator,
 	actionUtils: typeof ActionUtilities,
-	selectionUtils: typeof SelectionUtilies
+	selectionUtils: typeof SelectionUtilities
 )}
 	{#each blockMarks as { id, generateLabel, iconSrc, onclick, determineInversion } (id)}
 		{@const inversion =

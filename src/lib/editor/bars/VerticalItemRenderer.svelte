@@ -6,7 +6,7 @@
 	import TabState from '../state/tab-state.svelte.js';
 	import { schema } from '../prosemirror/view/schema.js';
 	import ProseMirrorEventBus from '../state/event-bus.svelte.js';
-	import { SelectionUtilies } from '../prosemirror/view/selection.js';
+	import { SelectionUtilities } from '../prosemirror/view/selection.js';
 	import { ActionUtilities } from '../prosemirror/view/actions.js';
 	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
 	import FloaterBarState from '../state/floater-state.svelte.js';
@@ -21,7 +21,7 @@
 	let itemProps: Omit<BarItemComponentProps, 'locale'> = {
 		proseMirror: {
 			actions: ActionUtilities,
-			selections: SelectionUtilies,
+			selections: SelectionUtilities,
 			eventBus: ProseMirrorEventBus,
 			schema
 		},
@@ -60,6 +60,8 @@
 		onrelocate: (to: BarTransferLocation) => void;
 		onmove: (direction: 'up' | 'down' | 'left' | 'right') => void;
 	} = $props();
+
+	$inspect(moveDetails);
 </script>
 
 <div class="renderer" draggable style:--size={size}>

@@ -24,6 +24,7 @@
 		"onmove",
 		"onrelocate",
 		"prosemirror",
-		"unsub"
+		"unsub",
+		"steeze"
 	]
 }

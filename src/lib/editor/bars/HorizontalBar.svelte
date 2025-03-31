@@ -64,7 +64,7 @@
 	function handleItemMove(
 		direction: 'up' | 'down' | 'left' | 'right',
 		itemId: string,
-		index: number
+		itemIndex: number
 	) {
 		if (direction === 'left' || direction === 'right') {
 			TransferHandler.swap(
@@ -73,7 +73,7 @@
 					barId: index,
 					itemId
 				},
-				direction === 'left' ? index - 1 : index + 1
+				direction === 'left' ? itemIndex - 1 : itemIndex + 1
 			);
 		} else {
 			TransferHandler.nudge(

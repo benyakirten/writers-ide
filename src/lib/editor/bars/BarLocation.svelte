@@ -42,9 +42,7 @@
 		}
 	}
 
-	let isVertical = $derived.by(
-		() => position === VerticalBarPosition.InlineStart || position === VerticalBarPosition.InlineEnd
-	);
+	$inspect('BAR LOCATION', moveDetails);
 </script>
 
 <DropdownMenu.Root>

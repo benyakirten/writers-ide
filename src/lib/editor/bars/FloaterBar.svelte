@@ -9,6 +9,7 @@
 	import TransferHandler, {
 		type BarTransferLocation
 	} from '../state/bar-transfer-handler.svelte.js';
+	import type { MoveDetails } from './BarLocation.svelte';
 
 	let { bar, items, index }: { bar: FloatingBar; items: BarItemData[]; index: number } = $props();
 
@@ -73,7 +74,7 @@
 	function handleItemMove(
 		direction: 'up' | 'down' | 'left' | 'right',
 		itemId: string,
-		index: number
+		itemIndex: number
 	) {
 		if (direction === 'left' || direction === 'right') {
 			return;
@@ -85,8 +86,17 @@
 				barId: index,
 				itemId
 			},
-			direction === 'up' ? index - 1 : index + 1
+			direction === 'up' ? itemIndex - 1 : itemIndex + 1
 		);
+	}
+
+	function determineMoveDetails(index: number, numItems: number): MoveDetails {
+		return {
+			up: index > 0,
+			down: index < numItems - 1,
+			left: null,
+			right: null
+		};
 	}
 </script>
 
@@ -128,11 +138,12 @@
 	</div>
 	<div class="items">
 		{#each items as item, itemIndex (item.id)}
+			{@const moveDetails = determineMoveDetails(itemIndex, items.length)}
 			<VerticalItemRenderer
 				{...item}
 				onremove={() => TransferHandler.remove('floating', bar.id, item.id)}
 				position="floating"
-				moveDetails={{ up: null, down: null, left: null, right: null }}
+				{moveDetails}
 				onmove={(direction) => handleItemMove(direction, item.id, itemIndex)}
 				onrelocate={(to) => handleItemRelocate(to, item.id)}
 			/>

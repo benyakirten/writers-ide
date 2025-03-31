@@ -10,7 +10,7 @@ import type { TextAlignment } from './actions.js';
  */
 export type TextMarkPresence = Map<string, number>;
 
-export class SelectionUtilies {
+export class SelectionUtilities {
 	/**
 	 * Check if every text node in the selection has a specific mark.
 	 */

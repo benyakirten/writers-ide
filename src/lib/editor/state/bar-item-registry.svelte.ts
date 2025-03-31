@@ -2,7 +2,7 @@ import { type Component } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
 import type { ActionUtilities } from '../prosemirror/view/actions.js';
-import type { SelectionUtilies } from '../prosemirror/view/selection.js';
+import type { SelectionUtilities } from '../prosemirror/view/selection.js';
 import type { ProseMirrorEventBus } from './event-bus.svelte.js';
 import type { VerticalBarState } from './vertical-bar-state.svelte.js';
 import type { HorizontalBarState } from './horizontal-bar-state.svelte.js';
@@ -18,7 +18,7 @@ type BarStates = {
 
 type ProseMirrorUtils = {
 	actions: typeof ActionUtilities;
-	selections: typeof SelectionUtilies;
+	selections: typeof SelectionUtilities;
 	eventBus: ProseMirrorEventBus;
 	schema: typeof schema;
 };
