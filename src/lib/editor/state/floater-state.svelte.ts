@@ -62,6 +62,7 @@ export class FloaterBarState {
 		}
 		return highestBar;
 	});
+
 	dragging: {
 		id: string;
 		x: number;
@@ -250,6 +251,10 @@ export class FloaterBarState {
 	updateMeasurements(id: string | number, width: number, height: number): FloatingBar | null {
 		const bar = this.bar(id);
 		if (!bar) {
+			return null;
+		}
+
+		if (bar.position.width === width && bar.position.height === height) {
 			return null;
 		}
 

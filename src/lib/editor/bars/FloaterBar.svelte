@@ -6,22 +6,32 @@
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
 	import VerticalItemRenderer from './VerticalItemRenderer.svelte';
-	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
+	import TransferHandler, {
+		type BarTransferLocation
+	} from '../state/bar-transfer-handler.svelte.js';
+	import type { MoveDetails } from './BarLocation.svelte';
 
 	let { bar, items, index }: { bar: FloatingBar; items: BarItemData[]; index: number } = $props();
 
 	let floater: HTMLElement;
-	let mutationObserver: MutationObserver;
+	let resizeObserver: ResizeObserver;
 	let menu: HTMLElement;
 
 	onMount(() => {
-		mutationObserver = new MutationObserver(() => {
-			FloaterBarState.updateMeasurements(bar.id, floater.clientWidth, floater.clientHeight);
+		resizeObserver = new ResizeObserver(([item]) => {
+			if (!(item.target instanceof HTMLElement)) {
+				return;
+			}
+			const { clientWidth, clientHeight } = item.target;
+			FloaterBarState.updateMeasurements(bar.id, clientWidth, clientHeight);
 		});
-		mutationObserver.observe(floater, { attributes: true });
+
+		// Changing the box doesn't seem to work.
+		// TODO: Figure out why a border is a problem but not an outline.
+		resizeObserver.observe(floater, { box: 'border-box' });
 
 		return () => {
-			mutationObserver.disconnect();
+			resizeObserver.disconnect();
 		};
 	});
 
@@ -48,6 +58,45 @@
 				FloaterBarState.nudge(index, 'down');
 				break;
 		}
+	}
+
+	function handleItemRelocate(to: BarTransferLocation, itemId: string) {
+		TransferHandler.relocateItem(
+			{
+				location: 'floating',
+				barId: index,
+				itemId
+			},
+			to
+		);
+	}
+
+	function handleItemMove(
+		direction: 'up' | 'down' | 'left' | 'right',
+		itemId: string,
+		itemIndex: number
+	) {
+		if (direction === 'left' || direction === 'right') {
+			return;
+		}
+
+		TransferHandler.swap(
+			{
+				location: 'floating',
+				barId: index,
+				itemId
+			},
+			direction === 'up' ? itemIndex - 1 : itemIndex + 1
+		);
+	}
+
+	function determineMoveDetails(index: number, numItems: number): MoveDetails {
+		return {
+			up: index > 0,
+			down: index < numItems - 1,
+			left: null,
+			right: null
+		};
 	}
 </script>
 
@@ -79,18 +128,24 @@
 	>
 		<FloaterBarTitle {index} title={bar.title} id={bar.id} />
 		<BarMenu
-			onMinimize={() => FloaterBarState.update(index, 'minimized', true)}
-			onClose={() => FloaterBarState.remove(index)}
-			isDragging={false}
-			isVertical
+			onminimize={() => FloaterBarState.update(index, 'minimized', true)}
+			onclose={() => FloaterBarState.remove(index)}
+			draggable={false}
+			position="floating"
+			canMoveForward={false}
 			{index}
 		/>
 	</div>
 	<div class="items">
-		{#each items as item (item.id)}
+		{#each items as item, itemIndex (item.id)}
+			{@const moveDetails = determineMoveDetails(itemIndex, items.length)}
 			<VerticalItemRenderer
 				{...item}
 				onremove={() => TransferHandler.remove('floating', bar.id, item.id)}
+				position="floating"
+				{moveDetails}
+				onmove={(direction) => handleItemMove(direction, item.id, itemIndex)}
+				onrelocate={(to) => handleItemRelocate(to, item.id)}
 			/>
 		{/each}
 	</div>
@@ -100,7 +155,8 @@
 	.floater {
 		position: absolute;
 		background-color: whitesmoke;
-		border: 1px solid black;
+		outline: 1px solid black;
+		outline-offset: 0px;
 		overflow: hidden;
 		resize: both;
 

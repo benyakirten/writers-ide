@@ -1,3 +1,5 @@
+import { swap } from '$lib/utils/arrays.js';
+import { clamp } from '@/utils/numbers.js';
 import type { BarItems } from './bar-items.svelte.js';
 import FloatingBarState, { type FloatingBar } from './floater-state.svelte.js';
 import HorizontalBarState, {
@@ -15,7 +17,6 @@ export type Bars = HorizontalBar[] | VerticalBar[] | FloatingBar[];
 export type BarTransfer = {
 	location: BarTransferLocation;
 	barId: string | number;
-	slot: PossibleSlot;
 	itemId: string;
 };
 
@@ -33,6 +34,7 @@ export type BarTransferInProgress = {
 };
 
 export class BarTransferHandler {
+	constructor(public deleteBarIfEmpty: boolean = true) {}
 	transfer: MenuTransferInProgress | BarTransferInProgress | null = $state(null);
 
 	startTransfer(transfer: MenuTransferInProgress | BarTransferInProgress): void {
@@ -45,10 +47,6 @@ export class BarTransferHandler {
 
 	#bars(location: BarTransferLocation): Bars {
 		switch (location) {
-			case HorizontalBarPosition.EditorBlockEnd:
-				return HorizontalBarState.editorBlockEnd;
-			case HorizontalBarPosition.EditorBlockStart:
-				return HorizontalBarState.editorBlockStart;
 			case HorizontalBarPosition.WindowBlockEnd:
 				return HorizontalBarState.windowBlockEnd;
 			case HorizontalBarPosition.WindowBlockStart:
@@ -64,16 +62,14 @@ export class BarTransferHandler {
 
 	#createEmptyBar(location: BarTransferLocation): string {
 		switch (location) {
-			case HorizontalBarPosition.EditorBlockEnd:
-			case HorizontalBarPosition.EditorBlockStart:
+			case 'floating':
+				return FloatingBarState.add().id;
 			case HorizontalBarPosition.WindowBlockEnd:
 			case HorizontalBarPosition.WindowBlockStart:
 				return HorizontalBarState.add({}, location).id;
-			case VerticalBarPosition.InlineEnd:
-			case VerticalBarPosition.InlineStart:
+
+			default:
 				return VerticalBarState.add({}, location).id;
-			case 'floating':
-				return FloatingBarState.add({}).id;
 		}
 	}
 
@@ -83,70 +79,125 @@ export class BarTransferHandler {
 		return bar?.data;
 	}
 
-	move(
-		from: BarTransfer,
-		to: Omit<BarTransfer, 'itemId'>,
-		createToBarIfMissing: boolean = true
-	): boolean {
-		const items = this.barItems(from, to, createToBarIfMissing);
-		if (!items) {
+	/**
+	 * Remove the item from a group of bars bar and add it to a different group bars.
+	 * If you are looking for a method to move the item from one bar to another
+	 * in the same group of bars, see `nudge`.
+	 *
+	 * It will append the item to the last bar. If there are no bars or
+	 * the item can't fit in the last bar, it will create a new bar.
+	 */
+	relocateItem(from: BarTransfer, to: BarTransferLocation): boolean {
+		if (from.location === to) {
 			return false;
 		}
+		const toBars = this.#bars(to);
 
-		const [fromItems, toItems] = items;
-
-		if (fromItems === toItems) {
-			return fromItems.swap(from.slot, to.slot);
+		// Put on the last bar
+		const lastBar = toBars.at(toBars.length - 1);
+		if (!lastBar || !lastBar.data.canFit(from.itemId)) {
+			this.#createEmptyBar(to);
 		}
 
-		fromItems.remove(from.slot);
-		toItems.insert(from.itemId, to.slot);
+		this.remove(from.location, from.barId, from.itemId);
+		this.append(to, toBars.length - 1, from.itemId);
+
+		if (to === 'floating') {
+			FloatingBarState.focus(toBars.length - 1);
+		}
 
 		return true;
 	}
 
-	barItems(
-		from: BarTransfer,
-		to: Omit<BarTransfer, 'itemId'>,
-		createToBarIfMissing: boolean = true
-	): [BarItems, BarItems] | null {
-		const fromItems = this.#items(from.location, from.barId);
-		const toItems = this.#items(to.location, to.barId);
-		if (!toItems) {
-			const bars = this.#bars(to.location);
-			if (bars.length === 0 && createToBarIfMissing) {
-				const id = this.#createEmptyBar(to.location);
-				to.barId = id;
-				return this.barItems(from, to);
+	/**
+	 * Move the item from one bar to another among a the same group of bars.
+	 * If you are looking for the method to move the item from to a different group of bars,
+	 * see `relocateItem`.
+	 *
+	 * If there is no available slot in the next bar, it will create a new bar on the other side.
+	 * E.g. if you are moving to the right and there is no available slot in any bar to the right, it will create a new bar on the left.
+	 */
+	nudge(from: BarTransfer, direction: 1 | -1): boolean {
+		if (from.location === 'floating') {
+			return false;
+		}
+
+		const bars = this.#bars(from.location);
+		let barIndex =
+			typeof from.barId === 'string' ? bars.findIndex((bar) => bar.id === from.barId) : from.barId;
+		const bar = bars[barIndex];
+
+		if (!bar || !bar.data.has(from.itemId) || bars.length < 2) {
+			return false;
+		}
+
+		// Making this into a separate if check to make it a little cleaner - checking for invalid movement types.
+		if ((barIndex === 0 && direction === -1) || (barIndex === bars.length - 1 && direction === 1)) {
+			return false;
+		}
+
+		let nextBar = bars.at(barIndex + direction);
+		// Can fit will check if the item already exists in the next bar.
+		if (!nextBar || !nextBar.data.canFit(from.itemId)) {
+			let newIndex = clamp(barIndex + 2 * direction, 0, bars.length);
+
+			if (direction === -1) {
+				// Because of how splice works, if we are going backwards, we actually want the inserted
+				// index to be 1 higher than the current index;
+				newIndex++;
+				// If we insert a new bar, then the index of the item's current bar has increased by 1.
+				barIndex++;
+			}
+
+			if (
+				from.location === HorizontalBarPosition.WindowBlockStart ||
+				from.location === HorizontalBarPosition.WindowBlockEnd
+			) {
+				nextBar = HorizontalBarState.add({}, from.location, newIndex);
+			} else {
+				nextBar = VerticalBarState.add({}, from.location, newIndex);
 			}
 		}
 
-		if (!fromItems || !toItems) {
-			return null;
+		if (!nextBar) {
+			return false;
 		}
 
-		if (from.slot > fromItems.ids.length || to.slot > toItems.ids.length) {
-			return null;
+		if (!this.remove(from.location, barIndex, from.itemId)) {
+			return false;
 		}
 
-		if (fromItems === toItems && !fromItems.canSwap(from.slot, to.slot)) {
-			return null;
-		}
-
-		if (!fromItems.has(from.itemId) || toItems.has(from.itemId)) {
-			return null;
-		}
-
-		return [fromItems, toItems];
+		return nextBar.data.append(from.itemId);
 	}
 
-	insert(to: BarTransfer): boolean {
+	swap(from: BarTransfer, to: string | number): boolean {
+		const items = this.#items(from.location, from.barId);
+		if (!items) {
+			return false;
+		}
+
+		const item1Index = items.ids.findIndex((id) => id === from.itemId);
+		const item2Index = typeof to === 'string' ? items.ids.findIndex((id) => id === to) : to;
+
+		return items.swap(item1Index, item2Index);
+	}
+
+	insert(to: BarTransfer, slot: PossibleSlot): boolean {
 		const toItems = this.#items(to.location, to.barId);
 		if (!toItems) {
 			return false;
 		}
 
-		return toItems.insert(to.itemId, to.slot);
+		return toItems.insert(to.itemId, slot);
+	}
+
+	append(to: BarTransferLocation, id: string | number, itemId: string): boolean {
+		const items = this.#items(to, id);
+		if (!items) {
+			return false;
+		}
+
+		return items.append(itemId);
 	}
 
 	remove(location: BarTransferLocation, id: string | number, itemId: string): boolean {
@@ -155,7 +206,96 @@ export class BarTransferHandler {
 			return false;
 		}
 
-		return items.remove(itemId);
+		if (!items.remove(itemId)) {
+			return false;
+		}
+
+		if (this.deleteBarIfEmpty && items.ids.length === 0) {
+			const bars = this.#bars(location);
+			const barIndex = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
+			if (barIndex !== -1) {
+				bars.splice(barIndex, 1);
+			}
+		}
+
+		return true;
+	}
+
+	moveMenu(from: BarTransferLocation, id: string | number, to: BarTransferLocation): boolean {
+		if (from === to) {
+			return false;
+		}
+
+		const fromItems = this.#items(from, id)?.ids;
+		if (!fromItems) {
+			return false;
+		}
+
+		if (from === 'floating') {
+			if (!FloatingBarState.remove(id)) {
+				return false;
+			}
+		} else if (
+			from === HorizontalBarPosition.WindowBlockStart ||
+			from === HorizontalBarPosition.WindowBlockEnd
+		) {
+			if (!HorizontalBarState.remove(id, from)) {
+				return false;
+			}
+		} else {
+			if (!VerticalBarState.remove(id, from)) {
+				return false;
+			}
+		}
+
+		if (to === 'floating') {
+			FloatingBarState.add({ data: fromItems });
+		} else if (
+			to === HorizontalBarPosition.WindowBlockStart ||
+			to === HorizontalBarPosition.WindowBlockEnd
+		) {
+			HorizontalBarState.add({ data: fromItems }, to);
+		} else {
+			VerticalBarState.add({ data: fromItems }, to);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Swaps bars between two locations in the same location.
+	 */
+	swapBarPosition(
+		fromId: string | number,
+		position: BarTransferLocation,
+		toId: string | number
+	): boolean {
+		if (position === 'floating') {
+			return false;
+		}
+
+		const bars = this.#bars(position);
+		const fromIndex =
+			typeof fromId === 'string' ? bars.findIndex((bar) => bar.id === fromId) : fromId;
+		const toIndex = typeof toId === 'string' ? bars.findIndex((bar) => bar.id === toId) : toId;
+
+		if (fromIndex === -1 || fromIndex >= bars.length || toIndex < 0 || toIndex >= bars.length) {
+			return false;
+		}
+
+		// @ts-expect-error: The type of array doesn't matter.
+		swap(bars, fromIndex, toIndex);
+		return true;
+	}
+
+	isBarLocation(val: string): val is BarTransferLocation {
+		return (
+			val === HorizontalBarPosition.WindowBlockEnd ||
+			val === HorizontalBarPosition.WindowBlockStart ||
+			val === VerticalBarPosition.InlineEnd ||
+			val === VerticalBarPosition.InlineStart ||
+			val === 'floating'
+		);
 	}
 }
 

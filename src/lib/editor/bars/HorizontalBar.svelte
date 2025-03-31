@@ -1,33 +1,96 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
+
 	import {
 		HorizontalBarPosition,
 		type HorizontalBar
 	} from '../state/horizontal-bar-state.svelte.js';
 	import BarMenu from './BarMenu.svelte';
 	import type { BarItemData } from '../state/bar-items.svelte.js';
-	import TransferHandler from '../state/bar-transfer-handler.svelte.js';
+	import TransferHandler, {
+		type BarTransferLocation
+	} from '../state/bar-transfer-handler.svelte.js';
 	import HorizontalItemRenderer from './HorizontalItemRenderer.svelte';
 	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
+	import type { MoveDetails } from './BarLocation.svelte';
 
 	let {
 		bar,
 		position,
 		index,
-		items
+		items,
+		canMoveForward
 	}: {
 		bar: HorizontalBar;
 		position: HorizontalBarPosition;
 		index: number;
 		items: BarItemData[];
+		canMoveForward: boolean;
 	} = $props();
 
 	let shouldInvert = HorizontalBarState.shouldInvert(position);
 	let height = $derived(HorizontalBarState.height(bar, position));
+	let resizeLabel = $derived.by(() =>
+		position === HorizontalBarPosition.WindowBlockStart
+			? m.resize_block_start_bar({ num: index + 1 })
+			: m.resize_block_end_bar({ num: index + 1 })
+	);
+
+	function determineMoveDetails(
+		itemIndex: number,
+		numItems: number,
+		barIndex: number,
+		canMoveForward: boolean
+	): MoveDetails {
+		return {
+			up: barIndex > 0,
+			down: canMoveForward,
+			left: itemIndex > 0,
+			right: itemIndex < numItems - 1
+		};
+	}
+
+	function handleItemRelocate(to: BarTransferLocation, itemId: string) {
+		TransferHandler.relocateItem(
+			{
+				location: position,
+				barId: index,
+				itemId
+			},
+			to
+		);
+	}
+
+	function handleItemMove(
+		direction: 'up' | 'down' | 'left' | 'right',
+		itemId: string,
+		itemIndex: number
+	) {
+		if (direction === 'left' || direction === 'right') {
+			TransferHandler.swap(
+				{
+					location: position,
+					barId: index,
+					itemId
+				},
+				direction === 'left' ? itemIndex - 1 : itemIndex + 1
+			);
+		} else {
+			TransferHandler.nudge(
+				{
+					location: position,
+					barId: index,
+					itemId
+				},
+				direction === 'up' ? -1 : 1
+			);
+		}
+	}
 </script>
 
 {#snippet resizeBar()}
 	<button
-		aria-label={HorizontalBarState.humanize(index, position)}
+		aria-label={resizeLabel}
 		class="resize"
 		onclick={() => HorizontalBarState.toggle(index, position)}
 		onmousedowncapture={(event) => HorizontalBarState.startResize(bar.id, position, event.clientY)}
@@ -45,17 +108,23 @@
 	>
 		<div class="bar-title">
 			<BarMenu
-				isDragging={false}
-				isVertical={false}
-				onMinimize={() => HorizontalBarState.toggle(index, position)}
-				onClose={() => HorizontalBarState.remove(index, position)}
+				onminimize={() => HorizontalBarState.toggle(index, position)}
+				onclose={() => HorizontalBarState.remove(index, position)}
+				draggable
+				{position}
 				{index}
+				{canMoveForward}
 			/>
 		</div>
 		<div class="items">
-			{#each items as item (item.id)}
+			{#each items as item, itemIndex (item.id)}
+				{@const moveDetails = determineMoveDetails(itemIndex, items.length, index, canMoveForward)}
 				<HorizontalItemRenderer
+					{position}
 					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
+					{moveDetails}
+					onrelocate={(to) => handleItemRelocate(to, item.id)}
+					onmove={(direction) => handleItemMove(direction, item.id, itemIndex)}
 					{...item}
 				/>
 			{/each}
@@ -84,7 +153,6 @@
 		z-index: 1;
 		height: 4px;
 		padding: 0;
-		appearance: none;
 		outline: none;
 		border: none;
 		background-color: #bbb;

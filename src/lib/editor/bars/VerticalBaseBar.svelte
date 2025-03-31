@@ -6,7 +6,7 @@
 	import LocaleManager from '../state/locale-manager.svelte.js';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
 
-	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'floating';
+	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'vertical';
 
 	function getBarPosition(): BarTransferLocation {
 		switch (selectValue) {
@@ -21,22 +21,12 @@
 
 	function addNullToBar() {
 		const location = getBarPosition();
-		TransferHandler.insert({
-			location,
-			slot: 0,
-			itemId: Math.random().toString(),
-			barId: 0
-		});
+		TransferHandler.append(location, 0, Math.random().toString());
 	}
 
 	function addBasicMenuToBar() {
 		const location = getBarPosition();
-		TransferHandler.insert({
-			location,
-			slot: 0,
-			itemId: 'basic-menu',
-			barId: 0
-		});
+		TransferHandler.append(location, 0, 'basic-menu');
 	}
 </script>
 

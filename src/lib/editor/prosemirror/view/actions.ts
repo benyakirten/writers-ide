@@ -2,7 +2,7 @@ import type { EditorView } from 'prosemirror-view';
 import { type EditorState, type Transaction } from 'prosemirror-state';
 
 import { clamp } from '$lib/utils/numbers.js';
-import { SelectionUtilies } from './selection.js';
+import { SelectionUtilities } from './selection.js';
 import { INDENT_MAX, INDENT_MIN } from './constants.js';
 import type { marks } from './marks.js';
 
@@ -26,7 +26,7 @@ export class ActionUtilities {
 			return false;
 		}
 
-		if (SelectionUtilies.doesSelectionHaveTextMark(tr.selection, tr.doc, mark)) {
+		if (SelectionUtilities.doesSelectionHaveTextMark(tr.selection, tr.doc, mark)) {
 			tr.removeMark(from, to, state.schema.marks[mark]);
 			dispatch(tr);
 			return true;

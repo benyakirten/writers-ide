@@ -1,13 +1,8 @@
-import * as m from '$lib/paraglide/messages.js';
-
-import { capitalize } from '$lib/utils/strings.js';
 import { BarItems } from './bar-items.svelte.js';
 
 export enum HorizontalBarPosition {
 	WindowBlockStart = 'WINDOW_BLOCK_START',
-	WindowBlockEnd = 'WINDOW_BLOCK_END',
-	EditorBlockStart = 'EDITOR_BLOCK_START',
-	EditorBlockEnd = 'EDITOR_BLOCK_END'
+	WindowBlockEnd = 'WINDOW_BLOCK_END'
 }
 
 export type HorizontalBar = {
@@ -25,8 +20,6 @@ export class HorizontalBarState {
 
 	windowBlockStart = $state<HorizontalBar[]>([]);
 	windowBlockEnd = $state<HorizontalBar[]>([]);
-	editorBlockStart = $state<HorizontalBar[]>([]);
-	editorBlockEnd = $state<HorizontalBar[]>([]);
 
 	resizedSection: {
 		id: string;
@@ -42,7 +35,8 @@ export class HorizontalBarState {
 			visible = true,
 			data
 		}: Partial<Omit<HorizontalBar, 'data'>> & { data?: string[] },
-		position: HorizontalBarPosition
+		position: HorizontalBarPosition,
+		index: number = -1
 	): HorizontalBar {
 		const bars = this.bars(position);
 		const existingBar = bars.find((bar) => bar.id === id);
@@ -55,7 +49,12 @@ export class HorizontalBarState {
 		const barData = new BarItems(false, data);
 		const bar = { height, id, visible, data: barData };
 
-		bars.push(bar);
+		if (index < 0 || index >= bars.length) {
+			bars.push(bar);
+		} else {
+			bars.splice(index, 0, bar);
+		}
+
 		return bar;
 	}
 
@@ -76,10 +75,6 @@ export class HorizontalBarState {
 				return this.windowBlockStart;
 			case HorizontalBarPosition.WindowBlockEnd:
 				return this.windowBlockEnd;
-			case HorizontalBarPosition.EditorBlockStart:
-				return this.editorBlockStart;
-			case HorizontalBarPosition.EditorBlockEnd:
-				return this.editorBlockEnd;
 		}
 	}
 
@@ -167,10 +162,7 @@ export class HorizontalBarState {
 	}
 
 	shouldInvert(position: HorizontalBarPosition): boolean {
-		return (
-			position === HorizontalBarPosition.WindowBlockEnd ||
-			position === HorizontalBarPosition.EditorBlockEnd
-		);
+		return position === HorizontalBarPosition.WindowBlockEnd;
 	}
 
 	async endResize(): Promise<void> {
@@ -183,37 +175,15 @@ export class HorizontalBarState {
 		});
 	}
 
-	humanize(id: string | number, bar: HorizontalBarPosition): string {
-		const bars = this.bars(bar);
-		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
-		let description: string;
-		switch (bar) {
-			case HorizontalBarPosition.WindowBlockStart:
-				description = m.window_block_start();
-				break;
-			case HorizontalBarPosition.WindowBlockEnd:
-				description = m.window_block_end();
-				break;
-			case HorizontalBarPosition.EditorBlockStart:
-				description = m.editor_block_start();
-				break;
-			case HorizontalBarPosition.EditorBlockEnd:
-				description = m.editor_block_end();
-				break;
-		}
-
-		const message =
-			index === -1 || index >= bars.length
-				? `${m.unknown()} ${description}`
-				: `${description} ${m.number({ count: index + 1 })}`;
-
-		return capitalize(message);
-	}
-
-	remove(id: string | number, position: HorizontalBarPosition) {
+	remove(id: string | number, position: HorizontalBarPosition): boolean {
 		const bars = this.bars(position);
 		const index = typeof id === 'string' ? bars.findIndex((bar) => bar.id === id) : id;
+		if (index === -1) {
+			return false;
+		}
+
 		bars.splice(index, 1);
+		return true;
 	}
 }
 

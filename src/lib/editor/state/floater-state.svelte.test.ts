@@ -372,6 +372,12 @@ describe('FloaterBarState', () => {
 			expect(got).toBeNull();
 		});
 
+		it('shoudl return null if the updated measurements are identical to the current measurements', () => {
+			const bar = floaterState.add({ width: 200, height: 300 });
+			const got = floaterState.updateMeasurements(bar.id, 200, 300);
+			expect(got).toBeNull();
+		});
+
 		it("should update the bar's width and height if it is found", () => {
 			const bar = floaterState.add({ width: 200, height: 300 });
 			const got = floaterState.updateMeasurements(bar.id, 250, 350);

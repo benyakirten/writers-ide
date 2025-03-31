@@ -5,7 +5,7 @@
 	import TabState from '../state/tab-state.svelte.js';
 	import { schema } from '../prosemirror/view/schema.js';
 	import ProseMirrorEventBus from '../state/event-bus.svelte.js';
-	import { SelectionUtilies } from '../prosemirror/view/selection.js';
+	import { SelectionUtilities } from '../prosemirror/view/selection.js';
 	import { ActionUtilities } from '../prosemirror/view/actions.js';
 	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
 	import FloaterBarState from '../state/floater-state.svelte.js';
@@ -14,12 +14,14 @@
 	import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
 	import ItemRendererMenu from './ItemRendererMenu.svelte';
 	import LocaleManager from '../state/locale-manager.svelte.js';
+	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte.js';
+	import type { MoveDetails } from './BarLocation.svelte';
 
 	let locale = $state(LocaleManager.data);
 	let itemProps: Omit<BarItemComponentProps, 'locale'> = {
 		proseMirror: {
 			actions: ActionUtilities,
-			selections: SelectionUtilies,
+			selections: SelectionUtilities,
 			eventBus: ProseMirrorEventBus,
 			schema
 		},
@@ -43,17 +45,25 @@
 		Component,
 		size,
 		title,
-		onremove
+		position,
+		moveDetails,
+		onremove,
+		onrelocate,
+		onmove
 	}: {
 		Component: BarItemData['Component'];
 		size: BarItemData['size'];
 		title: string;
+		position: BarTransferLocation;
+		moveDetails: MoveDetails;
 		onremove: () => void;
+		onrelocate: (to: BarTransferLocation) => void;
+		onmove: (direction: 'up' | 'down' | 'left' | 'right') => void;
 	} = $props();
 </script>
 
 <div class="renderer" style:--size={size}>
-	<ItemRendererMenu {title} {onremove} />
+	<ItemRendererMenu {moveDetails} {position} {title} {onremove} {onrelocate} {onmove} />
 	<div class="component">
 		{#if Component}
 			<Component {...itemProps} {locale} />

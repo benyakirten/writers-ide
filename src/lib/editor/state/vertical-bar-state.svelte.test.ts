@@ -81,6 +81,33 @@ describe('VerticalBarState', () => {
 			const bar = state.add({ width: 100, id: 'inline-end-1' }, VerticalBarPosition.InlineEnd);
 			expect(state.inlineEnd).toEqual([bar]);
 		});
+
+		it('should add a bar at the designated index if it is specified and a valid index', () => {
+			const bar1 = state.add({ width: 100, id: 'inline-start-1' }, VerticalBarPosition.InlineStart);
+			const bar2 = state.add(
+				{ width: 200, id: 'inline-start-2' },
+				VerticalBarPosition.InlineStart,
+				0
+			);
+			expect(state.inlineStart).toEqual([bar2, bar1]);
+		});
+
+		it('should add a bar at the end of the list if the index is -1 or too great', () => {
+			const bar1 = state.add({ width: 100, id: 'inline-start-1' }, VerticalBarPosition.InlineStart);
+			const bar2 = state.add(
+				{ width: 200, id: 'inline-start-2' },
+				VerticalBarPosition.InlineStart,
+				-1
+			);
+			expect(state.inlineStart).toEqual([bar1, bar2]);
+
+			const bar3 = state.add(
+				{ width: 300, id: 'inline-start-3' },
+				VerticalBarPosition.InlineStart,
+				10
+			);
+			expect(state.inlineStart).toEqual([bar1, bar2, bar3]);
+		});
 	});
 
 	describe('bar', () => {
@@ -184,39 +211,6 @@ describe('VerticalBarState', () => {
 			const got = state.toggle('inline-start-1', VerticalBarPosition.InlineEnd);
 			expect(bar.visible).toBe(true);
 			expect(got).toBe(false);
-		});
-
-		describe('humanize', () => {
-			it('should return the correct description for an inline start bar by id', () => {
-				state.add({ id: 'inline-start-1', width: 100 }, VerticalBarPosition.InlineStart);
-				const description = state.humanize('inline-start-1', VerticalBarPosition.InlineStart);
-				expect(description).toBe('Inline start bar #1');
-			});
-
-			it('should return the correct description for an inline end bar by id', () => {
-				state.add({ id: 'inline-end-1', width: 100 }, VerticalBarPosition.InlineEnd);
-				const description = state.humanize('inline-end-1', VerticalBarPosition.InlineEnd);
-				expect(description).toBe('Inline end bar #1');
-			});
-
-			it('should return the correct description for an inline start bar by index', () => {
-				state.add({ id: 'inline-start-1', width: 100 }, VerticalBarPosition.InlineStart);
-				state.add({ id: 'inline-start-2', width: 100 }, VerticalBarPosition.InlineStart);
-				const description = state.humanize(1, VerticalBarPosition.InlineStart);
-				expect(description).toBe('Inline start bar #2');
-			});
-
-			it('should return the correct description for an inline end bar by index', () => {
-				state.add({ id: 'inline-end-1', width: 100 }, VerticalBarPosition.InlineEnd);
-				state.add({ id: 'inline-end-2', width: 100 }, VerticalBarPosition.InlineEnd);
-				const description = state.humanize(1, VerticalBarPosition.InlineEnd);
-				expect(description).toBe('Inline end bar #2');
-			});
-
-			it('should give an error message if the bar does not exist', () => {
-				const description = state.humanize('non-existent', VerticalBarPosition.InlineStart);
-				expect(description).toBe('Unknown inline start bar');
-			});
 		});
 	});
 
@@ -348,6 +342,23 @@ describe('VerticalBarState', () => {
 			state.startResize('inline-start-1', VerticalBarPosition.InlineStart, 100);
 			await state.endResize();
 			expect(state.resizedSection).toBeNull();
+		});
+	});
+
+	describe('remove', () => {
+		it('should return false if the bar does not exist', () => {
+			const result = state.remove('non-existent', VerticalBarPosition.InlineStart);
+			expect(result).toBe(false);
+		});
+
+		it('should remove the bar if it exists', () => {
+			const bar1 = state.add({}, VerticalBarPosition.InlineStart);
+			const bar2 = state.add({}, VerticalBarPosition.InlineStart);
+			const bar3 = state.add({}, VerticalBarPosition.InlineStart);
+
+			const result = state.remove(bar2.id, VerticalBarPosition.InlineStart);
+			expect(result).toBe(true);
+			expect(state.inlineStart).toEqual([bar1, bar3]);
 		});
 	});
 });

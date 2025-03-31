@@ -50,6 +50,11 @@ export class BarItems {
 		})
 	);
 
+	availableSpace = $derived.by(() => {
+		const usedSpace = this.#ids.reduce((acc, id) => acc + Registry.size(id, this.isVertical), 0);
+		return Math.max(0, this.maxSize - usedSpace);
+	});
+
 	has(id: string | null): boolean {
 		if (id === null) {
 			return false;
@@ -58,12 +63,14 @@ export class BarItems {
 	}
 
 	index(id: string | number): number {
+		if (typeof id === 'number' && (id < 0 || id >= this.#ids.length)) {
+			return -1;
+		}
 		return typeof id === 'string' ? this.#ids.findIndex((_id) => _id === id) : id;
 	}
 
 	append(id: string): boolean {
-		const availableSpace = this.availableSpace;
-		if (this.has(id) || Registry.size(id, this.isVertical) > availableSpace) {
+		if (this.has(id) || !this.canFit(id)) {
 			return false;
 		}
 
@@ -91,28 +98,13 @@ export class BarItems {
 	}
 
 	insert(id: string, at: number): boolean {
-		if (this.has(id) || at < 0 || Registry.size(id, this.isVertical) > this.availableSpace) {
+		if (this.has(id) || at < 0 || !this.canFit(id)) {
 			return false;
 		}
 
 		const index = Math.min(at, this.#ids.length);
 		this.#ids.splice(index, 0, id);
 		return true;
-	}
-
-	moveTo(id: string | number, toIndex: number): boolean {
-		const fromIndex = this.index(id);
-		if (
-			fromIndex === -1 ||
-			fromIndex > this.#ids.length - 1 ||
-			toIndex < 0 ||
-			toIndex > this.#ids.length - 1 ||
-			fromIndex === toIndex
-		) {
-			return false;
-		}
-
-		return this.swap(fromIndex, toIndex);
 	}
 
 	remove(id: string | number): boolean {
@@ -125,8 +117,7 @@ export class BarItems {
 		return true;
 	}
 
-	availableSpace = $derived.by(() => {
-		const usedSpace = this.#ids.reduce((acc, id) => acc + Registry.size(id, this.isVertical), 0);
-		return Math.max(0, this.maxSize - usedSpace);
-	});
+	canFit(id: string): boolean {
+		return this.availableSpace >= Registry.size(id, this.isVertical) && !this.has(id);
+	}
 }
