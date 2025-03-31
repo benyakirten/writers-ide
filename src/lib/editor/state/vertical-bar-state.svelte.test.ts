@@ -81,6 +81,33 @@ describe('VerticalBarState', () => {
 			const bar = state.add({ width: 100, id: 'inline-end-1' }, VerticalBarPosition.InlineEnd);
 			expect(state.inlineEnd).toEqual([bar]);
 		});
+
+		it('should add a bar at the designated index if it is specified and a valid index', () => {
+			const bar1 = state.add({ width: 100, id: 'inline-start-1' }, VerticalBarPosition.InlineStart);
+			const bar2 = state.add(
+				{ width: 200, id: 'inline-start-2' },
+				VerticalBarPosition.InlineStart,
+				0
+			);
+			expect(state.inlineStart).toEqual([bar2, bar1]);
+		});
+
+		it('should add a bar at the end of the list if the index is -1 or too great', () => {
+			const bar1 = state.add({ width: 100, id: 'inline-start-1' }, VerticalBarPosition.InlineStart);
+			const bar2 = state.add(
+				{ width: 200, id: 'inline-start-2' },
+				VerticalBarPosition.InlineStart,
+				-1
+			);
+			expect(state.inlineStart).toEqual([bar1, bar2]);
+
+			const bar3 = state.add(
+				{ width: 300, id: 'inline-start-3' },
+				VerticalBarPosition.InlineStart,
+				10
+			);
+			expect(state.inlineStart).toEqual([bar1, bar2, bar3]);
+		});
 	});
 
 	describe('bar', () => {

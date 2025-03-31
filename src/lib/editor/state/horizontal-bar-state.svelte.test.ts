@@ -70,6 +70,39 @@ describe('HorizontalBarState', () => {
 			);
 			expect(state.windowBlockEnd).toEqual([bar]);
 		});
+
+		it('should add a bar at the designated index if it is specified and a valid index', () => {
+			const bar1 = state.add(
+				{ height: 100, id: 'inline-start-1' },
+				HorizontalBarPosition.WindowBlockEnd
+			);
+			const bar2 = state.add(
+				{ height: 200, id: 'inline-start-2' },
+				HorizontalBarPosition.WindowBlockEnd,
+				0
+			);
+			expect(state.windowBlockEnd).toEqual([bar2, bar1]);
+		});
+
+		it('should add a bar at the end of the list if the index is -1 or too great', () => {
+			const bar1 = state.add(
+				{ height: 100, id: 'inline-start-1' },
+				HorizontalBarPosition.WindowBlockEnd
+			);
+			const bar2 = state.add(
+				{ height: 200, id: 'inline-start-2' },
+				HorizontalBarPosition.WindowBlockEnd,
+				-1
+			);
+			expect(state.windowBlockEnd).toEqual([bar1, bar2]);
+
+			const bar3 = state.add(
+				{ height: 300, id: 'inline-start-3' },
+				HorizontalBarPosition.WindowBlockEnd,
+				10
+			);
+			expect(state.windowBlockEnd).toEqual([bar1, bar2, bar3]);
+		});
 	});
 
 	describe('bar', () => {
