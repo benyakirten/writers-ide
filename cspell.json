@@ -25,6 +25,7 @@
 		"onrelocate",
 		"prosemirror",
 		"unsub",
-		"steeze"
+		"steeze",
+		"tauri"
 	]
 }
