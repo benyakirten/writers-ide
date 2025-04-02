@@ -3,9 +3,9 @@ import { SvelteMap } from 'svelte/reactivity';
 import { Observable } from '$lib/utils/observable';
 
 export class ShortcutService extends Observable<string> {
-	commands = new SvelteMap<string, string>();
+	shortcutsToCommands = new SvelteMap<string, string>();
 
-	#homogenize(cmd: string[]): string {
+	#standardize(cmd: string[]): string {
 		const output: string[] = [];
 		const cmdKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'ctrl');
 		if (cmdKeyIndex !== -1) {
@@ -31,26 +31,38 @@ export class ShortcutService extends Observable<string> {
 			cmd.splice(altKeyIndex, 1);
 		}
 
-		output.push(cmd[0].toLocaleLowerCase());
+		const finalKey = cmd.at(0);
+		if (finalKey) {
+			output.push(finalKey.toLocaleLowerCase());
+		}
+
 		return output.join('+');
 	}
 
 	parse(cmd: Set<string> | string[] | string): string {
 		if (typeof cmd === 'string') {
 			const arr = cmd.split('+');
-			return this.#homogenize(arr);
+			return this.#standardize(arr);
 		} else if (Array.isArray(cmd)) {
-			return this.#homogenize(cmd);
+			return this.#standardize(cmd);
 		} else {
 			const arr = [...cmd];
-			return this.#homogenize(arr);
+			return this.#standardize(arr);
 		}
 	}
 
-	register(name: string, cmd: Set<string> | string[] | string) {
+	#hasCtrlMetaOrAltKeys(cmd: string): boolean {
+		return cmd.includes('ctrl') || cmd.includes('meta') || cmd.includes('alt');
+	}
+
+	register(name: string, cmd: Set<string> | string[] | string): boolean {
 		const key = this.parse(cmd);
-		this.commands.set(key, name);
-		return this;
+		if (!this.#hasCtrlMetaOrAltKeys(key)) {
+			return false;
+		}
+
+		this.shortcutsToCommands.set(key, name);
+		return true;
 	}
 
 	listen(e: KeyboardEvent) {
@@ -71,16 +83,19 @@ export class ShortcutService extends Observable<string> {
 			cmd.push('ctrl');
 		}
 
-		const key = this.#homogenize(cmd);
-		const emitted = this.commands.get(key);
+		const key = this.#standardize(cmd);
+		if (!key) {
+			return;
+		}
+
+		const emitted = this.shortcutsToCommands.get(key);
 		if (emitted) {
 			this.update(emitted);
 		}
 	}
 
 	on(cmds: Record<string, () => void>): () => void {
-		const unsub = this.subscribe((val) => cmds[val]?.());
-		return unsub;
+		return this.subscribe((val) => cmds[val]?.());
 	}
 }
 
