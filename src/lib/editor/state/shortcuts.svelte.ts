@@ -4,6 +4,7 @@ import { Observable } from '$lib/utils/observable';
 
 export class ShortcutService extends Observable<string> {
 	shortcutsToCommands = new SvelteMap<string, string>();
+	commandsToShortcuts = new SvelteMap<string, string>();
 
 	#standardize(cmd: string[]): string {
 		const output: string[] = [];
@@ -55,47 +56,96 @@ export class ShortcutService extends Observable<string> {
 		return cmd.includes('ctrl') || cmd.includes('meta') || cmd.includes('alt');
 	}
 
-	register(name: string, cmd: Set<string> | string[] | string): boolean {
-		const key = this.parse(cmd);
+	addCommand(name: string) {
+		if (!this.commandsToShortcuts.has(name)) {
+			this.commandsToShortcuts.set(name, '');
+		}
+		return this;
+	}
+
+	#getValue(map: Map<string, string>, needle: string): string | null {
+		for (const [key, value] of map) {
+			if (value === needle) {
+				return key;
+			}
+		}
+		return null;
+	}
+
+	unset(name: string) {
+		if (!this.commandsToShortcuts.has(name)) {
+			return false;
+		}
+
+		const cmd = this.#getValue(this.shortcutsToCommands, name);
+		if (!cmd) {
+			return false;
+		}
+
+		this.commandsToShortcuts.set(name, '');
+		this.shortcutsToCommands.delete(cmd);
+		return true;
+	}
+
+	removeShortcut(shortcut: Set<string> | string[] | string): boolean {
+		const key = this.parse(shortcut);
+		if (!this.shortcutsToCommands.has(key)) {
+			return false;
+		}
+
+		const name = this.shortcutsToCommands.get(key) ?? this.#getValue(this.commandsToShortcuts, key);
+		if (!name || !this.commandsToShortcuts.has(name)) {
+			return false;
+		}
+
+		this.shortcutsToCommands.delete(key);
+		this.commandsToShortcuts.set(name, '');
+
+		return true;
+	}
+
+	register(name: string, shortcut: Set<string> | string[] | string): boolean {
+		const key = this.parse(shortcut);
 		if (!this.#hasCtrlMetaOrAltKeys(key)) {
 			return false;
 		}
 
 		this.shortcutsToCommands.set(key, name);
+		this.commandsToShortcuts.set(name, key);
 		return true;
 	}
 
 	listen(e: KeyboardEvent) {
-		const cmd = [e.key];
+		const shortcut = [e.key];
 		if (e.altKey) {
-			cmd.push('alt');
+			shortcut.push('alt');
 		}
 
 		if (e.shiftKey) {
-			cmd.push('shift');
+			shortcut.push('shift');
 		}
 
 		if (e.metaKey) {
-			cmd.push('meta');
+			shortcut.push('meta');
 		}
 
 		if (e.ctrlKey) {
-			cmd.push('ctrl');
+			shortcut.push('ctrl');
 		}
 
-		const key = this.#standardize(cmd);
+		const key = this.#standardize(shortcut);
 		if (!key) {
 			return;
 		}
 
-		const emitted = this.shortcutsToCommands.get(key);
-		if (emitted) {
-			this.update(emitted);
+		const cmd = this.shortcutsToCommands.get(key);
+		if (cmd) {
+			this.update(cmd);
 		}
 	}
 
-	on(cmds: Record<string, () => void>): () => void {
-		return this.subscribe((val) => cmds[val]?.());
+	on(shortcuts: Record<string, () => void>): () => void {
+		return this.subscribe((val) => shortcuts[val]?.());
 	}
 }
 

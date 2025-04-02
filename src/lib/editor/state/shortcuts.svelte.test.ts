@@ -45,12 +45,27 @@ describe('ShortcutService', () => {
 			const result = service.register('copy', 'ctrl+C');
 			expect(result).toBe(true);
 			expect(service.shortcutsToCommands.get('ctrl+c')).toBe('copy');
+			expect(service.commandsToShortcuts.get('copy')).toBe('ctrl+c');
 		});
 
 		it('should not register a command with an invalid shortcut', () => {
 			const result = service.register('copy', 'C');
 			expect(result).toBe(false);
 			expect(service.shortcutsToCommands.has('C')).toBe(false);
+			expect(service.commandsToShortcuts.has('copy')).toBe(false);
+		});
+	});
+
+	describe('addCommand', () => {
+		it("should add the command with an empty shortcut if it doesn't already exist", () => {
+			service.addCommand('copy');
+			expect(service.commandsToShortcuts.get('copy')).toBe('');
+		});
+
+		it('should not override a preexisting command if it already exists', () => {
+			service.register('copy', 'ctrl+c');
+			service.addCommand('copy');
+			expect(service.commandsToShortcuts.get('copy')).toBe('ctrl+c');
 		});
 	});
 
@@ -116,6 +131,74 @@ describe('ShortcutService', () => {
 
 			expect(cmd1Spy).toHaveBeenCalledOnce();
 			expect(cmd2Spy).toHaveBeenCalledOnce();
+
+			const event3 = new KeyboardEvent('keydown', {
+				key: 'C',
+				ctrlKey: true,
+				shiftKey: true
+			});
+			service.listen(event3);
+
+			expect(cmd1Spy).toHaveBeenCalledOnce();
+			expect(cmd2Spy).toHaveBeenCalledOnce();
+		});
+	});
+
+	describe('unset', () => {
+		it('should not unset the command if a shortcut does not exist for the command', () => {
+			service.commandsToShortcuts.set('copy', 'ctrl+c');
+
+			const result = service.unset('copy');
+			expect(result).toBe(false);
+			expect(service.commandsToShortcuts.get('copy')).toBe('ctrl+c');
+			expect(service.shortcutsToCommands.get('paste')).toBe(undefined);
+		});
+
+		it('should unset the command if it exists', () => {
+			service.register('copy', 'ctrl+c');
+
+			const result = service.unset('copy');
+
+			expect(result).toBe(true);
+			expect(service.commandsToShortcuts.get('copy')).toBe('');
+			expect(service.shortcutsToCommands.get('ctrl+c')).toBe(undefined);
+		});
+
+		it("should not unset the command if it doesn't exist", () => {
+			const result = service.unset('copy');
+
+			expect(result).toBe(false);
+			expect(service.commandsToShortcuts.get('copy')).toBe(undefined);
+			expect(service.shortcutsToCommands.get('ctrl+c')).toBe(undefined);
+		});
+	});
+
+	describe('removeShortcut', () => {
+		it('should remove the shortcut from the command', () => {
+			service.register('copy', 'ctrl+c');
+
+			const result = service.removeShortcut('ctrl+c');
+
+			expect(result).toBe(true);
+			expect(service.commandsToShortcuts.get('copy')).toBe('');
+			expect(service.shortcutsToCommands.get('ctrl+c')).toBe(undefined);
+		});
+
+		it('should not remove the command if there is not a corresponding entry in commandsToShortcuts', () => {
+			service.shortcutsToCommands.set('ctrl+c', 'copy');
+			const result = service.removeShortcut('ctrl+c');
+
+			expect(result).toBe(false);
+			expect(service.commandsToShortcuts.get('copy')).toBe(undefined);
+			expect(service.shortcutsToCommands.get('ctrl+c')).toBe('copy');
+		});
+
+		it("should not remove the command if it doesn't exist", () => {
+			const result = service.removeShortcut('ctrl+c');
+
+			expect(result).toBe(false);
+			expect(service.commandsToShortcuts.get('copy')).toBe(undefined);
+			expect(service.shortcutsToCommands.get('ctrl+c')).toBe(undefined);
 		});
 	});
 });
