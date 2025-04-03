@@ -26,6 +26,8 @@
 		"prosemirror",
 		"unsub",
 		"steeze",
-		"tauri"
+		"tauri",
+		"Internationalizator",
+		"keymap"
 	]
 }

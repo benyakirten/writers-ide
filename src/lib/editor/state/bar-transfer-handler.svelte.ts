@@ -1,5 +1,5 @@
 import { swap } from '$lib/utils/arrays.js';
-import { clamp } from '@/utils/numbers.js';
+import { clamp } from '$lib/utils/numbers.js';
 import type { BarItems } from './bar-items.svelte.js';
 import FloatingBarState, { type FloatingBar } from './floater-state.svelte.js';
 import HorizontalBarState, {

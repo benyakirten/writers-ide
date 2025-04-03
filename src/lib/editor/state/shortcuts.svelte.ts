@@ -8,31 +8,29 @@ export class ShortcutService extends Observable<string> {
 
 	#standardize(cmd: string[]): string {
 		const output: string[] = [];
-		const cmdKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'ctrl');
-		if (cmdKeyIndex !== -1) {
-			cmd.splice(cmdKeyIndex, 1);
-			output.push('ctrl');
-		}
-
 		const metaKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'meta');
 		if (metaKeyIndex !== -1) {
 			output.push('meta');
-			cmd.splice(metaKeyIndex, 1);
-		}
-
-		const shiftKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'shift');
-		if (shiftKeyIndex !== -1) {
-			output.push('shift');
-			cmd.splice(shiftKeyIndex, 1);
 		}
 
 		const altKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'alt');
 		if (altKeyIndex !== -1) {
 			output.push('alt');
-			cmd.splice(altKeyIndex, 1);
 		}
 
-		const finalKey = cmd.at(0);
+		const cmdKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'ctrl');
+		if (cmdKeyIndex !== -1) {
+			output.push('ctrl');
+		}
+
+		const shiftKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'shift');
+		if (shiftKeyIndex !== -1) {
+			output.push('shift');
+		}
+
+		const finalKey = cmd.find(
+			(key) => key !== 'ctrl' && key !== 'meta' && key !== 'alt' && key !== 'shift'
+		);
 		if (finalKey) {
 			output.push(finalKey.toLocaleLowerCase());
 		}
@@ -117,20 +115,20 @@ export class ShortcutService extends Observable<string> {
 
 	listen(e: KeyboardEvent) {
 		const shortcut = [e.key];
-		if (e.altKey) {
-			shortcut.push('alt');
-		}
-
 		if (e.shiftKey) {
 			shortcut.push('shift');
 		}
 
-		if (e.metaKey) {
-			shortcut.push('meta');
-		}
-
 		if (e.ctrlKey) {
 			shortcut.push('ctrl');
+		}
+
+		if (e.altKey) {
+			shortcut.push('alt');
+		}
+
+		if (e.metaKey) {
+			shortcut.push('meta');
 		}
 
 		const key = this.#standardize(shortcut);
@@ -146,6 +144,13 @@ export class ShortcutService extends Observable<string> {
 
 	on(shortcuts: Record<string, () => void>): () => void {
 		return this.subscribe((val) => shortcuts[val]?.());
+	}
+
+	add(shortcuts: Record<string, string>) {
+		for (const [key, value] of Object.entries(shortcuts)) {
+			this.register(key, value);
+		}
+		return this;
 	}
 }
 

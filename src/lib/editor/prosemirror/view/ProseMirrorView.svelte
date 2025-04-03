@@ -15,7 +15,6 @@
 	let el: HTMLElement;
 	let state: EditorState;
 	let view: EditorView;
-	let deregister: () => void;
 	let initialState = schema.node('doc', null, [
 		schema.node('paragraph', null, [schema.text('This is a basic paragraph with no children.')]),
 		schema.node('paragraph', null, [schema.text('This is a paragraph with more nodes.')])
@@ -70,10 +69,10 @@
 			dispatchTransaction: (transaction) => handleTransaction(view, transaction)
 		});
 
-		deregister = TabState.registerEditor(id, view);
+		const deregister = TabState.registerEditor(id, view);
 		return () => {
 			view.destroy();
-			deregister?.();
+			deregister();
 		};
 	});
 </script>

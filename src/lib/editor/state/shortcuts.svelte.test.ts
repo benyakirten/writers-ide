@@ -20,17 +20,17 @@ describe('ShortcutService', () => {
 	describe('parse', () => {
 		it('should return a string with a standardized order from a string', () => {
 			expect(service.parse('ctrl+shift+A')).toBe('ctrl+shift+a');
-			expect(service.parse('alt+ctrl+shift+meta')).toBe('ctrl+meta+shift+alt');
+			expect(service.parse('alt+ctrl+shift+meta')).toBe('meta+alt+ctrl+shift');
 		});
 
 		it('should return a string with a standardized order from an array', () => {
 			expect(service.parse(['ctrl', 'shift', 'A'])).toBe('ctrl+shift+a');
-			expect(service.parse(['alt', 'ctrl', 'shift', 'meta'])).toBe('ctrl+meta+shift+alt');
+			expect(service.parse(['alt', 'ctrl', 'shift', 'meta'])).toBe('meta+alt+ctrl+shift');
 		});
 
 		it('should return a string with a standardized order from a set', () => {
 			expect(service.parse(new Set(['ctrl', 'shift', 'A']))).toBe('ctrl+shift+a');
-			expect(service.parse(new Set(['alt', 'ctrl', 'shift', 'meta']))).toBe('ctrl+meta+shift+alt');
+			expect(service.parse(new Set(['alt', 'ctrl', 'shift', 'meta']))).toBe('meta+alt+ctrl+shift');
 		});
 
 		it('should lowercase any uppercase letters', () => {
