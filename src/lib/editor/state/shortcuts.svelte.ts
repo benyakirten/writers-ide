@@ -5,48 +5,66 @@ import { Observable } from '$lib/utils/observable';
 export class ShortcutService extends Observable<string> {
 	shortcutsToCommands = new SvelteMap<string, string>();
 	commandsToShortcuts = new SvelteMap<string, string>();
-	keysDown: Set<string> = new Set();
-	SEPARATOR = '<>';
+	SEPARATOR = '-';
 
-	#standardize(cmd: Set<string>): string {
+	#standardize(cmd: string[]): string {
 		const output: string[] = [];
-
-		if (cmd.has('meta')) {
+		const metaKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'meta');
+		if (metaKeyIndex !== -1) {
 			output.push('meta');
 		}
 
-		if (cmd.has('alt')) {
+		const altKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'alt');
+		if (altKeyIndex !== -1) {
 			output.push('alt');
 		}
 
-		if (cmd.has('ctrl')) {
+		const cmdKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'ctrl');
+		if (cmdKeyIndex !== -1) {
 			output.push('ctrl');
 		}
 
-		if (cmd.has('shift')) {
+		const shiftKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'shift');
+		if (shiftKeyIndex !== -1) {
 			output.push('shift');
 		}
 
-		for (const key of cmd) {
-			if (key === 'ctrl' || key === 'meta' || key === 'alt' || key === 'shift') {
-				continue;
-			}
-			output.push(key.toLocaleLowerCase());
+		const finalKey = cmd.find(
+			(key) => key !== 'ctrl' && key !== 'meta' && key !== 'alt' && key !== 'shift'
+		);
+
+		if (finalKey) {
+			output.push(finalKey.toLocaleLowerCase());
 		}
 
-		return output.join(this.SEPARATOR);
+		const set = new Set<string>(output);
+		return [...set].join(this.SEPARATOR);
+	}
+
+	split(str: string): string[] {
+		let currentShortcutPart = '';
+		const output: string[] = [];
+		for (const char of str) {
+			if (char === this.SEPARATOR && currentShortcutPart) {
+				output.push(currentShortcutPart);
+				currentShortcutPart = '';
+			} else {
+				currentShortcutPart += char;
+			}
+		}
+
+		output.push(currentShortcutPart);
+		return output;
 	}
 
 	parse(cmd: Set<string> | string[] | string): string {
 		if (typeof cmd === 'string') {
-			const arr = cmd.split(this.SEPARATOR);
-			const set = new Set(arr);
-			return this.#standardize(set);
+			const arr = this.split(cmd);
+			return this.#standardize(arr);
 		} else if (Array.isArray(cmd)) {
-			const set = new Set(cmd);
-			return this.#standardize(set);
-		} else {
 			return this.#standardize(cmd);
+		} else {
+			return this.#standardize([...cmd]);
 		}
 	}
 
@@ -114,23 +132,29 @@ export class ShortcutService extends Observable<string> {
 	}
 
 	/** Return a shortcut from a key event. */
-	process(e: KeyboardEvent): string | null {
-		const key = e.key.toLocaleLowerCase();
-		if (e.type === 'keyup') {
-			this.keysDown.delete(key);
-			return null;
+	process(e: KeyboardEvent): string {
+		const shortcut = [e.key];
+		if (e.shiftKey) {
+			shortcut.push('shift');
 		}
 
-		this.keysDown.add(key);
-		return this.#standardize(this.keysDown);
+		if (e.ctrlKey) {
+			shortcut.push('ctrl');
+		}
+
+		if (e.altKey) {
+			shortcut.push('alt');
+		}
+
+		if (e.metaKey) {
+			shortcut.push('meta');
+		}
+
+		return this.#standardize(shortcut);
 	}
 
 	listen(e: KeyboardEvent): void {
 		const key = this.process(e);
-		if (!key) {
-			return;
-		}
-
 		const cmd = this.shortcutsToCommands.get(key);
 		if (cmd) {
 			this.update(cmd);
@@ -150,14 +174,12 @@ export class ShortcutService extends Observable<string> {
 
 	get(e: KeyboardEvent): string | null {
 		const shortcut = this.process(e);
-		if (!shortcut) {
-			return null;
-		}
-		return this.shortcutsToCommands.get(shortcut) ?? null;
+		console.log(shortcut);
+		return this.shortcutsToCommands.get(shortcut) || null;
 	}
 
 	shortcut(name: string): string | null {
-		return this.commandsToShortcuts.get(name) ?? null;
+		return this.commandsToShortcuts.get(name) || null;
 	}
 }
 

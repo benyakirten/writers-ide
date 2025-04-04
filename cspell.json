@@ -29,6 +29,7 @@
 		"tauri",
 		"Internationalizator",
 		"keymap",
-		"onfocusincapture"
+		"onfocusincapture",
+		"inlang"
 	]
 }
