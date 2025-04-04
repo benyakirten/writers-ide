@@ -46,14 +46,14 @@ export class ShortcutService extends Observable<string> {
 		const output: string[] = [];
 		for (const char of str) {
 			if (char === this.SEPARATOR && currentShortcutPart) {
-				output.push(currentShortcutPart);
+				output.push(currentShortcutPart.toLocaleLowerCase());
 				currentShortcutPart = '';
 			} else {
 				currentShortcutPart += char;
 			}
 		}
 
-		output.push(currentShortcutPart);
+		output.push(currentShortcutPart.toLocaleLowerCase());
 		return output;
 	}
 
@@ -174,7 +174,6 @@ export class ShortcutService extends Observable<string> {
 
 	get(e: KeyboardEvent): string | null {
 		const shortcut = this.process(e);
-		console.log(shortcut);
 		return this.shortcutsToCommands.get(shortcut) || null;
 	}
 
