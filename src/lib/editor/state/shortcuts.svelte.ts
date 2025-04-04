@@ -1,11 +1,29 @@
-import { SvelteMap } from 'svelte/reactivity';
-
 import { Observable } from '$lib/utils/observable';
+import { isMac } from '$lib/utils/misc';
 
 export class ShortcutService extends Observable<string> {
-	shortcutsToCommands = new SvelteMap<string, string>();
-	commandsToShortcuts = new SvelteMap<string, string>();
+	commandsToShortcuts = $state<Record<string, string>>({});
+	shortcutsToCommands = $derived.by(() => {
+		const shortcuts: Record<string, string> = {};
+		for (const [command, shortcut] of Object.entries(this.commandsToShortcuts)) {
+			if (shortcut) {
+				shortcuts[shortcut] = command;
+			}
+		}
+		return shortcuts;
+	});
+	commandsToDisplayedShortcuts = $derived.by(() => {
+		const displayShortcuts: Record<string, string> = {};
+		for (const [command, shortcut] of Object.entries(this.commandsToShortcuts)) {
+			displayShortcuts[command] = this.display(shortcut, isMac());
+		}
+		return displayShortcuts;
+	});
 	SEPARATOR = '-';
+
+	display(shortcut: string, isMac: boolean): string {
+		return (shortcut && isMac && 'a') || '';
+	}
 
 	#standardize(cmd: string[]): string {
 		const output: string[] = [];
@@ -73,50 +91,30 @@ export class ShortcutService extends Observable<string> {
 	}
 
 	addCommand(name: string) {
-		if (!this.commandsToShortcuts.has(name)) {
-			this.commandsToShortcuts.set(name, '');
+		if (!(name in this.commandsToShortcuts)) {
+			this.commandsToShortcuts[name] = '';
 		}
 		return this;
 	}
 
-	#getValue(map: Map<string, string>, needle: string): string | null {
-		for (const [key, value] of map) {
-			if (value === needle) {
-				return key;
-			}
-		}
-		return null;
-	}
-
 	unset(name: string) {
-		if (!this.commandsToShortcuts.has(name)) {
+		if (!(name in this.commandsToShortcuts)) {
 			return false;
 		}
 
-		const cmd = this.#getValue(this.shortcutsToCommands, name);
-		if (!cmd) {
-			return false;
-		}
-
-		this.commandsToShortcuts.set(name, '');
-		this.shortcutsToCommands.delete(cmd);
+		this.commandsToShortcuts[name] = '';
 		return true;
 	}
 
 	removeShortcut(shortcut: Set<string> | string[] | string): boolean {
 		const key = this.parse(shortcut);
-		if (!this.shortcutsToCommands.has(key)) {
+		const name = this.shortcutsToCommands[key];
+
+		if (!name || !(name in this.commandsToShortcuts)) {
 			return false;
 		}
 
-		const name = this.shortcutsToCommands.get(key) ?? this.#getValue(this.commandsToShortcuts, key);
-		if (!name || !this.commandsToShortcuts.has(name)) {
-			return false;
-		}
-
-		this.shortcutsToCommands.delete(key);
-		this.commandsToShortcuts.set(name, '');
-
+		this.commandsToShortcuts[name] = '';
 		return true;
 	}
 
@@ -126,8 +124,7 @@ export class ShortcutService extends Observable<string> {
 			return false;
 		}
 
-		this.shortcutsToCommands.set(key, name);
-		this.commandsToShortcuts.set(name, key);
+		this.commandsToShortcuts[name] = key;
 		return true;
 	}
 
@@ -155,7 +152,7 @@ export class ShortcutService extends Observable<string> {
 
 	listen(e: KeyboardEvent): void {
 		const key = this.process(e);
-		const cmd = this.shortcutsToCommands.get(key);
+		const cmd = this.shortcutsToCommands[key];
 		if (cmd) {
 			this.update(cmd);
 		}
@@ -174,11 +171,11 @@ export class ShortcutService extends Observable<string> {
 
 	get(e: KeyboardEvent): string | null {
 		const shortcut = this.process(e);
-		return this.shortcutsToCommands.get(shortcut) || null;
+		return this.shortcutsToCommands[shortcut] || null;
 	}
 
 	shortcut(name: string): string | null {
-		return this.commandsToShortcuts.get(name) || null;
+		return this.commandsToShortcuts[name] || null;
 	}
 }
 

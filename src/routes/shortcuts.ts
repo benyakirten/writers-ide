@@ -1,3 +1,5 @@
+// TODO: These will be saved into a system-wide config file
+// that will be editable when the user has initially set up the system.
 const builtInShortcuts = {
 	subscript: 'ctrl-shift-+',
 	superscript: 'ctrl-shift-_',
