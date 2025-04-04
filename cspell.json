@@ -28,6 +28,7 @@
 		"steeze",
 		"tauri",
 		"Internationalizator",
-		"keymap"
+		"keymap",
+		"onfocusincapture"
 	]
 }

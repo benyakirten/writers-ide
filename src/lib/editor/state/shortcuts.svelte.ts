@@ -5,48 +5,48 @@ import { Observable } from '$lib/utils/observable';
 export class ShortcutService extends Observable<string> {
 	shortcutsToCommands = new SvelteMap<string, string>();
 	commandsToShortcuts = new SvelteMap<string, string>();
+	keysDown: Set<string> = new Set();
+	SEPARATOR = '<>';
 
-	#standardize(cmd: string[]): string {
+	#standardize(cmd: Set<string>): string {
 		const output: string[] = [];
-		const metaKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'meta');
-		if (metaKeyIndex !== -1) {
+
+		if (cmd.has('meta')) {
 			output.push('meta');
 		}
 
-		const altKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'alt');
-		if (altKeyIndex !== -1) {
+		if (cmd.has('alt')) {
 			output.push('alt');
 		}
 
-		const cmdKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'ctrl');
-		if (cmdKeyIndex !== -1) {
+		if (cmd.has('ctrl')) {
 			output.push('ctrl');
 		}
 
-		const shiftKeyIndex = cmd.findIndex((key) => key.toLowerCase() === 'shift');
-		if (shiftKeyIndex !== -1) {
+		if (cmd.has('shift')) {
 			output.push('shift');
 		}
 
-		const finalKey = cmd.find(
-			(key) => key !== 'ctrl' && key !== 'meta' && key !== 'alt' && key !== 'shift'
-		);
-		if (finalKey) {
-			output.push(finalKey.toLocaleLowerCase());
+		for (const key of cmd) {
+			if (key === 'ctrl' || key === 'meta' || key === 'alt' || key === 'shift') {
+				continue;
+			}
+			output.push(key.toLocaleLowerCase());
 		}
 
-		return output.join('+');
+		return output.join(this.SEPARATOR);
 	}
 
 	parse(cmd: Set<string> | string[] | string): string {
 		if (typeof cmd === 'string') {
-			const arr = cmd.split('+');
-			return this.#standardize(arr);
+			const arr = cmd.split(this.SEPARATOR);
+			const set = new Set(arr);
+			return this.#standardize(set);
 		} else if (Array.isArray(cmd)) {
-			return this.#standardize(cmd);
+			const set = new Set(cmd);
+			return this.#standardize(set);
 		} else {
-			const arr = [...cmd];
-			return this.#standardize(arr);
+			return this.#standardize(cmd);
 		}
 	}
 
@@ -113,25 +113,20 @@ export class ShortcutService extends Observable<string> {
 		return true;
 	}
 
-	listen(e: KeyboardEvent) {
-		const shortcut = [e.key];
-		if (e.shiftKey) {
-			shortcut.push('shift');
+	/** Return a shortcut from a key event. */
+	process(e: KeyboardEvent): string | null {
+		const key = e.key.toLocaleLowerCase();
+		if (e.type === 'keyup') {
+			this.keysDown.delete(key);
+			return null;
 		}
 
-		if (e.ctrlKey) {
-			shortcut.push('ctrl');
-		}
+		this.keysDown.add(key);
+		return this.#standardize(this.keysDown);
+	}
 
-		if (e.altKey) {
-			shortcut.push('alt');
-		}
-
-		if (e.metaKey) {
-			shortcut.push('meta');
-		}
-
-		const key = this.#standardize(shortcut);
+	listen(e: KeyboardEvent): void {
+		const key = this.process(e);
 		if (!key) {
 			return;
 		}
@@ -151,6 +146,18 @@ export class ShortcutService extends Observable<string> {
 			this.register(key, value);
 		}
 		return this;
+	}
+
+	get(e: KeyboardEvent): string | null {
+		const shortcut = this.process(e);
+		if (!shortcut) {
+			return null;
+		}
+		return this.shortcutsToCommands.get(shortcut) ?? null;
+	}
+
+	shortcut(name: string): string | null {
+		return this.commandsToShortcuts.get(name) ?? null;
 	}
 }
 
