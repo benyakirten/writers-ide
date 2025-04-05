@@ -5,12 +5,17 @@ import { capitalize } from '$lib/utils/strings';
 export class ShortcutService extends Observable<string> {
 	commandsToShortcuts = $state<Record<string, string>>({});
 	shortcutsToCommands = $derived.by(() => {
-		const shortcuts: Record<string, string> = {};
+		const shortcuts: Record<string, string[]> = {};
 		for (const [command, shortcut] of Object.entries(this.commandsToShortcuts)) {
-			if (shortcut) {
-				shortcuts[shortcut] = command;
+			if (!shortcut) {
+				continue;
+			} else if (shortcut in shortcuts) {
+				shortcuts[shortcut].push(command);
+			} else {
+				shortcuts[shortcut] = [command];
 			}
 		}
+
 		return shortcuts;
 	});
 	commandsToDisplayedShortcuts = $derived.by(() => {
@@ -148,39 +153,22 @@ export class ShortcutService extends Observable<string> {
 		return true;
 	}
 
-	removeShortcut(shortcut: Set<string> | string[] | string): boolean {
+	removeShortcut(shortcut: Set<string> | string[] | string) {
 		const key = this.parse(shortcut);
-		const name = this.shortcutsToCommands[key];
-
-		if (!name || !(name in this.commandsToShortcuts)) {
-			return false;
+		const names = this.shortcutsToCommands[key];
+		for (const name of names) {
+			if (name in this.commandsToShortcuts) {
+				this.commandsToShortcuts[name] = '';
+			}
 		}
 
-		this.commandsToShortcuts[name] = '';
-		return true;
-	}
-
-	willEvict(name: string, shortcut: Set<string> | string[] | string): boolean {
-		const key = this.parse(shortcut);
-		if (!this.#hasCtrlMetaOrAltKeys(key)) {
-			return false;
-		}
-
-		const commandAtShortcut = this.shortcutsToCommands[key];
-		return commandAtShortcut !== name;
+		return this;
 	}
 
 	register(name: string, shortcut: Set<string> | string[] | string): boolean {
 		const key = this.parse(shortcut);
 		if (!this.#hasCtrlMetaOrAltKeys(key)) {
 			return false;
-		}
-
-		const commandAtShortcut = this.shortcutsToCommands[key];
-
-		// If the shortcut is already registered to another command, remove it.
-		if (commandAtShortcut && commandAtShortcut !== name) {
-			this.commandsToShortcuts[commandAtShortcut] = '';
 		}
 
 		this.commandsToShortcuts[name] = key;
@@ -219,9 +207,15 @@ export class ShortcutService extends Observable<string> {
 		}
 
 		const key = this.process(e);
-		const cmd = this.shortcutsToCommands[key];
-		if (cmd) {
-			this.update(cmd);
+		const cmds = this.shortcutsToCommands[key];
+		if (!cmds) {
+			return;
+		}
+
+		for (const cmd of cmds) {
+			if (cmd in this.commandsToShortcuts) {
+				this.update(cmd);
+			}
 		}
 	}
 
@@ -236,7 +230,7 @@ export class ShortcutService extends Observable<string> {
 		return this;
 	}
 
-	get(e: KeyboardEvent): string | null {
+	get(e: KeyboardEvent): string[] | null {
 		const shortcut = this.process(e);
 		return this.shortcutsToCommands[shortcut] || null;
 	}

@@ -10,16 +10,21 @@ export function keydownHandler(bindings: {
 	[key: string]: Command;
 }): (view: EditorView, event: KeyboardEvent) => boolean {
 	return (view, event) => {
-		const command = Shortcuts.get(event);
-		if (!command) {
+		const commands = Shortcuts.get(event);
+		if (!commands) {
 			return false;
 		}
 
-		const binding = bindings[command];
-		if (!binding) {
-			return false;
+		let anyCommand = false;
+		for (const command of commands) {
+			const binding = bindings[command];
+			if (!anyCommand && typeof binding === 'function') {
+				anyCommand = true;
+			}
+
+			binding(view.state, view.dispatch, view);
 		}
 
-		return binding(view.state, view.dispatch, view);
+		return anyCommand;
 	};
 }
