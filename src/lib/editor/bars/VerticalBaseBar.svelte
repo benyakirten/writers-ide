@@ -4,6 +4,7 @@
 	} from '../state/bar-transfer-handler.svelte.js';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte.js';
 	import LocaleManager from '../state/locale-manager.svelte.js';
+	import Shortcuts from '../state/shortcuts.svelte.js';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
 
 	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'vertical';
@@ -43,6 +44,9 @@
 			LocaleManager.data === 'en' ? (LocaleManager.data = 'fr') : (LocaleManager.data = 'en')}
 		>Change locale</button
 	>
+	<button onclick={() => Shortcuts.register('move-bar-up', 'meta-shift-arrowleft')}>
+		Change shortcut
+	</button>
 </div>
 
 <style>
