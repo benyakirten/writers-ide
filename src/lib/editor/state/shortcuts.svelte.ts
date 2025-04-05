@@ -1,5 +1,6 @@
 import { Observable } from '$lib/utils/observable';
 import { isMac } from '$lib/utils/misc';
+import { capitalize } from '$lib/utils/strings';
 
 export class ShortcutService extends Observable<string> {
 	commandsToShortcuts = $state<Record<string, string>>({});
@@ -21,8 +22,46 @@ export class ShortcutService extends Observable<string> {
 	});
 	SEPARATOR = '-';
 
+	WINDOWS_SPECIAL_KEYS = {
+		arrowdown: 'DownArrow',
+		arrowup: 'UpArrow',
+		arrowleft: 'LeftArrow',
+		arrowright: 'RightArrow',
+		ctrl: 'Ctrl',
+		shift: 'Shift',
+		meta: 'Win',
+		alt: 'Alt',
+		enter: 'enter',
+		backspace: 'backspace',
+		delete: 'delete',
+		escape: 'esc'
+	};
+
+	MAC_SPECIAL_KEYS = {
+		arrowdown: '↓',
+		arrowup: '↑',
+		arrowleft: '←',
+		arrowright: '→',
+		ctrl: '⌃',
+		meta: '⌘',
+		alt: '⌥',
+		shift: '⇧',
+		enter: '↩',
+		backspace: 'delete',
+		delete: 'fn delete',
+		escape: 'escape'
+	};
+
 	display(shortcut: string, isMac: boolean): string {
-		return (shortcut && isMac && 'a') || '';
+		const specialKeys = isMac ? this.MAC_SPECIAL_KEYS : this.WINDOWS_SPECIAL_KEYS;
+		const separator = isMac ? '' : '+';
+		return this.split(shortcut)
+			.reduce<string[]>((acc, next) => {
+				const k = next in specialKeys ? specialKeys[next as keyof typeof specialKeys] : next;
+				const capitalized = k.split(' ').map(capitalize);
+				return acc.concat(capitalized);
+			}, [])
+			.join(separator);
 	}
 
 	#standardize(cmd: string[]): string {
