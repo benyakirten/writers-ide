@@ -20,8 +20,9 @@ export class ShortcutService extends Observable<string> {
 	});
 	commandsToDisplayedShortcuts = $derived.by(() => {
 		const displayShortcuts: Record<string, string> = {};
+		const useMacShortcuts = isMac();
 		for (const [command, shortcut] of Object.entries(this.commandsToShortcuts)) {
-			displayShortcuts[command] = this.display(shortcut, isMac());
+			displayShortcuts[command] = this.display(shortcut, useMacShortcuts);
 		}
 		return displayShortcuts;
 	});
@@ -60,9 +61,12 @@ export class ShortcutService extends Observable<string> {
 		escape: 'escape'
 	};
 
+	MAC_SEPARATOR = '';
+	WINDOWS_SEPARATOR = '+';
+
 	display(shortcut: string, isMac: boolean): string {
 		const specialKeys = isMac ? this.MAC_SPECIAL_KEYS : this.WINDOWS_SPECIAL_KEYS;
-		const separator = isMac ? '' : '+';
+		const separator = isMac ? this.MAC_SEPARATOR : this.WINDOWS_SEPARATOR;
 		return this.split(shortcut)
 			.reduce<string[]>((acc, next) => {
 				const k = next in specialKeys ? specialKeys[next as keyof typeof specialKeys] : next;
@@ -151,18 +155,6 @@ export class ShortcutService extends Observable<string> {
 
 		this.commandsToShortcuts[name] = '';
 		return true;
-	}
-
-	removeShortcut(shortcut: Set<string> | string[] | string) {
-		const key = this.parse(shortcut);
-		const names = this.shortcutsToCommands[key];
-		for (const name of names) {
-			if (name in this.commandsToShortcuts) {
-				this.commandsToShortcuts[name] = '';
-			}
-		}
-
-		return this;
 	}
 
 	register(name: string, shortcut: Set<string> | string[] | string): boolean {

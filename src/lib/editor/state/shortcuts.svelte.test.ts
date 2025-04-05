@@ -5,7 +5,7 @@ import { ShortcutService } from './shortcuts.svelte';
 describe('ShortcutService', () => {
 	let service: ShortcutService;
 	const updateSpy = vi.fn();
-	let unsub: null | (() => void);
+	let unsub: () => void;
 
 	beforeEach(() => {
 		service = new ShortcutService();
@@ -13,8 +13,53 @@ describe('ShortcutService', () => {
 	});
 
 	afterEach(() => {
-		unsub?.();
+		unsub();
 		updateSpy.mockClear();
+	});
+
+	describe('shortcutsToCommands', () => {
+		it('should be empty on initialization', () => {
+			expect(service.shortcutsToCommands).toEqual({});
+		});
+
+		it("should not have any shortcuts for commands that haven't been registered", () => {
+			service.register('copy', 'ctrl-c');
+			expect(service.shortcutsToCommands['ctrl-c']).toEqual(['copy']);
+			expect(service.shortcutsToCommands['ctrl-v']).toEqual(undefined);
+		});
+
+		it('should return an array of shortcuts for every command registered', () => {
+			service.register('copy', 'ctrl-c');
+			service.register('paste', 'ctrl-v');
+			expect(service.shortcutsToCommands['ctrl-c']).toEqual(['copy']);
+			expect(service.shortcutsToCommands['ctrl-v']).toEqual(['paste']);
+		});
+
+		it('should allow multiple commands to be registered for the same shortcut', () => {
+			service.register('copy', 'ctrl-c');
+			service.register('paste', 'ctrl-c');
+			expect(service.shortcutsToCommands['ctrl-c']).toEqual(['copy', 'paste']);
+		});
+	});
+
+	describe('display', () => {
+		it('should render mac equivalents and not have a separator if the user agent is mac', () => {
+			const got = service.display(
+				'meta-ctrl-alt-shift-arrowup-arrowdown-arrowleft-arrowright-enter-backspace-delete',
+				true
+			);
+			expect(got).toEqual('⌘⌃⌥⇧↑↓←→↩DeleteFnDelete');
+		});
+
+		it('should render windows equivalents and have a separator if the user agent is not mac', () => {
+			const got = service.display(
+				'meta-ctrl-alt-shift-arrowup-arrowdown-arrowleft-arrowright-enter-backspace-delete',
+				false
+			);
+			expect(got).toEqual(
+				'Win+Ctrl+Alt+Shift+UpArrow+DownArrow+LeftArrow+RightArrow+Enter+Backspace+Delete'
+			);
+		});
 	});
 
 	describe('parse', () => {
@@ -42,15 +87,15 @@ describe('ShortcutService', () => {
 
 	describe('register', () => {
 		it('should register a command with a valid shortcut', () => {
-			const result = service.register('copy', 'ctrl-C');
-			expect(result).toBe(true);
-			expect(service.shortcutsToCommands['ctrl-c']).toBe('copy');
+			const got = service.register('copy', 'ctrl-C');
+			expect(got).toBe(true);
+			expect(service.shortcutsToCommands['ctrl-c']).toEqual(['copy']);
 			expect(service.commandsToShortcuts['copy']).toBe('ctrl-c');
 		});
 
 		it('should not register a command with an invalid shortcut', () => {
-			const result = service.register('copy', 'C');
-			expect(result).toBe(false);
+			const got = service.register('copy', 'C');
+			expect(got).toBe(false);
 			expect(service.shortcutsToCommands['c']).toBe(undefined);
 			expect(service.commandsToShortcuts['copy']).toBe(undefined);
 		});
@@ -148,36 +193,17 @@ describe('ShortcutService', () => {
 		it('should unset the command if it exists', () => {
 			service.register('copy', 'ctrl-c');
 
-			const result = service.unset('copy');
+			const got = service.unset('copy');
 
-			expect(result).toBe(true);
+			expect(got).toBe(true);
 			expect(service.commandsToShortcuts['copy']).toBe('');
 			expect(service.shortcutsToCommands['ctrl-c']).toBe(undefined);
 		});
 
 		it("should not unset the command if it doesn't exist", () => {
-			const result = service.unset('copy');
+			const got = service.unset('copy');
 
-			expect(result).toBe(false);
-			expect(service.commandsToShortcuts['copy']).toBe(undefined);
-			expect(service.shortcutsToCommands['ctrl-c']).toBe(undefined);
-		});
-	});
-
-	describe('removeShortcut', () => {
-		it('should remove the shortcut from the command', async () => {
-			service.register('copy', 'ctrl-c');
-
-			const result = service.removeShortcut('ctrl-c');
-			expect(result).toBe(true);
-			expect(service.commandsToShortcuts['copy']).toBe('');
-			expect(service.shortcutsToCommands['ctrl-c']).toBe(undefined);
-		});
-
-		it("should not remove the command if it doesn't exist", () => {
-			const result = service.removeShortcut('ctrl-c');
-
-			expect(result).toBe(false);
+			expect(got).toBe(false);
 			expect(service.commandsToShortcuts['copy']).toBe(undefined);
 			expect(service.shortcutsToCommands['ctrl-c']).toBe(undefined);
 		});
@@ -185,13 +211,13 @@ describe('ShortcutService', () => {
 
 	describe('split', () => {
 		it('should split a string into an array of strings', () => {
-			const result = service.split('ctrl-shift-A');
-			expect(result).toEqual(['ctrl', 'shift', 'a']);
+			const got = service.split('ctrl-shift-A');
+			expect(got).toEqual(['ctrl', 'shift', 'a']);
 		});
 
 		it('should properly process consecutive dashes', () => {
-			const result = service.split('---');
-			expect(result).toEqual(['-', '-']);
+			const got = service.split('---');
+			expect(got).toEqual(['-', '-']);
 		});
 	});
 
@@ -202,8 +228,8 @@ describe('ShortcutService', () => {
 				key: 'C',
 				ctrlKey: true
 			});
-			const result = service.get(e);
-			expect(result).toBe('copy');
+			const got = service.get(e);
+			expect(got).toEqual(['copy']);
 		});
 
 		it("should return null if the shortcut doesn't exist", () => {
@@ -211,8 +237,8 @@ describe('ShortcutService', () => {
 				key: 'C',
 				ctrlKey: true
 			});
-			const result = service.get(e);
-			expect(result).toBe(null);
+			const got = service.get(e);
+			expect(got).toBe(null);
 		});
 	});
 
@@ -225,21 +251,21 @@ describe('ShortcutService', () => {
 				shiftKey: true,
 				metaKey: true
 			});
-			const result = service.process(e);
-			expect(result).toBe('meta-alt-ctrl-shift-c');
+			const got = service.process(e);
+			expect(got).toBe('meta-alt-ctrl-shift-c');
 		});
 	});
 
 	describe('shortcut', () => {
 		it('should return the shortcut for a given command', () => {
 			service.register('copy', 'ctrl-c');
-			const result = service.shortcut('copy');
-			expect(result).toBe('ctrl-c');
+			const got = service.shortcut('copy');
+			expect(got).toEqual('ctrl-c');
 		});
 
 		it("should return null if the command doesn't exist", () => {
-			const result = service.shortcut('copy');
-			expect(result).toBeNull();
+			const got = service.shortcut('copy');
+			expect(got).toBeNull();
 		});
 	});
 
@@ -252,10 +278,10 @@ describe('ShortcutService', () => {
 
 			service.add(shortcuts);
 
-			expect(service.shortcutsToCommands['ctrl-c']).toBe('copy');
-			expect(service.shortcutsToCommands['ctrl-v']).toBe('paste');
-			expect(service.commandsToShortcuts['copy']).toBe('ctrl-c');
-			expect(service.commandsToShortcuts['paste']).toBe('ctrl-v');
+			expect(service.shortcutsToCommands['ctrl-c']).toEqual(['copy']);
+			expect(service.shortcutsToCommands['ctrl-v']).toEqual(['paste']);
+			expect(service.commandsToShortcuts['copy']).toEqual('ctrl-c');
+			expect(service.commandsToShortcuts['paste']).toEqual('ctrl-v');
 		});
 	});
 });
