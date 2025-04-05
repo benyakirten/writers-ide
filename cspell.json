@@ -25,6 +25,15 @@
 		"onrelocate",
 		"prosemirror",
 		"unsub",
-		"steeze"
+		"steeze",
+		"tauri",
+		"Internationalizator",
+		"keymap",
+		"onfocusincapture",
+		"inlang",
+		"arrowup",
+		"arrowdown",
+		"arrowleft",
+		"arrowright"
 	]
 }
