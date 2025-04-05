@@ -22,6 +22,9 @@ export class ShortcutService extends Observable<string> {
 	});
 	SEPARATOR = '-';
 
+	deactivated = $state(false);
+	lastTarget = $state<HTMLElement | null>(null);
+
 	WINDOWS_SPECIAL_KEYS = {
 		arrowdown: 'DownArrow',
 		arrowup: 'UpArrow',
@@ -157,10 +160,27 @@ export class ShortcutService extends Observable<string> {
 		return true;
 	}
 
+	willEvict(name: string, shortcut: Set<string> | string[] | string): boolean {
+		const key = this.parse(shortcut);
+		if (!this.#hasCtrlMetaOrAltKeys(key)) {
+			return false;
+		}
+
+		const commandAtShortcut = this.shortcutsToCommands[key];
+		return commandAtShortcut !== name;
+	}
+
 	register(name: string, shortcut: Set<string> | string[] | string): boolean {
 		const key = this.parse(shortcut);
 		if (!this.#hasCtrlMetaOrAltKeys(key)) {
 			return false;
+		}
+
+		const commandAtShortcut = this.shortcutsToCommands[key];
+
+		// If the shortcut is already registered to another command, remove it.
+		if (commandAtShortcut && commandAtShortcut !== name) {
+			this.commandsToShortcuts[commandAtShortcut] = '';
 		}
 
 		this.commandsToShortcuts[name] = key;
@@ -190,6 +210,14 @@ export class ShortcutService extends Observable<string> {
 	}
 
 	listen(e: KeyboardEvent): void {
+		if (this.deactivated) {
+			return;
+		}
+
+		if (e.target instanceof HTMLElement) {
+			this.lastTarget = e.target;
+		}
+
 		const key = this.process(e);
 		const cmd = this.shortcutsToCommands[key];
 		if (cmd) {
