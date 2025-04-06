@@ -3,8 +3,8 @@
 		type BarTransferLocation
 	} from '../state/bar-transfer-handler.svelte.js';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte.js';
-	import LocaleManager from '../state/locale-manager.svelte.js';
-	import Shortcuts from '../state/shortcuts.svelte.js';
+	import LocaleManager from '$lib/services/locale-manager.svelte';
+	import Shortcuts from '$lib/services/shortcuts.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
 
 	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'vertical';

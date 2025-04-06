@@ -13,7 +13,7 @@
 	import type { BarItemData } from '../state/bar-items.svelte.js';
 	import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
 	import ItemRendererMenu from './ItemRendererMenu.svelte';
-	import LocaleManager from '../state/locale-manager.svelte.js';
+	import LocaleManager from '$lib/services/locale-manager.svelte';
 	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte.js';
 	import type { MoveDetails } from './BarLocation.svelte';
 

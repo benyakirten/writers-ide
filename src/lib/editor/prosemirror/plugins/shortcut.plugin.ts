@@ -1,6 +1,7 @@
-import Shortcuts from '@/editor/state/shortcuts.svelte';
 import { type Command, Plugin } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
+
+import Shortcuts from '$lib/services/shortcuts.svelte';
 
 export function createShortcuts(bindings: { [key: string]: Command }): Plugin {
 	return new Plugin({ props: { handleKeyDown: keydownHandler(bindings) } });

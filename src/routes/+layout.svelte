@@ -1,10 +1,10 @@
 <script lang="ts">
 	import '../app.css';
 	import './global.css';
+	import { ParaglideJS } from '@inlang/paraglide-sveltekit';
 
 	import { i18n } from '$lib/i18n';
-	import { ParaglideJS } from '@inlang/paraglide-sveltekit';
-	import Shortcuts from '@/editor/state/shortcuts.svelte';
+	import Shortcuts from '$lib/services/shortcuts.svelte';
 
 	let { children } = $props();
 </script>

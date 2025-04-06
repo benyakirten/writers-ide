@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	import LocaleManager from '../state/locale-manager.svelte.js';
+	import LocaleManager from '$lib/services/locale-manager.svelte';
 	import type { BarItemComponentProps } from '../state/bar-item-registry.svelte.js';
 	import TabState from '../state/tab-state.svelte.js';
 	import { schema } from '../prosemirror/view/schema.js';
