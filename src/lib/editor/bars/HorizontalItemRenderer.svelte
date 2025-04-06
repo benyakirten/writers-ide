@@ -1,45 +1,18 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-
-	import type { BarItemComponentProps } from '../state/bar-item-registry.svelte.js';
-	import TabState from '../state/tab-state.svelte.js';
-	import { schema } from '../prosemirror/view/schema.js';
-	import ProseMirrorEventBus from '../state/event-bus.svelte.js';
-	import { SelectionUtilities } from '../prosemirror/view/selection.js';
-	import { ActionUtilities } from '../prosemirror/view/actions.js';
-	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
-	import FloaterBarState from '../state/floater-state.svelte.js';
-	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
-	import type { BarItemData } from '../state/bar-items.svelte.js';
-	import ErrorComponent from '../prosemirror/menu/ErrorComponent.svelte';
-	import ItemRendererMenu from './ItemRendererMenu.svelte';
 	import LocaleManager from '$lib/services/locale-manager.svelte';
-	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte.js';
+	import { schema } from '$lib/editor/prosemirror/view/schema.js';
+	import TabState from '$lib/editor/state/tab-state.svelte.js';
+	import ProseMirrorEventBus from '$lib/editor/state/event-bus.svelte.js';
+	import { SelectionUtilities } from '$lib/editor/prosemirror/view/selection.js';
+	import { ActionUtilities } from '$lib/editor/prosemirror/view/actions.js';
+	import VerticalBarState from '$lib/editor/state/vertical-bar-state.svelte.js';
+	import FloaterBarState from '$lib/editor/state/floater-state.svelte.js';
+	import HorizontalBarState from '$lib/editor/state/horizontal-bar-state.svelte.js';
+	import type { BarItemData } from '$lib/editor/state/bar-items.svelte.js';
+	import ErrorComponent from '$lib/editor/prosemirror/menu/ErrorComponent.svelte';
+	import type { BarTransferLocation } from '$lib/editor/state/bar-transfer-handler.svelte.js';
+	import ItemRendererMenu from './ItemRendererMenu.svelte';
 	import type { MoveDetails } from './BarLocation.svelte';
-
-	let locale = $state(LocaleManager.data);
-	let itemProps: Omit<BarItemComponentProps, 'locale'> = {
-		proseMirror: {
-			actions: ActionUtilities,
-			selections: SelectionUtilities,
-			eventBus: ProseMirrorEventBus,
-			schema
-		},
-		bars: {
-			vertical: VerticalBarState,
-			horizontal: HorizontalBarState,
-			floater: FloaterBarState
-		},
-		tabs: TabState
-	};
-
-	onMount(() => {
-		const unsub = LocaleManager.subscribe((value) => {
-			locale = value;
-		});
-
-		return () => unsub();
-	});
 
 	let {
 		Component,
@@ -66,7 +39,21 @@
 	<ItemRendererMenu {moveDetails} {position} {title} {onremove} {onrelocate} {onmove} />
 	<div class="component">
 		{#if Component}
-			<Component {...itemProps} {locale} />
+			<Component
+				proseMirror={{
+					actions: ActionUtilities,
+					selections: SelectionUtilities,
+					eventBus: ProseMirrorEventBus,
+					schema
+				}}
+				bars={{
+					vertical: VerticalBarState,
+					horizontal: HorizontalBarState,
+					floater: FloaterBarState
+				}}
+				tabs={TabState}
+				locale={LocaleManager.locale}
+			/>
 		{:else}
 			<ErrorComponent />
 		{/if}

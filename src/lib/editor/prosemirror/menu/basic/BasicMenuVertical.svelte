@@ -29,7 +29,6 @@
 
 <div class="menu">
 	<div class="section">
-		<p>Text Settings: {props.locale}</p>
 		<div class="grouping">
 			{@render textMarkButtons(activeCodeMarks, m, editorView, props.proseMirror.actions)}
 		</div>

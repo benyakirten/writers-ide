@@ -18,7 +18,7 @@ importers:
         specifier: ^0.0.8
         version: 0.0.8(svelte@5.23.1)
       '@inlang/paraglide-sveltekit':
-        specifier: ^0.11.1
+        specifier: ^0.11.5
         version: 0.11.5(@sveltejs/kit@2.19.2(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.23.1)(vite@6.2.2(@types/node@22.13.10)(jiti@1.21.7)(yaml@2.7.1)))(svelte@5.23.1)(vite@6.2.2(@types/node@22.13.10)(jiti@1.21.7)(yaml@2.7.1)))
       '@steeze-ui/phosphor-icons':
         specifier: ^2.1.1
@@ -657,6 +657,7 @@ packages:
 
   '@inlang/paraglide-sveltekit@0.11.5':
     resolution: {integrity: sha512-go2rQC4h6F8eDphICrHL0SAZUidEEgnOrplaZRle4u7Qthg9WDztOUHQW9BoRYHi3vmP2N2HZ7KsPjowAkuW5w==}
+    deprecated: use the paraglide-js package directly with v2 or above https://www.npmjs.com/package/@inlang/paraglide-js. the sveltekit adapter is not needed anymore
     hasBin: true
     peerDependencies:
       '@sveltejs/kit': ^2.4.3
