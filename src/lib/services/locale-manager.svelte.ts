@@ -1,6 +1,6 @@
 import { onSetLanguageTag, sourceLanguageTag } from '$lib/paraglide/runtime.js';
 
-export class LocaleKeeperState {
+export class LocaleState {
 	locale = $state(sourceLanguageTag);
 	constructor() {
 		onSetLanguageTag((tag) => {
@@ -9,5 +9,5 @@ export class LocaleKeeperState {
 	}
 }
 
-const LocaleManager = new LocaleKeeperState();
+const LocaleManager = new LocaleState();
 export default LocaleManager;
