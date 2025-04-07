@@ -36,6 +36,8 @@
 		"arrowdown",
 		"arrowleft",
 		"arrowright",
-		"dismissable"
+		"dismissable",
+		"describedby",
+		"debouncer"
 	]
 }

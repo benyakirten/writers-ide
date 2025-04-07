@@ -9,13 +9,13 @@ export type Toast = BaseToast & { id: string };
 
 export class ToasterState {
 	toasts = $state<Toast[]>([]);
-	addToast(toast: Toast, id?: string) {
-		id ??= toast.id;
+	addToast(toast: BaseToast, id?: string) {
+		const _id = id ?? crypto.randomUUID();
 		this.toasts.push({
 			...toast,
-			id
+			id: _id
 		});
-		return [id, () => this.dismissToast(id)];
+		return [id, () => this.dismissToast(_id)];
 	}
 
 	dismissToast(id: string | number) {
