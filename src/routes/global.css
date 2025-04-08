@@ -1,11 +1,7 @@
-* {
-	margin: 0;
-}
-
-button {
-	appearance: none;
-	padding: 0;
-	border: none;
-	cursor: pointer;
-	background: inherit;
+@media screen and (prefers-reduced-motion: reduce) {
+	* {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+	}
 }

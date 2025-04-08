@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Tooltip from '$lib/components/tooltip/Tooltip.svelte';
 	import FloaterBarState from '../state/floater-state.svelte.js';
 	import HorizontalBarState, {
 		HorizontalBarPosition
@@ -8,12 +9,16 @@
 
 <div class="base-bar">
 	<button onclick={() => HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart)}
-		>Add horizontal bar</button
-	>
+		>Add horizontal bar
+	</button>
 	<button onclick={() => VerticalBarState.add({}, VerticalBarPosition.InlineStart)}
-		>Add vertical bar</button
-	>
+		>Add vertical bar
+	</button>
 	<button onclick={() => FloaterBarState.add()}>Add floater bar</button>
+	<Tooltip tooltip="This is a tooltip" calibrateFor="vertical">
+		<button>Hover Me</button>
+		<span>This is some text</span>
+	</Tooltip>
 </div>
 
 <style>

@@ -4,11 +4,12 @@ import { type Snippet } from 'svelte';
 export type TooltipData = {
 	data: string | Snippet;
 	target: HTMLElement;
+	calibrateFor: 'vertical' | 'horizontal';
 };
 export class TooltipState {
 	open = $state(false);
 	tooltip = $state<TooltipData | null>(null);
-	tooltipElement: HTMLElement | null = null;
+	tooltipEl: HTMLElement | null = null;
 	TIMEOUT_DURATION = 200;
 	tooltipDebouncer = new Debouncer<boolean>(
 		(val) => {
@@ -21,14 +22,18 @@ export class TooltipState {
 		{ delay: this.TIMEOUT_DURATION }
 	);
 	TOOLTIP_ID = 'builtin-tooltip';
-	set(tooltip: TooltipData['data'], target: HTMLElement) {
+	set(
+		tooltip: TooltipData['data'],
+		calibrateFor: TooltipData['calibrateFor'],
+		target: HTMLElement
+	) {
 		this.tooltipDebouncer.update(true);
 		if (this.tooltip?.target === target) {
 			return;
 		}
 
 		this.dismiss();
-		this.tooltip = { data: tooltip, target };
+		this.tooltip = { data: tooltip, target, calibrateFor };
 	}
 
 	show() {
@@ -38,6 +43,66 @@ export class TooltipState {
 
 		this.open = true;
 		this.tooltip.target.setAttribute('aria-describedby', this.TOOLTIP_ID);
+		this.attemptCalibration();
+	}
+
+	MAX_RETRIES = 10;
+	attemptCalibration(attempts = 0) {
+		requestAnimationFrame(() => {
+			if (!this.tooltip || !this.tooltipEl) {
+				if (attempts > this.MAX_RETRIES) {
+					return;
+				}
+				return this.attemptCalibration(attempts + 1);
+			}
+			this.calibratePosition(this.tooltip.calibrateFor, this.tooltip.target, this.tooltipEl);
+		});
+	}
+
+	calibratePosition(
+		calibrateFor: TooltipData['calibrateFor'],
+		hostEl: HTMLElement,
+		tooltipEl: HTMLElement
+	) {
+		// TODO: Add the pointer to the tooltip.
+		if (calibrateFor === 'vertical') {
+			this.#calibrateVerticalPosition(hostEl, tooltipEl);
+		} else {
+			this.#calibrateHorizontalPosition(hostEl, tooltipEl);
+		}
+
+		tooltipEl.style.visibility = 'visible';
+	}
+
+	MARGIN = 10;
+	#calibrateHorizontalPosition(hostEl: HTMLElement, tooltipEl: HTMLElement) {
+		const hostRect = hostEl.getBoundingClientRect();
+		let tooltipRect = tooltipEl.getBoundingClientRect();
+
+		tooltipEl.style.left = `${hostRect.left - tooltipRect.width - this.MARGIN}px`;
+		tooltipEl.style.top = `${hostRect.top + hostRect.height / 2}px`;
+
+		tooltipRect = tooltipEl.getBoundingClientRect();
+		if (tooltipRect.left <= this.MARGIN * 2) {
+			tooltipEl.style.left = `${hostRect.right + this.MARGIN}px`;
+		}
+
+		tooltipEl.style.transform = 'translateY(-50%)';
+	}
+
+	#calibrateVerticalPosition(hostEl: HTMLElement, tooltipEl: HTMLElement) {
+		const hostRect = hostEl.getBoundingClientRect();
+		let tooltipRect = tooltipEl.getBoundingClientRect();
+
+		tooltipEl.style.top = `${hostRect.top - tooltipRect.height - this.MARGIN}px`;
+		tooltipEl.style.left = `${hostRect.left + hostRect.width / 2}px`;
+
+		tooltipRect = tooltipEl.getBoundingClientRect();
+		if (tooltipRect.top <= this.MARGIN * 2) {
+			tooltipEl.style.top = `${hostRect.bottom + this.MARGIN}px`;
+		}
+
+		tooltipEl.style.transform = 'translateX(-50%)';
 	}
 
 	dismiss() {

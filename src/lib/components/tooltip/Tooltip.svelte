@@ -1,14 +1,19 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	import TooltipManager from '@/services/tooltip.svelte';
+	import TooltipManager, { type TooltipData } from '@/services/tooltip.svelte';
 
-	let { children, tooltip }: { children: Snippet; tooltip: Snippet | string } = $props();
+	let {
+		children,
+		tooltip,
+		calibrateFor
+	}: { children: Snippet; tooltip: Snippet | string; calibrateFor: TooltipData['calibrateFor'] } =
+		$props();
 
 	let el: HTMLElement;
 
 	function showTooltip() {
-		TooltipManager.set(tooltip, el);
+		TooltipManager.set(tooltip, calibrateFor, el);
 	}
 
 	function hideTooltip() {
@@ -18,6 +23,7 @@
 
 <div
 	bind:this={el}
+	style:display="inline-block"
 	onfocusincapture={() => showTooltip()}
 	onmouseenter={() => showTooltip()}
 	onfocusoutcapture={() => hideTooltip()}

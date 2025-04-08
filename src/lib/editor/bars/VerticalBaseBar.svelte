@@ -48,7 +48,7 @@
 	<button onclick={() => Shortcuts.register('move-bar-up', 'meta-shift-arrowleft')}>
 		Change shortcut
 	</button>
-	<Tooltip tooltip="This is a tooltip">
+	<Tooltip tooltip="This is a tooltip" calibrateFor="horizontal">
 		<button>Hover Me</button>
 		<span>This is some text</span>
 	</Tooltip>

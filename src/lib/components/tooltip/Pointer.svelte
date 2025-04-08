@@ -20,6 +20,7 @@
 		onfocusoutcapture={() => TooltipManager.tooltipDebouncer.update(false)}
 		onmouseleave={() => TooltipManager.tooltipDebouncer.update(false)}
 		id={TooltipManager.TOOLTIP_ID}
+		bind:this={TooltipManager.tooltipEl}
 		role="tooltip"
 	>
 		{#if typeof TooltipManager.tooltip.data === 'string'}
@@ -37,5 +38,17 @@
 		background: pink;
 		border-radius: 4px;
 		border: 2px solid #000;
+		visibility: hidden;
+
+		animation: fadeIn 150ms ease-in-out;
+	}
+
+	@keyframes fadeIn {
+		0% {
+			opacity: 0;
+		}
+		100% {
+			opacity: 1;
+		}
 	}
 </style>
