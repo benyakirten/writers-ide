@@ -7,11 +7,9 @@ export type TooltipData = {
 	calibrateFor: 'vertical' | 'horizontal';
 };
 export class TooltipState {
-	open = $state(false);
-	tooltip = $state<TooltipData | null>(null);
-	tooltipEl: HTMLElement | null = null;
-	TIMEOUT_DURATION = 200;
-	tooltipDebouncer = new Debouncer<boolean>(
+	readonly TOOLTIP_ID = 'builtin-tooltip';
+	readonly TIMEOUT_DURATION = 200;
+	readonly tooltipDebouncer = new Debouncer<boolean>(
 		(val) => {
 			if (val) {
 				this.show();
@@ -21,7 +19,11 @@ export class TooltipState {
 		},
 		{ delay: this.TIMEOUT_DURATION }
 	);
-	TOOLTIP_ID = 'builtin-tooltip';
+
+	open = $state(false);
+	tooltip = $state<TooltipData | null>(null);
+	tooltipEl = $state<HTMLElement | null>(null);
+
 	set(
 		tooltip: TooltipData['data'],
 		calibrateFor: TooltipData['calibrateFor'],
@@ -44,6 +46,12 @@ export class TooltipState {
 		this.open = true;
 		this.tooltip.target.setAttribute('aria-describedby', this.TOOLTIP_ID);
 		this.attemptCalibration();
+	}
+
+	dismiss() {
+		this.tooltip?.target.removeAttribute('aria-describedby');
+		this.open = false;
+		this.tooltip = null;
 	}
 
 	MAX_RETRIES = 10;
@@ -79,10 +87,11 @@ export class TooltipState {
 		const hostRect = hostEl.getBoundingClientRect();
 		let tooltipRect = tooltipEl.getBoundingClientRect();
 
-		tooltipEl.style.left = `${hostRect.left - tooltipRect.width - this.MARGIN}px`;
-		tooltipEl.style.top = `${hostRect.top + hostRect.height / 2}px`;
 		const tooltipArrow = tooltipEl.querySelector('.arrow') as HTMLElement;
 		tooltipArrow.style.top = '50%';
+
+		tooltipEl.style.left = `${hostRect.left - tooltipRect.width - this.MARGIN}px`;
+		tooltipEl.style.top = `${hostRect.top + hostRect.height / 2}px`;
 
 		tooltipRect = tooltipEl.getBoundingClientRect();
 		if (tooltipRect.left <= this.MARGIN * 2) {
@@ -118,12 +127,6 @@ export class TooltipState {
 		}
 
 		tooltipEl.style.transform = 'translateX(-50%)';
-	}
-
-	dismiss() {
-		this.tooltip?.target.removeAttribute('aria-describedby');
-		this.open = false;
-		this.tooltip = null;
 	}
 }
 
