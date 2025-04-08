@@ -9,14 +9,19 @@
 </script>
 
 {#snippet textTooltip(text: string)}
-	<div>{text}</div>
+	<p>{text}</p>
+	<style>
+		p {
+			padding: 4px 8px;
+		}
+	</style>
 {/snippet}
 
 <svelte:window onkeydown={handleKeydown} />
 {#if TooltipManager.tooltip !== null}
 	<div
-		onmouseleave={() => TooltipManager.dismissDebouncer.update(true)}
-		onmouseenter={() => TooltipManager.dismissDebouncer.cancel()}
+		onmouseleave={() => TooltipManager.tooltipDebouncer.update(false)}
+		onmouseenter={() => TooltipManager.tooltipDebouncer.update(true)}
 		id={TooltipManager.TOOLTIP_ID}
 		role="tooltip"
 	>

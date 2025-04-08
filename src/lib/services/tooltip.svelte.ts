@@ -6,28 +6,38 @@ export type TooltipData = {
 	target: HTMLElement;
 };
 export class TooltipState {
+	open: boolean = false;
 	tooltip = $state<TooltipData | null>(null);
 	tooltipElement: HTMLElement | null = null;
 	TIMEOUT_DURATION = 200;
-	dismissDebouncer = new Debouncer<boolean>((val) => {
-		if (val) {
-			this.dismiss();
-		}
-	}, this.TIMEOUT_DURATION);
+	tooltipDebouncer = new Debouncer<boolean>(
+		(val) => {
+			if (val) {
+				this.show();
+			} else {
+				this.dismiss();
+			}
+		},
+		{ delay: this.TIMEOUT_DURATION }
+	);
 	TOOLTIP_ID = 'builtin-tooltip';
 	set(tooltip: TooltipData['data'], target: HTMLElement) {
-		target.setAttribute('aria-describedby', this.TOOLTIP_ID);
 		this.tooltip = { data: tooltip, target };
+	}
+
+	show() {
+		if (!this.tooltip) {
+			return;
+		}
+
+		this.open = true;
+		this.tooltip.target.setAttribute('aria-describedby', this.TOOLTIP_ID);
 	}
 
 	dismiss() {
 		this.tooltip?.target.removeAttribute('aria-describedby');
+		this.open = false;
 		this.tooltip = null;
-	}
-
-	initListeners() {
-		// TODO: add mouseenter and mouseleave events to the target element
-		// And make sure that they are removed when the tooltip is dismissed
 	}
 }
 

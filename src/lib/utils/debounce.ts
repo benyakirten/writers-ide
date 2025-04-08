@@ -1,20 +1,35 @@
+export type DebounceOptions = {
+	delay: number;
+	resetIfSameValue: boolean;
+};
+
 export class Debouncer<Item> {
 	static DEFAULT_DELAY_MS = 200;
+	private readonly options: DebounceOptions;
 
 	value: Item | null = null;
 	private timeout: NodeJS.Timeout | null = null;
 	constructor(
 		private readonly callback: (value: Item) => void | Promise<void>,
-		private readonly delay = Debouncer.DEFAULT_DELAY_MS
-	) {}
+		options: Partial<DebounceOptions> = {}
+	) {
+		this.options = {
+			delay: options.delay ?? Debouncer.DEFAULT_DELAY_MS,
+			resetIfSameValue: options.resetIfSameValue ?? false
+		};
+	}
 
 	update(value: Item) {
-		this.value = value;
+		// If the value hasn't changed, continue the timeout
+		if (!this.options.resetIfSameValue && this.value === value) {
+			return;
+		}
 
 		if (this.timeout) {
 			clearTimeout(this.timeout);
 		}
 
+		this.value = value;
 		this.timeout = setTimeout(() => {
 			if (this.value === null) {
 				return;
@@ -22,7 +37,7 @@ export class Debouncer<Item> {
 
 			this.callback(this.value);
 			this.timeout = null;
-		}, this.delay);
+		}, this.options.delay);
 	}
 
 	cancel() {
