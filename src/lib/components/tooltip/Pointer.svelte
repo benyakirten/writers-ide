@@ -20,8 +20,10 @@
 <svelte:window onkeydown={handleKeydown} />
 {#if TooltipManager.tooltip !== null}
 	<div
-		onmouseleave={() => TooltipManager.tooltipDebouncer.update(false)}
+		onfocusincapture={() => TooltipManager.tooltipDebouncer.update(true)}
 		onmouseenter={() => TooltipManager.tooltipDebouncer.update(true)}
+		onfocusoutcapture={() => TooltipManager.tooltipDebouncer.update(false)}
+		onmouseleave={() => TooltipManager.tooltipDebouncer.update(false)}
 		id={TooltipManager.TOOLTIP_ID}
 		role="tooltip"
 	>

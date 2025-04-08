@@ -22,6 +22,12 @@ export class TooltipState {
 	);
 	TOOLTIP_ID = 'builtin-tooltip';
 	set(tooltip: TooltipData['data'], target: HTMLElement) {
+		this.tooltipDebouncer.update(true);
+		if (this.tooltip?.target === target) {
+			return;
+		}
+
+		this.dismiss();
 		this.tooltip = { data: tooltip, target };
 	}
 

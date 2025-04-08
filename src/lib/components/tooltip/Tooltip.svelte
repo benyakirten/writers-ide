@@ -1,13 +1,14 @@
 <script lang="ts">
-	import { Debouncer } from '$lib/utils/debounce';
-	import TooltipManager, { type TooltipData } from '@/services/tooltip.svelte';
+	import type { Snippet } from 'svelte';
 
-	let {} = $props();
+	import TooltipManager from '@/services/tooltip.svelte';
+
+	let { content, tooltip }: { content: Snippet; tooltip: Snippet | string } = $props();
 
 	let el: HTMLElement;
 
 	function showTooltip() {
-		TooltipManager.tooltipDebouncer.update(true);
+		TooltipManager.set(tooltip, el);
 	}
 
 	function hideTooltip() {
@@ -23,5 +24,5 @@
 	onmouseleave={() => hideTooltip()}
 	role="region"
 >
-	<span>TODO</span>
+	{@render content()}
 </div>
