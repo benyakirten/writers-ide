@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { paraglide } from '@inlang/paraglide-sveltekit/vite';
+import { paraglideVitePlugin } from '@inlang/paraglide-js';
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -8,13 +8,12 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
 	plugins: [
 		sveltekit(),
-		paraglide({
+		paraglideVitePlugin({
 			project: './project.inlang',
 			outdir: './src/lib/paraglide',
 			// TODO: What is the best internationalizaiton strategy?
 			// We could route things based on a user settings - but should it come from the OS or the app?
 			// Should the user be able to override OS settings?
-			// @ts-expect-error This is a valid config option
 			strategy: ['preferredLanguage']
 		})
 	],

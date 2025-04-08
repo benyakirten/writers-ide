@@ -23,6 +23,7 @@
 	import FloaterBar from './bars/FloaterBar.svelte';
 	import VerticalBaseBar from './bars/VerticalBaseBar.svelte';
 	import HorizontalBaseBar from './bars/HorizontalBaseBar.svelte';
+	import Pointer from '$lib/components/tooltip/Pointer.svelte';
 
 	function resize(e: MouseEvent) {
 		VerticalBarState.resize(e);
@@ -63,6 +64,7 @@
 	onDragStart={handleDragStart}
 	onDragOver={handleDragOver}
 >
+	<Pointer />
 	<div
 		bind:this={FloaterBarState.root}
 		class="overlay"

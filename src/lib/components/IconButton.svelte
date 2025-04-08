@@ -1,5 +1,7 @@
 <script lang="ts">
+	import type { TooltipData } from '@/services/tooltip.svelte';
 	import { type Snippet } from 'svelte';
+	import Tooltip from './tooltip/Tooltip.svelte';
 
 	let buttonEl: HTMLElement;
 
@@ -8,25 +10,31 @@
 		label,
 		onclick,
 		inversion = 0,
-		disabled = false
+		disabled = false,
+		tooltip,
+		tooltipDirection
 	}: {
 		icon: Snippet;
 		label: string;
 		onclick: () => void;
 		disabled?: boolean;
 		inversion?: number;
+		tooltip?: Snippet | string;
+		tooltipDirection: TooltipData['calibrateFor'];
 	} = $props();
 </script>
 
-<button
-	style:--inversion={`${Math.floor(inversion * 100)}%`}
-	aria-label={label}
-	onclickcapture={onclick}
-	bind:this={buttonEl}
-	{disabled}
->
-	{@render icon()}
-</button>
+<Tooltip tooltip={tooltip || label} calibrateFor={tooltipDirection}>
+	<button
+		style:--inversion={`${Math.floor(inversion * 100)}%`}
+		aria-label={label}
+		onclickcapture={onclick}
+		bind:this={buttonEl}
+		{disabled}
+	>
+		{@render icon()}
+	</button>
+</Tooltip>
 
 <style>
 	button {

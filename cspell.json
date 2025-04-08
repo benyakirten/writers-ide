@@ -18,6 +18,8 @@
 		"onsubmitcapture",
 		"onclickcapture",
 		"ondblclickcapture",
+		"onmousemovecapture",
+		"onfocusoutcapture",
 		"oncontextmenu",
 		"onminimize",
 		"paraglide",
@@ -34,6 +36,9 @@
 		"arrowup",
 		"arrowdown",
 		"arrowleft",
-		"arrowright"
+		"arrowright",
+		"dismissable",
+		"describedby",
+		"debouncer"
 	]
 }

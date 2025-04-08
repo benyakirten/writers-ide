@@ -8,6 +8,7 @@
 </script>
 
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { Icon } from '@steeze-ui/svelte-icon';
 	import { DotsThree } from '@steeze-ui/phosphor-icons';
 
@@ -18,8 +19,7 @@
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import TransferHandler from '../state/bar-transfer-handler.svelte';
-	import { onMount } from 'svelte';
-	import Shortcuts from '../state/shortcuts.svelte';
+	import Shortcuts from '$lib/services/shortcuts.svelte';
 
 	let {
 		onrelocate,

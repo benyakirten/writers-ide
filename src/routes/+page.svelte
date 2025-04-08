@@ -2,7 +2,7 @@
 	import Editor from '$lib/editor/Editor.svelte';
 	import { MenuItem } from '$lib/editor/prosemirror/menu/basic/menu.js';
 	import Registry from '$lib/editor/state/bar-item-registry.svelte';
-	import Shortcuts from '$lib/editor/state/shortcuts.svelte';
+	import Shortcuts from '$lib/services/shortcuts.svelte';
 	import { builtInShortcuts } from './shortcuts';
 
 	Shortcuts.add(builtInShortcuts);

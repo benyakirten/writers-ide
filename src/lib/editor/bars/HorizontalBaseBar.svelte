@@ -8,11 +8,11 @@
 
 <div class="base-bar">
 	<button onclick={() => HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart)}
-		>Add horizontal bar</button
-	>
+		>Add horizontal bar
+	</button>
 	<button onclick={() => VerticalBarState.add({}, VerticalBarPosition.InlineStart)}
-		>Add vertical bar</button
-	>
+		>Add vertical bar
+	</button>
 	<button onclick={() => FloaterBarState.add()}>Add floater bar</button>
 </div>
 
