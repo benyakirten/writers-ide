@@ -6,7 +6,8 @@
 	import LocaleManager from '$lib/services/locale-manager.svelte';
 	import Shortcuts from '$lib/services/shortcuts.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
-	import { setLanguageTag } from '@/paraglide/runtime.js';
+	import { setLanguageTag } from '$lib/paraglide/runtime.js';
+	import Tooltip from '$lib/components/tooltip/Tooltip.svelte';
 
 	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'vertical';
 
@@ -47,6 +48,10 @@
 	<button onclick={() => Shortcuts.register('move-bar-up', 'meta-shift-arrowleft')}>
 		Change shortcut
 	</button>
+	<Tooltip tooltip="This is a tooltip">
+		<button>Hover Me</button>
+		<span>This is some text</span>
+	</Tooltip>
 </div>
 
 <style>

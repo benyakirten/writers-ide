@@ -9,16 +9,11 @@
 </script>
 
 {#snippet textTooltip(text: string)}
-	<p>{text}</p>
-	<style>
-		p {
-			padding: 4px 8px;
-		}
-	</style>
+	<p style:padding="4px 8px">{text}</p>
 {/snippet}
 
 <svelte:window onkeydown={handleKeydown} />
-{#if TooltipManager.tooltip !== null}
+{#if TooltipManager.open && TooltipManager.tooltip !== null}
 	<div
 		onfocusincapture={() => TooltipManager.tooltipDebouncer.update(true)}
 		onmouseenter={() => TooltipManager.tooltipDebouncer.update(true)}
@@ -39,5 +34,8 @@
 	[role='tooltip'] {
 		position: absolute;
 		z-index: 9999;
+		background: pink;
+		border-radius: 4px;
+		border: 2px solid #000;
 	}
 </style>

@@ -3,7 +3,7 @@
 
 	import TooltipManager from '@/services/tooltip.svelte';
 
-	let { content, tooltip }: { content: Snippet; tooltip: Snippet | string } = $props();
+	let { children, tooltip }: { children: Snippet; tooltip: Snippet | string } = $props();
 
 	let el: HTMLElement;
 
@@ -22,7 +22,7 @@
 	onmouseenter={() => showTooltip()}
 	onfocusoutcapture={() => hideTooltip()}
 	onmouseleave={() => hideTooltip()}
-	role="region"
+	role="presentation"
 >
-	{@render content()}
+	{@render children()}
 </div>

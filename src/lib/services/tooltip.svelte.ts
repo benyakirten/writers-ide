@@ -6,7 +6,7 @@ export type TooltipData = {
 	target: HTMLElement;
 };
 export class TooltipState {
-	open: boolean = false;
+	open = $state(false);
 	tooltip = $state<TooltipData | null>(null);
 	tooltipElement: HTMLElement | null = null;
 	TIMEOUT_DURATION = 200;
