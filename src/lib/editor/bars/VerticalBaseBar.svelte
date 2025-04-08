@@ -7,7 +7,6 @@
 	import Shortcuts from '$lib/services/shortcuts.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
 	import { setLanguageTag } from '$lib/paraglide/runtime.js';
-	import Tooltip from '$lib/components/tooltip/Tooltip.svelte';
 
 	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'vertical';
 
@@ -48,12 +47,6 @@
 	<button onclick={() => Shortcuts.register('move-bar-up', 'meta-shift-arrowleft')}>
 		Change shortcut
 	</button>
-	<Tooltip tooltip="This is a tooltip" calibrateFor="horizontal">
-		<div style:border="1px solid green">
-			<button>Hover Me</button>
-			<span>This is some text</span>
-		</div>
-	</Tooltip>
 </div>
 
 <style>

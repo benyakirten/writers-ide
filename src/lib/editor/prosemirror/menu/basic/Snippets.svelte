@@ -27,6 +27,7 @@
 
 	import type { UseableMarkName } from '$lib/editor/prosemirror/view/actions.js';
 	import { TextOverline } from '$lib/icons.js';
+	import { type TooltipData } from '@/services/tooltip.svelte.js';
 
 	type TextMenuIcon = {
 		iconSrc: IconSource;
@@ -245,7 +246,8 @@
 	activeCodeMarks: TextMarkPresence | undefined,
 	m: Internationalizator,
 	editorView: EditorView | null,
-	actionUtils: typeof ActionUtilities
+	actionUtils: typeof ActionUtilities,
+	tooltipDirection: TooltipData['calibrateFor']
 )}
 	{#each textMarks as { iconSrc, onclick, markName, translateMark } (markName)}
 		{@const inversion = activeCodeMarks?.get(markName) ?? 0}
@@ -255,6 +257,7 @@
 				? m.remove_mark_from_text({ mark: translatedMark })
 				: m.add_mark_to_text({ mark: translatedMark })}
 		<IconButton
+			{tooltipDirection}
 			{inversion}
 			label="{capitalize(label)}."
 			onclick={() => onclick(editorView, actionUtils)}
@@ -271,7 +274,8 @@
 	selection: Selection | null,
 	m: Internationalizator,
 	actionUtils: typeof ActionUtilities,
-	selectionUtils: typeof SelectionUtilities
+	selectionUtils: typeof SelectionUtilities,
+	tooltipDirection: TooltipData['calibrateFor']
 )}
 	{#each blockMarks as { id, generateLabel, iconSrc, onclick, determineInversion } (id)}
 		{@const inversion =
@@ -279,7 +283,12 @@
 				? determineInversion(selection, editorView.state.doc, selectionUtils)
 				: 0}
 		{@const label = generateLabel(m)}
-		<IconButton {inversion} {label} onclick={() => onclick(editorView, actionUtils)}>
+		<IconButton
+			{tooltipDirection}
+			{inversion}
+			{label}
+			onclick={() => onclick(editorView, actionUtils)}
+		>
 			{#snippet icon()}
 				<Icon src={iconSrc} title={label} size="16px" />
 			{/snippet}

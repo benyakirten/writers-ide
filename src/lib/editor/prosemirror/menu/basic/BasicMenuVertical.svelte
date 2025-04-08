@@ -30,7 +30,13 @@
 <div class="menu">
 	<div class="section">
 		<div class="grouping">
-			{@render textMarkButtons(activeCodeMarks, m, editorView, props.proseMirror.actions)}
+			{@render textMarkButtons(
+				activeCodeMarks,
+				m,
+				editorView,
+				props.proseMirror.actions,
+				'vertical'
+			)}
 		</div>
 	</div>
 	<div class="section">
@@ -41,7 +47,8 @@
 				selection,
 				m,
 				props.proseMirror.actions,
-				props.proseMirror.selections
+				props.proseMirror.selections,
+				'vertical'
 			)}
 		</div>
 	</div>
