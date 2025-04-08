@@ -1,11 +1,9 @@
-import { onSetLanguageTag, sourceLanguageTag } from '$lib/paraglide/runtime.js';
+import { baseLocale } from '$lib/paraglide/runtime.js';
 
 export class LocaleState {
-	locale = $state(sourceLanguageTag);
+	locale = $state(baseLocale);
 	constructor() {
-		onSetLanguageTag((tag) => {
-			this.locale = tag;
-		});
+		// TODO: Have locale be established by settings
 	}
 }
 
