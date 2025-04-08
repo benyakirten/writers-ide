@@ -23,6 +23,7 @@
 		bind:this={TooltipManager.tooltipEl}
 		role="tooltip"
 	>
+		<div class="arrow"></div>
 		{#if typeof TooltipManager.tooltip.data === 'string'}
 			{@render textTooltip(TooltipManager.tooltip.data)}
 		{:else}
@@ -41,6 +42,14 @@
 		visibility: hidden;
 
 		animation: fadeIn 150ms ease-in-out;
+	}
+
+	.arrow {
+		background-color: black;
+		position: absolute;
+		clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+		width: 12px;
+		height: 14px;
 	}
 
 	@keyframes fadeIn {

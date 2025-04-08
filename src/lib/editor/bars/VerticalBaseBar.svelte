@@ -49,8 +49,10 @@
 		Change shortcut
 	</button>
 	<Tooltip tooltip="This is a tooltip" calibrateFor="horizontal">
-		<button>Hover Me</button>
-		<span>This is some text</span>
+		<div style:border="1px solid green">
+			<button>Hover Me</button>
+			<span>This is some text</span>
+		</div>
 	</Tooltip>
 </div>
 

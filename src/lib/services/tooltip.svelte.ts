@@ -74,17 +74,24 @@ export class TooltipState {
 		tooltipEl.style.visibility = 'visible';
 	}
 
-	MARGIN = 10;
+	MARGIN = 15;
 	#calibrateHorizontalPosition(hostEl: HTMLElement, tooltipEl: HTMLElement) {
 		const hostRect = hostEl.getBoundingClientRect();
 		let tooltipRect = tooltipEl.getBoundingClientRect();
 
 		tooltipEl.style.left = `${hostRect.left - tooltipRect.width - this.MARGIN}px`;
 		tooltipEl.style.top = `${hostRect.top + hostRect.height / 2}px`;
+		const tooltipArrow = tooltipEl.querySelector('.arrow') as HTMLElement;
+		tooltipArrow.style.top = '50%';
 
 		tooltipRect = tooltipEl.getBoundingClientRect();
 		if (tooltipRect.left <= this.MARGIN * 2) {
 			tooltipEl.style.left = `${hostRect.right + this.MARGIN}px`;
+			tooltipArrow.style.transform = 'translateY(-50%) rotate(-90deg)';
+			tooltipArrow.style.right = 'calc(100% + 2px)';
+		} else {
+			tooltipArrow.style.transform = 'translateY(-50%) rotate(90deg)';
+			tooltipArrow.style.left = 'calc(100% + 2px)';
 		}
 
 		tooltipEl.style.transform = 'translateY(-50%)';
@@ -92,14 +99,22 @@ export class TooltipState {
 
 	#calibrateVerticalPosition(hostEl: HTMLElement, tooltipEl: HTMLElement) {
 		const hostRect = hostEl.getBoundingClientRect();
+		const tooltipArrow = tooltipEl.querySelector('.arrow') as HTMLElement;
 		let tooltipRect = tooltipEl.getBoundingClientRect();
 
 		tooltipEl.style.top = `${hostRect.top - tooltipRect.height - this.MARGIN}px`;
 		tooltipEl.style.left = `${hostRect.left + hostRect.width / 2}px`;
 
+		tooltipArrow.style.left = '50%';
+
 		tooltipRect = tooltipEl.getBoundingClientRect();
 		if (tooltipRect.top <= this.MARGIN * 2) {
 			tooltipEl.style.top = `${hostRect.bottom + this.MARGIN}px`;
+			tooltipArrow.style.transform = 'translateX(-50%) rotate(0deg)';
+			tooltipArrow.style.bottom = 'calc(100% + 2px)';
+		} else {
+			tooltipArrow.style.transform = 'translateX(-50%) rotate(180deg)';
+			tooltipArrow.style.top = 'calc(100% + 2px)';
 		}
 
 		tooltipEl.style.transform = 'translateX(-50%)';
