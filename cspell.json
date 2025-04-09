@@ -20,6 +20,7 @@
 		"ondblclickcapture",
 		"onmousemovecapture",
 		"onfocusoutcapture",
+		"ondismiss",
 		"oncontextmenu",
 		"onminimize",
 		"paraglide",
