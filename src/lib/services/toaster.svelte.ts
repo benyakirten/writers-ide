@@ -13,6 +13,7 @@ export class Toast {
 	id: string;
 	timeLeft: number | null;
 	#interval: NodeJS.Timeout | null = null;
+	static readonly INTERVAL_DELAY = 100;
 
 	constructor(
 		base: BaseToast,
@@ -23,21 +24,21 @@ export class Toast {
 		this.dismissable = base.dismissable;
 		this.message = base.message;
 		this.id = id;
-		if (this.duration !== null) {
-			this.#interval = this.start(this.duration);
+		if (this.duration) {
+			this.#interval = this.start();
 		}
 	}
 
-	start(duration: number): NodeJS.Timeout {
+	start(): NodeJS.Timeout {
 		const interval = setInterval(() => {
 			if (this.timeLeft === null || this.timeLeft <= 0) {
 				clearInterval(interval);
 				this.dismiss();
 				return;
 			} else {
-				this.timeLeft -= 1;
+				this.timeLeft -= 100;
 			}
-		}, duration);
+		}, Toast.INTERVAL_DELAY);
 
 		return interval;
 	}
@@ -53,17 +54,26 @@ export class Toast {
 
 	reset() {
 		this.stop();
+		if (!this.duration) {
+			return false;
+		}
+
 		this.timeLeft = this.duration;
 		if (this.duration !== null) {
-			this.#interval = this.start(this.duration);
+			this.#interval = this.start();
 		}
+		return true;
 	}
 }
 
 export class ToasterState {
-	DEFAULT_DURATION = 5000;
+	static readonly DEFAULT_DURATION = 5000;
 	toasts = $state<Toast[]>([]);
-	addToast(toast: Omit<BaseToast, 'duration'>, duration = this.DEFAULT_DURATION, id?: string) {
+	addToast(
+		toast: Omit<BaseToast, 'duration'>,
+		duration = ToasterState.DEFAULT_DURATION,
+		id?: string
+	) {
 		const _id = id ?? crypto.randomUUID();
 		const toastInstance = new Toast({ ...toast, duration }, _id, () => this.dismissToast(_id));
 		this.toasts.push(toastInstance);
