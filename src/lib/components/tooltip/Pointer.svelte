@@ -37,7 +37,7 @@
 <style>
 	[role='tooltip'] {
 		position: absolute;
-		z-index: (var(--pointer-z));
+		z-index: var(--pointer-z);
 		background: pink;
 		border-radius: 4px;
 		border: 2px solid #000;

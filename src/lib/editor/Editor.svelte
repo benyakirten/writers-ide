@@ -24,6 +24,7 @@
 	import VerticalBaseBar from './bars/VerticalBaseBar.svelte';
 	import HorizontalBaseBar from './bars/HorizontalBaseBar.svelte';
 	import Pointer from '$lib/components/tooltip/Pointer.svelte';
+	import Toaster from '$lib/components/toaster/Toaster.svelte';
 
 	function resize(e: MouseEvent) {
 		VerticalBarState.resize(e);
@@ -64,6 +65,7 @@
 	onDragStart={handleDragStart}
 	onDragOver={handleDragOver}
 >
+	<Toaster />
 	<Pointer />
 	<div
 		bind:this={FloaterBarState.root}

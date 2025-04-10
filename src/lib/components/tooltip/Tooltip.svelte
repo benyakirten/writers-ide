@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 
 	import TooltipManager, { type TooltipData } from '@/services/tooltip.svelte';
 
@@ -19,6 +19,10 @@
 	function hideTooltip() {
 		TooltipManager.tooltipDebouncer.update(false);
 	}
+
+	onMount(() => {
+		return () => TooltipManager.dismiss();
+	});
 </script>
 
 <div
