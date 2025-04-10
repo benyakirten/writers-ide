@@ -7,13 +7,13 @@ export type BaseToast = {
 };
 
 export class Toast implements BaseToast {
-	duration: number | null;
-	dismissable: boolean;
-	message: string | Snippet;
-	id: string;
-	timeLeft: number | null;
+	duration: number | null = $state(null);
+	dismissable: boolean = $state(false);
+	message: string | Snippet = $state('');
+	id: string = $state('');
+	timeLeft: number | null = $state(null);
 	#interval: NodeJS.Timeout | null = null;
-	static readonly INTERVAL_DELAY = 100;
+	static readonly INTERVAL_DELAY = 10;
 
 	constructor(
 		base: BaseToast,
@@ -36,7 +36,7 @@ export class Toast implements BaseToast {
 				this.dismiss();
 				return;
 			} else {
-				this.timeLeft -= 100;
+				this.timeLeft -= Toast.INTERVAL_DELAY;
 			}
 		}, Toast.INTERVAL_DELAY);
 

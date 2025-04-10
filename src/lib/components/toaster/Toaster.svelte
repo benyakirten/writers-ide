@@ -4,11 +4,12 @@
 	import Toast from './Toast.svelte';
 </script>
 
-<ul style:--toast-z={MAX_Z_INDEX}>
+<ul style:--toast-z={MAX_Z_INDEX - 1}>
 	{#each ToastManager.toasts as toast (toast.id)}
 		<Toast
 			message={toast.message}
 			timeLeft={toast.timeLeft}
+			duration={toast.duration}
 			ondismiss={toast.dismissable ? () => ToastManager.removeToast(toast.id) : null}
 		/>
 	{/each}
@@ -18,8 +19,7 @@
 	ul {
 		position: absolute;
 		top: 60px;
-		left: 50%;
-		transform: translateX(-50%);
+		left: 100px;
 		z-index: var(--toast-z);
 
 		display: grid;

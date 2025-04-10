@@ -16,7 +16,7 @@
 <svelte:window onkeydown={handleKeydown} />
 {#if TooltipManager.open && TooltipManager.tooltip !== null}
 	<div
-		style:--pointer-z={MAX_Z_INDEX - 1}
+		style:--pointer-z={MAX_Z_INDEX}
 		onfocusincapture={() => TooltipManager.tooltipDebouncer.update(true)}
 		onmouseenter={() => TooltipManager.tooltipDebouncer.update(true)}
 		onfocusoutcapture={() => TooltipManager.tooltipDebouncer.update(false)}

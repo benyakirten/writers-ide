@@ -34,7 +34,7 @@
 				<Icon src={DotsSixVertical} size="20px" />
 			{/if}
 		</div>
-		<IconButton onclick={onremove} label="Remove item">
+		<IconButton tooltipDirection="vertical" onclick={onremove} label="Remove item">
 			{#snippet icon()}
 				<Icon src={X} size="14px" />
 			{/snippet}
