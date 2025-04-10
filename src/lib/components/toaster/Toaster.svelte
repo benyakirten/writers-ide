@@ -9,7 +9,7 @@
 		<Toast
 			message={toast.message}
 			timeLeft={toast.timeLeft}
-			ondismiss={toast.dismissable ? () => ToastManager.dismissToast(toast.id) : null}
+			ondismiss={toast.dismissable ? () => ToastManager.removeToast(toast.id) : null}
 		/>
 	{/each}
 </ul>

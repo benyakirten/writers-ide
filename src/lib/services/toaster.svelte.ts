@@ -1,12 +1,12 @@
 import type { Snippet } from 'svelte';
 
 export type BaseToast = {
-	duration?: number;
+	duration: number | null;
 	dismissable: boolean;
 	message: string | Snippet;
 };
 
-export class Toast {
+export class Toast implements BaseToast {
 	duration: number | null;
 	dismissable: boolean;
 	message: string | Snippet;
@@ -71,37 +71,44 @@ export class ToasterState {
 	toasts = $state<Toast[]>([]);
 	addToast(
 		toast: Omit<BaseToast, 'duration'>,
-		duration = ToasterState.DEFAULT_DURATION,
+		duration: number | null = ToasterState.DEFAULT_DURATION,
 		id?: string
 	) {
 		const _id = id ?? crypto.randomUUID();
-		const toastInstance = new Toast({ ...toast, duration }, _id, () => this.dismissToast(_id));
+		const toastInstance = new Toast({ ...toast, duration }, _id, () => this.removeToast(_id));
 		this.toasts.push(toastInstance);
-		return id;
+
+		return _id;
 	}
 
 	#index(id: string | number): number | null {
-		let index: number;
-		if (typeof id === 'string') {
-			index = this.toasts.findIndex((t) => t.id === id);
-			if (index === -1) {
-				return null;
-			}
-		} else if (id >= 0 && id < this.toasts.length) {
-			index = id;
-		} else {
+		if (typeof id === 'number' && id >= 0 && id < this.toasts.length) {
+			return id;
+		}
+
+		const index = this.toasts.findIndex((t) => t.id === id);
+		if (index === -1) {
 			return null;
 		}
 
 		return index;
 	}
 
-	dismissToast(id: string | number) {
+	removeToast(id: string | number) {
 		const index = this.#index(id);
 		if (index === null) {
-			return;
+			return false;
 		}
+
+		const toast = this.toasts.at(index);
+		if (!toast) {
+			return false;
+		}
+
+		toast.stop();
 		this.toasts.splice(index, 1);
+
+		return true;
 	}
 
 	pauseToast(id: string | number) {
@@ -110,14 +117,12 @@ export class ToasterState {
 			return false;
 		}
 
-		const toast = this.toasts[index];
-		return toast.stop();
-	}
+		const toast = this.toasts.at(index);
+		if (!toast) {
+			return false;
+		}
 
-	pop() {
-		const toast = this.toasts.pop();
-		toast?.stop();
-		return toast;
+		return toast.stop();
 	}
 }
 
