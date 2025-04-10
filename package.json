@@ -25,7 +25,6 @@
 		"@dnd-kit-svelte/core": "^0.0.8",
 		"@dnd-kit-svelte/sortable": "^0.0.8",
 		"@dnd-kit-svelte/utilities": "^0.0.8",
-		"@inlang/paraglide-js": "^2.0.11",
 		"@steeze-ui/phosphor-icons": "^2.1.1",
 		"@steeze-ui/svelte-icon": "^1.6.2",
 		"@tauri-apps/api": "^2",
@@ -42,6 +41,7 @@
 	"devDependencies": {
 		"@chromatic-com/storybook": "^3.2.2",
 		"@eslint/js": "^9.22.0",
+		"@inlang/paraglide-sveltekit": "^0.16.1",
 		"@playwright/test": "^1.45.3",
 		"@storybook/addon-essentials": "^8.4.5",
 		"@storybook/addon-interactions": "^8.4.5",

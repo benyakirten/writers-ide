@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
 import { TooltipState, type TooltipData } from './tooltip.svelte';
 
 describe('TooltipSTate', () => {
@@ -13,6 +13,10 @@ describe('TooltipSTate', () => {
 
 	afterAll(() => {
 		vi.useRealTimers();
+	});
+
+	afterEach(() => {
+		vi.runAllTimers();
 	});
 
 	beforeEach(() => {

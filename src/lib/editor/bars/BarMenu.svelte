@@ -68,12 +68,20 @@
 		onrelocate={(to) => TransferHandler.moveMenu(position, index, to)}
 		onmove={handleMove}
 	/>
-	<IconButton onclick={onminimize} label={m.minimize_bar({ num: index + 1 })}>
+	<IconButton
+		tooltipDirection="horizontal"
+		onclick={onminimize}
+		label={m.minimize_bar({ num: index + 1 })}
+	>
 		{#snippet icon()}
 			<Icon src={Minus} size="16px" />
 		{/snippet}
 	</IconButton>
-	<IconButton onclick={onclose} label={m.close_bar({ num: index + 1 })}>
+	<IconButton
+		tooltipDirection="horizontal"
+		onclick={onclose}
+		label={m.close_bar({ num: index + 1 })}
+	>
 		{#snippet icon()}
 			<Icon src={X} size="16px" />
 		{/snippet}

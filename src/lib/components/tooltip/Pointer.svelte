@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TooltipManager from '$lib/services/tooltip.svelte';
+	import { MAX_Z_INDEX } from '@/constants';
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
@@ -15,6 +16,7 @@
 <svelte:window onkeydown={handleKeydown} />
 {#if TooltipManager.open && TooltipManager.tooltip !== null}
 	<div
+		style:--pointer-z={MAX_Z_INDEX}
 		onfocusincapture={() => TooltipManager.tooltipDebouncer.update(true)}
 		onmouseenter={() => TooltipManager.tooltipDebouncer.update(true)}
 		onfocusoutcapture={() => TooltipManager.tooltipDebouncer.update(false)}
@@ -35,7 +37,7 @@
 <style>
 	[role='tooltip'] {
 		position: absolute;
-		z-index: 9999;
+		z-index: var(--pointer-z);
 		background: pink;
 		border-radius: 4px;
 		border: 2px solid #000;

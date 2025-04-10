@@ -1,12 +1,10 @@
 <script lang="ts">
+	import ToastManager from '@/services/toaster.svelte.js';
 	import TransferHandler, {
 		type BarTransferLocation
 	} from '../state/bar-transfer-handler.svelte.js';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte.js';
-	import LocaleManager from '$lib/services/locale-manager.svelte';
-	import Shortcuts from '$lib/services/shortcuts.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
-	import { setLanguageTag } from '$lib/paraglide/runtime.js';
 
 	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'vertical';
 
@@ -30,6 +28,16 @@
 		const location = getBarPosition();
 		TransferHandler.append(location, 0, 'basic-menu');
 	}
+
+	function generateRandomMessage() {
+		const messages = [
+			'Hello, world!',
+			'This is a test toast.',
+			'Toast with a long message to test the layout.',
+			'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua..'
+		];
+		return messages[Math.floor(Math.random() * messages.length)];
+	}
 </script>
 
 <div class="base-bar">
@@ -41,11 +49,10 @@
 	<button onclick={() => addNullToBar()}>Add null to bar</button>
 	<button onclick={() => addBasicMenuToBar()}>Add basic menu to bar</button>
 	<button
-		onclick={() => (LocaleManager.locale === 'en' ? setLanguageTag('fr') : setLanguageTag('en'))}
-		>Change locale</button
+		onclick={() =>
+			ToastManager.addToast({ message: generateRandomMessage(), dismissable: true }, 2000)}
 	>
-	<button onclick={() => Shortcuts.register('move-bar-up', 'meta-shift-arrowleft')}>
-		Change shortcut
+		Add Toast
 	</button>
 </div>
 
