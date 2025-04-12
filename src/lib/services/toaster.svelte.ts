@@ -2,17 +2,15 @@ import type { Snippet } from 'svelte';
 
 export type BaseToast = {
 	duration: number | null;
-	dismissable: boolean;
 	message: string | Snippet;
 };
 
 export class Toast implements BaseToast {
 	duration: number | null = $state(null);
-	dismissable: boolean = $state(false);
 	message: string | Snippet = $state('');
 	id: string = $state('');
 	timeLeft: number | null = $state(null);
-	#interval: NodeJS.Timeout | null = null;
+	interval: NodeJS.Timeout | null = $state(null);
 	static readonly INTERVAL_DELAY = 10;
 
 	constructor(
@@ -21,15 +19,14 @@ export class Toast implements BaseToast {
 		private dismiss: () => void
 	) {
 		this.timeLeft = this.duration = base.duration ?? null;
-		this.dismissable = base.dismissable;
 		this.message = base.message;
 		this.id = id;
 		if (this.duration) {
-			this.#interval = this.start();
+			this.start();
 		}
 	}
 
-	start(): NodeJS.Timeout {
+	start() {
 		const interval = setInterval(() => {
 			if (this.timeLeft === null || this.timeLeft <= 0) {
 				clearInterval(interval);
@@ -40,15 +37,16 @@ export class Toast implements BaseToast {
 			}
 		}, Toast.INTERVAL_DELAY);
 
-		return interval;
+		this.interval = interval;
 	}
 
 	stop(): boolean {
-		if (this.#interval === null) {
+		if (this.interval === null) {
 			return false;
 		}
 
-		clearInterval(this.#interval!);
+		clearInterval(this.interval);
+		this.interval = null;
 		return true;
 	}
 
@@ -60,7 +58,7 @@ export class Toast implements BaseToast {
 
 		this.timeLeft = this.duration;
 		if (this.duration !== null) {
-			this.#interval = this.start();
+			this.start();
 		}
 		return true;
 	}
@@ -70,12 +68,12 @@ export class ToasterState {
 	static readonly DEFAULT_DURATION = 5000;
 	toasts = $state<Toast[]>([]);
 	addToast(
-		toast: Omit<BaseToast, 'duration'>,
+		message: BaseToast['message'],
 		duration: number | null = ToasterState.DEFAULT_DURATION,
 		id?: string
 	) {
 		const _id = id ?? crypto.randomUUID();
-		const toastInstance = new Toast({ ...toast, duration }, _id, () => this.removeToast(_id));
+		const toastInstance = new Toast({ message, duration }, _id, () => this.removeToast(_id));
 		this.toasts.push(toastInstance);
 
 		return _id;

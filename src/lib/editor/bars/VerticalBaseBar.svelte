@@ -34,7 +34,8 @@
 			'Hello, world!',
 			'This is a test toast.',
 			'Toast with a long message to test the layout.',
-			'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua..'
+			'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua..',
+			'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua..'
 		];
 		return messages[Math.floor(Math.random() * messages.length)];
 	}
@@ -48,12 +49,7 @@
 	</select>
 	<button onclick={() => addNullToBar()}>Add null to bar</button>
 	<button onclick={() => addBasicMenuToBar()}>Add basic menu to bar</button>
-	<button
-		onclick={() =>
-			ToastManager.addToast({ message: generateRandomMessage(), dismissable: true }, 2000)}
-	>
-		Add Toast
-	</button>
+	<button onclick={() => ToastManager.addToast(generateRandomMessage(), null)}> Add Toast </button>
 </div>
 
 <style>
