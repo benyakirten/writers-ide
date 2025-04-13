@@ -73,6 +73,10 @@ export class SelectionUtilities {
 		return ratios;
 	}
 
+	/**
+	 * Given a selection of text of paragraph nodes, return the ratio of indentation levels
+	 * to its potential maximum.
+	 */
 	static getIndentRatio({ from, to }: Selection, doc: Node): number | null {
 		let indentLevels = 0;
 		let maxIndents = 0;
@@ -96,6 +100,10 @@ export class SelectionUtilities {
 		return indentLevels / maxIndents;
 	}
 
+	/**
+	 * Given a selection fo text nodes, return the ratio of nodes with a specific attribute
+	 * to the total amount of nodes.
+	 */
 	static getBlockAttributeRatio<Value>(
 		{ from, to }: Selection,
 		doc: Node,

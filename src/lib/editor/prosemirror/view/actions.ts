@@ -8,14 +8,23 @@ import type { marks } from './marks.js';
 
 export type UseableMarkName = keyof typeof marks;
 export type TextAlignment = 'start' | 'end' | 'left' | 'center' | 'right' | 'justify';
+
+/**
+ * A collection of utility functions for adding and removing marks from a prosemirror document.
+ */
 export class ActionUtilities {
+	/**
+	 * Toggles a text mark on the current selection in the ProseMirror editor. It returns a boolean for whether the operation was successful.
+	 * If every node in the selection has the mark, it removes the mark. It can optionally be passed in a `exclusiveWith` mark which will remove the other mark
+	 * if the mark is being added to the current selection.
+	 */
 	static toggleTextMark(
 		mark: UseableMarkName,
 		state: EditorState,
 		dispatch?: (tr: Transaction) => void,
 		view?: EditorView,
 		exclusiveWith?: UseableMarkName
-	) {
+	): boolean {
 		if (!view || !dispatch) {
 			return false;
 		}
@@ -41,6 +50,9 @@ export class ActionUtilities {
 		return true;
 	}
 
+	/**
+	 * Adds or removes indentation from a selection of text between the maximum and minimum indentation levels (0-8).
+	 */
 	static dent(
 		direction: 'indent' | 'dedent',
 		state: EditorState,
@@ -71,6 +83,9 @@ export class ActionUtilities {
 		return true;
 	}
 
+	/**
+	 * Sets text alignment on a paragraph node of the following options: left, right, center and justify.
+	 */
 	static setTextAlignment(
 		alignment: TextAlignment,
 		state: EditorState,

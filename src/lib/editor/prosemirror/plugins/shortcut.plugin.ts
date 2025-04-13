@@ -3,6 +3,13 @@ import type { EditorView } from 'prosemirror-view';
 
 import Shortcuts from '$lib/services/shortcuts.svelte';
 
+/**
+ * Create a ProseMirror plugin that handles keyboard shortcuts.
+ * We need this over using the one in prosemirror-keymap because
+ * we want to be able to change the shortcuts at runtime according
+ * to user preference. Therefore we map effects to functions rather than
+ * shortcuts to functions.
+ */
 export function createShortcuts(bindings: { [key: string]: Command }): Plugin {
 	return new Plugin({ props: { handleKeyDown: keydownHandler(bindings) } });
 }
