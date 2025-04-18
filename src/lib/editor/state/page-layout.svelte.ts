@@ -74,11 +74,10 @@ export class PageLayoutManager {
 	units = $state<Unit>('in');
 	pageWidth = $state<number>(0);
 	pageHeight = $state<number>(0);
-	pageXMargin = $state<number>(0);
-	pageYMargin = $state<number>(0);
-	pageXPadding = $state<number>(0);
 	pageYPadding = $state<number>(0);
 	pageBleed = $state<number>(0);
+	numOrphanLines = $state<number>(2);
+	numWidowLines = $state<number>(2);
 
 	cmToInches(cm: number): number {
 		return cm / 2.54;
