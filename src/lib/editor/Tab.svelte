@@ -1,19 +1,36 @@
 <script lang="ts">
-	import type { TabData } from './state/tab-state.svelte';
-	import ProseMirrorView from './prosemirror/view/ProseMirrorView.svelte';
-	import { createUpdatePlugin } from './state/event-bus.svelte';
+	import LocaleManager from '$lib/services/locale-manager.svelte';
+	import TabState from './state/tab-state.svelte';
+	import ProseMirrorEventBus from './state/event-bus.svelte';
+	import type { ModularComponent } from './state/shared.types';
+	import { ActionUtilities } from './prosemirror/view/actions';
+	import { SelectionUtilities } from './prosemirror/view/selection';
+	import FloaterBarState from './state/floater-state.svelte';
+	import HorizontalBarState from './state/horizontal-bar-state.svelte';
+	import VerticalBarState from './state/vertical-bar-state.svelte';
+	import { schema } from './prosemirror/view/schema';
 
-	let { index, id, view }: { index: number; id: string; view?: TabData['view'] } = $props();
+	let { index, Component }: { index: number; Component: ModularComponent } = $props();
 </script>
 
-<!-- TODO: Much more complexity here -->
 <div class="tab">
-	{#if view === undefined}
-		<div></div>
-	{:else}
-		{@const updatePlugin = createUpdatePlugin(id)}
-		<ProseMirrorView plugins={[updatePlugin]} {index} {id} />
-	{/if}
+	<!-- Tab Menu -->
+	<!-- Component should be zoomable -->
+	<Component
+		proseMirror={{
+			actions: ActionUtilities,
+			selections: SelectionUtilities,
+			eventBus: ProseMirrorEventBus,
+			schema
+		}}
+		bars={{
+			vertical: VerticalBarState,
+			horizontal: HorizontalBarState,
+			floater: FloaterBarState
+		}}
+		tabs={TabState}
+		locale={LocaleManager.locale}
+	/>
 </div>
 
 <style>

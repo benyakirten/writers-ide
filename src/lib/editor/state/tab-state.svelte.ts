@@ -3,7 +3,7 @@ import { IdGenerator } from '$lib/services/ids';
 export type TabData = {
 	id: string;
 	data?: object;
-	name: string | null;
+	name: string;
 };
 
 export class TabState {
@@ -35,7 +35,7 @@ export class TabState {
 		this.#active = null;
 	}
 
-	create(name: string | null, id: string = IdGenerator.generate(), data?: object): string {
+	create(name: string, id: string = IdGenerator.generate(), data?: object): string {
 		this.windows.push({ id, name, data });
 		return id;
 	}

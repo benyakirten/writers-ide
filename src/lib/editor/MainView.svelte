@@ -1,17 +1,22 @@
 <script lang="ts">
+	import { SortableContext } from '@dnd-kit-svelte/sortable';
+
+	import TabRegistry from './state/tab-state-registry.svelte';
 	import TabState from './state/tab-state.svelte';
 	import Tab from './Tab.svelte';
 </script>
 
 <div class="main-view">
-	{#each TabState.windows as window, index (window.id)}
-		<Tab {...window} {index} />
-	{/each}
+	<SortableContext items={TabState.windows.map((w) => w.id)}>
+		{#each TabState.windows as { name, id }, index (id)}
+			{@const Component = TabRegistry.get(name)}
+			<Tab {index} {Component} />
+		{/each}
+	</SortableContext>
 </div>
 
 <style>
 	.main-view {
 		flex: 1;
 	}
-	/* Main view will be grid */
 </style>
