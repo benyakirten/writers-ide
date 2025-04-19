@@ -1,4 +1,4 @@
-import { Debouncer } from '@/utils/debounce';
+import { Debouncer } from '$lib/utils/debounce';
 import { type Snippet } from 'svelte';
 
 export type TooltipData = {

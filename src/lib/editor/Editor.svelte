@@ -12,10 +12,10 @@
 	} from '@dnd-kit-svelte/core';
 	import { SortableContext } from '@dnd-kit-svelte/sortable';
 
-	import VerticalBarState, { VerticalBarPosition } from './state/vertical-bar-state.svelte.js';
-	import HorizontalBarState from './state/horizontal-bar-state.svelte.js';
-	import { HorizontalBarPosition } from './state/horizontal-bar-state.svelte.js';
-	import FloaterBarState from './state/floater-state.svelte.js';
+	import VerticalBarState, { VerticalBarPosition } from './state/vertical-bar-state.svelte';
+	import HorizontalBarState from './state/horizontal-bar-state.svelte';
+	import { HorizontalBarPosition } from './state/horizontal-bar-state.svelte';
+	import FloaterBarState from './state/floater-state.svelte';
 
 	import MainView from './MainView.svelte';
 	import VerticalBar from './bars/VerticalBar.svelte';

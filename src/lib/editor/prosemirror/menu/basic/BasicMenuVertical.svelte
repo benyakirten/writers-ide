@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import * as m from '$lib/paraglide/messages.js';
+	import * as m from '$lib/paraglide/messages';
 	import type { EditorView } from 'prosemirror-view';
 	import type { Selection } from 'prosemirror-state';
 
-	import type { BarItemComponentProps } from '$lib/editor/state/bar-item-registry.svelte.js';
-	import type { TextMarkPresence } from '../../view/selection.js';
+	import type { BarItemComponentProps } from '$lib/editor/state/bar-item-registry.svelte';
+	import type { TextMarkPresence } from '../../view/selection';
 	import { blockMarkButtons, textMarkButtons } from './Snippets.svelte';
 
 	let activeCodeMarks = $state<TextMarkPresence>();

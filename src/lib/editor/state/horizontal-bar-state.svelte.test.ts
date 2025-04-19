@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { HorizontalBarState, HorizontalBarPosition } from './horizontal-bar-state.svelte';
-import { BarItems } from './bar-items.svelte.js';
+import { BarItems } from './bar-items.svelte';
 
 describe('HorizontalBarState', () => {
 	let state: HorizontalBarState;

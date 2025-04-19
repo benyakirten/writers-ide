@@ -1,22 +1,16 @@
-import type { EditorView } from 'prosemirror-view';
+import { IdGenerator } from '$lib/services/ids';
 
-export type WindowData = {
+export type TabData = {
 	id: string;
-	view?: EditorView | null;
+	data?: object;
+	name: string | null;
 };
 
 export class TabState {
-	windows = $state<WindowData[]>([
-		{
-			id: 'my-1',
-			view: null
-		}
-	]);
+	windows = $state<TabData[]>([]);
 
 	#active = $state<string | null>(null);
-	active = $derived.by(
-		() => this.windows.find((window) => window.id === this.#active)?.view ?? null
-	);
+	active = $derived.by(() => this.windows.find((window) => window.id === this.#active)?.id);
 
 	activate = (id: string | number): boolean => {
 		if (typeof id === 'number') {
@@ -41,25 +35,9 @@ export class TabState {
 		this.#active = null;
 	}
 
-	// Other types of tabs?
-	registerEditor(id: string, view: EditorView | null): () => void {
-		const index = this.windows.findIndex((item) => item.id === id);
-		if (index === -1) {
-			return () => {};
-		}
-		this.windows[index].view = view;
-		return () => this.windows.splice(index, 1);
-	}
-
-	createTab(): string {
-		const id = crypto.randomUUID();
-		this.windows.push({ id });
+	create(name: string | null, id: string = IdGenerator.generate(), data?: object): string {
+		this.windows.push({ id, name, data });
 		return id;
-	}
-
-	createEditor(): void {
-		const id = this.createTab();
-		this.registerEditor(id, null);
 	}
 
 	remove(id: string): void {

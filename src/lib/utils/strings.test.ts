@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 
-import { capitalize, capitalizeAllWords } from './strings.js';
+import { capitalize, capitalizeAllWords } from './strings';
 
 describe('capitalize', () => {
 	describe('capitalize', () => {

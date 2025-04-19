@@ -1,5 +1,5 @@
 <script lang="ts">
-	import TabState from './state/tab-state.svelte.js';
+	import TabState from './state/tab-state.svelte';
 	import Tab from './Tab.svelte';
 </script>
 

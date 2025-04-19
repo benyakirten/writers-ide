@@ -1,17 +1,12 @@
 <script lang="ts">
 	import * as m from '$lib/paraglide/messages';
 
-	import {
-		HorizontalBarPosition,
-		type HorizontalBar
-	} from '../state/horizontal-bar-state.svelte.js';
+	import { HorizontalBarPosition, type HorizontalBar } from '../state/horizontal-bar-state.svelte';
 	import BarMenu from './BarMenu.svelte';
-	import type { BarItemData } from '../state/bar-items.svelte.js';
-	import TransferHandler, {
-		type BarTransferLocation
-	} from '../state/bar-transfer-handler.svelte.js';
+	import type { BarItemData } from '../state/bar-items.svelte';
+	import TransferHandler, { type BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import HorizontalItemRenderer from './HorizontalItemRenderer.svelte';
-	import HorizontalBarState from '../state/horizontal-bar-state.svelte.js';
+	import HorizontalBarState from '../state/horizontal-bar-state.svelte';
 	import type { MoveDetails } from './BarLocation.svelte';
 
 	let {

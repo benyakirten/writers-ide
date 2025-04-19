@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ParagraphProps } from '$lib/types/block.js';
+	import type { ParagraphProps } from '$lib/types/block';
 
 	let { content, classes, updateBlockContent, index, id }: ParagraphProps = $props();
 

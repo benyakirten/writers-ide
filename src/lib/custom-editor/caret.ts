@@ -1,5 +1,5 @@
-import type { Blocks } from '$lib/types/block.js';
-import { nextAnimationFrame } from './utils.js';
+import type { Blocks } from '$lib/types/block';
+import { nextAnimationFrame } from './utils';
 
 export function getCaretPosition(): number {
 	return window.getSelection()?.getRangeAt(0).endOffset ?? 0;

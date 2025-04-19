@@ -3,9 +3,9 @@ import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import type { Schema, Node } from 'prosemirror-model';
 
-import { schema } from './schema.js';
-import { ActionUtilities } from './actions.js';
-import { INDENT_MIN, INDENT_MAX } from './constants.js';
+import { schema } from './schema';
+import { ActionUtilities } from './actions';
+import { INDENT_MIN, INDENT_MAX } from './constants';
 
 function createEditorView(
 	nodes: Node[],

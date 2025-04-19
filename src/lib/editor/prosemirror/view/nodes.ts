@@ -1,7 +1,7 @@
 import type { DOMOutputSpec, NodeSpec } from 'prosemirror-model';
 
-import { clamp } from '$lib/utils/numbers.js';
-import { INDENT_MAX, INDENT_MIN, INDENT_SIZE_PX } from './constants.js';
+import { clamp } from '$lib/utils/numbers';
+import { INDENT_MAX, INDENT_MIN, INDENT_SIZE_PX } from './constants';
 
 const doc: NodeSpec = {
 	content: 'block+'

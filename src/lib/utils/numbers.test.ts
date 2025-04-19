@@ -1,6 +1,6 @@
 import { describe, it, expect, test } from 'vitest';
 
-import { clamp, mod } from './numbers.js';
+import { clamp, mod } from './numbers';
 
 describe('clamp', () => {
 	test.each([

@@ -1,7 +1,7 @@
-import type * as m from '$lib/paraglide/messages.js';
+import type * as m from '$lib/paraglide/messages';
 
-import type { HorizontalBar, HorizontalBarPosition } from './state/horizontal-bar-state.svelte.js';
-import type { VerticalBar, VerticalBarPosition } from './state/vertical-bar-state.svelte.js';
+import type { HorizontalBar, HorizontalBarPosition } from './state/horizontal-bar-state.svelte';
+import type { VerticalBar, VerticalBarPosition } from './state/vertical-bar-state.svelte';
 
 /**
  * Configuration settings for the editor. It includes vertical and horizontal options

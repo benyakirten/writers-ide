@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterAll, beforeAll } from 'vitest';
 
-import { Observable } from './observable.js';
-import { RequiredObservable } from './observable.js';
+import { Observable } from './observable';
+import { RequiredObservable } from './observable';
 
 describe('Observable', () => {
 	beforeAll(() => {

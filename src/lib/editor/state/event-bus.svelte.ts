@@ -1,7 +1,7 @@
 import { Plugin } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
-import { Observable } from '$lib/utils/observable.js';
+import { Observable } from '$lib/utils/observable';
 
 export const createUpdatePlugin = (id: string) =>
 	new Plugin({

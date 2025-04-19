@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { EditorProps, ParagraphData } from '$lib/types/block.js';
+	import type { EditorProps, ParagraphData } from '$lib/types/block';
 	import { tick } from 'svelte';
 	import Block from './blocks/Block.svelte';
 	import {
@@ -13,8 +13,8 @@
 		moveToNextBlock,
 		moveToPrevBlock,
 		caretIsAtEndOfEl
-	} from './caret.js';
-	import { nextAnimationFrame } from './utils.js';
+	} from './caret';
+	import { nextAnimationFrame } from './utils';
 
 	// let blocks: Blocks = $state([
 	// 	{

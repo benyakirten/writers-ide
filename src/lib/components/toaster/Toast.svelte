@@ -1,50 +1,67 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
-	import { Icon } from '@steeze-ui/svelte-icon';
-	import { X } from '@steeze-ui/phosphor-icons';
 	import { fade } from 'svelte/transition';
+	import { Icon } from '@steeze-ui/svelte-icon';
+	import { Pause, Play, X } from '@steeze-ui/phosphor-icons';
 
 	import IconButton from '$lib/components/IconButton.svelte';
+	import type { Toast } from '$lib/services/toaster.svelte';
+	import ToastManager from '$lib/services/toaster.svelte';
 
 	let {
-		message,
-		timeLeft,
-		duration,
-		ondismiss
+		toast
 	}: {
-		message: string | Snippet;
-		timeLeft: number | null;
-		duration: number | null;
-		ondismiss: (() => void) | null;
+		toast: Toast;
 	} = $props();
 
-	const percentage = $derived.by(() => (timeLeft && duration ? (timeLeft / duration) * 100 : 0));
+	const percentage = $derived.by(() =>
+		toast.timeLeft && toast.duration ? (toast.timeLeft / toast.duration) * 100 : 0
+	);
 </script>
 
-<div class="toast" out:fade|global={{ duration: 200 }}>
-	<div class="time-remaining" style:--remaining={percentage + '%'}></div>
-	{#if typeof message === 'string'}
-		{message}
+<li role="status" class="toast" out:fade|global={{ duration: 200 }}>
+	<div class="buttons">
+		{#if percentage}
+			{#if toast.interval !== null}
+				<IconButton label="Pause Toast" tooltipDirection="vertical" onclick={() => toast.stop()}>
+					{#snippet icon()}
+						<Icon src={Pause} size="16px" />
+					{/snippet}
+				</IconButton>
+			{:else}
+				<IconButton label="Resume Toast" tooltipDirection="vertical" onclick={() => toast.start()}>
+					{#snippet icon()}
+						<Icon src={Play} size="16px" />
+					{/snippet}
+				</IconButton>
+			{/if}
+		{/if}
+		<IconButton
+			label="Dismiss Toast"
+			tooltipDirection="vertical"
+			onclick={() => ToastManager.removeToast(toast.id)}
+		>
+			{#snippet icon()}
+				<Icon src={X} size="16px" />
+			{/snippet}
+		</IconButton>
+	</div>
+	{#if percentage}
+		<div class="time-remaining" style:--remaining={percentage + '%'}></div>
+	{/if}
+	{#if typeof toast.message === 'string'}
+		{toast.message}
 	{:else}
-		{@render message()}
+		{@render toast.message()}
 	{/if}
-	{#if ondismiss}
-		<div class="dismiss">
-			<IconButton label="Dismiss Toast" tooltipDirection="vertical" onclick={ondismiss}>
-				{#snippet icon()}
-					<Icon src={X} size="16px" />
-				{/snippet}
-			</IconButton>
-		</div>
-	{/if}
-</div>
+</li>
 
 <style>
 	.toast {
 		position: relative;
 
 		min-width: 200px;
-		max-width: fit-content;
+		width: fit-content;
+		max-width: 400px;
 
 		padding: 8px 4px;
 		border: 2px solid black;
@@ -63,8 +80,8 @@
 		background-color: green;
 	}
 
-	.dismiss {
-		margin-left: 8px;
+	.buttons {
+		margin: 2px 0 8px 8px;
 		float: right;
 	}
 </style>

@@ -4,7 +4,7 @@ import {
 	VerticalBarPosition,
 	type VerticalBar
 } from './vertical-bar-state.svelte';
-import { BarItems } from './bar-items.svelte.js';
+import { BarItems } from './bar-items.svelte';
 
 describe('VerticalBarState', () => {
 	let state: VerticalBarState;
