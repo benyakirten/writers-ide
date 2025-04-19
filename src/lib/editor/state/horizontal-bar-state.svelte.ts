@@ -1,5 +1,5 @@
-import { IdGenerator } from '@/services/ids.js';
-import { BarItems } from './bar-items.svelte.js';
+import { IdGenerator } from '@/services/ids';
+import { BarItems } from './bar-items.svelte';
 
 export enum HorizontalBarPosition {
 	WindowBlockStart = 'WINDOW_BLOCK_START',

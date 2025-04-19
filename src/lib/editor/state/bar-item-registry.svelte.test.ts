@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { BarItemRegistry, type BarItem } from './bar-item-registry.svelte.js';
+import { BarItemRegistry, type BarItem } from './bar-item-registry.svelte';
 
 describe('BarItemRegistry', () => {
 	let registry: BarItemRegistry;

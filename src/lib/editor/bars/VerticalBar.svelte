@@ -1,13 +1,11 @@
 <script lang="ts">
 	import * as m from '$lib/paraglide/messages';
-	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
-	import { VerticalBarPosition, type VerticalBar } from '../state/vertical-bar-state.svelte.js';
+	import VerticalBarState from '../state/vertical-bar-state.svelte';
+	import { VerticalBarPosition, type VerticalBar } from '../state/vertical-bar-state.svelte';
 	import BarMenu from './BarMenu.svelte';
-	import type { BarItemData } from '../state/bar-items.svelte.js';
+	import type { BarItemData } from '../state/bar-items.svelte';
 	import VerticalItemRenderer from './VerticalItemRenderer.svelte';
-	import TransferHandler, {
-		type BarTransferLocation
-	} from '../state/bar-transfer-handler.svelte.js';
+	import TransferHandler, { type BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import type { MoveDetails } from './BarLocation.svelte';
 
 	let {

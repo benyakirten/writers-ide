@@ -1,10 +1,10 @@
 import type { Component } from 'svelte';
 
-import * as m from '$lib/paraglide/messages.js';
+import * as m from '$lib/paraglide/messages';
 import Registry, {
 	type BarItemComponentProps,
 	type BarItemSection
-} from './bar-item-registry.svelte.js';
+} from './bar-item-registry.svelte';
 
 export type BarItemData = {
 	id: string;

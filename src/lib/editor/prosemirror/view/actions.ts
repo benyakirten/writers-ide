@@ -1,10 +1,10 @@
 import type { EditorView } from 'prosemirror-view';
 import { type EditorState, type Transaction } from 'prosemirror-state';
 
-import { clamp } from '$lib/utils/numbers.js';
-import { SelectionUtilities } from './selection.js';
-import { INDENT_MAX, INDENT_MIN } from './constants.js';
-import type { marks } from './marks.js';
+import { clamp } from '$lib/utils/numbers';
+import { SelectionUtilities } from './selection';
+import { INDENT_MAX, INDENT_MIN } from './constants';
+import type { marks } from './marks';
 
 export type UseableMarkName = keyof typeof marks;
 export type TextAlignment = 'start' | 'end' | 'left' | 'center' | 'right' | 'justify';

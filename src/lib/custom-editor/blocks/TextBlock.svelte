@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TextProps } from '$lib/types/block.js';
+	import type { TextProps } from '$lib/types/block';
 
 	// @ts-expect-error: TODO
 	let { content, classes, type }: TextProps = $props();

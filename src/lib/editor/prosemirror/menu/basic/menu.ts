@@ -1,4 +1,4 @@
-import type { BarItem } from '$lib/editor/state/bar-item-registry.svelte.js';
+import type { BarItem } from '$lib/editor/state/bar-item-registry.svelte';
 import BasicMenuHorizontal from './BasicMenuHorizontal.svelte';
 import BasicMenuVertical from './BasicMenuVertical.svelte';
 

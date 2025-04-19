@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { TabData } from './state/tab-state.svelte.js';
+	import type { TabData } from './state/tab-state.svelte';
 	import ProseMirrorView from './prosemirror/view/ProseMirrorView.svelte';
-	import { createUpdatePlugin } from './state/event-bus.svelte.js';
+	import { createUpdatePlugin } from './state/event-bus.svelte';
 
 	let { index, id, view }: { index: number; id: string; view?: TabData['view'] } = $props();
 </script>

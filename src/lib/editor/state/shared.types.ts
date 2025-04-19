@@ -1,13 +1,13 @@
 import { type Component } from 'svelte';
 
-import type { ActionUtilities } from '../prosemirror/view/actions.js';
-import type { SelectionUtilities } from '../prosemirror/view/selection.js';
-import type { ProseMirrorEventBus } from './event-bus.svelte.js';
-import type { VerticalBarState } from './vertical-bar-state.svelte.js';
-import type { HorizontalBarState } from './horizontal-bar-state.svelte.js';
-import type { FloaterBarState } from './floater-state.svelte.js';
-import type { TabState } from './tab-state.svelte.js';
-import type { schema } from '../prosemirror/view/schema.js';
+import type { ActionUtilities } from '../prosemirror/view/actions';
+import type { SelectionUtilities } from '../prosemirror/view/selection';
+import type { ProseMirrorEventBus } from './event-bus.svelte';
+import type { VerticalBarState } from './vertical-bar-state.svelte';
+import type { HorizontalBarState } from './horizontal-bar-state.svelte';
+import type { FloaterBarState } from './floater-state.svelte';
+import type { TabState } from './tab-state.svelte';
+import type { schema } from '../prosemirror/view/schema';
 
 export type BarItem = {
 	id: string;

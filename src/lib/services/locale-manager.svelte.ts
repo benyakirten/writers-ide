@@ -1,4 +1,4 @@
-import { sourceLanguageTag } from '$lib/paraglide/runtime.js';
+import { sourceLanguageTag } from '$lib/paraglide/runtime';
 
 export class LocaleState {
 	locale = $state(sourceLanguageTag);

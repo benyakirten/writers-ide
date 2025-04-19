@@ -6,10 +6,10 @@
 	import { undo, redo, history } from 'prosemirror-history';
 	import { baseKeymap } from 'prosemirror-commands';
 
-	import { schema } from './schema.js';
-	import { ActionUtilities } from './actions.js';
-	import TabState from '../../state/tab-state.svelte.js';
-	import { createShortcuts } from '../plugins/shortcut.plugin.js';
+	import { schema } from './schema';
+	import { ActionUtilities } from './actions';
+	import TabState from '../../state/tab-state.svelte';
+	import { createShortcuts } from '../plugins/shortcut.plugin';
 
 	let { id, plugins = [] }: { index: number; id: string; plugins?: Plugin[] } = $props();
 

@@ -1,8 +1,8 @@
 import type { Node } from 'prosemirror-model';
 import type { Selection } from 'prosemirror-state';
 
-import { INDENT_MAX } from './constants.js';
-import type { TextAlignment } from './actions.js';
+import { INDENT_MAX } from './constants';
+import type { TextAlignment } from './actions';
 
 /**
  * Identify which marks cover a portion of the selection,

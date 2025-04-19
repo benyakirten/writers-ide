@@ -1,4 +1,4 @@
-import { clamp } from '$lib/utils/numbers.js';
+import { clamp } from '$lib/utils/numbers';
 import { IdGenerator } from '$lib/services/ids';
 import { BarItems } from './bar-items.svelte';
 
