@@ -1,3 +1,4 @@
+import { IdGenerator } from '@/services/ids.js';
 import { BarItems } from './bar-items.svelte.js';
 
 export enum HorizontalBarPosition {
@@ -31,7 +32,7 @@ export class HorizontalBarState {
 	add(
 		{
 			height,
-			id = crypto.randomUUID(),
+			id = IdGenerator.generate(),
 			visible = true,
 			data
 		}: Partial<Omit<HorizontalBar, 'data'>> & { data?: string[] },

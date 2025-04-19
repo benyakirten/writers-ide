@@ -1,4 +1,5 @@
 import type { Snippet } from 'svelte';
+import { IdGenerator } from './ids';
 
 export type BaseToast = {
 	duration: number | null;
@@ -72,7 +73,7 @@ export class ToasterState {
 		duration: number | null = ToasterState.DEFAULT_DURATION,
 		id?: string
 	) {
-		const _id = id ?? crypto.randomUUID();
+		const _id = id ?? IdGenerator.generate();
 		const toastInstance = new Toast({ message, duration }, _id, () => this.removeToast(_id));
 		this.toasts.push(toastInstance);
 

@@ -1,3 +1,4 @@
+import { IdGenerator } from '@/services/ids';
 import type { EditorView } from 'prosemirror-view';
 
 export enum EditorState {
@@ -44,10 +45,6 @@ export class TabState {
 		() => this.windows.find((window) => window.id === this.#active)?.view ?? null
 	);
 
-	#randomId() {
-		return crypto.randomUUID();
-	}
-
 	activate = (id: string | number): boolean => {
 		if (typeof id === 'number') {
 			if (id > this.windows.length) {
@@ -88,13 +85,13 @@ export class TabState {
 	}
 
 	createTab(): string {
-		const id = this.#randomId();
+		const id = IdGenerator.generate();
 		this.windows.push({ id, view: null });
 		return id;
 	}
 
 	createEditor(): void {
-		const id = this.#randomId();
+		const id = IdGenerator.generate();
 		this.windows.push({ id, view: { state: EditorState.Uninitialized } });
 	}
 
