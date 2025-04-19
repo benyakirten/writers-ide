@@ -1,49 +1,16 @@
 import { IdGenerator } from '$lib/services/ids';
-import type { EditorView } from 'prosemirror-view';
-
-export enum EditorState {
-	Uninitialized = 'uninitialized',
-	Unpaginated = 'unpaginated',
-	Paginated = 'paginated'
-}
-
-export type UnpaginatedEditorData = {
-	state: EditorState.Unpaginated;
-	view: EditorView;
-};
-
-export type PaginatedEditorData = {
-	state: EditorState.Paginated;
-	data: EditorView;
-	pages: EditorView[];
-};
-
-export type UninitializedEditorData = {
-	state: EditorState.Uninitialized;
-};
-
-export type EditorData = UninitializedEditorData | UnpaginatedEditorData | PaginatedEditorData;
-
-// Null represents an uninitialized state
-export type TabView = EditorData | null;
 
 export type TabData = {
 	id: string;
-	view: TabView;
+	data?: object;
+	name: string | null;
 };
 
 export class TabState {
-	windows = $state<TabData[]>([
-		{
-			id: 'my-1',
-			view: null
-		}
-	]);
+	windows = $state<TabData[]>([]);
 
 	#active = $state<string | null>(null);
-	active = $derived.by(
-		() => this.windows.find((window) => window.id === this.#active)?.view ?? null
-	);
+	active = $derived.by(() => this.windows.find((window) => window.id === this.#active)?.id);
 
 	activate = (id: string | number): boolean => {
 		if (typeof id === 'number') {
@@ -68,31 +35,9 @@ export class TabState {
 		this.#active = null;
 	}
 
-	// Other types of tabs?
-	registerEditor(id: string, view: EditorView): () => void {
-		const index = this.windows.findIndex((item) => item.id === id);
-		if (index === -1) {
-			return () => {};
-		}
-		this.windows[index] = {
-			id,
-			view: {
-				state: EditorState.Unpaginated,
-				view
-			}
-		};
-		return () => this.windows.splice(index, 1);
-	}
-
-	createTab(): string {
-		const id = IdGenerator.generate();
-		this.windows.push({ id, view: null });
+	create(name: string | null, id: string = IdGenerator.generate(), data?: object): string {
+		this.windows.push({ id, name, data });
 		return id;
-	}
-
-	createEditor(): void {
-		const id = IdGenerator.generate();
-		this.windows.push({ id, view: { state: EditorState.Uninitialized } });
 	}
 
 	remove(id: string): void {
