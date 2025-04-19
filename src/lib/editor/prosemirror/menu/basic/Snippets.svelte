@@ -27,7 +27,7 @@
 
 	import type { UseableMarkName } from '$lib/editor/prosemirror/view/actions';
 	import { TextOverline } from '$lib/icons';
-	import { type TooltipData } from '@/services/tooltip.svelte';
+	import { type TooltipData } from '$lib/services/tooltip.svelte';
 
 	type TextMenuIcon = {
 		iconSrc: IconSource;

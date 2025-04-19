@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
 
-	import TooltipManager, { type TooltipData } from '@/services/tooltip.svelte';
+	import TooltipManager, { type TooltipData } from '$lib/services/tooltip.svelte';
 
 	let {
 		children,

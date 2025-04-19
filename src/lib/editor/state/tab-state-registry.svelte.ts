@@ -1,4 +1,4 @@
-import { IdGenerator } from '@/services/ids';
+import { IdGenerator } from '$lib/services/ids';
 import type { ModularComponent } from './shared.types';
 
 export type TabItem = {

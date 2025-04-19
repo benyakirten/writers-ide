@@ -1,6 +1,7 @@
 <script lang="ts">
-	import type { TooltipData } from '@/services/tooltip.svelte';
 	import { type Snippet } from 'svelte';
+
+	import type { TooltipData } from '$lib/services/tooltip.svelte';
 	import Tooltip from './tooltip/Tooltip.svelte';
 
 	let buttonEl: HTMLElement;

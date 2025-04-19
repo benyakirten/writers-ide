@@ -1,4 +1,4 @@
-import { IdGenerator } from '@/services/ids';
+import { IdGenerator } from '$lib/services/ids';
 import type { EditorView } from 'prosemirror-view';
 
 export enum EditorState {

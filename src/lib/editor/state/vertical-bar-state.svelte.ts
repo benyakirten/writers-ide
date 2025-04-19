@@ -1,4 +1,4 @@
-import { IdGenerator } from '@/services/ids';
+import { IdGenerator } from '$lib/services/ids';
 import { BarItems } from './bar-items.svelte';
 
 export type VerticalBar = {

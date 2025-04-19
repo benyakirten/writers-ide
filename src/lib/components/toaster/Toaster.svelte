@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { MAX_Z_INDEX } from '$lib/constants';
-	import ToastManager from '@/services/toaster.svelte';
+	import ToastManager from '$lib/services/toaster.svelte';
 	import Toast from './Toast.svelte';
 </script>
 

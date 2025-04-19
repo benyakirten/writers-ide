@@ -1,4 +1,4 @@
-import { IdGenerator } from '@/services/ids';
+import { IdGenerator } from '$lib/services/ids';
 
 /**
  * Base class for making a value and its change into an observable. It does not store the current value.
