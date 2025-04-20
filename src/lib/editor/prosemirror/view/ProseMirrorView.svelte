@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+
 	import { EditorState, Plugin, type Transaction } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import { keymap } from 'prosemirror-keymap';
@@ -10,8 +11,11 @@
 	import { ActionUtilities } from './actions';
 	import TabState from '../../state/tab-state.svelte';
 	import { createShortcuts } from '../plugins/shortcut.plugin';
+	import type { TabComponentProps } from '@/editor/state/tab-state-registry.svelte';
+	import ProseMirrorPlugins from '../plugins.svelte';
+	import Editors from '../prose-mirror-editor.svelte';
 
-	let { id, plugins = [] }: { index: number; id: string; plugins?: Plugin[] } = $props();
+	let { id }: TabComponentProps = $props();
 
 	let el: HTMLElement;
 	let state: EditorState;
@@ -62,7 +66,7 @@
 				}),
 				// TODO: Replace this
 				keymap(baseKeymap),
-				...plugins
+				...ProseMirrorPlugins.plugins
 			]
 		});
 
@@ -71,7 +75,7 @@
 			dispatchTransaction: (transaction) => handleTransaction(view, transaction)
 		});
 
-		const deregister = TabState.registerEditor(id, view);
+		const deregister = Editors.register(id, view);
 		return () => {
 			view.destroy();
 			deregister();

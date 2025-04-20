@@ -1,9 +1,15 @@
 import { IdGenerator } from '$lib/services/ids';
+import type { Component } from 'svelte';
 import ErrorTab from '../prosemirror/ErrorTab.svelte';
-import type { ModularComponent } from './shared.types';
+import type { ModularComponentProps } from './shared.types';
 
+export type TabComponentProps = ModularComponentProps & {
+	id: string;
+	data: object;
+};
+export type TabComponent = Component<TabComponentProps>;
 export type TabItem = {
-	component: ModularComponent;
+	component: TabComponent;
 };
 
 export class TabStateRegistry {
@@ -17,7 +23,7 @@ export class TabStateRegistry {
 		delete this.items[id];
 	}
 
-	get(name: string): ModularComponent {
+	get(name: string): TabComponent {
 		return this.items[name]?.component ?? ErrorTab;
 	}
 }

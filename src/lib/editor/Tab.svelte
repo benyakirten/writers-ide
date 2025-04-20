@@ -9,14 +9,22 @@
 	import HorizontalBarState from './state/horizontal-bar-state.svelte';
 	import VerticalBarState from './state/vertical-bar-state.svelte';
 	import { schema } from './prosemirror/view/schema';
+	import type { TabComponent } from './state/tab-state-registry.svelte';
 
-	let { index, Component }: { index: number; Component: ModularComponent } = $props();
+	let {
+		index,
+		id,
+		data,
+		Component
+	}: { index: number; id: string; data: object; Component: TabComponent } = $props();
 </script>
 
 <div class="tab">
 	<!-- Tab Menu -->
 	<!-- Component should be zoomable -->
 	<Component
+		{id}
+		{data}
 		proseMirror={{
 			actions: ActionUtilities,
 			selections: SelectionUtilities,

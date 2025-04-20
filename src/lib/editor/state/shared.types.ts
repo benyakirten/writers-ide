@@ -27,11 +27,11 @@ type ProseMirrorUtils = {
 	schema: typeof schema;
 };
 
-export type BarItemComponentProps = {
+export type ModularComponentProps = {
 	proseMirror: ProseMirrorUtils;
 	bars: BarStates;
 	tabs: TabState;
 	locale: string;
 };
 
-export type ModularComponent = Component<BarItemComponentProps>;
+export type ModularComponent = Component<ModularComponentProps>;

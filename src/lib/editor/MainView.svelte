@@ -10,7 +10,7 @@
 	<SortableContext items={TabState.windows.map((w) => w.id)}>
 		{#each TabState.windows as { name, id }, index (id)}
 			{@const Component = TabRegistry.get(name)}
-			<Tab {index} {Component} />
+			<Tab {id} {index} {Component} />
 		{/each}
 	</SortableContext>
 </div>

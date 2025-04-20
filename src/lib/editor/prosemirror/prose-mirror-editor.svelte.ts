@@ -1,7 +1,6 @@
 import type { EditorView } from 'prosemirror-view';
 
 export enum EditorState {
-	Uninitialized = 'uninitialized',
 	Unpaginated = 'unpaginated',
 	Paginated = 'paginated'
 }
@@ -13,32 +12,34 @@ export type UnpaginatedEditorData = {
 
 export type PaginatedEditorData = {
 	state: EditorState.Paginated;
-	data: EditorView;
+	view: EditorView;
 	pages: EditorView[];
 };
 
-export type UninitializedEditorData = {
-	state: EditorState.Uninitialized;
-};
+export type EditorData = UnpaginatedEditorData | PaginatedEditorData;
 
-export type EditorData = UninitializedEditorData | UnpaginatedEditorData | PaginatedEditorData;
+export class ProseMirrorEditors {
+	editors = $state<Record<string, EditorData>>({});
 
-// Null represents an uninitialized state
-export type TabView = EditorData | null;
+	register(id: string, view: EditorView): () => void {
+		if (!this.editors[id]) {
+			const editor: UnpaginatedEditorData = {
+				state: EditorState.Unpaginated,
+				view
+			};
+			this.editors[id] = editor;
+		}
 
-export class ProseMirrorEditor {
-	// registerEditor(id: string, view: EditorView): () => void {
-	// 		const index = this.windows.findIndex((item) => item.id === id);
-	// 		if (index === -1) {
-	// 			return () => {};
-	// 		}
-	// 		this.windows[index] = {
-	// 			id,
-	// 			view: {
-	// 				state: EditorState.Unpaginated,
-	// 				view
-	// 			}
-	// 		};
-	// 		return () => this.windows.splice(index, 1);
-	// 	}
+		return () => this.deregister(id);
+	}
+
+	deregister(id: string): void {
+		if (this.editors[id]) {
+			this.editors[id].view.destroy();
+			delete this.editors[id];
+		}
+	}
 }
+
+const Editors = new ProseMirrorEditors();
+export default Editors;
