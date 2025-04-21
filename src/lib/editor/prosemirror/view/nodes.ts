@@ -12,7 +12,7 @@ const paragraph: NodeSpec = {
 	group: 'block',
 	attrs: {
 		indent: {
-			default: 0,
+			default: 1,
 			validate: (value) => {
 				const _value = parseInt(value);
 				if (isNaN(_value) || _value < INDENT_MIN || _value > INDENT_MAX) {

@@ -7,7 +7,12 @@ export type TabData = {
 };
 
 export class TabState {
-	windows = $state<TabData[]>([]);
+	windows = $state<TabData[]>([
+		{
+			id: '1',
+			name: 'prosemirror'
+		}
+	]);
 
 	#active = $state<string | null>(null);
 	active = $derived.by(() => this.windows.find((window) => window.id === this.#active)?.id);
