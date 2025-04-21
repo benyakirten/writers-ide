@@ -34,10 +34,8 @@ export class ProseMirrorEditors {
 	}
 
 	deregister(id: string): void {
-		if (this.editors[id]) {
-			this.editors[id].view.destroy();
-			delete this.editors[id];
-		}
+		this.editors[id].view?.destroy();
+		delete this.editors[id];
 	}
 }
 

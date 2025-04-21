@@ -2,7 +2,6 @@
 	import LocaleManager from '$lib/services/locale-manager.svelte';
 	import TabState from './state/tab-state.svelte';
 	import ProseMirrorEventBus from './state/event-bus.svelte';
-	import type { ModularComponent } from './state/shared.types';
 	import { ActionUtilities } from './prosemirror/view/actions';
 	import { SelectionUtilities } from './prosemirror/view/selection';
 	import FloaterBarState from './state/floater-state.svelte';
@@ -16,7 +15,7 @@
 		id,
 		data,
 		Component
-	}: { index: number; id: string; data: object; Component: TabComponent } = $props();
+	}: { index: number; id: string; data?: object; Component: TabComponent } = $props();
 </script>
 
 <div class="tab">

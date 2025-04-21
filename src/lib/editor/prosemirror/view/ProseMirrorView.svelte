@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	import { EditorState, Plugin, type Transaction } from 'prosemirror-state';
+	import { EditorState, type Transaction } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import { keymap } from 'prosemirror-keymap';
 	import { undo, redo, history } from 'prosemirror-history';
@@ -76,10 +76,7 @@
 		});
 
 		const deregister = Editors.register(id, view);
-		return () => {
-			view.destroy();
-			deregister();
-		};
+		return () => deregister();
 	});
 </script>
 

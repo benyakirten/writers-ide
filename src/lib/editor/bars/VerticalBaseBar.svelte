@@ -2,6 +2,7 @@
 	import ToastManager from '$lib/services/toaster.svelte';
 	import TransferHandler, { type BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
+	import tabState, { TabState } from '../state/tab-state.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
 
 	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'vertical';
@@ -48,6 +49,7 @@
 	<button onclick={() => addNullToBar()}>Add null to bar</button>
 	<button onclick={() => addBasicMenuToBar()}>Add basic menu to bar</button>
 	<button onclick={() => ToastManager.addToast(generateRandomMessage(), null)}> Add Toast </button>
+	<button onclick={() => tabState.create('prosemirror')}>Create Prosemirror</button>
 </div>
 
 <style>

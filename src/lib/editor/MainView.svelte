@@ -8,9 +8,9 @@
 
 <div class="main-view">
 	<SortableContext items={TabState.windows.map((w) => w.id)}>
-		{#each TabState.windows as { name, id }, index (id)}
+		{#each TabState.windows as { name, id, data }, index (id)}
 			{@const Component = TabRegistry.get(name)}
-			<Tab {id} {index} {Component} />
+			<Tab {id} {index} {Component} {data} />
 		{/each}
 	</SortableContext>
 </div>
