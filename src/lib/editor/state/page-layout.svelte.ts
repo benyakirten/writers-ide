@@ -79,6 +79,12 @@ export class PageLayoutManager {
 	numOrphanLines = $state<number>(2);
 	numWidowLines = $state<number>(2);
 
+	constructor() {
+		// For testing purposes - this will be set by settings at a certain point
+		// Also set from a menu
+		this.setPredefinedPageSize('in', 'Letter');
+	}
+
 	cmToInches(cm: number): number {
 		return cm / 2.54;
 	}
@@ -95,7 +101,7 @@ export class PageLayoutManager {
 		return this.inchesToCm(inches) * 10;
 	}
 
-	predefinedPageSize(
+	setPredefinedPageSize(
 		units: Unit,
 		size: keyof typeof PAGE_SIZES_MM
 	): { width: number; height: number } {
