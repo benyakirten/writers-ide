@@ -150,6 +150,44 @@ const hardBreak: NodeSpec = {
 	}
 };
 
+const pageBreakDom: DOMOutputSpec = ['div', { class: 'page-break' }, 0];
+const pageBreak: NodeSpec = {
+	inline: true,
+	group: 'inline',
+	selectable: false,
+	atom: true,
+	parseDOM: [{ tag: 'div.page-break' }],
+	toDOM() {
+		return pageBreakDom;
+	}
+};
+
+const headerDom: DOMOutputSpec = ['div', { class: 'page-header' }, 0];
+export const header: NodeSpec = {
+	content: 'block+',
+	group: 'footer',
+	defining: true,
+	isolating: true,
+	toDOM: () => headerDom,
+	parseDOM: [
+		{
+			tag: 'div.page-header'
+		}
+	]
+};
+
+const footerDom: DOMOutputSpec = ['div', { class: 'page-footer' }, 0];
+export const footer: NodeSpec = {
+	content: 'block+',
+	group: 'footer',
+	toDOM: () => footerDom,
+	parseDOM: [
+		{
+			tag: 'div.page-footer'
+		}
+	]
+};
+
 export const nodes = {
 	doc,
 	paragraph,
@@ -159,5 +197,7 @@ export const nodes = {
 	codeBlock,
 	text,
 	image,
-	hardBreak
+	hardBreak,
+	pageBreak,
+	header
 } as const;
