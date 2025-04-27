@@ -1,3 +1,5 @@
+import type { Node } from 'prosemirror-model';
+
 export type Unit = 'in' | 'cm' | 'mm';
 
 export const PAGE_SIZES_INCHES = {
@@ -70,14 +72,31 @@ export const PAGE_SIZES_MM = {
 	}
 };
 
+type PageData = {
+	modified: Date;
+	ref: Node;
+};
+
+type ModificationData = {
+	modified: Date;
+	page: number;
+};
+
 export class PageLayoutManager {
 	units = $state<Unit>('in');
 	pageWidth = $state<number>(0);
 	pageHeight = $state<number>(0);
-	pageYPadding = $state<number>(0);
+	pageYMargin = $state<number>(0);
+	pageXMargin = $state<number>(0);
 	pageBleed = $state<number>(0);
 	numOrphanLines = $state<number>(2);
 	numWidowLines = $state<number>(2);
+	currentPage = $state<number>(0);
+	lastModification = $state<ModificationData>({
+		modified: new Date(),
+		page: 0
+	});
+	pages = $state<PageData[]>([]);
 
 	constructor() {
 		// For testing purposes - this will be set by settings at a certain point
@@ -117,4 +136,84 @@ export class PageLayoutManager {
 			return PAGE_SIZES_MM[size];
 		}
 	}
+
+	updateLastModified(page: number) {
+		this.lastModification = {
+			modified: new Date(),
+			page
+		};
+	}
+
+	/**
+	 * Reflow the pages from the from page to the to page.
+	 * This function is effectively dumb and will not check if the pages do not to be reflowed.
+	 * This should be done in the calling functions.
+	 *
+	 * This function will add meta data to each page.
+	 */
+	reflow(page: number) {
+		const from = Math.min(this.pages.length - 1, page);
+		const to = this.currentPage + 1;
+
+		if (from > to) {
+			return;
+		}
+
+		for (let i = from; i <= to + 1; i++) {
+			// We can assume
+		}
+	}
+
+	reflowToLandmark(landmark: unknown) {
+		// TODO: Figure out
+		console.log(landmark);
+	}
 }
+
+/**
+ * we will paginate from page 0 to the current page the user is on + 1
+ * which means there will be something like this:
+ * [page]
+ * [page]
+ * [page]
+ * [current page]
+ * [page]
+ * [rest of content]
+ *
+ * Whenever a page is modified, all pages from then to the current page + 1 need to be modified
+ * All pages should cache the content they have
+ * Also, we need to track where the user's viewport is
+ *
+ *
+ * How will this work with multiple simultaneous users?
+ * It should be possible for each user to have multiple pages open
+ * and multiple users, each on different pages.
+ *
+ * To reduce time complexity but increase space complexity,
+ * we will eep a reference to each page, including a last time modified
+ * and a reference to the node (the PageData type)
+ *
+ * Every time a page is modified, we will search for the page and update
+ * the last modified data after we have updated the node.
+ *
+ * We will want to update the pagination if any of the following occurs:
+ * 1. Page size changes.
+ * 2. Page orientation changes.
+ * 3. Page margins change.
+ * 4. Page bleed changes.
+ * 5. Page padding changes.
+ * 6. Page number of orphan lines changes.
+ * 7. Page number of widow lines changes.
+ * 8. Insertion of content
+ * 9. Deletion of content
+ * 10. Modification of content that affects layout
+ *
+ *
+ * Any time a modification occurs that requires a reflow/checking of pagination,
+ * then we will update the lastModified item
+ *
+ * When the user scrolls, if the page is already paginated according to
+ * latest reflow, we will not act. However, if it is, we have to paginate.
+ * We'll have to measure performance since it has to happen linearly - we cannot
+ * calculate pagination for page 3 until page 2 is done, etc.
+ */
