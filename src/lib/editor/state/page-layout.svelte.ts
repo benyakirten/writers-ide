@@ -168,6 +168,10 @@ export class PageLayoutManager {
 		// TODO: Figure out
 		console.log(landmark);
 	}
+
+	splitPage() {
+		//
+	}
 }
 
 /**

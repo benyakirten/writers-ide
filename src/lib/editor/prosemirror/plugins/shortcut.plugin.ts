@@ -1,7 +1,9 @@
-import { type Command, Plugin } from 'prosemirror-state';
+import { type Command, Plugin, PluginKey } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
 import Shortcuts from '$lib/services/shortcuts.svelte';
+
+export const shortcutKey = new PluginKey('shortcut-plugin');
 
 /**
  * Create a ProseMirror plugin that handles keyboard shortcuts.
@@ -11,7 +13,7 @@ import Shortcuts from '$lib/services/shortcuts.svelte';
  * shortcuts to functions.
  */
 export function createShortcuts(bindings: { [key: string]: Command }): Plugin {
-	return new Plugin({ props: { handleKeyDown: keydownHandler(bindings) } });
+	return new Plugin({ key: shortcutKey, props: { handleKeyDown: keydownHandler(bindings) } });
 }
 
 export function keydownHandler(bindings: {

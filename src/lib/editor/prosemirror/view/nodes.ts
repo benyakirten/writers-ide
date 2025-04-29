@@ -150,15 +150,31 @@ const hardBreak: NodeSpec = {
 	}
 };
 
-const pageBreakDom: DOMOutputSpec = ['div', { class: 'page-break' }, 0];
-const pageBreak: NodeSpec = {
+const pageStartDom: DOMOutputSpec = ['div', { class: 'page-start' }, 0];
+const pageStart: NodeSpec = {
 	inline: true,
 	group: 'inline',
 	selectable: false,
 	atom: true,
-	parseDOM: [{ tag: 'div.page-break' }],
+	draggable: false,
+	defining: true,
+	parseDOM: [{ tag: 'div.page-start' }],
 	toDOM() {
-		return pageBreakDom;
+		return pageStartDom;
+	}
+};
+
+const pageEndDom: DOMOutputSpec = ['div', { class: 'page-end' }, 0];
+const pageEnd: NodeSpec = {
+	inline: true,
+	group: 'inline',
+	selectable: false,
+	atom: true,
+	draggable: false,
+	defining: true,
+	parseDOM: [{ tag: 'div.page-end' }],
+	toDOM() {
+		return pageEndDom;
 	}
 };
 
@@ -198,6 +214,7 @@ export const nodes = {
 	text,
 	image,
 	hardBreak,
-	pageBreak,
+	pageEnd,
+	pageStart,
 	header
 } as const;
