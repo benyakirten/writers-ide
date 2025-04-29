@@ -1,4 +1,8 @@
 import type { Node } from 'prosemirror-model';
+import type { EditorView } from 'prosemirror-view';
+
+import { CM_PER_INCH, PIXELS_PER_INCH } from '../prosemirror/view/constants';
+import { schema } from '../prosemirror/view/schema';
 
 export type Unit = 'in' | 'cm' | 'mm';
 
@@ -101,26 +105,19 @@ export class PageLayoutManager {
 	constructor() {
 		// For testing purposes - this will be set by settings at a certain point
 		// Also set from a menu
-		this.setPredefinedPageSize('in', 'Letter');
+		this.setPredefinedPageSize('in', 'A5');
 	}
 
-	cmToInches(cm: number): number {
-		return cm / 2.54;
+	setPredefinedPageSize(units: Unit, size: keyof typeof PAGE_SIZES_MM): void {
+		const { width, height } = this.getPredefinedPageSize(units, size);
+		this.pageWidth = width;
+		this.pageHeight = height;
+		this.pageXMargin = 0.5;
+		this.pageYMargin = 0.4;
+		this.units = units;
 	}
 
-	inchesToCm(inches: number): number {
-		return inches * 2.54;
-	}
-
-	mmToInches(mm: number): number {
-		return this.cmToInches(mm / 10);
-	}
-
-	inchesToMm(inches: number): number {
-		return this.inchesToCm(inches) * 10;
-	}
-
-	setPredefinedPageSize(
+	getPredefinedPageSize(
 		units: Unit,
 		size: keyof typeof PAGE_SIZES_MM
 	): { width: number; height: number } {
@@ -169,8 +166,76 @@ export class PageLayoutManager {
 		console.log(landmark);
 	}
 
-	splitPage() {
-		//
+	convertMeasurementToPx(measurement: number, units: Unit): number {
+		const pixelsPerInch = window.devicePixelRatio * PIXELS_PER_INCH;
+		let factor: number;
+		switch (units) {
+			case 'cm':
+				factor = CM_PER_INCH;
+				break;
+			case 'mm':
+				factor = CM_PER_INCH * 10;
+				break;
+			case 'in':
+				factor = 1;
+				break;
+		}
+
+		return (measurement / factor) * pixelsPerInch;
+	}
+
+	calculatePageBottom(host: HTMLElement): number {
+		const { bottom } = host.getBoundingClientRect();
+		const bottomPadding = this.convertMeasurementToPx(this.pageYMargin, this.units);
+
+		return bottom - bottomPadding;
+	}
+
+	detectPageFrom(view: EditorView, host: HTMLElement) {
+		const maxBottom = this.calculatePageBottom(host);
+		let prevEl: HTMLElement | null = null;
+		let overflowingEl: HTMLElement | null = null;
+		let overflowingNode: Node | null = null;
+
+		let pos = 0;
+		while (pos < view.state.doc.nodeSize) {
+			const node = view.state.doc.nodeAt(pos);
+			if (!node) {
+				break;
+			}
+
+			if (!node.isBlock) {
+				continue;
+			}
+
+			const el = view.nodeDOM(pos) as HTMLElement | null;
+			if (!el) {
+				console.warn('No element found for node', node, pos);
+				break;
+			}
+			const { bottom } = el.getBoundingClientRect();
+			pos += node.nodeSize;
+			if (bottom >= maxBottom) {
+				overflowingEl = el;
+				overflowingNode = node;
+				break;
+			}
+
+			prevEl = el;
+		}
+
+		if (!prevEl || !overflowingEl || !overflowingNode) {
+			return;
+		}
+
+		const newBottom = prevEl.getBoundingClientRect().bottom;
+
+		console.log(prevEl, overflowingEl);
+
+		// const slice = view.state.doc.slice(pos, view.state.doc.nodeSize);
+		// const newDoc = schema.nodes.doc.createAndFill(null, slice.content);
+		const tr = view.state.tr.delete(pos, view.state.doc.content.size);
+		view.dispatch(tr);
 	}
 }
 
@@ -221,3 +286,6 @@ export class PageLayoutManager {
  * We'll have to measure performance since it has to happen linearly - we cannot
  * calculate pagination for page 3 until page 2 is done, etc.
  */
+
+const PageLayout = new PageLayoutManager();
+export default PageLayout;

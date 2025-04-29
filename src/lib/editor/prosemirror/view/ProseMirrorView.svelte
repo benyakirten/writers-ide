@@ -13,10 +13,12 @@
 	import type { TabComponentProps } from '@/editor/state/tab-state-registry.svelte';
 	import ProseMirrorPlugins from '../plugins.svelte';
 	import Editors from '../prose-mirror-editor.svelte';
+	import PageLayout from '@/editor/state/page-layout.svelte';
 
 	let { id }: TabComponentProps = $props();
 
 	let el: HTMLElement;
+	let host: HTMLElement;
 	let state: EditorState;
 	let view: EditorView;
 	let initialState = schema.node('doc', null, [
@@ -45,72 +47,72 @@
 			schema.text(
 				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
 			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
-		]),
-		schema.node('paragraph', null, [
-			schema.text(
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
-			)
 		])
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ]),
+		// schema.node('paragraph', null, [
+		// 	schema.text(
+		// 		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.'
+		// 	)
+		// ])
 	]);
 
 	function handleTransaction(view: EditorView, transaction: Transaction) {
@@ -164,34 +166,39 @@
 		});
 
 		const deregister = Editors.register(id, view);
+
+		PageLayout.detectPageFrom(view, host, PageLayout.pageYMargin);
+
 		return () => deregister();
 	});
 </script>
 
-<div class="outer-container" onfocusincapture={() => TabState.activate(id)}>
+<div
+	style:--editor-height={`${PageLayout.pageHeight}${PageLayout.units}`}
+	style:--editor-width={`${PageLayout.pageWidth}${PageLayout.units}`}
+	style:--editor-x-padding={`${PageLayout.pageXMargin}${PageLayout.units}`}
+	style:--editor-y-padding={`${PageLayout.pageYMargin}${PageLayout.units}`}
+	class="outer-container"
+	onfocusincapture={() => TabState.activate(id)}
+	bind:this={host}
+>
 	<div class="editor-host" bind:this={el}></div>
 </div>
 
 <style>
 	.outer-container {
-		width: 100%;
-		height: 100%;
+		height: var(--editor-height);
+		width: var(--editor-width);
+		border: 1px solid black;
+		padding-top: var(--editor-y-padding);
+		padding-bottom: var(--editor-y-padding);
+		padding-left: var(--editor-x-padding);
+		padding-right: var(--editor-x-padding);
 	}
 
 	.editor-host {
 		& > :global([contenteditable]) {
 			outline: none;
 		}
-
-		& :global(.paragraph) {
-			margin: 0;
-			padding: 0;
-		}
-
-		max-width: 5in;
-		max-height: 5in;
-
-		border: 1px solid black;
-		overflow: auto;
 	}
 </style>
