@@ -1,31 +1,24 @@
 import type { EditorView } from 'prosemirror-view';
 
-export enum EditorState {
-	Unpaginated = 'unpaginated',
-	Paginated = 'paginated'
-}
-
-export type UnpaginatedEditorData = {
-	state: EditorState.Unpaginated;
+export type ProsemirrorPage = {
 	view: EditorView;
+	raw: object;
+	container: HTMLElement;
 };
-
-export type PaginatedEditorData = {
-	state: EditorState.Paginated;
+export type EditorData = {
 	view: EditorView;
-	pages: EditorView[];
+	pages: ProsemirrorPage[];
+	unpaginatedView: EditorView;
 };
-
-export type EditorData = UnpaginatedEditorData | PaginatedEditorData;
 
 export class ProseMirrorEditors {
 	editors = $state<Record<string, EditorData>>({});
 
 	register(id: string, view: EditorView): () => void {
 		if (!this.editors[id]) {
-			const editor: UnpaginatedEditorData = {
-				state: EditorState.Unpaginated,
-				view
+			const editor: EditorData = {
+				view,
+				pages: []
 			};
 			this.editors[id] = editor;
 		}
@@ -36,6 +29,10 @@ export class ProseMirrorEditors {
 	deregister(id: string): void {
 		this.editors[id].view?.destroy();
 		delete this.editors[id];
+	}
+
+	get(id: string): EditorView | null {
+		return this.editors[id]?.view || null;
 	}
 }
 

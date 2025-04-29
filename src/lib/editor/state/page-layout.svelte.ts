@@ -229,8 +229,9 @@ export class PageLayoutManager {
 
 		const newBottom = prevEl.getBoundingClientRect().bottom;
 
-		// const slice = view.state.doc.slice(pos, view.state.doc.nodeSize);
-		// const newDoc = schema.nodes.doc.createAndFill(null, slice.content);
+		const slice = view.state.doc.slice(pos, view.state.doc.nodeSize);
+		const nextPage = schema.nodes.doc.createAndFill(null, slice.content);
+
 		const tr = view.state.tr.delete(pos - overflowingNode.nodeSize, view.state.doc.content.size);
 		view.dispatch(tr);
 	}
