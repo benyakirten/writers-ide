@@ -1,4 +1,4 @@
-import type { Node } from 'prosemirror-model';
+import { Slice, type Node } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 
 import { CM_PER_INCH, PIXELS_PER_INCH } from '../prosemirror/view/constants';
@@ -195,7 +195,6 @@ export class PageLayoutManager {
 		const maxBottom = this.calculatePageBottom(host);
 		let prevEl: HTMLElement | null = null;
 		let overflowingEl: HTMLElement | null = null;
-		let overflowingNode: Node | null = null;
 
 		let pos = 0;
 		while (pos < view.state.doc.nodeSize) {
@@ -217,24 +216,22 @@ export class PageLayoutManager {
 			pos += node.nodeSize;
 			if (bottom >= maxBottom) {
 				overflowingEl = el;
-				overflowingNode = node;
 				break;
 			}
 
 			prevEl = el;
 		}
 
+		const overflowingNode = view.state.doc.nodeAt(pos);
 		if (!prevEl || !overflowingEl || !overflowingNode) {
 			return;
 		}
 
 		const newBottom = prevEl.getBoundingClientRect().bottom;
 
-		console.log(prevEl, overflowingEl);
-
 		// const slice = view.state.doc.slice(pos, view.state.doc.nodeSize);
 		// const newDoc = schema.nodes.doc.createAndFill(null, slice.content);
-		const tr = view.state.tr.delete(pos, view.state.doc.content.size);
+		const tr = view.state.tr.delete(pos - overflowingNode.nodeSize, view.state.doc.content.size);
 		view.dispatch(tr);
 	}
 }
