@@ -150,17 +150,15 @@ const hardBreak: NodeSpec = {
 	}
 };
 
-const pageStartDom: DOMOutputSpec = ['div', { class: 'page-start' }, 0];
-const pageStart: NodeSpec = {
-	inline: true,
-	group: 'inline',
+const pageDom: DOMOutputSpec = ['div', { class: 'prosemirror-page' }, 0];
+const page: NodeSpec = {
+	content: 'block+',
+	group: 'block',
 	selectable: false,
-	atom: true,
 	draggable: false,
-	defining: true,
-	parseDOM: [{ tag: 'div.page-start' }],
+	parseDOM: [{ tag: 'div.prosemirror-page' }],
 	toDOM() {
-		return pageStartDom;
+		return pageDom;
 	}
 };
 
@@ -215,6 +213,6 @@ export const nodes = {
 	image,
 	hardBreak,
 	pageEnd,
-	pageStart,
+	page,
 	header
 } as const;

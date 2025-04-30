@@ -5,3 +5,19 @@
 		transition-duration: 0.001ms !important;
 	}
 }
+
+@media print {
+	.page-end {
+		border-bottom: none;
+	}
+}
+
+.prosemirror-page {
+	height: var(--editor-height);
+	width: var(--editor-width);
+	border: 1px solid black;
+	padding-top: var(--editor-y-padding);
+	padding-bottom: var(--editor-y-padding);
+	padding-left: var(--editor-x-padding);
+	padding-right: var(--editor-x-padding);
+}

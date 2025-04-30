@@ -1,8 +1,8 @@
-import { Slice, type Node } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 
 import { CM_PER_INCH, PIXELS_PER_INCH } from '../prosemirror/view/constants';
 import { schema } from '../prosemirror/view/schema';
+import type { Node } from 'prosemirror-model';
 
 export type Unit = 'in' | 'cm' | 'mm';
 
@@ -76,16 +76,6 @@ export const PAGE_SIZES_MM = {
 	}
 };
 
-type PageData = {
-	modified: Date;
-	ref: Node;
-};
-
-type ModificationData = {
-	modified: Date;
-	page: number;
-};
-
 export class PageLayoutManager {
 	units = $state<Unit>('in');
 	pageWidth = $state<number>(0);
@@ -96,11 +86,6 @@ export class PageLayoutManager {
 	numOrphanLines = $state<number>(2);
 	numWidowLines = $state<number>(2);
 	currentPage = $state<number>(0);
-	lastModification = $state<ModificationData>({
-		modified: new Date(),
-		page: 0
-	});
-	pages = $state<PageData[]>([]);
 
 	constructor() {
 		// For testing purposes - this will be set by settings at a certain point
@@ -134,38 +119,6 @@ export class PageLayoutManager {
 		}
 	}
 
-	updateLastModified(page: number) {
-		this.lastModification = {
-			modified: new Date(),
-			page
-		};
-	}
-
-	/**
-	 * Reflow the pages from the from page to the to page.
-	 * This function is effectively dumb and will not check if the pages do not to be reflowed.
-	 * This should be done in the calling functions.
-	 *
-	 * This function will add meta data to each page.
-	 */
-	reflow(page: number) {
-		const from = Math.min(this.pages.length - 1, page);
-		const to = this.currentPage + 1;
-
-		if (from > to) {
-			return;
-		}
-
-		for (let i = from; i <= to + 1; i++) {
-			// We can assume
-		}
-	}
-
-	reflowToLandmark(landmark: unknown) {
-		// TODO: Figure out
-		console.log(landmark);
-	}
-
 	convertMeasurementToPx(measurement: number, units: Unit): number {
 		const pixelsPerInch = window.devicePixelRatio * PIXELS_PER_INCH;
 		let factor: number;
@@ -191,18 +144,64 @@ export class PageLayoutManager {
 		return bottom - bottomPadding;
 	}
 
-	detectPageFrom(view: EditorView, host: HTMLElement) {
-		const maxBottom = this.calculatePageBottom(host);
-		let prevEl: HTMLElement | null = null;
-		let overflowingEl: HTMLElement | null = null;
-
+	getPage(view: EditorView, page: number): { page: HTMLElement; node: Node } | null {
 		let pos = 0;
+		let currentPage = -1;
 		while (pos < view.state.doc.nodeSize) {
 			const node = view.state.doc.nodeAt(pos);
 			if (!node) {
 				break;
 			}
 
+			if (!node.isBlock) {
+				pos += node.nodeSize;
+				continue;
+			}
+
+			if (node.type.name !== 'page') {
+				pos += 1;
+				continue;
+			}
+
+			currentPage++;
+			if (currentPage === page) {
+				const el = view.nodeDOM(pos) as HTMLElement;
+				if (!el) {
+					return null;
+				}
+
+				return { page: el, node };
+			}
+
+			pos += node.nodeSize;
+		}
+
+		return null;
+	}
+
+	detectPageFrom(view: EditorView) {
+		const pageDetails = this.getPage(view, 0);
+		console.log(pageDetails);
+		if (!pageDetails) {
+			// We will want to create a new page and nest all of the content
+			// inside of it, i.e.:
+			// this.createPage(view)
+			return;
+		}
+		const { page, node: root } = pageDetails;
+		const maxBottom = this.calculatePageBottom(page);
+		let prevEl: HTMLElement | null = null;
+		let overflowingEl: HTMLElement | null = null;
+
+		console.log(maxBottom, root, page);
+		let pos = 0;
+		while (pos < root.nodeSize) {
+			const node = root.nodeAt(pos);
+			if (!node) {
+				break;
+			}
+
+			pos += node.nodeSize;
 			if (!node.isBlock) {
 				continue;
 			}
@@ -212,8 +211,8 @@ export class PageLayoutManager {
 				console.warn('No element found for node', node, pos);
 				break;
 			}
+
 			const { bottom } = el.getBoundingClientRect();
-			pos += node.nodeSize;
 			if (bottom >= maxBottom) {
 				overflowingEl = el;
 				break;
@@ -222,6 +221,8 @@ export class PageLayoutManager {
 			prevEl = el;
 		}
 
+		console.log(pos, overflowingEl, prevEl);
+
 		const overflowingNode = view.state.doc.nodeAt(pos);
 		if (!prevEl || !overflowingEl || !overflowingNode) {
 			return;
@@ -229,11 +230,11 @@ export class PageLayoutManager {
 
 		const newBottom = prevEl.getBoundingClientRect().bottom;
 
-		const slice = view.state.doc.slice(pos, view.state.doc.nodeSize);
+		const slice = view.state.doc.slice(pos, view.state.doc.content.size);
 		const nextPage = schema.nodes.doc.createAndFill(null, slice.content);
 
-		const tr = view.state.tr.delete(pos - overflowingNode.nodeSize, view.state.doc.content.size);
-		view.dispatch(tr);
+		// const tr = view.state.tr.delete(pos - overflowingNode.nodeSize, view.state.doc.content.size);
+		// view.dispatch(tr);
 	}
 }
 

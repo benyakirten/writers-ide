@@ -25,6 +25,7 @@
 	import HorizontalBaseBar from './bars/HorizontalBaseBar.svelte';
 	import Pointer from '$lib/components/tooltip/Pointer.svelte';
 	import Toaster from '$lib/components/toaster/Toaster.svelte';
+	import PageLayout from './state/page-layout.svelte';
 
 	function resize(e: MouseEvent) {
 		VerticalBarState.resize(e);
@@ -72,6 +73,10 @@
 		class="overlay"
 		onmouseupcapture={() => endResize()}
 		onmousemovecapture={(event) => resize(event)}
+		style:--editor-height={`${PageLayout.pageHeight}${PageLayout.units}`}
+		style:--editor-width={`${PageLayout.pageWidth}${PageLayout.units}`}
+		style:--editor-x-padding={`${PageLayout.pageXMargin}${PageLayout.units}`}
+		style:--editor-y-padding={`${PageLayout.pageYMargin}${PageLayout.units}`}
 	>
 		<HorizontalBaseBar />
 		{#each FloaterBarState.visibleBars as bar, index (bar.id)}

@@ -4,11 +4,12 @@ export type ProsemirrorPage = {
 	view: EditorView;
 	raw: object;
 	container: HTMLElement;
+	modified: Date;
 };
 export type EditorData = {
 	view: EditorView;
 	pages: ProsemirrorPage[];
-	unpaginatedView: EditorView;
+	remainingView: EditorView;
 };
 
 export class ProseMirrorEditors {
@@ -18,7 +19,8 @@ export class ProseMirrorEditors {
 		if (!this.editors[id]) {
 			const editor: EditorData = {
 				view,
-				pages: []
+				pages: [],
+				remainingView: view
 			};
 			this.editors[id] = editor;
 		}
