@@ -1,8 +1,8 @@
 import type { EditorView } from 'prosemirror-view';
-
-import { CM_PER_INCH, PIXELS_PER_INCH } from '../prosemirror/view/constants';
-import { schema } from '../prosemirror/view/schema';
 import type { Node } from 'prosemirror-model';
+
+import { convertToPx, isAbsoluteCSSUnit } from '$lib/utils/css';
+import { CM_PER_INCH, PIXELS_PER_INCH } from '../prosemirror/view/constants';
 
 export type Unit = 'in' | 'cm' | 'mm';
 
@@ -232,9 +232,29 @@ export class PageLayoutManager {
 
 		const newBottom = prevEl.getBoundingClientRect().bottom;
 
-		console.log('HERE');
-		const tr = view.state.tr.delete(pos, view.state.doc.content.size);
-		view.dispatch(tr);
+		const lineHeight = window.getComputedStyle(overflowingEl).lineHeight;
+		const height = overflowingEl.getBoundingClientRect().height;
+		const numLines = height / this.parseLineHeight(lineHeight);
+		console.log(lineHeight, height, numLines);
+
+		// const tr = view.state.tr.delete(pos, view.state.doc.content.size);
+		// view.dispatch(tr);
+	}
+
+	parseLineHeight(lineHeight: string): number {
+		const match = lineHeight.match(/(\d*\.?\d+)([a-zA-Z%]*)/);
+		if (!match) {
+			throw new Error('Invalid line height format');
+		}
+
+		const value = parseFloat(match[1]);
+		const unit = match[2] || 'px';
+
+		if (!isAbsoluteCSSUnit(unit)) {
+			throw new Error('Invalid line height unit');
+		}
+
+		return convertToPx(value, unit);
 	}
 }
 
