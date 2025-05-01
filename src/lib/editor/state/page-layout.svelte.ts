@@ -144,7 +144,10 @@ export class PageLayoutManager {
 		return bottom - bottomPadding;
 	}
 
-	getPage(view: EditorView, page: number): { page: HTMLElement; node: Node } | null {
+	getPage(
+		view: EditorView,
+		page: number
+	): { page: HTMLElement; node: Node; offset: number } | null {
 		let pos = 0;
 		let currentPage = -1;
 		while (pos < view.state.doc.nodeSize) {
@@ -170,7 +173,7 @@ export class PageLayoutManager {
 					return null;
 				}
 
-				return { page: el, node };
+				return { page: el, node, offset: pos };
 			}
 
 			pos += node.nodeSize;
@@ -181,19 +184,18 @@ export class PageLayoutManager {
 
 	detectPageFrom(view: EditorView) {
 		const pageDetails = this.getPage(view, 0);
-		console.log(pageDetails);
 		if (!pageDetails) {
 			// We will want to create a new page and nest all of the content
 			// inside of it, i.e.:
 			// this.createPage(view)
 			return;
 		}
-		const { page, node: root } = pageDetails;
+		const { page, node: root, offset } = pageDetails;
 		const maxBottom = this.calculatePageBottom(page);
 		let prevEl: HTMLElement | null = null;
 		let overflowingEl: HTMLElement | null = null;
+		let overflowingNode: Node | null = null;
 
-		console.log(maxBottom, root, page);
 		let pos = 0;
 		while (pos < root.nodeSize) {
 			const node = root.nodeAt(pos);
@@ -201,12 +203,12 @@ export class PageLayoutManager {
 				break;
 			}
 
-			pos += node.nodeSize;
 			if (!node.isBlock) {
+				pos += node.nodeSize;
 				continue;
 			}
 
-			const el = view.nodeDOM(pos) as HTMLElement | null;
+			const el = view.nodeDOM(pos + offset + 1) as HTMLElement | null;
 			if (!el) {
 				console.warn('No element found for node', node, pos);
 				break;
@@ -214,27 +216,25 @@ export class PageLayoutManager {
 
 			const { bottom } = el.getBoundingClientRect();
 			if (bottom >= maxBottom) {
+				overflowingNode = node;
 				overflowingEl = el;
 				break;
 			}
 
 			prevEl = el;
+			pos += node.nodeSize;
 		}
 
-		console.log(pos, overflowingEl, prevEl);
-
-		const overflowingNode = view.state.doc.nodeAt(pos);
 		if (!prevEl || !overflowingEl || !overflowingNode) {
+			console.log(!!prevEl, !!overflowingEl, !!overflowingNode);
 			return;
 		}
 
 		const newBottom = prevEl.getBoundingClientRect().bottom;
 
-		const slice = view.state.doc.slice(pos, view.state.doc.content.size);
-		const nextPage = schema.nodes.doc.createAndFill(null, slice.content);
-
-		// const tr = view.state.tr.delete(pos - overflowingNode.nodeSize, view.state.doc.content.size);
-		// view.dispatch(tr);
+		console.log('HERE');
+		const tr = view.state.tr.delete(pos, view.state.doc.content.size);
+		view.dispatch(tr);
 	}
 }
 
