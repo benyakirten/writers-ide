@@ -1,7 +1,7 @@
 import type { EditorView } from 'prosemirror-view';
 import type { Node } from 'prosemirror-model';
 
-import { convertToPx, isAbsoluteCSSUnit } from '$lib/utils/css';
+import { getLineHeight, linesInEl } from '$lib/utils/css';
 import { CM_PER_INCH, PIXELS_PER_INCH } from '../prosemirror/view/constants';
 
 export type Unit = 'in' | 'cm' | 'mm';
@@ -182,6 +182,12 @@ export class PageLayoutManager {
 		return null;
 	}
 
+	getRemainingLineCountInPage(pageBottom: number, lastEl: HTMLElement): number {
+		const lineHeight = getLineHeight(lastEl);
+		const remainingPx = pageBottom - lastEl.getBoundingClientRect().bottom;
+		return Math.floor(remainingPx / lineHeight);
+	}
+
 	detectPageFrom(view: EditorView) {
 		const pageDetails = this.getPage(view, 0);
 		if (!pageDetails) {
@@ -191,7 +197,7 @@ export class PageLayoutManager {
 			return;
 		}
 		const { page, node: root, offset } = pageDetails;
-		const maxBottom = this.calculatePageBottom(page);
+		const pageBottom = this.calculatePageBottom(page);
 		let prevEl: HTMLElement | null = null;
 		let overflowingEl: HTMLElement | null = null;
 		let overflowingNode: Node | null = null;
@@ -215,7 +221,7 @@ export class PageLayoutManager {
 			}
 
 			const { bottom } = el.getBoundingClientRect();
-			if (bottom >= maxBottom) {
+			if (bottom >= pageBottom) {
 				overflowingNode = node;
 				overflowingEl = el;
 				break;
@@ -230,31 +236,12 @@ export class PageLayoutManager {
 			return;
 		}
 
-		const newBottom = prevEl.getBoundingClientRect().bottom;
-
-		const lineHeight = window.getComputedStyle(overflowingEl).lineHeight;
-		const height = overflowingEl.getBoundingClientRect().height;
-		const numLines = height / this.parseLineHeight(lineHeight);
-		console.log(lineHeight, height, numLines);
+		const remainingLines = this.getRemainingLineCountInPage(pageBottom, prevEl);
+		const overflowingElLines = linesInEl(overflowingEl);
+		console.log(remainingLines, overflowingElLines);
 
 		// const tr = view.state.tr.delete(pos, view.state.doc.content.size);
 		// view.dispatch(tr);
-	}
-
-	parseLineHeight(lineHeight: string): number {
-		const match = lineHeight.match(/(\d*\.?\d+)([a-zA-Z%]*)/);
-		if (!match) {
-			throw new Error('Invalid line height format');
-		}
-
-		const value = parseFloat(match[1]);
-		const unit = match[2] || 'px';
-
-		if (!isAbsoluteCSSUnit(unit)) {
-			throw new Error('Invalid line height unit');
-		}
-
-		return convertToPx(value, unit);
 	}
 }
 

@@ -33,3 +33,29 @@ export function isAbsoluteCSSUnit(value: string): value is AbsoluteCSSUnit {
 		value === 'pc'
 	);
 }
+
+export function parseLineHeight(lineHeight: string): number {
+	const match = lineHeight.match(/(\d*\.?\d+)([a-zA-Z%]*)/);
+	if (!match) {
+		throw new Error('Invalid line height format');
+	}
+
+	const value = parseFloat(match[1]);
+	const unit = match[2] || 'px';
+
+	if (!isAbsoluteCSSUnit(unit)) {
+		throw new Error('Invalid line height unit');
+	}
+
+	return convertToPx(value, unit);
+}
+
+export function linesInEl(el: HTMLElement, lineHeight: number = getLineHeight(el)): number {
+	const height = el.getBoundingClientRect().height;
+	return Math.round(height / lineHeight);
+}
+
+export function getLineHeight(el: HTMLElement): number {
+	const { lineHeight } = window.getComputedStyle(el);
+	return parseLineHeight(lineHeight);
+}
