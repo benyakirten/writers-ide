@@ -182,10 +182,42 @@ export class PageLayoutManager {
 		return null;
 	}
 
-	getRemainingLineCountInPage(pageBottom: number, lastEl: HTMLElement): number {
-		const lineHeight = getLineHeight(lastEl);
-		const remainingPx = pageBottom - lastEl.getBoundingClientRect().bottom;
+	getRemainingLineCountInPage(pageBottom: number, overflowingEl: HTMLElement): number {
+		const lineHeight = getLineHeight(overflowingEl);
+		const remainingPx = pageBottom - overflowingEl.getBoundingClientRect().bottom;
 		return Math.floor(remainingPx / lineHeight);
+	}
+
+	/**
+	 * Determines how to split a paragraph between pages based on widow/orphan rules.
+	 *
+	 * @param {number} linesRemaining - The number of lines that can still be added to the current page.
+	 * @param {number} paragraphLines - The number of lines in the next paragraph.
+	 * @param {number} minOrphanLines - Minimum lines required at the bottom of a page (to avoid orphans). Usually 2.
+	 * @param {number} minWidowLines - Minimum lines required at the top of the next page (to avoid widows). Usually 2.
+	 * @returns {{ currentPageLines: number, nextPageLines: number }} - How many lines to place on the current vs next page.
+	 */
+	splitParagraphForPagination(
+		linesRemaining: number,
+		paragraphLines: number,
+		minOrphanLines = 2,
+		minWidowLines = 2
+	): { currentPageLines: number; nextPageLines: number } {
+		// Case 1: Entire paragraph fits
+		if (paragraphLines <= linesRemaining) {
+			return { currentPageLines: paragraphLines, nextPageLines: 0 };
+		}
+
+		// Case 2: Can't split while satisfying widow/orphan rules
+		if (linesRemaining < minOrphanLines || paragraphLines - linesRemaining < minWidowLines) {
+			return { currentPageLines: 0, nextPageLines: paragraphLines };
+		}
+
+		// Case 3: Split while honoring widow/orphan rules
+		return {
+			currentPageLines: linesRemaining,
+			nextPageLines: paragraphLines - linesRemaining
+		};
 	}
 
 	detectPageFrom(view: EditorView) {
@@ -236,7 +268,7 @@ export class PageLayoutManager {
 			return;
 		}
 
-		const remainingLines = this.getRemainingLineCountInPage(pageBottom, prevEl);
+		const remainingLines = this.getRemainingLineCountInPage(pageBottom, overflowingEl);
 		const overflowingElLines = linesInEl(overflowingEl);
 		console.log(remainingLines, overflowingElLines);
 
