@@ -83,8 +83,8 @@ export class PageLayoutManager {
 	pageYMargin = $state<number>(0);
 	pageXMargin = $state<number>(0);
 	pageBleed = $state<number>(0);
-	numOrphanLines = $state<number>(2);
-	numWidowLines = $state<number>(2);
+	orphanLines = $state<number>(2);
+	widowLines = $state<number>(2);
 	currentPage = $state<number>(0);
 
 	constructor() {
@@ -190,32 +190,28 @@ export class PageLayoutManager {
 
 	/**
 	 * Determines how to split a paragraph between pages based on widow/orphan rules.
-	 *
-	 * @param {number} linesRemaining - The number of lines that can still be added to the current page.
-	 * @param {number} paragraphLines - The number of lines in the next paragraph.
-	 * @returns {{ currentPageLines: number, nextPageLines: number }} - How many lines to place on the current vs next page.
 	 */
-	splitParagraphForPagination(
-		linesRemaining: number,
-		paragraphLines: number
+	getCurrentAndNextPageLines(
+		linesRemainingOnPage: number,
+		linesInNextParagraph: number
 	): { currentPageLines: number; nextPageLines: number } {
 		// Case 1: Entire paragraph fits
-		if (paragraphLines <= linesRemaining) {
-			return { currentPageLines: paragraphLines, nextPageLines: 0 };
+		if (linesInNextParagraph <= linesRemainingOnPage) {
+			return { currentPageLines: linesInNextParagraph, nextPageLines: 0 };
 		}
 
 		// Case 2: Can't split while satisfying widow/orphan rules
 		if (
-			linesRemaining < this.numOrphanLines ||
-			paragraphLines - linesRemaining < this.numWidowLines
+			linesRemainingOnPage < this.orphanLines ||
+			linesInNextParagraph - linesRemainingOnPage < this.widowLines
 		) {
-			return { currentPageLines: 0, nextPageLines: paragraphLines };
+			return { currentPageLines: 0, nextPageLines: linesInNextParagraph };
 		}
 
 		// Case 3: Split while honoring widow/orphan rules
 		return {
-			currentPageLines: linesRemaining,
-			nextPageLines: paragraphLines - linesRemaining
+			currentPageLines: linesRemainingOnPage,
+			nextPageLines: linesInNextParagraph - linesRemainingOnPage
 		};
 	}
 
@@ -269,7 +265,11 @@ export class PageLayoutManager {
 
 		const remainingLines = this.getRemainingLineCountInPage(pageBottom, overflowingEl);
 		const overflowingElLines = linesInEl(overflowingEl);
-		console.log(remainingLines, overflowingElLines);
+		const { currentPageLines, nextPageLines } = this.getCurrentAndNextPageLines(
+			remainingLines,
+			overflowingElLines
+		);
+		console.log(currentPageLines, nextPageLines);
 
 		// const tr = view.state.tr.delete(pos, view.state.doc.content.size);
 		// view.dispatch(tr);
