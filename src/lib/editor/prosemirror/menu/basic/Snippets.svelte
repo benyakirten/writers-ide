@@ -20,14 +20,14 @@
 	} from '@steeze-ui/phosphor-icons';
 
 	import IconButton from '$lib/components/IconButton.svelte';
-	import { type Internationalizator } from '$lib/editor/types.js';
-	import { type SelectionUtilities, type TextMarkPresence } from '../../view/selection.js';
-	import { type ActionUtilities } from '../../view/actions.js';
-	import { capitalize } from '$lib/utils/strings.js';
+	import { type Internationalizator } from '$lib/editor/types';
+	import { type SelectionUtilities, type TextMarkPresence } from '../../view/selection';
+	import { type ActionUtilities } from '../../view/actions';
+	import { capitalize } from '$lib/utils/strings';
 
-	import type { UseableMarkName } from '$lib/editor/prosemirror/view/actions.js';
-	import { TextOverline } from '$lib/icons.js';
-	import { type TooltipData } from '@/services/tooltip.svelte.js';
+	import type { UseableMarkName } from '$lib/editor/prosemirror/view/actions';
+	import { TextOverline } from '$lib/icons';
+	import { type TooltipData } from '$lib/services/tooltip.svelte';
 
 	type TextMenuIcon = {
 		iconSrc: IconSource;

@@ -1,10 +1,9 @@
 <script lang="ts">
-	import ToastManager from '@/services/toaster.svelte.js';
-	import TransferHandler, {
-		type BarTransferLocation
-	} from '../state/bar-transfer-handler.svelte.js';
-	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte.js';
-	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
+	import ToastManager from '$lib/services/toaster.svelte';
+	import TransferHandler, { type BarTransferLocation } from '../state/bar-transfer-handler.svelte';
+	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
+	import tabState, { TabState } from '../state/tab-state.svelte';
+	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
 
 	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'vertical';
 
@@ -34,7 +33,8 @@
 			'Hello, world!',
 			'This is a test toast.',
 			'Toast with a long message to test the layout.',
-			'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua..'
+			'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua..',
+			'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua..'
 		];
 		return messages[Math.floor(Math.random() * messages.length)];
 	}
@@ -48,12 +48,8 @@
 	</select>
 	<button onclick={() => addNullToBar()}>Add null to bar</button>
 	<button onclick={() => addBasicMenuToBar()}>Add basic menu to bar</button>
-	<button
-		onclick={() =>
-			ToastManager.addToast({ message: generateRandomMessage(), dismissable: true }, 2000)}
-	>
-		Add Toast
-	</button>
+	<button onclick={() => ToastManager.addToast(generateRandomMessage(), null)}> Add Toast </button>
+	<button onclick={() => tabState.create('prosemirror')}>Create Prosemirror</button>
 </div>
 
 <style>

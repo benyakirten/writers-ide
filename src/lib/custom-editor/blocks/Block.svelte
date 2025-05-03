@@ -7,7 +7,7 @@
 	// import ListBlock from './ListBlock.svelte';
 	// import LinkBlock from './LinkBlock.svelte';
 
-	import type { BlockProps } from '$lib/types/block.js';
+	import type { BlockProps } from '$lib/types/block';
 	import ParagraphBlock from './ParagraphBlock.svelte';
 
 	let { index, block, updateBlockContent }: BlockProps = $props();

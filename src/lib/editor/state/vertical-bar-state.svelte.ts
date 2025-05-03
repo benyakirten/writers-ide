@@ -1,4 +1,5 @@
-import { BarItems } from './bar-items.svelte.js';
+import { IdGenerator } from '$lib/services/ids';
+import { BarItems } from './bar-items.svelte';
 
 export type VerticalBar = {
 	width: number;
@@ -39,7 +40,7 @@ export class VerticalBarState {
 	add(
 		{
 			width = this.minSize,
-			id = crypto.randomUUID(),
+			id = IdGenerator.generate(),
 			visible = true,
 			data
 		}: Partial<Omit<VerticalBar, 'data'>> & { data?: string[] },

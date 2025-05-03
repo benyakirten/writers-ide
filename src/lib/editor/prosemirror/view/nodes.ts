@@ -1,7 +1,7 @@
 import type { DOMOutputSpec, NodeSpec } from 'prosemirror-model';
 
-import { clamp } from '$lib/utils/numbers.js';
-import { INDENT_MAX, INDENT_MIN, INDENT_SIZE_PX } from './constants.js';
+import { clamp } from '$lib/utils/numbers';
+import { INDENT_MAX, INDENT_MIN, INDENT_SIZE_PX } from './constants';
 
 const doc: NodeSpec = {
 	content: 'block+'
@@ -12,7 +12,7 @@ const paragraph: NodeSpec = {
 	group: 'block',
 	attrs: {
 		indent: {
-			default: 0,
+			default: 1,
 			validate: (value) => {
 				const _value = parseInt(value);
 				if (isNaN(_value) || _value < INDENT_MIN || _value > INDENT_MAX) {
@@ -150,6 +150,58 @@ const hardBreak: NodeSpec = {
 	}
 };
 
+const pageDom: DOMOutputSpec = ['div', { class: 'prosemirror-page' }, 0];
+const page: NodeSpec = {
+	content: 'block+',
+	group: 'block',
+	selectable: false,
+	draggable: false,
+	parseDOM: [{ tag: 'div.prosemirror-page' }],
+	toDOM() {
+		return pageDom;
+	}
+};
+
+const pageEndDom: DOMOutputSpec = ['div', { class: 'page-end' }, 0];
+const pageEnd: NodeSpec = {
+	inline: true,
+	group: 'inline',
+	selectable: false,
+	atom: true,
+	draggable: false,
+	defining: true,
+	parseDOM: [{ tag: 'div.page-end' }],
+	toDOM() {
+		return pageEndDom;
+	}
+};
+
+const headerDom: DOMOutputSpec = ['div', { class: 'page-header' }, 0];
+export const header: NodeSpec = {
+	content: 'block+',
+	group: 'footer',
+	defining: true,
+	isolating: true,
+	toDOM: () => headerDom,
+	parseDOM: [
+		{
+			tag: 'div.page-header'
+		}
+	]
+};
+
+const footerDom: DOMOutputSpec = ['div', { class: 'page-footer' }, 0];
+export const footer: NodeSpec = {
+	content: 'block+',
+	group: 'footer',
+	toDOM: () => footerDom,
+	parseDOM: [
+		{
+			tag: 'div.page-footer'
+		}
+	]
+};
+
 export const nodes = {
 	doc,
 	paragraph,
@@ -159,5 +211,8 @@ export const nodes = {
 	codeBlock,
 	text,
 	image,
-	hardBreak
+	hardBreak,
+	pageEnd,
+	page,
+	header
 } as const;

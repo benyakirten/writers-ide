@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 
-import { TabState } from './tab-state.svelte.js';
+import { TabState } from './tab-state.svelte';
 
 describe('TabState', () => {
 	let tabState: TabState;

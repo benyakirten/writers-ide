@@ -17,7 +17,7 @@
 	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index';
 	import TransferHandler from '../state/bar-transfer-handler.svelte';
 	import Shortcuts from '$lib/services/shortcuts.svelte';
 

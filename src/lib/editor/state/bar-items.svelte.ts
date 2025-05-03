@@ -1,14 +1,14 @@
 import type { Component } from 'svelte';
 
-import * as m from '$lib/paraglide/messages.js';
+import * as m from '$lib/paraglide/messages';
 import Registry, {
-	type BarItemComponentProps,
+	type ModularComponentProps,
 	type BarItemSection
-} from './bar-item-registry.svelte.js';
+} from './bar-item-registry.svelte';
 
 export type BarItemData = {
 	id: string;
-	Component: Component<BarItemComponentProps> | null;
+	Component: Component<ModularComponentProps> | null;
 	size: BarItemSection['size'];
 	title: string;
 };

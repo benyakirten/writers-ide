@@ -1,17 +1,12 @@
 <script lang="ts">
 	import { MAX_Z_INDEX } from '$lib/constants';
-	import ToastManager from '@/services/toaster.svelte';
+	import ToastManager from '$lib/services/toaster.svelte';
 	import Toast from './Toast.svelte';
 </script>
 
-<ul style:--toast-z={MAX_Z_INDEX - 1}>
+<ul style:--toast-z={MAX_Z_INDEX - 1} aria-live="polite" aria-atomic="true">
 	{#each ToastManager.toasts as toast (toast.id)}
-		<Toast
-			message={toast.message}
-			timeLeft={toast.timeLeft}
-			duration={toast.duration}
-			ondismiss={toast.dismissable ? () => ToastManager.removeToast(toast.id) : null}
-		/>
+		<Toast {toast} />
 	{/each}
 </ul>
 

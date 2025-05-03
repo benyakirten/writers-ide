@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import TransferHandler from './bar-transfer-handler.svelte';
-import FloatingBarState from './floater-state.svelte.js';
-import HorizontalBarState, { HorizontalBarPosition } from './horizontal-bar-state.svelte.js';
-import VerticalBarState, { VerticalBarPosition } from './vertical-bar-state.svelte.js';
+import FloatingBarState from './floater-state.svelte';
+import HorizontalBarState, { HorizontalBarPosition } from './horizontal-bar-state.svelte';
+import VerticalBarState, { VerticalBarPosition } from './vertical-bar-state.svelte';
 import Registry from './bar-item-registry.svelte';
 
 describe('BarTransferHandler', () => {

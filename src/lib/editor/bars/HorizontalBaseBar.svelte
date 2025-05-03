@@ -1,9 +1,7 @@
 <script lang="ts">
-	import FloaterBarState from '../state/floater-state.svelte.js';
-	import HorizontalBarState, {
-		HorizontalBarPosition
-	} from '../state/horizontal-bar-state.svelte.js';
-	import VerticalBarState, { VerticalBarPosition } from '../state/vertical-bar-state.svelte.js';
+	import FloaterBarState from '../state/floater-state.svelte';
+	import HorizontalBarState, { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
+	import VerticalBarState, { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
 </script>
 
 <div class="base-bar">

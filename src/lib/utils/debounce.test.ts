@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
-import { Debouncer } from './debounce.js';
+import { Debouncer } from './debounce';
 
 describe('Debouncer', () => {
 	beforeAll(() => {

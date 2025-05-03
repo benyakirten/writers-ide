@@ -1,4 +1,5 @@
-import { BarItems } from './bar-items.svelte.js';
+import { IdGenerator } from '$lib/services/ids';
+import { BarItems } from './bar-items.svelte';
 
 export enum HorizontalBarPosition {
 	WindowBlockStart = 'WINDOW_BLOCK_START',
@@ -31,7 +32,7 @@ export class HorizontalBarState {
 	add(
 		{
 			height,
-			id = crypto.randomUUID(),
+			id = IdGenerator.generate(),
 			visible = true,
 			data
 		}: Partial<Omit<HorizontalBar, 'data'>> & { data?: string[] },

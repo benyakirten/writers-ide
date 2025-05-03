@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach, test } from 'vitest';
 import { BarItems } from './bar-items.svelte';
-import Registry from './bar-item-registry.svelte.js';
+import Registry from './bar-item-registry.svelte';
 
 describe('BarItems', () => {
 	let barItems: BarItems;
