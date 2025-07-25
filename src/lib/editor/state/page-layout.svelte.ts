@@ -279,21 +279,48 @@ export class PageLayoutManager {
 			numLinesOverflowing
 		);
 
-		// if (nextPageLines > 0) {
-		// 	// Find where the next page's words start,
-		// 	// remove them from the overflowing element,
-		// 	// and create a new page with the remaining content.
-		// 	const nextPageContent = overflowingNode.content.cut(
-		// 		overflowingNode.content.size - overflowingElLines + nextPageLines
-		// 	);
-		// 	// const currentPageContent = overflowingNode.content.cut(0, overflowingElLines - nextPageLines);
-
-		// 	console.log(nextPageContent);
-		// }
-		console.log(linesToKeepOnPage, linesToPutOnNextPage);
+		if (linesToPutOnNextPage > 0) {
+			// Find where the next page's words start,
+			// remove them from the overflowing element,
+			// and create a new page with the remaining content.
+			const splitPosition = this.getSplitPosition(overflowingEl, linesToKeepOnPage);
+			console.log(splitPosition);
+		}
 
 		// const tr = view.state.tr.delete(pos, view.state.doc.content.size);
 		// view.dispatch(tr);
+	}
+
+	/**
+	 * Get the position in which to split the overflowing element so that we can split it onto two separate pages.
+	 */
+	getSplitPosition(el: HTMLElement, linesToKeepOnPage: number): number | null {
+		const range = document.createRange();
+		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+
+		let posInNode = 0; // relative offset in ProseMirror node
+		let currentNode = walker.nextNode();
+
+		while (currentNode) {
+			const text = currentNode.textContent || '';
+			for (let i = 1; i <= text.length; i++) {
+				range.setStart(el, 0); // start from beginning of element
+				range.setEnd(currentNode, i);
+
+				const rects = range.getClientRects();
+				const lineCount = rects.length;
+
+				if (lineCount >= linesToKeepOnPage) {
+					return posInNode;
+				}
+
+				posInNode++;
+			}
+
+			currentNode = walker.nextNode();
+		}
+
+		return null; // Not enough lines to reach the requested split
 	}
 }
 
