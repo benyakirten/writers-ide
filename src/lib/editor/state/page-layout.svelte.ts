@@ -184,35 +184,38 @@ export class PageLayoutManager {
 
 	getRemainingLineCountInPage(pageBottom: number, overflowingEl: HTMLElement): number {
 		const lineHeight = getLineHeight(overflowingEl);
-		const remainingPx = pageBottom - overflowingEl.getBoundingClientRect().bottom;
+		const remainingPx = overflowingEl.getBoundingClientRect().bottom - pageBottom;
 		return Math.floor(remainingPx / lineHeight);
 	}
 
 	/**
 	 * Determines how to split a paragraph between pages based on widow/orphan rules.
 	 */
-	getCurrentAndNextPageLines(
-		linesRemainingOnPage: number,
-		linesInNextParagraph: number
-	): { currentPageLines: number; nextPageLines: number } {
-		// Case 1: Entire paragraph fits
-		if (linesInNextParagraph <= linesRemainingOnPage) {
-			return { currentPageLines: linesInNextParagraph, nextPageLines: 0 };
+	splitLinesOnPages(
+		linesNotOverflowingPage: number,
+		linesOverflowingPage: number
+	): [linesToKeepOnPage: number, linesToPutOnNextPage: number] {
+		// If either is 0, we don't need to think about widow/orphan lines.
+		if (linesOverflowingPage == 0) {
+			return [linesNotOverflowingPage, 0];
+		} else if (linesNotOverflowingPage == 0) {
+			return [0, linesOverflowingPage];
 		}
 
-		// Case 2: Can't split while satisfying widow/orphan rules
-		if (
-			linesRemainingOnPage < this.orphanLines ||
-			linesInNextParagraph - linesRemainingOnPage < this.widowLines
-		) {
-			return { currentPageLines: 0, nextPageLines: linesInNextParagraph };
+		// Adjust if we violate widow rule (not enough lines on next page).
+		if (linesOverflowingPage < this.widowLines) {
+			const linesToTransferFromCurrentPageToNext = this.widowLines - linesOverflowingPage;
+
+			linesNotOverflowingPage -= linesToTransferFromCurrentPageToNext;
+			linesOverflowingPage += linesToTransferFromCurrentPageToNext;
 		}
 
-		// Case 3: Split while honoring widow/orphan rules
-		return {
-			currentPageLines: linesRemainingOnPage,
-			nextPageLines: linesInNextParagraph - linesRemainingOnPage
-		};
+		if (linesNotOverflowingPage < this.orphanLines) {
+			linesOverflowingPage += linesNotOverflowingPage;
+			linesNotOverflowingPage = 0;
+		}
+
+		return [linesNotOverflowingPage, linesOverflowingPage];
 	}
 
 	detectPageFrom(view: EditorView) {
@@ -263,13 +266,31 @@ export class PageLayoutManager {
 			return;
 		}
 
-		const remainingLines = this.getRemainingLineCountInPage(pageBottom, overflowingEl);
-		const overflowingElLines = linesInEl(overflowingEl);
-		const { currentPageLines, nextPageLines } = this.getCurrentAndNextPageLines(
-			remainingLines,
-			overflowingElLines
+		// Count the number of lines that fit on the page.
+		const numLinesOverflowing = this.getRemainingLineCountInPage(pageBottom, overflowingEl);
+
+		// Count the nuber of lines that overflow the page.
+		const totalLines = linesInEl(overflowingEl);
+
+		// Count the amount of lines that should be on the current page
+		// and the number of lines that should be on the next page.
+		const [linesToKeepOnPage, linesToPutOnNextPage] = this.splitLinesOnPages(
+			totalLines - numLinesOverflowing,
+			numLinesOverflowing
 		);
-		console.log(currentPageLines, nextPageLines);
+
+		// if (nextPageLines > 0) {
+		// 	// Find where the next page's words start,
+		// 	// remove them from the overflowing element,
+		// 	// and create a new page with the remaining content.
+		// 	const nextPageContent = overflowingNode.content.cut(
+		// 		overflowingNode.content.size - overflowingElLines + nextPageLines
+		// 	);
+		// 	// const currentPageContent = overflowingNode.content.cut(0, overflowingElLines - nextPageLines);
+
+		// 	console.log(nextPageContent);
+		// }
+		console.log(linesToKeepOnPage, linesToPutOnNextPage);
 
 		// const tr = view.state.tr.delete(pos, view.state.doc.content.size);
 		// view.dispatch(tr);
