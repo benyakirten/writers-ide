@@ -1,8 +1,10 @@
 <script lang="ts">
 	import ToastManager from '$lib/services/toaster.svelte';
+	import Editors from '../prosemirror/prose-mirror-editor.svelte';
 	import TransferHandler, { type BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
-	import tabState, { TabState } from '../state/tab-state.svelte';
+	import PageLayout from '../state/page-layout.svelte';
+	import tabState from '../state/tab-state.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
 
 	let selectValue: 'vertical' | 'horizontal' | 'floating' = 'vertical';
@@ -38,6 +40,11 @@
 		];
 		return messages[Math.floor(Math.random() * messages.length)];
 	}
+
+	function paginate() {
+		const [data] = Object.values(Editors.editors);
+		PageLayout.paginate(data.view);
+	}
 </script>
 
 <div class="base-bar">
@@ -50,6 +57,7 @@
 	<button onclick={() => addBasicMenuToBar()}>Add basic menu to bar</button>
 	<button onclick={() => ToastManager.addToast(generateRandomMessage(), null)}> Add Toast </button>
 	<button onclick={() => tabState.create('prosemirror')}>Create Prosemirror</button>
+	<button onclick={() => paginate()}>Paginate</button>
 </div>
 
 <style>

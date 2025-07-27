@@ -218,7 +218,7 @@ export class PageLayoutManager {
 		return [linesNotOverflowingPage, linesOverflowingPage];
 	}
 
-	detectPageFrom(view: EditorView) {
+	paginate(view: EditorView) {
 		const pageDetails = this.getPage(view, 0);
 		if (!pageDetails) {
 			// We will want to create a new page and nest all of the content

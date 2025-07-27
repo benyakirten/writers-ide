@@ -170,7 +170,7 @@
 
 		const deregister = Editors.register(id, view);
 
-		PageLayout.detectPageFrom(view);
+		// setTimeout(() => PageLayout.paginate(view), 1000);
 
 		return () => deregister();
 	});
