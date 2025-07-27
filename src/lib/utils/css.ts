@@ -50,9 +50,23 @@ export function parseCSSMeasurement(lineHeight: string): number | null {
 	return convertToPx(value, unit);
 }
 
-export function linesInEl(el: HTMLElement, lineHeight: number = getLineHeight(el)): number {
+export function calculateTotalLinesOfText(el: HTMLElement, lineHeight: number): number {
 	const height = el.getBoundingClientRect().height;
 	return Math.round(height / lineHeight);
+}
+
+export function calculateOverflowingLinesOfText(
+	el: HTMLElement,
+	pageBottom: number,
+	lineHeight: number
+): number {
+	const elBottom = el.getBoundingClientRect().bottom;
+	if (elBottom <= pageBottom) {
+		return 0; // No overflowing lines
+	}
+
+	const overflowingPx = elBottom - pageBottom;
+	return Math.floor(overflowingPx / lineHeight);
 }
 
 export function getLineHeight(el: HTMLElement): number {

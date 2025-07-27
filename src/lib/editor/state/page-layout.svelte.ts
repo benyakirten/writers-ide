@@ -1,7 +1,11 @@
 import type { EditorView } from 'prosemirror-view';
 import type { Node } from 'prosemirror-model';
 
-import { getLineHeight, linesInEl } from '$lib/utils/css';
+import {
+	getLineHeight,
+	calculateTotalLinesOfText,
+	calculateOverflowingLinesOfText
+} from '$lib/utils/css';
 import { CM_PER_INCH, INDENT_MIN, PIXELS_PER_INCH } from '../prosemirror/view/constants';
 
 export type Unit = 'in' | 'cm' | 'mm';
@@ -204,16 +208,10 @@ export class PageLayoutManager {
 		return null;
 	}
 
-	getOverflowingLineCount(pageBottom: number, overflowingEl: HTMLElement): number {
-		const lineHeight = getLineHeight(overflowingEl);
-		const overflowingPx = overflowingEl.getBoundingClientRect().bottom - pageBottom;
-		return Math.floor(overflowingPx / lineHeight);
-	}
-
 	/**
 	 * Determines how to split a paragraph between pages based on widow/orphan rules.
 	 */
-	splitLinesOnPages(
+	calculateLineSplitAmount(
 		linesNotOverflowingPage: number,
 		linesOverflowingPage: number
 	): [linesToKeepOnPage: number, linesToPutOnNextPage: number] {
@@ -258,17 +256,13 @@ export class PageLayoutManager {
 			} = overflowingDetails;
 			pageNumber++;
 
-			// TODO: Make make this into one method and pass in the line height since it is a relatively expensive operation.
-			const numLines = linesInEl(overflowingEl);
-			const numLinesOverflowing = this.getOverflowingLineCount(pageBottom, overflowingEl);
-
 			// TODO: Write overflowing logic to handle non-text overflowing elements and/or nodes with combined types.
-			const [linesToKeepOnPage, linesToPutOnNextPage] = this.splitLinesOnPages(
-				numLines - numLinesOverflowing,
-				numLinesOverflowing
+			const [linesToKeepOnPage, linesToPutOnNextPage] = this.calculateTextOverflow(
+				pageBottom,
+				overflowingEl
 			);
-
 			// TODO: Check if the next pagination on the next page affects this one in case of widow/orphan lines.
+			// Could we maybe want to do two passes: one forward and one backward?
 
 			if (linesToPutOnNextPage === 0) {
 				// There could be a page that is overflowing/underflowing after a page that is not overflowing.
@@ -294,38 +288,19 @@ export class PageLayoutManager {
 
 			view.dispatch(tr);
 		}
+	}
 
-		// // Count the nuber of lines that overflow the page.
-		// const totalLines = linesInEl(overflowingEl);
+	calculateTextOverflow(
+		pageBottom: number,
+		overflowingEl: HTMLElement
+	): [linesToKeepOnPage: number, linesToPutOnNextPage: number] {
+		const lineHeight = getLineHeight(overflowingEl);
 
-		// // Count the amount of lines that should be on the current page
-		// // and the number of lines that should be on the next page.
-		// const [linesToKeepOnPage, linesToPutOnNextPage] = this.splitLinesOnPages(
-		// 	totalLines - numLinesOverflowing,
-		// 	numLinesOverflowing
-		// );
+		const numLines = calculateTotalLinesOfText(overflowingEl, lineHeight);
+		const overflowingLines = calculateOverflowingLinesOfText(overflowingEl, pageBottom, lineHeight);
 
-		// if (linesToPutOnNextPage > 0) {
-		// 	// Find where the next page's words start,
-		// 	// remove them from the overflowing element,
-		// 	// and create a new page with the remaining content.
-		// 	const splitOffset = this.getSplitPosition(overflowingNode, overflowingEl, linesToKeepOnPage);
-
-		// 	if (splitOffset === null) {
-		// 		console.warn('Could not find split position for overflowing element', overflowingEl);
-		// 		return;
-		// 	}
-
-		// 	const contentToKeep = pageNode.cut(0, pos + splitOffset);
-		// 	const contentToMove = pageNode.cut(pos + splitOffset);
-
-		// 	const { tr } = view.state;
-
-		// 	tr.replaceWith(offset, offset + pageNode.nodeSize, contentToKeep);
-		// 	tr.insert(offset + contentToKeep.nodeSize, contentToMove);
-
-		// 	view.dispatch(tr);
-		// }
+		// TODO: Write overflowing logic to handle non-text overflowing elements and/or nodes with combined types.
+		return this.calculateLineSplitAmount(numLines - overflowingLines, overflowingLines);
 	}
 
 	getOverflowingInformation(view: EditorView, pageNumber: number): OverflowingDetails {
