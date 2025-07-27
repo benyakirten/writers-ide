@@ -2,7 +2,7 @@ import type { EditorView } from 'prosemirror-view';
 import type { Node } from 'prosemirror-model';
 
 import { getLineHeight, linesInEl } from '$lib/utils/css';
-import { CM_PER_INCH, PIXELS_PER_INCH } from '../prosemirror/view/constants';
+import { CM_PER_INCH, INDENT_MIN, PIXELS_PER_INCH } from '../prosemirror/view/constants';
 
 export type Unit = 'in' | 'cm' | 'mm';
 
@@ -285,8 +285,12 @@ export class PageLayoutManager {
 
 			const { tr } = view.state;
 
+			// Remove overflowing content from the page;
 			tr.replaceWith(pageOffset, pageOffset + pageNode.nodeSize, contentToKeep);
+			// Create a new page with the content that was overflowing.
 			tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
+			// Remove indentation from first paragraph.
+			tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
 
 			view.dispatch(tr);
 		}
