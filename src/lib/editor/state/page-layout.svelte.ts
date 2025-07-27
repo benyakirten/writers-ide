@@ -6,6 +6,28 @@ import { CM_PER_INCH, PIXELS_PER_INCH } from '../prosemirror/view/constants';
 
 export type Unit = 'in' | 'cm' | 'mm';
 
+// Not sure if this is necessary, but it might be useful
+// for other developers?
+export enum OverflowingFailureReason {
+	NoPage = 1,
+	NoOverflowingElement = 2
+}
+type OverflowingDetailsSuccess = {
+	success: true;
+	overflowingNode: Node;
+	overflowingNodeOffset: number;
+	overflowingEl: HTMLElement;
+	pageNode: Node;
+	pageOffset: number;
+	pageEl: HTMLElement;
+	pageBottom: number;
+};
+type OverflowingDetailsFailure = {
+	success: false;
+	reason: OverflowingFailureReason;
+};
+export type OverflowingDetails = OverflowingDetailsSuccess | OverflowingDetailsFailure;
+
 export const PAGE_SIZES_INCHES = {
 	A4: {
 		width: 8.27,
@@ -182,10 +204,10 @@ export class PageLayoutManager {
 		return null;
 	}
 
-	getRemainingLineCountInPage(pageBottom: number, overflowingEl: HTMLElement): number {
+	getOverflowingLineCount(pageBottom: number, overflowingEl: HTMLElement): number {
 		const lineHeight = getLineHeight(overflowingEl);
-		const remainingPx = overflowingEl.getBoundingClientRect().bottom - pageBottom;
-		return Math.floor(remainingPx / lineHeight);
+		const overflowingPx = overflowingEl.getBoundingClientRect().bottom - pageBottom;
+		return Math.floor(overflowingPx / lineHeight);
 	}
 
 	/**
@@ -219,20 +241,106 @@ export class PageLayoutManager {
 	}
 
 	paginate(view: EditorView) {
-		const pageDetails = this.getPage(view, 0);
-		if (!pageDetails) {
-			// We will want to create a new page and nest all of the content
-			// inside of it, i.e.:
-			// this.createPage(view)
-			return;
+		let pageNumber = 0;
+		while (true) {
+			const overflowingDetails = this.getOverflowingInformation(view, pageNumber);
+			if (!overflowingDetails.success) {
+				return;
+			}
+
+			const {
+				pageBottom,
+				overflowingNode,
+				overflowingEl,
+				overflowingNodeOffset,
+				pageNode,
+				pageOffset
+			} = overflowingDetails;
+			pageNumber++;
+
+			// TODO: Make make this into one method and pass in the line height since it is a relatively expensive operation.
+			const numLines = linesInEl(overflowingEl);
+			const numLinesOverflowing = this.getOverflowingLineCount(pageBottom, overflowingEl);
+
+			// TODO: Write overflowing logic to handle non-text overflowing elements and/or nodes with combined types.
+			const [linesToKeepOnPage, linesToPutOnNextPage] = this.splitLinesOnPages(
+				numLines - numLinesOverflowing,
+				numLinesOverflowing
+			);
+
+			// TODO: Check if the next pagination on the next page affects this one in case of widow/orphan lines.
+
+			if (linesToPutOnNextPage === 0) {
+				// There could be a page that is overflowing/underflowing after a page that is not overflowing.
+				continue;
+			}
+
+			const splitOffset = this.getSplitPosition(overflowingNode, overflowingEl, linesToKeepOnPage);
+			if (splitOffset === null) {
+				console.warn('Could not find split position for overflowing element', overflowingEl);
+				return;
+			}
+			const contentToKeep = pageNode.cut(0, overflowingNodeOffset + splitOffset);
+			const contentToMove = pageNode.cut(overflowingNodeOffset + splitOffset);
+
+			const { tr } = view.state;
+
+			tr.replaceWith(pageOffset, pageOffset + pageNode.nodeSize, contentToKeep);
+			tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
+
+			view.dispatch(tr);
 		}
+
+		// // Count the nuber of lines that overflow the page.
+		// const totalLines = linesInEl(overflowingEl);
+
+		// // Count the amount of lines that should be on the current page
+		// // and the number of lines that should be on the next page.
+		// const [linesToKeepOnPage, linesToPutOnNextPage] = this.splitLinesOnPages(
+		// 	totalLines - numLinesOverflowing,
+		// 	numLinesOverflowing
+		// );
+
+		// if (linesToPutOnNextPage > 0) {
+		// 	// Find where the next page's words start,
+		// 	// remove them from the overflowing element,
+		// 	// and create a new page with the remaining content.
+		// 	const splitOffset = this.getSplitPosition(overflowingNode, overflowingEl, linesToKeepOnPage);
+
+		// 	if (splitOffset === null) {
+		// 		console.warn('Could not find split position for overflowing element', overflowingEl);
+		// 		return;
+		// 	}
+
+		// 	const contentToKeep = pageNode.cut(0, pos + splitOffset);
+		// 	const contentToMove = pageNode.cut(pos + splitOffset);
+
+		// 	const { tr } = view.state;
+
+		// 	tr.replaceWith(offset, offset + pageNode.nodeSize, contentToKeep);
+		// 	tr.insert(offset + contentToKeep.nodeSize, contentToMove);
+
+		// 	view.dispatch(tr);
+		// }
+	}
+
+	getOverflowingInformation(view: EditorView, pageNumber: number): OverflowingDetails {
+		const pageDetails = this.getPage(view, pageNumber);
+		if (!pageDetails) {
+			return {
+				success: false,
+				reason: OverflowingFailureReason.NoPage
+			};
+		}
+
 		const { page, node: pageNode, offset } = pageDetails;
 		const pageBottom = this.calculatePageBottom(page);
+
 		let prevEl: HTMLElement | null = null;
 		let overflowingEl: HTMLElement | null = null;
 		let overflowingNode: Node | null = null;
-
 		let pos = 0;
+
 		while (pos < pageNode.nodeSize) {
 			const node = pageNode.nodeAt(pos);
 			if (!node) {
@@ -262,44 +370,22 @@ export class PageLayoutManager {
 		}
 
 		if (!prevEl || !overflowingEl || !overflowingNode) {
-			console.log(!!prevEl, !!overflowingEl, !!overflowingNode);
-			return;
+			return {
+				success: false,
+				reason: OverflowingFailureReason.NoOverflowingElement
+			};
 		}
 
-		// Count the number of lines that fit on the page.
-		const numLinesOverflowing = this.getRemainingLineCountInPage(pageBottom, overflowingEl);
-
-		// Count the nuber of lines that overflow the page.
-		const totalLines = linesInEl(overflowingEl);
-
-		// Count the amount of lines that should be on the current page
-		// and the number of lines that should be on the next page.
-		const [linesToKeepOnPage, linesToPutOnNextPage] = this.splitLinesOnPages(
-			totalLines - numLinesOverflowing,
-			numLinesOverflowing
-		);
-
-		if (linesToPutOnNextPage > 0) {
-			// Find where the next page's words start,
-			// remove them from the overflowing element,
-			// and create a new page with the remaining content.
-			const splitOffset = this.getSplitPosition(overflowingNode, overflowingEl, linesToKeepOnPage);
-
-			if (splitOffset === null) {
-				console.warn('Could not find split position for overflowing element', overflowingEl);
-				return;
-			}
-
-			const contentToKeep = pageNode.cut(0, pos + splitOffset);
-			const contentToMove = pageNode.cut(pos + splitOffset);
-
-			const { tr } = view.state;
-
-			tr.replaceWith(offset, offset + pageNode.nodeSize, contentToKeep);
-			tr.insert(offset + contentToKeep.nodeSize, contentToMove);
-
-			view.dispatch(tr);
-		}
+		return {
+			success: true,
+			overflowingNode,
+			overflowingNodeOffset: pos,
+			overflowingEl,
+			pageNode,
+			pageOffset: offset,
+			pageEl: page,
+			pageBottom
+		};
 	}
 
 	/**
