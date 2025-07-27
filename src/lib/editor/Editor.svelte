@@ -142,7 +142,6 @@
 		display: flex;
 		flex-direction: column;
 		position: relative;
-		overflow: hidden;
 	}
 
 	.main-container {

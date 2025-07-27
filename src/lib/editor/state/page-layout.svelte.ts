@@ -283,8 +283,27 @@ export class PageLayoutManager {
 			// Find where the next page's words start,
 			// remove them from the overflowing element,
 			// and create a new page with the remaining content.
-			const splitPosition = this.getSplitPosition(overflowingEl, linesToKeepOnPage);
-			console.log(splitPosition);
+			const splitOffset = this.getSplitPosition(overflowingNode, overflowingEl, linesToKeepOnPage);
+
+			if (splitOffset === null) {
+				console.warn('Could not find split position for overflowing element', overflowingEl);
+				return;
+			}
+
+			const contentToKeep = root.cut(0, pos + splitOffset);
+			const contentToMove = root.cut(pos + splitOffset);
+
+			const currentPageReplacement = overflowingNode.type.create(overflowingNode.attrs, [
+				contentToKeep
+			]);
+			const { tr } = view.state;
+
+			tr.replaceWith(offset, offset + root.nodeSize, currentPageReplacement);
+
+			const newPage = root.type.create(root.attrs, contentToMove);
+			tr.insert(offset + currentPageReplacement.nodeSize, newPage);
+
+			view.dispatch(tr);
 		}
 
 		// const tr = view.state.tr.delete(pos, view.state.doc.content.size);
@@ -294,33 +313,54 @@ export class PageLayoutManager {
 	/**
 	 * Get the position in which to split the overflowing element so that we can split it onto two separate pages.
 	 */
-	getSplitPosition(el: HTMLElement, linesToKeepOnPage: number): number | null {
+	getSplitPosition(node: Node, el: HTMLElement, linesToKeepOnPage: number): number | null {
 		const range = document.createRange();
 		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
 
-		let posInNode = 0; // relative offset in ProseMirror node
-		let currentNode = walker.nextNode();
+		let visualLineCount = 0;
+		let pmOffset = 0;
 
-		while (currentNode) {
-			const text = currentNode.textContent || '';
-			for (let i = 1; i <= text.length; i++) {
-				range.setStart(el, 0); // start from beginning of element
-				range.setEnd(currentNode, i);
+		// We’ll iterate through the ProseMirror node’s descendants and DOM text nodes together
+		let domTextNode = walker.nextNode();
 
-				const rects = range.getClientRects();
-				const lineCount = rects.length;
+		if (!domTextNode) return null;
 
-				if (lineCount >= linesToKeepOnPage) {
-					return posInNode;
+		node.descendants((child) => {
+			if (!child.isText || !child.text) return true; // only interested in text nodes
+
+			let remaining = child.text.length;
+
+			while (remaining > 0 && domTextNode) {
+				const domText = domTextNode.textContent || '';
+				const toConsume = Math.min(remaining, domText.length);
+
+				for (let i = 1; i <= toConsume; i++) {
+					range.setStart(el, 0);
+					range.setEnd(domTextNode, i);
+
+					const rects = range.getClientRects();
+					const lines = rects.length;
+
+					if (lines > visualLineCount) {
+						visualLineCount = lines;
+						// linesToeepOnPage + 1 becaue we want to start at the beginnign of the next line.
+						if (linesToKeepOnPage + 1 === visualLineCount) {
+							return false; // Stop traversal, we reached the split line
+						}
+					}
+
+					pmOffset += 1;
 				}
 
-				posInNode++;
+				remaining -= toConsume;
+				domTextNode = walker.nextNode();
 			}
 
-			currentNode = walker.nextNode();
-		}
+			return true; // keep descending
+		});
 
-		return null; // Not enough lines to reach the requested split
+		// If we reached or passed desired line count, return offset
+		return visualLineCount >= linesToKeepOnPage ? pmOffset : null;
 	}
 }
 
