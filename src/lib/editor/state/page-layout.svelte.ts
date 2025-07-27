@@ -293,22 +293,13 @@ export class PageLayoutManager {
 			const contentToKeep = pageNode.cut(0, pos + splitOffset);
 			const contentToMove = pageNode.cut(pos + splitOffset);
 
-			console.log(contentToKeep.toJSON());
-			console.log(contentToMove.toJSON());
-
-			const currentPageReplacement = pageNode.type.create(pageNode.attrs, contentToKeep);
 			const { tr } = view.state;
 
-			tr.replaceWith(offset, offset + pageNode.nodeSize, currentPageReplacement);
-
-			const newPage = pageNode.type.create(pageNode.attrs, contentToMove);
-			tr.insert(offset + currentPageReplacement.nodeSize, newPage);
+			tr.replaceWith(offset, offset + pageNode.nodeSize, contentToKeep);
+			tr.insert(offset + contentToKeep.nodeSize, contentToMove);
 
 			view.dispatch(tr);
 		}
-
-		// const tr = view.state.tr.delete(pos, view.state.doc.content.size);
-		// view.dispatch(tr);
 	}
 
 	/**
