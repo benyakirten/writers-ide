@@ -226,15 +226,15 @@ export class PageLayoutManager {
 			// this.createPage(view)
 			return;
 		}
-		const { page, node: root, offset } = pageDetails;
+		const { page, node: pageNode, offset } = pageDetails;
 		const pageBottom = this.calculatePageBottom(page);
 		let prevEl: HTMLElement | null = null;
 		let overflowingEl: HTMLElement | null = null;
 		let overflowingNode: Node | null = null;
 
 		let pos = 0;
-		while (pos < root.nodeSize) {
-			const node = root.nodeAt(pos);
+		while (pos < pageNode.nodeSize) {
+			const node = pageNode.nodeAt(pos);
 			if (!node) {
 				break;
 			}
@@ -290,17 +290,18 @@ export class PageLayoutManager {
 				return;
 			}
 
-			const contentToKeep = root.cut(0, pos + splitOffset);
-			const contentToMove = root.cut(pos + splitOffset);
+			const contentToKeep = pageNode.cut(0, pos + splitOffset);
+			const contentToMove = pageNode.cut(pos + splitOffset);
 
-			const currentPageReplacement = overflowingNode.type.create(overflowingNode.attrs, [
-				contentToKeep
-			]);
+			console.log(contentToKeep.toJSON());
+			console.log(contentToMove.toJSON());
+
+			const currentPageReplacement = pageNode.type.create(pageNode.attrs, contentToKeep);
 			const { tr } = view.state;
 
-			tr.replaceWith(offset, offset + root.nodeSize, currentPageReplacement);
+			tr.replaceWith(offset, offset + pageNode.nodeSize, currentPageReplacement);
 
-			const newPage = root.type.create(root.attrs, contentToMove);
+			const newPage = pageNode.type.create(pageNode.attrs, contentToMove);
 			tr.insert(offset + currentPageReplacement.nodeSize, newPage);
 
 			view.dispatch(tr);

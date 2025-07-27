@@ -4,7 +4,7 @@ import { clamp } from '$lib/utils/numbers';
 import { INDENT_MAX, INDENT_MIN, INDENT_SIZE_PX } from './constants';
 
 const doc: NodeSpec = {
-	content: 'block+'
+	content: 'page+'
 };
 
 const paragraph: NodeSpec = {
@@ -204,6 +204,7 @@ export const footer: NodeSpec = {
 
 export const nodes = {
 	doc,
+	page,
 	paragraph,
 	blockquote,
 	horizontalRule,
@@ -213,6 +214,5 @@ export const nodes = {
 	image,
 	hardBreak,
 	pageEnd,
-	page,
 	header
 } as const;
