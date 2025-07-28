@@ -242,8 +242,14 @@ export class PageLayoutManager {
 		let pageNumber = 0;
 		while (true) {
 			const overflowingDetails = this.getOverflowingInformation(view, pageNumber);
+			pageNumber++;
 			if (!overflowingDetails.success) {
-				return;
+				if (overflowingDetails.reason === OverflowingFailureReason.NoPage) {
+					// No more pages to paginate, we are done.
+					break;
+				} else {
+					continue;
+				}
 			}
 
 			const {
@@ -254,26 +260,13 @@ export class PageLayoutManager {
 				pageNode,
 				pageOffset
 			} = overflowingDetails;
-			pageNumber++;
 
-			// TODO: Write overflowing logic to handle non-text overflowing elements and/or nodes with combined types.
-			const [linesToKeepOnPage, linesToPutOnNextPage] = this.calculateTextOverflow(
-				pageBottom,
-				overflowingEl
-			);
-			// TODO: Check if the next pagination on the next page affects this one in case of widow/orphan lines.
-			// Could we maybe want to do two passes: one forward and one backward?
-
-			if (linesToPutOnNextPage === 0) {
-				// There could be a page that is overflowing/underflowing after a page that is not overflowing.
-				continue;
-			}
-
-			const splitOffset = this.getSplitPosition(overflowingNode, overflowingEl, linesToKeepOnPage);
+			const splitOffset = this.getSplitOffset(pageBottom, overflowingNode, overflowingEl);
 			if (splitOffset === null) {
 				console.warn('Could not find split position for overflowing element', overflowingEl);
 				return;
 			}
+
 			const contentToKeep = pageNode.cut(0, overflowingNodeOffset + splitOffset);
 			const contentToMove = pageNode.cut(overflowingNodeOffset + splitOffset);
 
@@ -284,6 +277,7 @@ export class PageLayoutManager {
 			// Create a new page with the content that was overflowing.
 			tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
 			// Remove indentation from first paragraph.
+			// TODO: Find out how to determine this.
 			tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
 
 			view.dispatch(tr);
@@ -368,21 +362,27 @@ export class PageLayoutManager {
 	}
 
 	/**
-	 * Get the position in which to split the overflowing element so that we can split it onto two separate pages.
+	 * Find the first position in the overflowing element that causes the overflow.
 	 */
-	getSplitPosition(node: Node, el: HTMLElement, linesToKeepOnPage: number): number | null {
+	getSplitOffset(
+		pageBottom: number,
+		overflowingNode: Node,
+		overflowingEl: HTMLElement
+	): number | null {
 		const range = document.createRange();
-		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+		const walker = document.createTreeWalker(overflowingEl, NodeFilter.SHOW_TEXT);
 
-		let visualLineCount = 0;
+		let positionFound = false;
 		let pmOffset = 0;
 
 		// We’ll iterate through the ProseMirror node’s descendants and DOM text nodes together
 		let domTextNode = walker.nextNode();
 
-		if (!domTextNode) return null;
+		if (!domTextNode) {
+			return null;
+		}
 
-		node.descendants((child) => {
+		overflowingNode.descendants((child) => {
 			if (!child.isText || !child.text) return true; // only interested in text nodes
 
 			let remaining = child.text.length;
@@ -392,18 +392,18 @@ export class PageLayoutManager {
 				const toConsume = Math.min(remaining, domText.length);
 
 				for (let i = 1; i <= toConsume; i++) {
-					range.setStart(el, 0);
+					range.setStart(overflowingEl, 0);
 					range.setEnd(domTextNode, i);
 
 					const rects = range.getClientRects();
-					const lines = rects.length;
+					if (rects.length === 0) {
+						continue;
+					}
 
-					if (lines > visualLineCount) {
-						visualLineCount = lines;
-						// linesToeepOnPage + 1 becaue we want to start at the beginnign of the next line.
-						if (linesToKeepOnPage + 1 === visualLineCount) {
-							return false; // Stop traversal, we reached the split line
-						}
+					const lastRectBottom = rects[rects.length - 1].bottom;
+					if (pageBottom < lastRectBottom) {
+						positionFound = true;
+						return false;
 					}
 
 					pmOffset += 1;
@@ -417,7 +417,7 @@ export class PageLayoutManager {
 		});
 
 		// If we reached or passed desired line count, return offset
-		return visualLineCount >= linesToKeepOnPage ? pmOffset : null;
+		return positionFound ? pmOffset : null;
 	}
 }
 
