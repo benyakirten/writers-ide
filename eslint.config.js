@@ -28,6 +28,16 @@ export default ts.config(
 		}
 	},
 	{
-		ignores: ['src-tauri/', '.svelte-kit/', 'dist/', 'src/lib/paraglide/']
+		ignores: ['src-tauri/', '.svelte-kit/', 'dist/', 'src/lib/paraglide/'],
+		rules: {
+			'@typescript-eslint/no-unused-vars': [
+				'error',
+				{
+					argsIgnorePattern: '^_',
+					varsIgnorePattern: '^_',
+					caughtErrorsIgnorePattern: '^_'
+				}
+			]
+		}
 	}
 );

@@ -286,10 +286,9 @@ export class PageLayoutManager {
 
 	calculateTextOverflow(
 		pageBottom: number,
-		overflowingEl: HTMLElement
+		overflowingEl: HTMLElement,
+		lineHeight: number
 	): [linesToKeepOnPage: number, linesToPutOnNextPage: number] {
-		const lineHeight = getLineHeight(overflowingEl);
-
 		const numLines = calculateTotalLinesOfText(overflowingEl, lineHeight);
 		const overflowingLines = calculateOverflowingLinesOfText(overflowingEl, pageBottom, lineHeight);
 
@@ -399,7 +398,7 @@ export class PageLayoutManager {
 			return bottom > maxBottom;
 		}
 
-		function advanceForTextNode(child: ProseMirrorNode): boolean {
+		const advanceForTextNode = (child: ProseMirrorNode): boolean => {
 			let nextTextNode = getNextTextNode();
 			if (!nextTextNode) {
 				console.error(child);
@@ -413,9 +412,8 @@ export class PageLayoutManager {
 				const domText = nextTextNode.textContent || '';
 				const toConsume = Math.min(remaining, domText.length);
 				if (doesNodeAtPositionOverflow(nextTextNode, toConsume, pageBottom)) {
-					console.log('OVERFLOW DETECTED');
-					console.log(nextTextNode);
-					console.log(child);
+					const _lineHeight = getLineHeight(overflowingEl);
+					// TODO: Figure out how long the overflowing node is and calculate where to put the offset based on that.
 				}
 
 				for (let i = 1; i <= toConsume; i++) {
@@ -431,7 +429,7 @@ export class PageLayoutManager {
 			}
 
 			return true;
-		}
+		};
 
 		overflowingNode.descendants((child) => {
 			if (child.isText && child.text) {
