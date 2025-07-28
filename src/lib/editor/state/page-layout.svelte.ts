@@ -370,53 +370,68 @@ export class PageLayoutManager {
 		overflowingEl: HTMLElement
 	): number | null {
 		const range = document.createRange();
-		const walker = document.createTreeWalker(overflowingEl, NodeFilter.SHOW_TEXT);
+		const walker = document.createTreeWalker(
+			overflowingEl,
+			NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT
+		);
 
 		let positionFound = false;
 		let pmOffset = 0;
 
-		// We’ll iterate through the ProseMirror node’s descendants and DOM text nodes together
-		let domTextNode = walker.nextNode();
+		function getNextTextNode(): Node | null {
+			while (true) {
+				const node = walker.nextNode();
+				if (!node) {
+					return null;
+				}
 
-		if (!domTextNode) {
-			return null;
+				if (node.nodeType === Node.TEXT_NODE) {
+					return node;
+				}
+			}
 		}
 
 		overflowingNode.descendants((child) => {
-			if (!child.isText || !child.text) return true; // only interested in text nodes
-
-			let remaining = child.text.length;
-
-			while (remaining > 0 && domTextNode) {
-				const domText = domTextNode.textContent || '';
-				const toConsume = Math.min(remaining, domText.length);
-
-				for (let i = 1; i <= toConsume; i++) {
-					range.setStart(overflowingEl, 0);
-					range.setEnd(domTextNode, i);
-
-					const rects = range.getClientRects();
-					if (rects.length === 0) {
-						continue;
-					}
-
-					const lastRectBottom = rects[rects.length - 1].bottom;
-					if (pageBottom < lastRectBottom) {
-						positionFound = true;
-						return false;
-					}
-
-					pmOffset += 1;
+			if (child.isText && child.text) {
+				let nextTextNode = getNextTextNode();
+				if (!nextTextNode) {
+					console.error(child);
+					throw new Error(
+						'HTML Walker and PM descendents lost coordination. No text node discovered but expected'
+					);
 				}
 
-				remaining -= toConsume;
-				domTextNode = walker.nextNode();
-			}
+				let remaining = child.text.length;
+				while (remaining > 0 && nextTextNode) {
+					const domText = nextTextNode.textContent || '';
+					const toConsume = Math.min(remaining, domText.length);
 
-			return true; // keep descending
+					for (let i = 1; i <= toConsume; i++) {
+						range.setStart(overflowingEl, 0);
+						range.setEnd(nextTextNode, i);
+
+						const rects = range.getClientRects();
+						if (rects.length === 0) {
+							continue;
+						}
+
+						const lastRectBottom = rects[rects.length - 1].bottom;
+						if (pageBottom < lastRectBottom) {
+							positionFound = true;
+							return false;
+						}
+
+						pmOffset++;
+					}
+
+					remaining -= toConsume;
+					nextTextNode = getNextTextNode();
+				}
+
+				return true;
+			}
 		});
 
-		// If we reached or passed desired line count, return offset
 		return positionFound ? pmOffset : null;
 	}
 }
