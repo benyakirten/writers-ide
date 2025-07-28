@@ -391,45 +391,56 @@ export class PageLayoutManager {
 			}
 		}
 
+		function doesNodeAtPositionOverflow(node: Node, position: number, maxBottom: number) {
+			range.setStart(overflowingEl, 0);
+			range.setEnd(node, position);
+
+			const { bottom } = range.getBoundingClientRect();
+			return bottom > maxBottom;
+		}
+
+		function advanceForTextNode(child: ProseMirrorNode): boolean {
+			let nextTextNode = getNextTextNode();
+			if (!nextTextNode) {
+				console.error(child);
+				throw new Error(
+					'HTML Walker and PM descendents lost coordination. No text node discovered but expected'
+				);
+			}
+
+			let remaining = child.text!.length;
+			while (remaining > 0 && nextTextNode) {
+				const domText = nextTextNode.textContent || '';
+				const toConsume = Math.min(remaining, domText.length);
+				if (doesNodeAtPositionOverflow(nextTextNode, toConsume, pageBottom)) {
+					console.log('OVERFLOW DETECTED');
+					console.log(nextTextNode);
+					console.log(child);
+				}
+
+				for (let i = 1; i <= toConsume; i++) {
+					if (doesNodeAtPositionOverflow(nextTextNode, i, pageBottom)) {
+						positionFound = true;
+						return false;
+					}
+					pmOffset++;
+				}
+
+				remaining -= toConsume;
+				nextTextNode = getNextTextNode();
+			}
+
+			return true;
+		}
+
 		overflowingNode.descendants((child) => {
 			if (child.isText && child.text) {
-				let nextTextNode = getNextTextNode();
-				if (!nextTextNode) {
-					console.error(child);
-					throw new Error(
-						'HTML Walker and PM descendents lost coordination. No text node discovered but expected'
-					);
-				}
-
-				let remaining = child.text.length;
-				while (remaining > 0 && nextTextNode) {
-					const domText = nextTextNode.textContent || '';
-					const toConsume = Math.min(remaining, domText.length);
-
-					for (let i = 1; i <= toConsume; i++) {
-						range.setStart(overflowingEl, 0);
-						range.setEnd(nextTextNode, i);
-
-						const rects = range.getClientRects();
-						if (rects.length === 0) {
-							continue;
-						}
-
-						const lastRectBottom = rects[rects.length - 1].bottom;
-						if (pageBottom < lastRectBottom) {
-							positionFound = true;
-							return false;
-						}
-
-						pmOffset++;
-					}
-
-					remaining -= toConsume;
-					nextTextNode = getNextTextNode();
-				}
-
-				return true;
+				return advanceForTextNode(child);
+			} else {
+				// TODO
 			}
+
+			return true;
 		});
 
 		return positionFound ? pmOffset : null;
