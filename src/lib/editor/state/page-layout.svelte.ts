@@ -1,5 +1,5 @@
 import type { EditorView } from 'prosemirror-view';
-import type { Node } from 'prosemirror-model';
+import type { Node as ProseMirrorNode } from 'prosemirror-model';
 
 import {
 	getLineHeight,
@@ -18,10 +18,10 @@ export enum OverflowingFailureReason {
 }
 type OverflowingDetailsSuccess = {
 	success: true;
-	overflowingNode: Node;
+	overflowingNode: ProseMirrorNode;
 	overflowingNodeOffset: number;
 	overflowingEl: HTMLElement;
-	pageNode: Node;
+	pageNode: ProseMirrorNode;
 	pageOffset: number;
 	pageEl: HTMLElement;
 	pageBottom: number;
@@ -173,7 +173,7 @@ export class PageLayoutManager {
 	getPage(
 		view: EditorView,
 		page: number
-	): { page: HTMLElement; node: Node; offset: number } | null {
+	): { pageEl: HTMLElement; pageNode: ProseMirrorNode; pageOffset: number } | null {
 		let pos = 0;
 		let currentPage = -1;
 		while (pos < view.state.doc.nodeSize) {
@@ -199,7 +199,7 @@ export class PageLayoutManager {
 					return null;
 				}
 
-				return { page: el, node, offset: pos };
+				return { pageEl: el, pageNode: node, pageOffset: pos };
 			}
 
 			pos += node.nodeSize;
@@ -306,12 +306,12 @@ export class PageLayoutManager {
 			};
 		}
 
-		const { page, node: pageNode, offset } = pageDetails;
-		const pageBottom = this.calculatePageBottom(page);
+		const { pageEl, pageNode, pageOffset } = pageDetails;
+		const pageBottom = this.calculatePageBottom(pageEl);
 
 		let prevEl: HTMLElement | null = null;
 		let overflowingEl: HTMLElement | null = null;
-		let overflowingNode: Node | null = null;
+		let overflowingNode: ProseMirrorNode | null = null;
 		let pos = 0;
 
 		while (pos < pageNode.nodeSize) {
@@ -325,7 +325,7 @@ export class PageLayoutManager {
 				continue;
 			}
 
-			const el = view.nodeDOM(pos + offset + 1) as HTMLElement | null;
+			const el = view.nodeDOM(pos + pageOffset + 1) as HTMLElement | null;
 			if (!el) {
 				console.warn('No element found for node', node, pos);
 				break;
@@ -355,8 +355,8 @@ export class PageLayoutManager {
 			overflowingNodeOffset: pos,
 			overflowingEl,
 			pageNode,
-			pageOffset: offset,
-			pageEl: page,
+			pageOffset,
+			pageEl,
 			pageBottom
 		};
 	}
@@ -366,7 +366,7 @@ export class PageLayoutManager {
 	 */
 	getSplitOffset(
 		pageBottom: number,
-		overflowingNode: Node,
+		overflowingNode: ProseMirrorNode,
 		overflowingEl: HTMLElement
 	): number | null {
 		const range = document.createRange();
