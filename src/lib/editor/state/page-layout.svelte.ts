@@ -376,6 +376,7 @@ export class PageLayoutManager {
 
 		let positionFound = false;
 		let pmOffset = 0;
+		let sequentialTextNodes: Node[] = [];
 
 		function getNextTextNode(): Node | null {
 			while (true) {
@@ -399,6 +400,7 @@ export class PageLayoutManager {
 		}
 
 		const advanceForTextNode = (child: ProseMirrorNode): boolean => {
+			sequentialTextNodes = [];
 			let nextTextNode = getNextTextNode();
 			if (!nextTextNode) {
 				console.error(child);
@@ -409,11 +411,12 @@ export class PageLayoutManager {
 
 			let remaining = child.text!.length;
 			while (remaining > 0 && nextTextNode) {
+				sequentialTextNodes.push(nextTextNode);
 				const domText = nextTextNode.textContent || '';
 				const toConsume = Math.min(remaining, domText.length);
 				if (doesNodeAtPositionOverflow(nextTextNode, toConsume, pageBottom)) {
 					const _lineHeight = getLineHeight(overflowingEl);
-					// TODO: Figure out how long the overflowing node is and calculate where to put the offset based on that.
+					// TODO: Use the sequential text nodes to figure out how widow/orphan lines and offset.
 				}
 
 				for (let i = 1; i <= toConsume; i++) {
