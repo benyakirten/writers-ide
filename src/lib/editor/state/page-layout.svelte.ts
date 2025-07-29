@@ -262,6 +262,7 @@ export class PageLayoutManager {
 			} = overflowingDetails;
 
 			const splitOffset = this.getSplitOffset(pageBottom, overflowingNode, overflowingEl);
+			console.log(splitOffset);
 			if (splitOffset === null) {
 				console.warn('Could not find split position for overflowing element', overflowingEl);
 				return;
@@ -374,7 +375,6 @@ export class PageLayoutManager {
 			NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT
 		);
 
-		let splitPositionData: number | null = null;
 		let pmOffset = 0;
 
 		function getNextTextNode(): Node | null {
@@ -438,7 +438,7 @@ export class PageLayoutManager {
 			}
 		};
 
-		const advanceForTextNode = (text: string): number | null => {
+		const advanceForTextNode = (text: string): boolean => {
 			let overflowDiscovered: boolean = false;
 
 			const sequentialTextNodes = [];
@@ -462,18 +462,15 @@ export class PageLayoutManager {
 				remaining -= toConsume;
 			}
 
-			return overflowDiscovered ? identifyOverflowingLines(sequentialTextNodes) : null;
+			if (overflowDiscovered) {
+				identifyOverflowingLines(sequentialTextNodes);
+			}
+			return !overflowDiscovered;
 		};
 
 		overflowingNode.descendants((child) => {
 			if (child.isText && child.text) {
-				const data = advanceForTextNode(child.text);
-				if (!data) {
-					return true;
-				}
-
-				splitPositionData = data;
-				return false;
+				return advanceForTextNode(child.text);
 			} else {
 				// TODO
 			}
@@ -481,7 +478,7 @@ export class PageLayoutManager {
 			return true;
 		});
 
-		return splitPositionData;
+		return pmOffset;
 	}
 }
 
