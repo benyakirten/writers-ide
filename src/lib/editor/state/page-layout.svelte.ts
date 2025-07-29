@@ -376,6 +376,7 @@ export class PageLayoutManager {
 
 		let pmOffset = 0;
 
+		// TODO: Fix these inline functions to be pure functions with no side effects.
 		function getNextTextNode(): Node | null {
 			while (true) {
 				const node = walker.nextNode();
@@ -429,7 +430,7 @@ export class PageLayoutManager {
 					range.setEnd(node, i);
 
 					const rects = range.getClientRects();
-					if (rects.length >= linesToKeepOnPage + 1) {
+					if (rects.length - 1 >= linesToKeepOnPage) {
 						return;
 					}
 					pmOffset++;
