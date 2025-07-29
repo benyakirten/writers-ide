@@ -398,27 +398,31 @@ export class PageLayoutManager {
 			return bottom > maxBottom;
 		}
 
-		const identifyOverflowingLines = (nodes: Node[]): number => {
+		const getNodeLineSplitAmount = (firstNode: Node, lastNode: Node) => {
 			const lineHeight = getLineHeight(overflowingEl);
 
-			const lastNode = nodes[nodes.length - 1];
 			const lastNodeText = lastNode.textContent ?? '';
-			range.setStart(nodes[0], 0);
+			range.setStart(firstNode, 0);
 			range.setEnd(lastNode, lastNodeText.length);
 
 			const textRect = range.getBoundingClientRect();
 
 			const totalLines = Math.round(textRect.height / lineHeight);
 			const overflowingLines = Math.min((textRect.bottom - pageBottom) / lineHeight);
-			const [linesToKeepOnPage, linesToPutOnNextPage] = this.calculateLineSplitAmount(
-				totalLines - overflowingLines,
-				overflowingLines
+			return this.calculateLineSplitAmount(totalLines - overflowingLines, overflowingLines);
+		};
+
+		const identifyOverflowingLines = (nodes: Node[]) => {
+			const [linesToKeepOnPage, linesToPutOnNextPage] = getNodeLineSplitAmount(
+				nodes[0],
+				nodes[nodes.length - 1]
 			);
 
 			if (linesToPutOnNextPage === 0) {
-				return 0;
+				throw new Error('Overflow detected, but no lines should be moved to the next page.');
 			}
 
+			// Go through the nodes and find out when we've achieved the correct number of lines.
 			for (const node of nodes) {
 				const domText = node.textContent ?? '';
 				for (let i = 0; i < domText.length; i++) {
@@ -426,14 +430,12 @@ export class PageLayoutManager {
 					range.setEnd(node, i);
 
 					const rects = range.getClientRects();
-					if (rects.length === linesToKeepOnPage) {
-						return pmOffset;
+					if (rects.length >= linesToKeepOnPage) {
+						return;
 					}
 					pmOffset++;
 				}
 			}
-
-			return 0;
 		};
 
 		const advanceForTextNode = (text: string): number | null => {
