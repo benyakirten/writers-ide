@@ -374,9 +374,8 @@ export class PageLayoutManager {
 			NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT
 		);
 
-		let positionFound = false;
+		let splitPositionData: number | null = null;
 		let pmOffset = 0;
-		let sequentialTextNodes: Node[] = [];
 
 		function getNextTextNode(): Node | null {
 			while (true) {
@@ -399,44 +398,80 @@ export class PageLayoutManager {
 			return bottom > maxBottom;
 		}
 
-		const advanceForTextNode = (child: ProseMirrorNode): boolean => {
-			sequentialTextNodes = [];
-			let nextTextNode = getNextTextNode();
-			if (!nextTextNode) {
-				console.error(child);
-				throw new Error(
-					'HTML Walker and PM descendents lost coordination. No text node discovered but expected'
-				);
+		const identifyOverflowingLines = (nodes: Node[]): number => {
+			const lineHeight = getLineHeight(overflowingEl);
+
+			const lastNode = nodes[nodes.length - 1];
+			const lastNodeText = lastNode.textContent ?? '';
+			range.setStart(nodes[0], 0);
+			range.setEnd(lastNode, lastNodeText.length);
+
+			const textRect = range.getBoundingClientRect();
+
+			const totalLines = Math.round(textRect.height / lineHeight);
+			const overflowingLines = Math.min((textRect.bottom - pageBottom) / lineHeight);
+			const [linesToKeepOnPage, linesToPutOnNextPage] = this.calculateLineSplitAmount(
+				totalLines - overflowingLines,
+				overflowingLines
+			);
+
+			if (linesToPutOnNextPage === 0) {
+				return 0;
 			}
 
-			let remaining = child.text!.length;
-			while (remaining > 0 && nextTextNode) {
+			for (const node of nodes) {
+				const domText = node.textContent ?? '';
+				for (let i = 0; i < domText.length; i++) {
+					range.setStart(nodes[0], 0);
+					range.setEnd(node, i);
+
+					const rects = range.getClientRects();
+					if (rects.length === linesToKeepOnPage) {
+						return pmOffset;
+					}
+					pmOffset++;
+				}
+			}
+
+			return 0;
+		};
+
+		const advanceForTextNode = (text: string): number | null => {
+			let overflowDiscovered: boolean = false;
+
+			const sequentialTextNodes = [];
+			let remaining = text.length;
+
+			while (remaining > 0) {
+				const nextTextNode = getNextTextNode();
+				if (!nextTextNode) {
+					throw new Error(
+						`HTML Walker and PM descendents lost coordination. No text node discovered but expected finding one containing part of ${text}`
+					);
+				}
 				sequentialTextNodes.push(nextTextNode);
 				const domText = nextTextNode.textContent || '';
 				const toConsume = Math.min(remaining, domText.length);
 				if (doesNodeAtPositionOverflow(nextTextNode, toConsume, pageBottom)) {
-					const _lineHeight = getLineHeight(overflowingEl);
-					// TODO: Use the sequential text nodes to figure out how widow/orphan lines and offset.
+					overflowDiscovered = true;
 				}
 
-				for (let i = 1; i <= toConsume; i++) {
-					if (doesNodeAtPositionOverflow(nextTextNode, i, pageBottom)) {
-						positionFound = true;
-						return false;
-					}
-					pmOffset++;
-				}
-
+				pmOffset += toConsume;
 				remaining -= toConsume;
-				nextTextNode = getNextTextNode();
 			}
 
-			return true;
+			return overflowDiscovered ? identifyOverflowingLines(sequentialTextNodes) : null;
 		};
 
 		overflowingNode.descendants((child) => {
 			if (child.isText && child.text) {
-				return advanceForTextNode(child);
+				const data = advanceForTextNode(child.text);
+				if (!data) {
+					return true;
+				}
+
+				splitPositionData = data;
+				return false;
 			} else {
 				// TODO
 			}
@@ -444,7 +479,7 @@ export class PageLayoutManager {
 			return true;
 		});
 
-		return positionFound ? pmOffset : null;
+		return splitPositionData;
 	}
 }
 
