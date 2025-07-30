@@ -5,3 +5,5 @@ export const INDENT_SIZE_PX = 40;
 export const CM_PER_INCH = 2.54;
 /**  https://www.w3.org/TR/CSS2/syndata.html#length-units */
 export const PIXELS_PER_INCH = 96;
+
+export const PROSEMIRROR_PAGE_CLASS = 'prosemirror-page';

@@ -1,7 +1,7 @@
 import type { DOMOutputSpec, NodeSpec } from 'prosemirror-model';
 
 import { clamp } from '$lib/utils/numbers';
-import { INDENT_MAX, INDENT_MIN, INDENT_SIZE_PX } from './constants';
+import { INDENT_MAX, INDENT_MIN, INDENT_SIZE_PX, PROSEMIRROR_PAGE_CLASS } from './constants';
 
 const doc: NodeSpec = {
 	content: 'page+'
@@ -150,13 +150,13 @@ const hardBreak: NodeSpec = {
 	}
 };
 
-const pageDom: DOMOutputSpec = ['div', { class: 'prosemirror-page' }, 0];
+const pageDom: DOMOutputSpec = ['div', { class: PROSEMIRROR_PAGE_CLASS }, 0];
 const page: NodeSpec = {
 	content: 'block+',
 	group: 'block',
 	selectable: false,
 	draggable: false,
-	parseDOM: [{ tag: 'div.prosemirror-page' }],
+	parseDOM: [{ tag: `div.${PROSEMIRROR_PAGE_CLASS}` }],
 	toDOM() {
 		return pageDom;
 	}
