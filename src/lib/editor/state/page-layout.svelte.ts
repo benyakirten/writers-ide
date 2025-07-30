@@ -238,9 +238,14 @@ export class PageLayoutManager {
 		return [linesNotOverflowingPage, linesOverflowingPage];
 	}
 
-	paginate(view: EditorView) {
-		let pageNumber = 0;
+	paginate(view: EditorView, from: number, to?: number) {
+		let pageNumber = from;
 		while (true) {
+			// Since the page count can change while we're iterating, if a definite page count
+			// is not provided, we should ignore the condition.
+			if (to !== undefined && pageNumber >= to) {
+				break;
+			}
 			const overflowingDetails = this.getOverflowingInformation(view, pageNumber);
 			pageNumber++;
 			if (!overflowingDetails.success) {

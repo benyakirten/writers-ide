@@ -43,7 +43,7 @@
 
 	function paginate() {
 		const [data] = Object.values(Editors.editors);
-		PageLayout.paginate(data.view);
+		PageLayout.paginate(data.view, 0, 1);
 	}
 </script>
 
