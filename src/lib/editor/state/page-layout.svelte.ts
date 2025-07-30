@@ -175,7 +175,7 @@ export class PageLayoutManager {
 		page: number
 	): { pageEl: HTMLElement; pageNode: ProseMirrorNode; pageOffset: number } | null {
 		let pos = 0;
-		let currentPage = -1;
+		let currentPage = 0;
 		while (pos < view.state.doc.nodeSize) {
 			const node = view.state.doc.nodeAt(pos);
 			if (!node) {
@@ -192,7 +192,6 @@ export class PageLayoutManager {
 				continue;
 			}
 
-			currentPage++;
 			if (currentPage === page) {
 				const el = view.nodeDOM(pos) as HTMLElement;
 				if (!el) {
@@ -202,6 +201,7 @@ export class PageLayoutManager {
 				return { pageEl: el, pageNode: node, pageOffset: pos };
 			}
 
+			currentPage++;
 			pos += node.nodeSize;
 		}
 
@@ -246,6 +246,7 @@ export class PageLayoutManager {
 			if (to !== undefined && pageNumber >= to) {
 				break;
 			}
+
 			const overflowingDetails = this.getOverflowingInformation(view, pageNumber);
 			pageNumber++;
 			if (!overflowingDetails.success) {
@@ -272,6 +273,8 @@ export class PageLayoutManager {
 				return;
 			}
 
+			// NOTE: node.cut WILL KEEP THE OUTER ELEMENT so if we only want the content
+			// and not the page too, we need to get cutContent.content instead of cutContent.
 			const contentToKeep = pageNode.cut(0, overflowingNodeOffset + splitOffset);
 			const contentToMove = pageNode.cut(overflowingNodeOffset + splitOffset);
 
@@ -280,7 +283,15 @@ export class PageLayoutManager {
 			// Remove overflowing content from the page;
 			tr.replaceWith(pageOffset, pageOffset + pageNode.nodeSize, contentToKeep);
 			// Create a new page with the content that was overflowing.
-			tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
+
+			const nextPageInfo = this.getPage(view, pageNumber);
+			if (!nextPageInfo) {
+				// If there is no next page, we create it.
+				tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
+			} else {
+				// If there is a next page, we insert the content there.
+				tr.insert(pageOffset + contentToKeep.nodeSize + 1, contentToMove.content);
+			}
 			// Remove indentation from first paragraph.
 			// TODO: Find out how to determine this.
 			tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
@@ -412,6 +423,11 @@ export class PageLayoutManager {
 		return this.calculateLineSplitAmount(totalLines - overflowingLines, overflowingLines);
 	}
 
+	/**
+	 * Since in text we care about wodw and orphan lines, we need to count lines and use them
+	 * alongside widow and orphan lines to determine how many lines we can keep on the page.
+	 * We can use this amount to determine the offset position to split the page.
+	 */
 	private identifyOverflowingLines(el: HTMLElement, nodes: Node[], maxBottom: number) {
 		const range = document.createRange();
 		let offset = 0;
