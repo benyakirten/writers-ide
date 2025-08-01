@@ -238,8 +238,21 @@ export class PageLayoutManager {
 		return [linesNotOverflowingPage, linesOverflowingPage];
 	}
 
-	paginate(view: EditorView, from: number, to?: number) {
+	/**
+	 * Paginate from the given `from` position to the `to` position, non-inclusive.
+	 * This function is relatively complex since we need to use the DOM to measure
+	 * the effects of the underlying layout engine that JS does not have access to.
+	 * This function requires the main thread and cannot be run on a web/service worker
+	 * because neither can access the DOM, and this function requires DOM access to measure/
+	 * compare the page elements and their rendered positions.
+	 *
+	 * Therefore, we use a generator function to allow the caller to control the pagination
+	 * and yield to allow the UI to update if necessary. The data yielded is the number of the page,
+	 * which is 1 greater than the page index.
+	 */
+	*paginate(view: EditorView, from: number, to?: number): Generator<number, number, void> {
 		let pageNumber = from;
+
 		while (true) {
 			// Since the page count can change while we're iterating, if a definite page count
 			// is not provided, we should ignore the condition.
@@ -254,6 +267,8 @@ export class PageLayoutManager {
 					// No more pages to paginate, we are done.
 					break;
 				} else {
+					// Test for if we might want to move widow lines to the next page.
+					yield pageNumber;
 					continue;
 				}
 			}
@@ -270,7 +285,7 @@ export class PageLayoutManager {
 			const splitOffset = this.getSplitOffset(pageBottom, overflowingNode, overflowingEl);
 			if (splitOffset === null) {
 				console.warn('Could not find split position for overflowing element', overflowingEl);
-				return;
+				return pageNumber - 1;
 			}
 
 			// NOTE: node.cut WILL KEEP THE OUTER ELEMENT so if we only want the content
@@ -297,7 +312,10 @@ export class PageLayoutManager {
 			tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
 
 			view.dispatch(tr);
+			yield pageNumber;
 		}
+
+		return pageNumber;
 	}
 
 	calculateTextOverflow(

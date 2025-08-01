@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ToastManager from '$lib/services/toaster.svelte';
-	import Editors from '../prosemirror/prose-mirror-editor.svelte';
+	import Editors, { type EditorData } from '../prosemirror/prose-mirror-editor.svelte';
 	import TransferHandler, { type BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 	import PageLayout from '../state/page-layout.svelte';
@@ -41,9 +41,13 @@
 		return messages[Math.floor(Math.random() * messages.length)];
 	}
 
+	let gen: Generator<number, number, void> | null = null;
 	function paginate() {
-		const [data] = Object.values(Editors.editors);
-		PageLayout.paginate(data.view, 0);
+		if (!gen) {
+			const [data] = Object.values(Editors.editors);
+			gen = PageLayout.paginate(data.view, 0);
+		}
+		console.log(gen.next());
 	}
 </script>
 

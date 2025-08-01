@@ -152,7 +152,7 @@ const hardBreak: NodeSpec = {
 
 const pageDom: DOMOutputSpec = ['div', { class: PROSEMIRROR_PAGE_CLASS }, 0];
 const page: NodeSpec = {
-	content: 'block+',
+	content: 'block*',
 	group: 'block',
 	selectable: false,
 	draggable: false,

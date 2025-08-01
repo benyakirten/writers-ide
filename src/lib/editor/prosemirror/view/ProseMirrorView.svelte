@@ -13,7 +13,6 @@
 	import type { TabComponentProps } from '@/editor/state/tab-state-registry.svelte';
 	import ProseMirrorPlugins from '../plugins.svelte';
 	import Editors from '../prose-mirror-editor.svelte';
-	import PageLayout from '@/editor/state/page-layout.svelte';
 
 	let { id }: TabComponentProps = $props();
 
@@ -36,7 +35,7 @@
 			]),
 			schema.node('paragraph', null, [
 				schema.text(
-					'3Morbi consequat viverra lacus non maximus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Nunc vestibulum semper sodales. Sed eu hendrerit felis.',
+					'3Morbi consequat viverra lacus non maximus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo.',
 					[schema.marks.bold.create({})]
 				),
 				schema.text(
@@ -175,9 +174,6 @@
 		});
 
 		const deregister = Editors.register(id, view);
-
-		// setTimeout(() => PageLayout.paginate(view), 1000);
-
 		return () => deregister();
 	});
 </script>
