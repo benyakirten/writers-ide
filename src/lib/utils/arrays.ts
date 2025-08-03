@@ -24,7 +24,7 @@ export function toSwapped<T>(array: T[], indexA: number, indexB: number): T[] {
 // TODO: Apply this where methods are used.
 export function index<T extends { id: string }>(array: T[], index: string | number): T | undefined {
 	if (typeof index === 'number') {
-		return array[index];
+		return array.at(index);
 	} else {
 		return array.find((item) => item.id === index);
 	}
