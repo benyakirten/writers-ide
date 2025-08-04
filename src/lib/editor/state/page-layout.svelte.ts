@@ -550,36 +550,7 @@ export class PageLayoutManager {
 
 		let consecutiveTextNodeContent: string[] = [];
 
-		overflowingNode.descendants((child) => {
-			if (child.isText && child.text) {
-				consecutiveTextNodeContent.push(child.text);
-			} else {
-				if (consecutiveTextNodeContent.length > 0) {
-					const result = this.advanceForTextNode(
-						walker,
-						overflowingEl,
-						consecutiveTextNodeContent.join(''),
-						pageBottom
-					);
-					const { offset, overflowDiscovered } = result;
-
-					pmOffset += offset;
-
-					if (overflowDiscovered) {
-						shouldDedent = true;
-						return false;
-					}
-
-					consecutiveTextNodeContent = [];
-				}
-
-				// TODO
-			}
-
-			return true;
-		});
-
-		if (consecutiveTextNodeContent.length > 0) {
+		const moveForwardForNextNode = () => {
 			const result = this.advanceForTextNode(
 				walker,
 				overflowingEl,
@@ -589,10 +560,34 @@ export class PageLayoutManager {
 			const { offset, overflowDiscovered } = result;
 
 			pmOffset += offset;
+			consecutiveTextNodeContent = [];
 
 			if (overflowDiscovered) {
 				shouldDedent = true;
 			}
+
+			return overflowDiscovered;
+		};
+
+		overflowingNode.descendants((child) => {
+			if (child.isText && child.text) {
+				consecutiveTextNodeContent.push(child.text);
+			} else {
+				if (consecutiveTextNodeContent.length > 0) {
+					const overflowDiscovered = moveForwardForNextNode();
+					if (overflowDiscovered) {
+						return false;
+					}
+				}
+
+				// TODO
+			}
+
+			return true;
+		});
+
+		if (consecutiveTextNodeContent.length > 0) {
+			moveForwardForNextNode();
 		}
 
 		return { splitOffset: pmOffset, shouldDedent };
