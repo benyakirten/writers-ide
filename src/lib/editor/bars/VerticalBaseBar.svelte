@@ -47,7 +47,8 @@
 			const [data] = Object.values(Editors.editors);
 			gen = PageLayout.paginate(data.view, 0);
 		}
-		console.log(gen.next());
+		[...gen];
+		gen = null;
 	}
 </script>
 

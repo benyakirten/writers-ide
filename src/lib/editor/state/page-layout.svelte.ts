@@ -282,11 +282,13 @@ export class PageLayoutManager {
 				pageOffset
 			} = overflowingDetails;
 
-			const splitOffset = this.getSplitOffset(pageBottom, overflowingNode, overflowingEl);
-			if (splitOffset === null) {
+			const splitOffsetInfo = this.getSplitOffset(pageBottom, overflowingNode, overflowingEl);
+			if (splitOffsetInfo === null) {
 				console.warn('Could not find split position for overflowing element', overflowingEl);
 				return pageNumber - 1;
 			}
+
+			const { splitOffset, shouldDedent } = splitOffsetInfo;
 
 			// NOTE: node.cut WILL KEEP THE OUTER ELEMENT so if we only want the content
 			// and not the page too, we need to get cutContent.content instead of cutContent.
@@ -307,9 +309,10 @@ export class PageLayoutManager {
 				// If there is a next page, we insert the content there.
 				tr.insert(pageOffset + contentToKeep.nodeSize + 1, contentToMove.content);
 			}
-			// Remove indentation from first paragraph.
-			// TODO: Find out how to determine this.
-			tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
+
+			if (shouldDedent) {
+				tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
+			}
 
 			view.dispatch(tr);
 			yield pageNumber;
@@ -425,10 +428,10 @@ export class PageLayoutManager {
 		el: HTMLElement,
 		firstNode: Node,
 		lastNode: Node,
-		maxBottom: number
+		maxBottom: number,
+		lineHeight: number
 	) {
 		const range = document.createRange();
-		const lineHeight = getLineHeight(el);
 
 		const lastNodeText = lastNode.textContent ?? '';
 		range.setStart(firstNode, 0);
@@ -446,15 +449,25 @@ export class PageLayoutManager {
 	 * alongside widow and orphan lines to determine how many lines we can keep on the page.
 	 * We can use this amount to determine the offset position to split the page.
 	 */
-	private identifyOverflowingLines(el: HTMLElement, nodes: Node[], maxBottom: number) {
+	private identifyOffsetBasedOffOverflowingLines(
+		el: HTMLElement,
+		nodes: Node[],
+		maxBottom: number
+	) {
 		const range = document.createRange();
 		let offset = 0;
+
+		const lineHeight = getLineHeight(el);
 		const [linesToKeepOnPage, linesToPutOnNextPage] = this.getNodeLineSplitAmount(
 			el,
 			nodes[0],
 			nodes[nodes.length - 1],
-			maxBottom
+			maxBottom,
+			lineHeight
 		);
+
+		console.log(nodes.map((n) => n.textContent));
+		console.log(linesToKeepOnPage, linesToPutOnNextPage);
 
 		if (linesToPutOnNextPage === 0) {
 			throw new Error('Overflow detected, but no lines should be moved to the next page.');
@@ -467,8 +480,9 @@ export class PageLayoutManager {
 				range.setStart(nodes[0], 0);
 				range.setEnd(node, i);
 
-				const rects = range.getClientRects();
-				if (rects.length - 1 >= linesToKeepOnPage) {
+				const rect = range.getBoundingClientRect();
+				const numLines = Math.round(rect.height / lineHeight);
+				if (numLines - 1 >= linesToKeepOnPage) {
 					break outer;
 				}
 				offset++;
@@ -483,12 +497,13 @@ export class PageLayoutManager {
 		el: HTMLElement,
 		text: string,
 		maxBottom: number
-	): { offset: number; success: boolean } {
+	): { offset: number; overflowDiscovered: boolean } {
 		let pmOffset = 0;
 		let overflowDiscovered: boolean = false;
 
 		const sequentialTextNodes = [];
 		let remaining = text.length;
+		console.log(text);
 		let potentialExtra = 0;
 
 		while (remaining > 0) {
@@ -510,13 +525,13 @@ export class PageLayoutManager {
 		}
 
 		if (overflowDiscovered) {
-			pmOffset += this.identifyOverflowingLines(el, sequentialTextNodes, maxBottom);
+			pmOffset += this.identifyOffsetBasedOffOverflowingLines(el, sequentialTextNodes, maxBottom);
 		} else {
 			pmOffset += potentialExtra;
 		}
 
 		return {
-			success: overflowDiscovered,
+			overflowDiscovered,
 			offset: pmOffset
 		};
 	}
@@ -528,27 +543,63 @@ export class PageLayoutManager {
 		pageBottom: number,
 		overflowingNode: ProseMirrorNode,
 		overflowingEl: HTMLElement
-	): number | null {
+	): { splitOffset: number; shouldDedent: boolean } | null {
 		const walker = document.createTreeWalker(
 			overflowingEl,
 			NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT
 		);
 
 		let pmOffset = 0;
+		let shouldDedent = false;
+
+		let consecutiveTextNodeContent: string[] = [];
 
 		overflowingNode.descendants((child) => {
 			if (child.isText && child.text) {
-				const result = this.advanceForTextNode(walker, overflowingEl, child.text, pageBottom);
-				pmOffset += result.offset;
-				return !result.success;
+				consecutiveTextNodeContent.push(child.text);
 			} else {
+				if (consecutiveTextNodeContent.length > 0) {
+					const result = this.advanceForTextNode(
+						walker,
+						overflowingEl,
+						consecutiveTextNodeContent.join(''),
+						pageBottom
+					);
+					const { offset, overflowDiscovered } = result;
+
+					pmOffset += offset;
+
+					if (overflowDiscovered) {
+						shouldDedent = true;
+						return false;
+					}
+
+					consecutiveTextNodeContent = [];
+				}
+
 				// TODO
 			}
 
 			return true;
 		});
 
-		return pmOffset;
+		if (consecutiveTextNodeContent.length > 0) {
+			const result = this.advanceForTextNode(
+				walker,
+				overflowingEl,
+				consecutiveTextNodeContent.join(''),
+				pageBottom
+			);
+			const { offset, overflowDiscovered } = result;
+
+			pmOffset += offset;
+
+			if (overflowDiscovered) {
+				shouldDedent = true;
+			}
+		}
+
+		return { splitOffset: pmOffset, shouldDedent };
 	}
 }
 
