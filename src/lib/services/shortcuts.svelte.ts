@@ -4,6 +4,7 @@ import { capitalize } from '$lib/utils/strings';
 
 export class ShortcutService extends Observable<string> {
 	commandsToShortcuts = $state<Record<string, string>>({});
+
 	shortcutsToCommands = $derived.by(() => {
 		const shortcuts: Record<string, string[]> = {};
 		for (const [command, shortcut] of Object.entries(this.commandsToShortcuts)) {
@@ -18,6 +19,7 @@ export class ShortcutService extends Observable<string> {
 
 		return shortcuts;
 	});
+
 	commandsToDisplayedShortcuts = $derived.by(() => {
 		const displayShortcuts: Record<string, string> = {};
 		const useMacShortcuts = isMac();
@@ -26,6 +28,7 @@ export class ShortcutService extends Observable<string> {
 		}
 		return displayShortcuts;
 	});
+
 	SEPARATOR = '-';
 
 	deactivated = $state(false);
@@ -137,9 +140,9 @@ export class ShortcutService extends Observable<string> {
 		}
 	}
 
-	#hasCtrlMetaOrAltKeys(cmd: string): boolean {
-		return cmd.includes('ctrl') || cmd.includes('meta') || cmd.includes('alt');
-	}
+	// #hasCtrlMetaOrAltKeys(cmd: string): boolean {
+	// 	return cmd.includes('ctrl') || cmd.includes('meta') || cmd.includes('alt');
+	// }
 
 	addCommand(name: string) {
 		if (!(name in this.commandsToShortcuts)) {
@@ -159,10 +162,6 @@ export class ShortcutService extends Observable<string> {
 
 	register(name: string, shortcut: Set<string> | string[] | string): boolean {
 		const key = this.parse(shortcut);
-		if (!this.#hasCtrlMetaOrAltKeys(key)) {
-			return false;
-		}
-
 		this.commandsToShortcuts[name] = key;
 		return true;
 	}
@@ -170,6 +169,7 @@ export class ShortcutService extends Observable<string> {
 	/** Return a shortcut from a key event. */
 	process(e: KeyboardEvent): string {
 		const shortcut = [e.key];
+
 		if (e.shiftKey) {
 			shortcut.push('shift');
 		}
@@ -219,6 +219,7 @@ export class ShortcutService extends Observable<string> {
 		for (const [key, value] of Object.entries(shortcuts)) {
 			this.register(key, value);
 		}
+		$inspect(this.commandsToShortcuts);
 		return this;
 	}
 

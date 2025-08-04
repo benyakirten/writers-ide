@@ -227,7 +227,7 @@ export class PageLayoutManager {
 	/**
 	 * Get the amount of unused space on the page in pixels.
 	 */
-	private getUnusedSpace() {
+	private getUnusedSpace(pageEl: HTMLElement, pageNode: ProseMirrorNode): number {
 		// const pageHeight = this.pageHeight;
 		// const contentHeight = this.getContentHeight();
 		// return pageHeight - contentHeight;
@@ -264,7 +264,12 @@ export class PageLayoutManager {
 
 			const overflowingDetails = this.getOverflowingInformation(view, pageDetails);
 			if (!overflowingDetails) {
+				const nextPageInfo = this.getPage(view, pageNumber);
+				const { firstChild } = pageDetails.pageNode;
 				// TODO: Test for if we might want to move widow lines to the next page.
+				if (firstChild) {
+					console.log(firstChild);
+				}
 				yield pageNumber;
 				continue;
 			}
@@ -307,6 +312,7 @@ export class PageLayoutManager {
 			}
 
 			if (shouldDedent) {
+				// Why is a paragraph made after a dedented one dedented too?
 				tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
 			}
 

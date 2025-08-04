@@ -5,6 +5,7 @@ import { clamp } from '$lib/utils/numbers';
 import { SelectionUtilities } from './selection';
 import { INDENT_MAX, INDENT_MIN } from './constants';
 import type { marks } from './marks';
+import { newlineInCode } from 'prosemirror-commands';
 
 export type UseableMarkName = keyof typeof marks;
 export type TextAlignment = 'start' | 'end' | 'left' | 'center' | 'right' | 'justify';
@@ -106,6 +107,18 @@ export class ActionUtilities {
 
 		if (tr.docChanged) {
 			dispatch(tr);
+		}
+		return true;
+	}
+
+	static break(
+		state: EditorState,
+		dispatch?: (tr: Transaction) => void,
+		view?: EditorView
+	): boolean {
+		console.log('CALLED!');
+		if (!newlineInCode(state, dispatch, view)) {
+			return false;
 		}
 		return true;
 	}
