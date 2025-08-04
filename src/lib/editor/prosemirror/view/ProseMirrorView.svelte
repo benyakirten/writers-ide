@@ -39,7 +39,7 @@
 					[schema.marks.bold.create({})]
 				),
 				schema.text(
-					'Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.',
+					' Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus. Donec pellentesque, tellus sodales accumsan rhoncus, massa tortor cursus mi, vel pellentesque eros enim eleifend ligula. Suspendisse potenti. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis. Donec nec nunc id ligula efficitur fringilla. Sed ut erat a enim tincidunt facilisis.',
 					[schema.marks.italic.create({})]
 				)
 			])

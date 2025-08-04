@@ -466,9 +466,6 @@ export class PageLayoutManager {
 			lineHeight
 		);
 
-		console.log(nodes.map((n) => n.textContent));
-		console.log(linesToKeepOnPage, linesToPutOnNextPage);
-
 		if (linesToPutOnNextPage === 0) {
 			throw new Error('Overflow detected, but no lines should be moved to the next page.');
 		}
@@ -503,7 +500,6 @@ export class PageLayoutManager {
 
 		const sequentialTextNodes = [];
 		let remaining = text.length;
-		console.log(text);
 		let potentialExtra = 0;
 
 		while (remaining > 0) {
