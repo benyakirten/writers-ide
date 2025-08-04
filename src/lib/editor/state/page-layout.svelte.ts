@@ -10,14 +10,7 @@ import { CM_PER_INCH, INDENT_MIN, PIXELS_PER_INCH } from '../prosemirror/view/co
 
 export type Unit = 'in' | 'cm' | 'mm';
 
-// Not sure if this is necessary, but it might be useful
-// for other developers?
-export enum OverflowingFailureReason {
-	NoPage = 1,
-	NoOverflowingElement = 2
-}
-type OverflowingDetailsSuccess = {
-	success: true;
+type OverflowingDetails = {
 	overflowingNode: ProseMirrorNode;
 	overflowingNodeOffset: number;
 	overflowingEl: HTMLElement;
@@ -26,11 +19,7 @@ type OverflowingDetailsSuccess = {
 	pageEl: HTMLElement;
 	pageBottom: number;
 };
-type OverflowingDetailsFailure = {
-	success: false;
-	reason: OverflowingFailureReason;
-};
-export type OverflowingDetails = OverflowingDetailsSuccess | OverflowingDetailsFailure;
+type PageDetails = { pageEl: HTMLElement; pageNode: ProseMirrorNode; pageOffset: number };
 
 export const PAGE_SIZES_INCHES = {
 	A4: {
@@ -170,10 +159,7 @@ export class PageLayoutManager {
 		return bottom - bottomPadding;
 	}
 
-	getPage(
-		view: EditorView,
-		page: number
-	): { pageEl: HTMLElement; pageNode: ProseMirrorNode; pageOffset: number } | null {
+	getPage(view: EditorView, page: number): PageDetails | null {
 		let pos = 0;
 		let currentPage = 0;
 		while (pos < view.state.doc.nodeSize) {
@@ -239,6 +225,15 @@ export class PageLayoutManager {
 	}
 
 	/**
+	 * Get the amount of unused space on the page in pixels.
+	 */
+	private getUnusedSpace() {
+		// const pageHeight = this.pageHeight;
+		// const contentHeight = this.getContentHeight();
+		// return pageHeight - contentHeight;
+	}
+
+	/**
 	 * Paginate from the given `from` position to the `to` position, non-inclusive.
 	 * This function is relatively complex since we need to use the DOM to measure
 	 * the effects of the underlying layout engine that JS does not have access to.
@@ -260,17 +255,18 @@ export class PageLayoutManager {
 				break;
 			}
 
-			const overflowingDetails = this.getOverflowingInformation(view, pageNumber);
+			const pageDetails = this.getPage(view, pageNumber);
+			// We've run out of pages.
+			if (!pageDetails) {
+				break;
+			}
 			pageNumber++;
-			if (!overflowingDetails.success) {
-				if (overflowingDetails.reason === OverflowingFailureReason.NoPage) {
-					// No more pages to paginate, we are done.
-					break;
-				} else {
-					// Test for if we might want to move widow lines to the next page.
-					yield pageNumber;
-					continue;
-				}
+
+			const overflowingDetails = this.getOverflowingInformation(view, pageDetails);
+			if (!overflowingDetails) {
+				// TODO: Test for if we might want to move widow lines to the next page.
+				yield pageNumber;
+				continue;
 			}
 
 			const {
@@ -333,15 +329,7 @@ export class PageLayoutManager {
 		return this.calculateLineSplitAmount(numLines - overflowingLines, overflowingLines);
 	}
 
-	getOverflowingInformation(view: EditorView, pageNumber: number): OverflowingDetails {
-		const pageDetails = this.getPage(view, pageNumber);
-		if (!pageDetails) {
-			return {
-				success: false,
-				reason: OverflowingFailureReason.NoPage
-			};
-		}
-
+	getOverflowingInformation(view: EditorView, pageDetails: PageDetails): OverflowingDetails | null {
 		const { pageEl, pageNode, pageOffset } = pageDetails;
 		const pageBottom = this.calculatePageBottom(pageEl);
 
@@ -379,14 +367,10 @@ export class PageLayoutManager {
 		}
 
 		if (!prevEl || !overflowingEl || !overflowingNode) {
-			return {
-				success: false,
-				reason: OverflowingFailureReason.NoOverflowingElement
-			};
+			return null;
 		}
 
 		return {
-			success: true,
 			overflowingNode,
 			overflowingNodeOffset: pos,
 			overflowingEl,
