@@ -7,3 +7,4 @@ export const CM_PER_INCH = 2.54;
 export const PIXELS_PER_INCH = 96;
 
 export const PROSEMIRROR_PAGE_CLASS = 'prosemirror-page';
+export const PROSEMIRROR_PAGE_END_CLASS = 'prosemirror-page-end';

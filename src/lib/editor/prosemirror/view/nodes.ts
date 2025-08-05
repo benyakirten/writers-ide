@@ -1,7 +1,13 @@
 import type { DOMOutputSpec, NodeSpec } from 'prosemirror-model';
 
 import { clamp } from '$lib/utils/numbers';
-import { INDENT_MAX, INDENT_MIN, INDENT_SIZE_PX, PROSEMIRROR_PAGE_CLASS } from './constants';
+import {
+	INDENT_MAX,
+	INDENT_MIN,
+	INDENT_SIZE_PX,
+	PROSEMIRROR_PAGE_CLASS,
+	PROSEMIRROR_PAGE_END_CLASS
+} from './constants';
 
 const doc: NodeSpec = {
 	content: 'page+'
@@ -96,7 +102,7 @@ const heading: NodeSpec = {
 };
 
 const preDOM: DOMOutputSpec = ['pre', ['code', 0]];
-const codeBlock: NodeSpec = {
+const code: NodeSpec = {
 	content: 'text*',
 	marks: '',
 	group: 'block',
@@ -140,7 +146,7 @@ const image: NodeSpec = {
 };
 
 const brDOM: DOMOutputSpec = ['br'];
-const hardBreak: NodeSpec = {
+const inlineBreak: NodeSpec = {
 	inline: true,
 	group: 'inline',
 	selectable: false,
@@ -162,15 +168,14 @@ const page: NodeSpec = {
 	}
 };
 
-const pageEndDom: DOMOutputSpec = ['div', { class: 'page-end' }, 0];
+const pageEndDom: DOMOutputSpec = ['div', { class: PROSEMIRROR_PAGE_END_CLASS }];
 const pageEnd: NodeSpec = {
-	inline: true,
-	group: 'inline',
+	group: 'block',
 	selectable: false,
 	atom: true,
 	draggable: false,
 	defining: true,
-	parseDOM: [{ tag: 'div.page-end' }],
+	parseDOM: [{ tag: `div.${PROSEMIRROR_PAGE_END_CLASS}` }],
 	toDOM() {
 		return pageEndDom;
 	}
@@ -209,10 +214,10 @@ export const nodes = {
 	blockquote,
 	horizontalRule,
 	heading,
-	codeBlock,
+	code,
 	text,
 	image,
-	hardBreak,
+	inlineBreak,
 	pageEnd,
 	header
 } as const;

@@ -17,6 +17,7 @@ import { clamp } from '@/utils/numbers';
 export type Unit = 'in' | 'cm' | 'mm';
 
 type OverflowingDetails = {
+	overflow: true;
 	overflowingNode: ProseMirrorNode;
 	overflowingNodeOffset: number;
 	overflowingEl: HTMLElement;
@@ -25,6 +26,13 @@ type OverflowingDetails = {
 	pageEl: HTMLElement;
 	pageBottom: number;
 };
+
+type NotOverflowingDetails = {
+	overflow: false;
+	lastNode: ProseMirrorNode;
+	lastNodeOffset: number;
+};
+
 type PageDetails = { pageEl: HTMLElement; pageNode: ProseMirrorNode; pageOffset: number };
 
 export const PAGE_SIZES_INCHES = {
@@ -236,10 +244,20 @@ export class PageLayoutManager {
 	/**
 	 * Get the amount of unused space on the page in pixels.
 	 */
-	private getUnusedSpace(pageEl: HTMLElement, pageNode: ProseMirrorNode): number {
-		// const pageHeight = this.pageHeight;
-		// const contentHeight = this.getContentHeight();
-		// return pageHeight - contentHeight;
+	private calculateUnusedSpace(
+		view: EditorView,
+		pageDetails: PageDetails,
+		details: NotOverflowingDetails
+	): number | null {
+		const { lastNode, lastNodeOffset } = details;
+		const { pageEl, pageOffset } = pageDetails;
+
+		const nodeEl = view.nodeDOM(pageOffset + lastNodeOffset) as HTMLElement | null;
+		if (!nodeEl) {
+			console.warn('Could not find node element for page end', lastNode);
+			return null;
+		}
+		return this.calculatePageBottom(pageEl) - nodeEl.getBoundingClientRect().bottom;
 	}
 
 	/**
@@ -272,13 +290,39 @@ export class PageLayoutManager {
 			pageNumber++;
 
 			const overflowingDetails = this.getOverflowingInformation(view, pageDetails);
-			if (!overflowingDetails) {
-				const nextPageInfo = this.getPage(view, pageNumber);
-				const { firstChild } = pageDetails.pageNode;
-				// TODO: Test for if we might want to move widow lines to the next page.
-				if (firstChild) {
-					console.log(firstChild);
+			if (overflowingDetails === null) {
+				yield pageNumber;
+				continue;
+			}
+
+			if (!overflowingDetails?.overflow) {
+				if (overflowingDetails.lastNode.type.name === 'pageEnd') {
+					console.log(pageDetails.pageNode.nodeSize, overflowingDetails.lastNode.nodeSize);
+					// If the last node's offset -s pageNode.nodeSize - 1, it should be at the end of the page.
+					// If the last node is a page end, we can yield the page number and continue.
+					yield pageNumber;
+					continue;
 				}
+				// The page does not overflow - but we need to check for one of the following scenarios:
+				// Five possibile courses of action:
+				// 1. Page ends with page end node and no content after it - yield page number and continue.
+				// 2. Page ends with page end node and has content after it - move the content to the next page.
+				// 3. Page ends with any other block node but no remaining space on the page, yield page number and continue.
+				// 4. Page ends with any other block node and has remaining space on the page but we don't need to move content
+				//    from the next page back - yield page number and continue.
+				// 5. Page ends with any other block node and has remaining space on the page but we need to move content
+				//    from the next page back - move the content to the current page then yield the page number and continue.
+				const unusedSpace = overflowingDetails
+					? this.calculateUnusedSpace(view, pageDetails, overflowingDetails)
+					: this.pageHeight;
+				// Check
+				console.log(unusedSpace, overflowingDetails?.lastNode);
+				// const nextPageInfo = this.getPage(view, pageNumber);
+				// const { firstChild } = pageDetails.pageNode;
+				// // TODO: Test for if we might want to move widow lines to the next page.
+				// if (firstChild) {
+				// 	console.log(firstChild);
+				// }
 				yield pageNumber;
 				continue;
 			}
@@ -344,11 +388,16 @@ export class PageLayoutManager {
 		return this.calculateLineSplitAmount(numLines - overflowingLines, overflowingLines);
 	}
 
-	getOverflowingInformation(view: EditorView, pageDetails: PageDetails): OverflowingDetails | null {
+	getOverflowingInformation(
+		view: EditorView,
+		pageDetails: PageDetails
+	): OverflowingDetails | NotOverflowingDetails | null {
 		const { pageEl, pageNode, pageOffset } = pageDetails;
 		const pageBottom = this.calculatePageBottom(pageEl);
 
 		let prevEl: HTMLElement | null = null;
+		let prevNode: ProseMirrorNode | null = null;
+		let isOverflowing: boolean = false;
 		let overflowingEl: HTMLElement | null = null;
 		let overflowingNode: ProseMirrorNode | null = null;
 		let pos = 0;
@@ -370,22 +419,40 @@ export class PageLayoutManager {
 				break;
 			}
 
+			if (node.type.name === 'pageEnd') {
+				// If we hit a page end, we can stop.
+				prevNode = node;
+				prevEl = el;
+				break;
+			}
+
 			const { bottom } = el.getBoundingClientRect();
 			if (bottom >= pageBottom) {
 				overflowingNode = node;
 				overflowingEl = el;
+				isOverflowing = true;
 				break;
 			}
 
 			prevEl = el;
+			prevNode = node;
 			pos += node.nodeSize;
 		}
 
-		if (!prevEl || !overflowingEl || !overflowingNode) {
+		if (prevEl && prevNode && !isOverflowing) {
+			return {
+				overflow: false,
+				lastNode: prevNode,
+				lastNodeOffset: pos
+			};
+		}
+
+		if (!overflowingEl || !overflowingNode) {
 			return null;
 		}
 
 		return {
+			overflow: true,
 			overflowingNode,
 			overflowingNodeOffset: pos,
 			overflowingEl,

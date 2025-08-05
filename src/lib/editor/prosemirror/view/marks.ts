@@ -2,7 +2,7 @@ import type { DOMOutputSpec, MarkSpec } from 'prosemirror-model';
 
 const emDOM: DOMOutputSpec = ['em', 0];
 const boldDOM: DOMOutputSpec = ['strong', 0];
-const codeDOM: DOMOutputSpec = ['code', 0];
+const inlineCodeDOM: DOMOutputSpec = ['inline-code', 0];
 const supDOM: DOMOutputSpec = ['sup', 0];
 const subDOM: DOMOutputSpec = ['sub', 0];
 const underlineDOM: DOMOutputSpec = ['span', { style: 'text-decoration: underline' }, 0];
@@ -53,10 +53,10 @@ const bold: MarkSpec = {
 	}
 };
 
-const code: MarkSpec = {
-	parseDOM: [{ tag: 'code' }],
+const inlineCode: MarkSpec = {
+	parseDOM: [{ tag: 'inline-code' }],
 	toDOM() {
-		return codeDOM;
+		return inlineCodeDOM;
 	}
 };
 
@@ -118,7 +118,7 @@ export const marks = {
 	link,
 	italic,
 	bold,
-	code,
+	inlineCode,
 	superscript,
 	subscript,
 	underline,
