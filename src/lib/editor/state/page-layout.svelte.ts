@@ -6,7 +6,13 @@ import {
 	calculateTotalLinesOfText,
 	calculateOverflowingLinesOfText
 } from '$lib/utils/css';
-import { CM_PER_INCH, INDENT_MIN, PIXELS_PER_INCH } from '../prosemirror/view/constants';
+import {
+	CM_PER_INCH,
+	INDENT_MAX,
+	INDENT_MIN,
+	PIXELS_PER_INCH
+} from '../prosemirror/view/constants';
+import { clamp } from '@/utils/numbers';
 
 export type Unit = 'in' | 'cm' | 'mm';
 
@@ -101,6 +107,9 @@ export class PageLayoutManager {
 	orphanLines = $state<number>(2);
 	widowLines = $state<number>(2);
 	currentPage = $state<number>(0);
+
+	_defaultParagraphIndent = $state<number>(1);
+	defaultParagraphIndent = $derived(clamp(this._defaultParagraphIndent, INDENT_MIN, INDENT_MAX));
 
 	constructor() {
 		// For testing purposes - this will be set by settings at a certain point

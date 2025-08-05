@@ -136,7 +136,8 @@
 				// TODO: Replace this
 				history(),
 				createShortcuts({
-					break: (state, dispatch, view) => ActionUtilities.break(state, dispatch),
+					splitParagraph: (state, dispatch, view) =>
+						ActionUtilities.splitParagraph(state, dispatch),
 					subscript: (state, dispatch, view) =>
 						ActionUtilities.toggleTextMark('superscript', state, dispatch, view, 'subscript'),
 					superscript: (state, dispatch, view) =>

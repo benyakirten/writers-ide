@@ -1,11 +1,19 @@
 import type { EditorView } from 'prosemirror-view';
-import { AllSelection, TextSelection, type EditorState, type Transaction } from 'prosemirror-state';
+import { type EditorState, type Transaction } from 'prosemirror-state';
 
 import { clamp } from '$lib/utils/numbers';
 import { SelectionUtilities } from './selection';
 import { INDENT_MAX, INDENT_MIN } from './constants';
 import type { marks } from './marks';
-import { liftEmptyBlock, newlineInCode, splitBlockAs } from 'prosemirror-commands';
+import {
+	chainCommands,
+	createParagraphNear,
+	liftEmptyBlock,
+	newlineInCode,
+	splitBlockAs
+} from 'prosemirror-commands';
+import { schema } from './schema';
+import PageLayout from '@/editor/state/page-layout.svelte';
 
 export type UseableMarkName = keyof typeof marks;
 export type TextAlignment = 'start' | 'end' | 'left' | 'center' | 'right' | 'justify';
@@ -111,45 +119,18 @@ export class ActionUtilities {
 		return true;
 	}
 
-	static #createParagraphNode(state: EditorState, dispatch?: (tr: Transaction) => void) {
-		const sel = state.selection,
-			{ $from, $to } = sel;
-		if (sel instanceof AllSelection || $from.parent.inlineContent || $to.parent.inlineContent) {
-			return false;
-		}
-
-		const node = state.schema.node('paragraph', { indent: 1 });
-		if (!node) {
-			return false;
-		}
-
-		if (dispatch) {
-			const side = (!$from.parentOffset && $to.index() < $to.parent.childCount ? $from : $to).pos;
-			const tr = state.tr.insert(side, node);
-			tr.setSelection(TextSelection.create(tr.doc, side + 1));
-			dispatch(tr.scrollIntoView());
-		}
-		return true;
-	}
-
-	static break(
-		state: EditorState,
-		dispatch?: (tr: Transaction) => void,
-		view?: EditorView
-	): boolean {
-		// TODO: Make this better - simplify the logic since the default commands are incredibly generic
-		if (newlineInCode(state, dispatch, view)) {
-			return true;
-		}
-
-		if (this.#createParagraphNode(state, dispatch)) {
-			return true;
-		}
-
-		if (liftEmptyBlock(state, dispatch)) {
-			return true;
-		}
-
-		return splitBlockAs(() => state.schema.node('paragraph', { indent: 1 }))(state, dispatch);
-	}
+	/**
+	 * Slight modification of prosemirror-commands' `Enter` command to give the new paragraph generated
+	 * an default indent value, which can be set in the PageLayout store. We undoubtedy want to separate
+	 * this from various store. We will want some sort of ProseMirror layout settings store in the future
+	 * where users can set/modify/add values for various options. I'm not sure where it belongs yet.
+	 */
+	static splitParagraph = chainCommands(
+		newlineInCode,
+		createParagraphNear,
+		liftEmptyBlock,
+		splitBlockAs(() => {
+			return schema.node('paragraph', { indent: PageLayout.defaultParagraphIndent });
+		})
+	);
 }
