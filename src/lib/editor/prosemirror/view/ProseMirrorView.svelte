@@ -134,14 +134,9 @@
 			schema,
 			plugins: [
 				// TODO: Replace this
-				keymap({
-					...baseKeymap,
-					// Disable default enter behavior - overwritten by ActionUtilities.break
-					Enter: () => false
-				}),
 				history(),
 				createShortcuts({
-					break: (state, dispatch, view) => ActionUtilities.break(state, dispatch, view),
+					break: (state, dispatch, view) => ActionUtilities.break(state, dispatch),
 					subscript: (state, dispatch, view) =>
 						ActionUtilities.toggleTextMark('superscript', state, dispatch, view, 'subscript'),
 					superscript: (state, dispatch, view) =>
@@ -169,6 +164,7 @@
 					overline: (state, dispatch, view) =>
 						ActionUtilities.toggleTextMark('overline', state, dispatch, view)
 				}),
+				keymap(baseKeymap),
 				...ProseMirrorPlugins.plugins
 			]
 		});

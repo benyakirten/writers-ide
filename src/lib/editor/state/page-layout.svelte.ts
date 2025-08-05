@@ -559,6 +559,7 @@ export class PageLayoutManager {
 			return overflowDiscovered;
 		};
 
+		// TODO: Change this to a while loop with the position
 		overflowingNode.descendants((child) => {
 			if (child.isText && child.text) {
 				consecutiveTextNodeContent.push(child.text);

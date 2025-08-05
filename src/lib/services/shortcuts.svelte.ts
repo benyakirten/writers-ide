@@ -140,9 +140,11 @@ export class ShortcutService extends Observable<string> {
 		}
 	}
 
-	// #hasCtrlMetaOrAltKeys(cmd: string): boolean {
-	// 	return cmd.includes('ctrl') || cmd.includes('meta') || cmd.includes('alt');
-	// }
+	#isValidShortcutSetting(cmd: string): boolean {
+		return (
+			cmd.includes('ctrl') || cmd.includes('meta') || cmd.includes('alt') || cmd.includes('enter')
+		);
+	}
 
 	addCommand(name: string) {
 		if (!(name in this.commandsToShortcuts)) {
@@ -162,6 +164,10 @@ export class ShortcutService extends Observable<string> {
 
 	register(name: string, shortcut: Set<string> | string[] | string): boolean {
 		const key = this.parse(shortcut);
+
+		if (!this.#isValidShortcutSetting(key)) {
+			return false;
+		}
 		this.commandsToShortcuts[name] = key;
 		return true;
 	}
@@ -219,7 +225,6 @@ export class ShortcutService extends Observable<string> {
 		for (const [key, value] of Object.entries(shortcuts)) {
 			this.register(key, value);
 		}
-		$inspect(this.commandsToShortcuts);
 		return this;
 	}
 
