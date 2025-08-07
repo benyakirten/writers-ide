@@ -428,12 +428,44 @@ export class PageLayoutManager {
 				}
 
 				const availableSpace = this.calculateUnusedSpace(view, pageDetails, lastNodeOffset);
-				console.log(pageNumber, availableSpace);
+				// Situation #4
+				if (availableSpace === null || availableSpace <= 0) {
+					yield pageNumber;
+					continue;
+				}
+
+				const nextPageOverflowingDetails = this.getOverflowingInformation(
+					view,
+					availableSpace,
+					nextPageInfo.pageNode,
+					nextPageInfo.pageOffset
+				);
+
+				let splitOffset: number;
+				let shouldDedent = false;
+				if ('hasDiscoveredPageEnd' in nextPageOverflowingDetails) {
+					// Move all content over to the current page.
+					splitOffset = nextPageOverflowingDetails.lastNodeOffset + 1;
+				} else {
+					// Calculat how much content we can move over to the current page.
+					const splitDetails = this.getSplitOffsetForOverflowingElement(
+						maxBottom,
+						nextPageOverflowingDetails.overflowingNode,
+						nextPageOverflowingDetails.overflowingEl
+					);
+
+					splitOffset = splitDetails.splitOffset ?? 0;
+					shouldDedent = splitDetails.shouldDedent;
+				}
+
+				console.log(splitOffset, shouldDedent);
 
 				// Find the amount of nodes that fit into the available space. If the node that
 				// would take up too much space is a paragraph, we have to discover where it would cause overflow,
 				// we need to calculate lines so we can estimate widow/orphan line. This feels very similar to what
 				// we do in `getSplitOffsetForOverflowingElement`.
+				// Since it looks like we might - maybe we should write some sort of recursive function.
+				// However, having more than 2 depth would be impossible.
 
 				// We must check if there is a page end node inside of page node. If so, that's condition 2.
 				// Otherwise, we must get the remaining content on the page.
@@ -464,11 +496,6 @@ export class PageLayoutManager {
 				overflowingNode,
 				overflowingEl
 			);
-			if (splitOffsetInfo === null) {
-				console.warn('Could not find split position for overflowing element', overflowingEl);
-				return pageNumber - 1;
-			}
-
 			const { splitOffset, shouldDedent } = splitOffsetInfo;
 
 			const addedPages = this.splitPageAtOffset(
@@ -704,7 +731,7 @@ export class PageLayoutManager {
 		pageBottom: number,
 		overflowingNode: ProseMirrorNode,
 		overflowingEl: HTMLElement
-	): { splitOffset: number; shouldDedent: boolean } | null {
+	): { splitOffset: number; shouldDedent: boolean } {
 		const walker = document.createTreeWalker(
 			overflowingEl,
 			NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT
