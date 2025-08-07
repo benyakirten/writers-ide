@@ -20,7 +20,6 @@ type OverflowingDetails = {
 	overflowingNode: ProseMirrorNode;
 	overflowingNodeOffset: number;
 	overflowingEl: HTMLElement;
-	pageBottom: number;
 };
 
 type NotOverflowingDetails = {
@@ -369,7 +368,13 @@ export class PageLayoutManager {
 			pageNumber++;
 
 			// TODO: Replace empty paragraphs with an page end node - configured by option.
-			const overflowingDetails = this.getOverflowingInformation(view, pageEl, pageNode, pageOffset);
+			const maxBottom = this.calculatePageBottom(pageEl);
+			const overflowingDetails = this.getOverflowingInformation(
+				view,
+				maxBottom,
+				pageNode,
+				pageOffset
+			);
 			// If we have a `hasDiscoveredPageEnd`, it means the page does not overflow.
 			if ('hasDiscoveredPageEnd' in overflowingDetails) {
 				const { lastNodeOffset, hasDiscoveredPageEnd } = overflowingDetails;
@@ -452,11 +457,10 @@ export class PageLayoutManager {
 				continue;
 			}
 
-			const { pageBottom, overflowingNode, overflowingEl, overflowingNodeOffset } =
-				overflowingDetails;
+			const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
 
 			const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
-				pageBottom,
+				maxBottom,
 				overflowingNode,
 				overflowingEl
 			);
@@ -505,12 +509,10 @@ export class PageLayoutManager {
 	 */
 	getOverflowingInformation(
 		view: EditorView,
-		pageEl: HTMLElement,
+		maxBottom: number,
 		pageNode: ProseMirrorNode,
 		pageOffset: number
 	): OverflowingDetails | NotOverflowingDetails {
-		const pageBottom = this.calculatePageBottom(pageEl);
-
 		let overflowingEl: HTMLElement | null = null;
 		let overflowingNode: ProseMirrorNode | null = null;
 		let pos = 0;
@@ -538,7 +540,7 @@ export class PageLayoutManager {
 			}
 
 			const { bottom } = el.getBoundingClientRect();
-			if (bottom >= pageBottom) {
+			if (bottom >= maxBottom) {
 				overflowingNode = node;
 				overflowingEl = el;
 				break;
@@ -558,8 +560,7 @@ export class PageLayoutManager {
 		return {
 			overflowingNode,
 			overflowingNodeOffset: pos,
-			overflowingEl,
-			pageBottom
+			overflowingEl
 		};
 	}
 
