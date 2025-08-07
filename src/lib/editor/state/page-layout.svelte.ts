@@ -436,18 +436,24 @@ export class PageLayoutManager {
 
 				const nextPageOverflowingDetails = this.getOverflowingInformation(
 					view,
-					availableSpace,
+					availableSpace + nextPageInfo.pageEl.getBoundingClientRect().top,
 					nextPageInfo.pageNode,
 					nextPageInfo.pageOffset
 				);
 
 				let splitOffset: number;
 				let shouldDedent = false;
+				console.log(nextPageOverflowingDetails);
 				if ('hasDiscoveredPageEnd' in nextPageOverflowingDetails) {
-					// Move all content over to the current page.
-					splitOffset = nextPageOverflowingDetails.lastNodeOffset + 1;
+					if (nextPageOverflowingDetails.hasDiscoveredPageEnd) {
+						// Move everything up until the page end node.
+						splitOffset = nextPageOverflowingDetails.lastNodeOffset + 1;
+					} else {
+						// Move all content over to the current page.
+						splitOffset = nextPageInfo.pageNode.nodeSize - 1;
+					}
 				} else {
-					// Calculat how much content we can move over to the current page.
+					// Calculate how much content we can move over to the current page.
 					const splitDetails = this.getSplitOffsetForOverflowingElement(
 						maxBottom,
 						nextPageOverflowingDetails.overflowingNode,
@@ -466,25 +472,6 @@ export class PageLayoutManager {
 				// we do in `getSplitOffsetForOverflowingElement`.
 				// Since it looks like we might - maybe we should write some sort of recursive function.
 				// However, having more than 2 depth would be impossible.
-
-				// We must check if there is a page end node inside of page node. If so, that's condition 2.
-				// Otherwise, we must get the remaining content on the page.
-				// If we have no remaining space - situation 3
-				// Then we check the next page
-				// If there is no next page, situation 4
-				// If there is a next page but content should not be moved back, situation 4
-				// If there is a next page and content should be moved back, situation 5
-				// const unusedSpace = overflowingDetails
-				// 	? this.calculateUnusedSpace(view, pageDetails, overflowingDetails)
-				// 	: this.pageHeight;
-				// // Check
-				// console.log(unusedSpace, overflowingDetails?.lastNode);
-				// const nextPageInfo = this.getPage(view, pageNumber);
-				// const { firstChild } = pageDetails.pageNode;
-				// // TODO: Test for if we might want to move widow lines to the next page.
-				// if (firstChild) {
-				// 	console.log(firstChild);
-				// }
 				yield pageNumber;
 				continue;
 			}
