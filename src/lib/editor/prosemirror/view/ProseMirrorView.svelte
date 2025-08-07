@@ -21,6 +21,7 @@
 	let state: EditorState;
 	let view: EditorView;
 	let initialState = schema.node('doc', null, [
+		schema.node('page', null, [schema.node('paragraph', null, [])]),
 		schema.node('page', null, [
 			schema.node('paragraph', null, [schema.text('This is a basic paragraph with no children.')]),
 			schema.node('paragraph', null, [

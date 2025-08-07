@@ -20,9 +20,6 @@ type OverflowingDetails = {
 	overflowingNode: ProseMirrorNode;
 	overflowingNodeOffset: number;
 	overflowingEl: HTMLElement;
-	pageNode: ProseMirrorNode;
-	pageOffset: number;
-	pageEl: HTMLElement;
 	pageBottom: number;
 };
 
@@ -113,6 +110,7 @@ export class PageLayoutManager {
 	orphanLines = $state<number>(2);
 	widowLines = $state<number>(2);
 	currentPage = $state<number>(0);
+	deleteEmptyPages = $state<boolean>(true);
 
 	_defaultParagraphIndent = $state<number>(1);
 	defaultParagraphIndent = $derived(clamp(this._defaultParagraphIndent, INDENT_MIN, INDENT_MAX));
@@ -242,21 +240,21 @@ export class PageLayoutManager {
 	/**
 	 * Get the amount of unused space on the page in pixels.
 	 */
-	// private calculateUnusedSpace(
-	// 	view: EditorView,
-	// 	pageDetails: PageDetails,
-	// 	details: NotOverflowingDetails
-	// ): number | null {
-	// 	const { lastNode, lastNodeOffset } = details;
-	// 	const { pageEl, pageOffset } = pageDetails;
+	private calculateUnusedSpace(
+		view: EditorView,
+		pageDetails: PageDetails,
+		lastNodeOffset: number
+	): number | null {
+		const { pageEl, pageOffset } = pageDetails;
 
-	// 	const nodeEl = view.nodeDOM(pageOffset + lastNodeOffset) as HTMLElement | null;
-	// 	if (!nodeEl) {
-	// 		console.warn('Could not find node element for page end', lastNode);
-	// 		return null;
-	// 	}
-	// 	return this.calculatePageBottom(pageEl) - nodeEl.getBoundingClientRect().bottom;
-	// }
+		const nodeEl = view.nodeDOM(pageOffset + lastNodeOffset + 1) as HTMLElement | null;
+		if (!nodeEl) {
+			console.warn('Could not find node element for page end at offset', lastNodeOffset);
+			return null;
+		}
+
+		return this.calculatePageBottom(pageEl) - nodeEl.getBoundingClientRect().bottom;
+	}
 
 	pageHasNoNodesAfter(pageNode: ProseMirrorNode, offset: number): boolean {
 		if (pageNode.childCount === 0 || offset >= pageNode.nodeSize - 1) {
@@ -303,6 +301,12 @@ export class PageLayoutManager {
 		view.dispatch(tr);
 	}
 
+	private deletePage(view: EditorView, pageNode: ProseMirrorNode, pageOffset: number): void {
+		const { tr } = view.state;
+		tr.delete(pageOffset, pageOffset + pageNode.nodeSize);
+		view.dispatch(tr);
+	}
+
 	/**
 	 * Paginate from the given `from` position to the `to` position, non-inclusive.
 	 * This function is relatively complex since we need to use the DOM to measure
@@ -330,10 +334,19 @@ export class PageLayoutManager {
 			if (!pageDetails) {
 				break;
 			}
+
+			const nextPageInfo = this.getPage(view, pageNumber + 1);
+			const { pageNode, pageOffset, pageEl } = pageDetails;
+
+			if (pageNode.textContent === '' && nextPageInfo !== null && this.deleteEmptyPages) {
+				this.deletePage(view, pageNode, pageOffset);
+				continue;
+			}
+
 			pageNumber++;
 
-			const overflowingDetails = this.getOverflowingInformation(view, pageDetails);
-			// If we have a `pageEndOffset`, it means the page ends with a `pageEnd` node.
+			const overflowingDetails = this.getOverflowingInformation(view, pageEl, pageNode, pageOffset);
+			// If we have a `hasDiscoveredPageEnd`, it means the page does not overflow.
 			if ('hasDiscoveredPageEnd' in overflowingDetails) {
 				const { lastNodeOffset, hasDiscoveredPageEnd } = overflowingDetails;
 				// The page does not overflow - but we need to check for one of the following scenarios:
@@ -349,9 +362,11 @@ export class PageLayoutManager {
 
 				if (hasDiscoveredPageEnd) {
 					// If it's the lasts item on the page, we just move on.
-					// But if it isn't, all of the content after the page end node
-					// should be moved to the next page.
 					if (!this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
+						// If the page node isn't the last item on the page, all of the content
+						// after the page end node should be moved to the next page. We don't
+						// care about line of text, just move everything over then we can worry
+						// about lines of text when we paginate that next page.
 						this.splitPageAtOffset(
 							view,
 							pageDetails.pageNode,
@@ -365,6 +380,15 @@ export class PageLayoutManager {
 					yield pageNumber;
 					continue;
 				}
+
+				if (!nextPageInfo) {
+					// If there is no next page, we can just yield the page number and continue.
+					yield pageNumber;
+					continue;
+				}
+
+				const availableSpace = this.calculateUnusedSpace(view, pageDetails, lastNodeOffset);
+				console.log(pageNumber, availableSpace);
 
 				// We must check if there is a page end node inside of page node. If so, that's condition 2.
 				// Otherwise, we must get the remaining content on the page.
@@ -388,14 +412,8 @@ export class PageLayoutManager {
 				continue;
 			}
 
-			const {
-				pageBottom,
-				overflowingNode,
-				overflowingEl,
-				overflowingNodeOffset,
-				pageNode,
-				pageOffset
-			} = overflowingDetails;
+			const { pageBottom, overflowingNode, overflowingEl, overflowingNodeOffset } =
+				overflowingDetails;
 
 			const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
 				pageBottom,
@@ -443,9 +461,10 @@ export class PageLayoutManager {
 	 */
 	getOverflowingInformation(
 		view: EditorView,
-		pageDetails: PageDetails
+		pageEl: HTMLElement,
+		pageNode: ProseMirrorNode,
+		pageOffset: number
 	): OverflowingDetails | NotOverflowingDetails {
-		const { pageEl, pageNode, pageOffset } = pageDetails;
 		const pageBottom = this.calculatePageBottom(pageEl);
 
 		let overflowingEl: HTMLElement | null = null;
@@ -496,9 +515,6 @@ export class PageLayoutManager {
 			overflowingNode,
 			overflowingNodeOffset: pos,
 			overflowingEl,
-			pageNode,
-			pageOffset,
-			pageEl,
 			pageBottom
 		};
 	}
