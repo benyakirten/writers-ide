@@ -348,12 +348,22 @@ export class PageLayoutManager {
 				// const lastNode = pageDetails.pageNode.lastChild;
 
 				if (hasDiscoveredPageEnd) {
-					// 1. Resolved - if the page ends with a `pageEnd` node and it's the last node on the page, we're done.
-					if (this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
-						yield pageNumber;
-						continue;
+					// If it's the lasts item on the page, we just move on.
+					// But if it isn't, all of the content after the page end node
+					// should be moved to the next page.
+					if (!this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
+						this.splitPageAtOffset(
+							view,
+							pageDetails.pageNode,
+							pageNumber,
+							lastNodeOffset + 1,
+							pageDetails.pageOffset,
+							false
+						);
 					}
-					// 2. We need to move everything from the page end node to the next page.
+
+					yield pageNumber;
+					continue;
 				}
 
 				// We must check if there is a page end node inside of page node. If so, that's condition 2.
