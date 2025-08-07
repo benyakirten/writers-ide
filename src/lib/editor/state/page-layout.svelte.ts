@@ -17,7 +17,6 @@ import { clamp } from '@/utils/numbers';
 export type Unit = 'in' | 'cm' | 'mm';
 
 type OverflowingDetails = {
-	overflow: true;
 	overflowingNode: ProseMirrorNode;
 	overflowingNodeOffset: number;
 	overflowingEl: HTMLElement;
@@ -28,8 +27,7 @@ type OverflowingDetails = {
 };
 
 type NotOverflowingDetails = {
-	overflow: false;
-	lastNode: ProseMirrorNode;
+	hasDiscoveredPageEnd: boolean;
 	lastNodeOffset: number;
 };
 
@@ -244,20 +242,65 @@ export class PageLayoutManager {
 	/**
 	 * Get the amount of unused space on the page in pixels.
 	 */
-	private calculateUnusedSpace(
-		view: EditorView,
-		pageDetails: PageDetails,
-		details: NotOverflowingDetails
-	): number | null {
-		const { lastNode, lastNodeOffset } = details;
-		const { pageEl, pageOffset } = pageDetails;
+	// private calculateUnusedSpace(
+	// 	view: EditorView,
+	// 	pageDetails: PageDetails,
+	// 	details: NotOverflowingDetails
+	// ): number | null {
+	// 	const { lastNode, lastNodeOffset } = details;
+	// 	const { pageEl, pageOffset } = pageDetails;
 
-		const nodeEl = view.nodeDOM(pageOffset + lastNodeOffset) as HTMLElement | null;
-		if (!nodeEl) {
-			console.warn('Could not find node element for page end', lastNode);
-			return null;
+	// 	const nodeEl = view.nodeDOM(pageOffset + lastNodeOffset) as HTMLElement | null;
+	// 	if (!nodeEl) {
+	// 		console.warn('Could not find node element for page end', lastNode);
+	// 		return null;
+	// 	}
+	// 	return this.calculatePageBottom(pageEl) - nodeEl.getBoundingClientRect().bottom;
+	// }
+
+	pageHasNoNodesAfter(pageNode: ProseMirrorNode, offset: number): boolean {
+		if (pageNode.childCount === 0 || offset >= pageNode.nodeSize - 1) {
+			return true;
 		}
-		return this.calculatePageBottom(pageEl) - nodeEl.getBoundingClientRect().bottom;
+
+		for (let i = offset; i < pageNode.nodeSize - 1; i++) {
+			const node = pageNode.nodeAt(i);
+			if (node) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private splitPageAtOffset(
+		view: EditorView,
+		pageNode: ProseMirrorNode,
+		nextPageNumber: number,
+		splitOffset: number,
+		pageOffset: number,
+		shouldDedent: boolean
+	): void {
+		const { tr } = view.state;
+		// NOTE: node.cut WILL KEEP THE OUTER ELEMENT so if we only want the content
+		// and not the page too, we need to get cutContent.content instead of cutContent.
+		const contentToKeep = pageNode.cut(0, splitOffset);
+		const contentToMove = pageNode.cut(splitOffset);
+
+		tr.replaceWith(pageOffset, pageOffset + pageNode.nodeSize, contentToKeep);
+		// Create a new page with the content that was overflowing.
+		const nextPageInfo = this.getPage(view, nextPageNumber);
+		if (!nextPageInfo) {
+			// If there is no next page, we create it.
+			tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
+		} else {
+			// If there is a next page, we insert the content there.
+			tr.insert(pageOffset + contentToKeep.nodeSize + 1, contentToMove.content);
+		}
+		if (shouldDedent) {
+			// Why is a paragraph made after a dedented one dedented too?
+			tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
+		}
+		view.dispatch(tr);
 	}
 
 	/**
@@ -290,19 +333,9 @@ export class PageLayoutManager {
 			pageNumber++;
 
 			const overflowingDetails = this.getOverflowingInformation(view, pageDetails);
-			if (overflowingDetails === null) {
-				yield pageNumber;
-				continue;
-			}
-
-			if (!overflowingDetails?.overflow) {
-				if (overflowingDetails.lastNode.type.name === 'pageEnd') {
-					console.log(pageDetails.pageNode.nodeSize, overflowingDetails.lastNode.nodeSize);
-					// If the last node's offset -s pageNode.nodeSize - 1, it should be at the end of the page.
-					// If the last node is a page end, we can yield the page number and continue.
-					yield pageNumber;
-					continue;
-				}
+			// If we have a `pageEndOffset`, it means the page ends with a `pageEnd` node.
+			if ('hasDiscoveredPageEnd' in overflowingDetails) {
+				const { lastNodeOffset, hasDiscoveredPageEnd } = overflowingDetails;
 				// The page does not overflow - but we need to check for one of the following scenarios:
 				// Five possibile courses of action:
 				// 1. Page ends with page end node and no content after it - yield page number and continue.
@@ -312,11 +345,29 @@ export class PageLayoutManager {
 				//    from the next page back - yield page number and continue.
 				// 5. Page ends with any other block node and has remaining space on the page but we need to move content
 				//    from the next page back - move the content to the current page then yield the page number and continue.
-				const unusedSpace = overflowingDetails
-					? this.calculateUnusedSpace(view, pageDetails, overflowingDetails)
-					: this.pageHeight;
-				// Check
-				console.log(unusedSpace, overflowingDetails?.lastNode);
+				// const lastNode = pageDetails.pageNode.lastChild;
+
+				if (hasDiscoveredPageEnd) {
+					// 1. Resolved - if the page ends with a `pageEnd` node and it's the last node on the page, we're done.
+					if (this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
+						yield pageNumber;
+						continue;
+					}
+					// 2. We need to move everything from the page end node to the next page.
+				}
+
+				// We must check if there is a page end node inside of page node. If so, that's condition 2.
+				// Otherwise, we must get the remaining content on the page.
+				// If we have no remaining space - situation 3
+				// Then we check the next page
+				// If there is no next page, situation 4
+				// If there is a next page but content should not be moved back, situation 4
+				// If there is a next page and content should be moved back, situation 5
+				// const unusedSpace = overflowingDetails
+				// 	? this.calculateUnusedSpace(view, pageDetails, overflowingDetails)
+				// 	: this.pageHeight;
+				// // Check
+				// console.log(unusedSpace, overflowingDetails?.lastNode);
 				// const nextPageInfo = this.getPage(view, pageNumber);
 				// const { firstChild } = pageDetails.pageNode;
 				// // TODO: Test for if we might want to move widow lines to the next page.
@@ -336,7 +387,11 @@ export class PageLayoutManager {
 				pageOffset
 			} = overflowingDetails;
 
-			const splitOffsetInfo = this.getSplitOffset(pageBottom, overflowingNode, overflowingEl);
+			const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
+				pageBottom,
+				overflowingNode,
+				overflowingEl
+			);
 			if (splitOffsetInfo === null) {
 				console.warn('Could not find split position for overflowing element', overflowingEl);
 				return pageNumber - 1;
@@ -344,32 +399,14 @@ export class PageLayoutManager {
 
 			const { splitOffset, shouldDedent } = splitOffsetInfo;
 
-			// NOTE: node.cut WILL KEEP THE OUTER ELEMENT so if we only want the content
-			// and not the page too, we need to get cutContent.content instead of cutContent.
-			const contentToKeep = pageNode.cut(0, overflowingNodeOffset + splitOffset);
-			const contentToMove = pageNode.cut(overflowingNodeOffset + splitOffset);
-
-			const { tr } = view.state;
-
-			// Remove overflowing content from the page;
-			tr.replaceWith(pageOffset, pageOffset + pageNode.nodeSize, contentToKeep);
-			// Create a new page with the content that was overflowing.
-
-			const nextPageInfo = this.getPage(view, pageNumber);
-			if (!nextPageInfo) {
-				// If there is no next page, we create it.
-				tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
-			} else {
-				// If there is a next page, we insert the content there.
-				tr.insert(pageOffset + contentToKeep.nodeSize + 1, contentToMove.content);
-			}
-
-			if (shouldDedent) {
-				// Why is a paragraph made after a dedented one dedented too?
-				tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
-			}
-
-			view.dispatch(tr);
+			this.splitPageAtOffset(
+				view,
+				pageNode,
+				pageNumber,
+				overflowingNodeOffset + splitOffset,
+				pageOffset,
+				shouldDedent
+			);
 			yield pageNumber;
 		}
 
@@ -388,19 +425,23 @@ export class PageLayoutManager {
 		return this.calculateLineSplitAmount(numLines - overflowingLines, overflowingLines);
 	}
 
+	/**
+	 * This function determines has three different possible return values:
+	 * 1. The page overflows. It returns the page and overflowing node/element information (`overflowingDetails`)
+	 * 2. The page ends with a `pageEnd` node. It returns the page end offset to check that the page ends with that node (`NotOverflowingDetails`).
+	 * 3. The page does not overflow and has no `pageEnd` node (last page of document). It returns `null`.
+	 */
 	getOverflowingInformation(
 		view: EditorView,
 		pageDetails: PageDetails
-	): OverflowingDetails | NotOverflowingDetails | null {
+	): OverflowingDetails | NotOverflowingDetails {
 		const { pageEl, pageNode, pageOffset } = pageDetails;
 		const pageBottom = this.calculatePageBottom(pageEl);
 
-		let prevEl: HTMLElement | null = null;
-		let prevNode: ProseMirrorNode | null = null;
-		let isOverflowing: boolean = false;
 		let overflowingEl: HTMLElement | null = null;
 		let overflowingNode: ProseMirrorNode | null = null;
 		let pos = 0;
+		let lastNodeSize = 0;
 
 		while (pos < pageNode.nodeSize) {
 			const node = pageNode.nodeAt(pos);
@@ -420,39 +461,28 @@ export class PageLayoutManager {
 			}
 
 			if (node.type.name === 'pageEnd') {
-				// If we hit a page end, we can stop.
-				prevNode = node;
-				prevEl = el;
-				break;
+				return { lastNodeOffset: pos, hasDiscoveredPageEnd: true };
 			}
 
 			const { bottom } = el.getBoundingClientRect();
 			if (bottom >= pageBottom) {
 				overflowingNode = node;
 				overflowingEl = el;
-				isOverflowing = true;
 				break;
 			}
 
-			prevEl = el;
-			prevNode = node;
 			pos += node.nodeSize;
-		}
-
-		if (prevEl && prevNode && !isOverflowing) {
-			return {
-				overflow: false,
-				lastNode: prevNode,
-				lastNodeOffset: pos
-			};
+			lastNodeSize = node.nodeSize;
 		}
 
 		if (!overflowingEl || !overflowingNode) {
-			return null;
+			return {
+				hasDiscoveredPageEnd: false,
+				lastNodeOffset: pos - lastNodeSize
+			};
 		}
 
 		return {
-			overflow: true,
 			overflowingNode,
 			overflowingNodeOffset: pos,
 			overflowingEl,
@@ -491,7 +521,6 @@ export class PageLayoutManager {
 	}
 
 	private getNodeLineSplitAmount(
-		el: HTMLElement,
 		firstNode: Node,
 		lastNode: Node,
 		maxBottom: number,
@@ -525,7 +554,6 @@ export class PageLayoutManager {
 
 		const lineHeight = getLineHeight(el);
 		const [linesToKeepOnPage, linesToPutOnNextPage] = this.getNodeLineSplitAmount(
-			el,
 			nodes[0],
 			nodes[nodes.length - 1],
 			maxBottom,
@@ -601,7 +629,7 @@ export class PageLayoutManager {
 	/**
 	 * Find the first position in the overflowing element that causes the overflow.
 	 */
-	getSplitOffset(
+	getSplitOffsetForOverflowingElement(
 		pageBottom: number,
 		overflowingNode: ProseMirrorNode,
 		overflowingEl: HTMLElement
