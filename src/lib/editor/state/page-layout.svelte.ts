@@ -351,6 +351,9 @@ export class PageLayoutManager {
 	 */
 	*paginate(view: EditorView, from: number, to?: number): Generator<number, number, void> {
 		let pageNumber = from;
+		// TODO: We should refactor this function when all functionality is implemented.
+		// Unfortunately tests can only be implemented in a browser environment, and everything's too volatile
+		// to create a setup for it right now.
 
 		while (true) {
 			// Since the page count can change while we're iterating, if a definite max page
@@ -443,6 +446,7 @@ export class PageLayoutManager {
 
 				let splitOffset: number;
 				let shouldDedent = false;
+				let shouldDeleteNextPage = false;
 				console.log(nextPageOverflowingDetails);
 				if ('hasDiscoveredPageEnd' in nextPageOverflowingDetails) {
 					if (nextPageOverflowingDetails.hasDiscoveredPageEnd) {
@@ -452,6 +456,8 @@ export class PageLayoutManager {
 						// Move all content over to the current page.
 						splitOffset = nextPageInfo.pageNode.nodeSize - 1;
 					}
+
+					shouldDeleteNextPage = nextPageInfo.pageNode.nodeSize - splitOffset - 1 <= 0;
 				} else {
 					// Calculate how much content we can move over to the current page.
 					const splitDetails = this.getSplitOffsetForOverflowingElement(
@@ -464,7 +470,7 @@ export class PageLayoutManager {
 					shouldDedent = splitDetails.shouldDedent;
 				}
 
-				console.log(splitOffset, shouldDedent);
+				console.log(splitOffset, shouldDedent, shouldDeleteNextPage);
 
 				// Find the amount of nodes that fit into the available space. If the node that
 				// would take up too much space is a paragraph, we have to discover where it would cause overflow,
