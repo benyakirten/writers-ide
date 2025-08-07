@@ -110,7 +110,6 @@ export class PageLayoutManager {
 	orphanLines = $state<number>(2);
 	widowLines = $state<number>(2);
 	currentPage = $state<number>(0);
-	deleteEmptyPages = $state<boolean>(true);
 
 	_defaultParagraphIndent = $state<number>(1);
 	defaultParagraphIndent = $derived(clamp(this._defaultParagraphIndent, INDENT_MIN, INDENT_MAX));
@@ -301,6 +300,26 @@ export class PageLayoutManager {
 		view.dispatch(tr);
 	}
 
+	deleteEmptyPages(view: EditorView) {
+		let pageNumber = 0;
+		while (true) {
+			const currentPageDetails = this.getPage(view, pageNumber);
+			if (!currentPageDetails) {
+				break;
+			}
+
+			const nextPageDetails = this.getPage(view, pageNumber + 1);
+			if (
+				(nextPageDetails === null || nextPageDetails.pageNode.textContent === '') &&
+				currentPageDetails.pageNode.textContent === ''
+			) {
+				this.deletePage(view, currentPageDetails.pageNode, currentPageDetails.pageOffset);
+			} else {
+				pageNumber++;
+			}
+		}
+	}
+
 	private deletePage(view: EditorView, pageNode: ProseMirrorNode, pageOffset: number): void {
 		const { tr } = view.state;
 		tr.delete(pageOffset, pageOffset + pageNode.nodeSize);
@@ -334,17 +353,10 @@ export class PageLayoutManager {
 			if (!pageDetails) {
 				break;
 			}
-
-			const nextPageInfo = this.getPage(view, pageNumber + 1);
 			const { pageNode, pageOffset, pageEl } = pageDetails;
-
-			if (pageNode.textContent === '' && nextPageInfo !== null && this.deleteEmptyPages) {
-				this.deletePage(view, pageNode, pageOffset);
-				continue;
-			}
-
 			pageNumber++;
 
+			// TODO: Replace empty paragraphs with an page end node - configured by option.
 			const overflowingDetails = this.getOverflowingInformation(view, pageEl, pageNode, pageOffset);
 			// If we have a `hasDiscoveredPageEnd`, it means the page does not overflow.
 			if ('hasDiscoveredPageEnd' in overflowingDetails) {
@@ -381,6 +393,8 @@ export class PageLayoutManager {
 					continue;
 				}
 
+				// NOTE: pageNumber has already been incremented so this already points to the next page.
+				const nextPageInfo = this.getPage(view, pageNumber);
 				if (!nextPageInfo) {
 					// If there is no next page, we can just yield the page number and continue.
 					yield pageNumber;
