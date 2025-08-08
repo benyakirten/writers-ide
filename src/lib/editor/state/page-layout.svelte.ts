@@ -327,16 +327,21 @@ export class PageLayoutManager {
 		nextPageNode: ProseMirrorNode,
 		nextPageOffset: number,
 		splitOffset: number,
-		shouldDedent: boolean
+		shouldDedent: boolean,
+		shouldDeleteNextPage: boolean
 	) {
 		const { tr } = view.state;
 
 		const contentToMoveBackward = nextPageNode.cut(0, splitOffset - 1);
 		const contentToKeep = nextPageNode.cut(splitOffset - 1);
 
-		tr.replaceWith(nextPageOffset, nextPageOffset + nextPageNode.nodeSize, contentToKeep);
-		if (shouldDedent) {
-			tr.setNodeAttribute(nextPageOffset + 1, 'indent', INDENT_MIN);
+		if (shouldDeleteNextPage) {
+			tr.delete(nextPageOffset, nextPageOffset + nextPageNode.nodeSize);
+		} else {
+			tr.replaceWith(nextPageOffset, nextPageOffset + nextPageNode.nodeSize, contentToKeep);
+			if (shouldDedent) {
+				tr.setNodeAttribute(nextPageOffset + 1, 'indent', INDENT_MIN);
+			}
 		}
 		tr.insert(pageOffset + pageNode.nodeSize - 1, contentToMoveBackward.content);
 
