@@ -13,6 +13,7 @@ import {
 	PIXELS_PER_INCH
 } from '../prosemirror/view/constants';
 import { clamp } from '@/utils/numbers';
+import type { Transaction } from 'prosemirror-state';
 
 export type Unit = 'in' | 'cm' | 'mm';
 
@@ -170,6 +171,13 @@ export class PageLayoutManager {
 		return bottom - bottomPadding;
 	}
 
+	calculatePageTop(host: HTMLElement): number {
+		const { top } = host.getBoundingClientRect();
+		const topPadding = this.convertMeasurementToPx(this.pageYMargin, this.units);
+
+		return top + topPadding;
+	}
+
 	getPage(view: EditorView, page: number): PageDetails | null {
 		let pos = 0;
 		let currentPage = 0;
@@ -268,7 +276,11 @@ export class PageLayoutManager {
 		return true;
 	}
 
-	private splitPageAtOffset(
+	/**
+	 * Move all content from the page at the given offset to the next page.
+	 * If the next page does not exist, it will be created.
+	 */
+	private paginateForwardFromOffset(
 		view: EditorView,
 		pageNode: ProseMirrorNode,
 		nextPageNumber: number,
@@ -303,9 +315,46 @@ export class PageLayoutManager {
 		return addedNewPage ? 1 : 0;
 	}
 
+	/**
+	 * Move all content from the next page at the given offset to the previous page.
+	 * This function assumes that both pages already exist. If they don't, you're
+	 * definitely calling the wrong function.
+	 */
+	private paginateBackwardFromOffset(
+		view: EditorView,
+		pageNode: ProseMirrorNode,
+		pageOffset: number,
+		nextPageNode: ProseMirrorNode,
+		nextPageOffset: number,
+		splitOffset: number,
+		shouldDedent: boolean,
+		shouldDeleteNextPage: boolean
+	) {
+		const { tr } = view.state;
+
+		const contentToMoveBackward = nextPageNode.cut(0, splitOffset - 1);
+		const contentToKeep = nextPageNode.cut(splitOffset - 1);
+
+		tr.insert(pageOffset + pageNode.nodeSize - 1, contentToMoveBackward.content);
+		if (shouldDeleteNextPage) {
+			this.deletePage(tr, nextPageOffset, nextPageNode.nodeSize);
+		} else {
+			tr.replaceWith(nextPageOffset, nextPageOffset + nextPageNode.nodeSize, contentToKeep);
+			if (shouldDedent) {
+				tr.setNodeAttribute(pageOffset + contentToMoveBackward.nodeSize, 'indent', INDENT_MIN);
+			}
+		}
+		view.dispatch(tr);
+	}
+
+	private deletePage(tr: Transaction, pageOffset: number, pageSize: number): void {
+		tr.delete(pageOffset, pageOffset + pageSize);
+	}
+
 	deleteEmptyPages(view: EditorView) {
 		let pageNumber = 0;
 		while (true) {
+			const { tr } = view.state;
 			const currentPageDetails = this.getPage(view, pageNumber);
 			if (!currentPageDetails) {
 				break;
@@ -316,7 +365,7 @@ export class PageLayoutManager {
 				(nextPageDetails === null || nextPageDetails.pageNode.textContent === '') &&
 				currentPageDetails.pageNode.textContent === ''
 			) {
-				this.deletePage(view, currentPageDetails.pageNode, currentPageDetails.pageOffset);
+				this.deletePage(tr, currentPageDetails.pageOffset, currentPageDetails.pageNode.nodeSize);
 			} else {
 				pageNumber++;
 			}
@@ -330,12 +379,6 @@ export class PageLayoutManager {
 	// ): void {
 	// 	// TODO
 	// }
-
-	private deletePage(view: EditorView, pageNode: ProseMirrorNode, pageOffset: number): void {
-		const { tr } = view.state;
-		tr.delete(pageOffset, pageOffset + pageNode.nodeSize);
-		view.dispatch(tr);
-	}
 
 	/**
 	 * Paginate from the given `from` position to the `to` position, non-inclusive.
@@ -400,7 +443,7 @@ export class PageLayoutManager {
 						// after the page end node should be moved to the next page. We don't
 						// care about line of text, just move everything over then we can worry
 						// about lines of text when we paginate that next page.
-						const addedPages = this.splitPageAtOffset(
+						const addedPages = this.paginateForwardFromOffset(
 							view,
 							pageDetails.pageNode,
 							pageNumber,
@@ -439,15 +482,16 @@ export class PageLayoutManager {
 
 				const nextPageOverflowingDetails = this.getOverflowingInformation(
 					view,
-					availableSpace + nextPageInfo.pageEl.getBoundingClientRect().top,
+					availableSpace + this.calculatePageTop(nextPageInfo.pageEl),
 					nextPageInfo.pageNode,
 					nextPageInfo.pageOffset
 				);
 
+				// Split offset means everything before it e.g. (0, offset) should be moved to the page
+				// and everything else after should stay on the page.
 				let splitOffset: number;
 				let shouldDedent = false;
 				let shouldDeleteNextPage = false;
-				console.log(nextPageOverflowingDetails);
 				if ('hasDiscoveredPageEnd' in nextPageOverflowingDetails) {
 					if (nextPageOverflowingDetails.hasDiscoveredPageEnd) {
 						// Move everything up until the page end node.
@@ -470,7 +514,16 @@ export class PageLayoutManager {
 					shouldDedent = splitDetails.shouldDedent;
 				}
 
-				console.log(splitOffset, shouldDedent, shouldDeleteNextPage);
+				this.paginateBackwardFromOffset(
+					view,
+					pageNode,
+					pageOffset,
+					nextPageInfo.pageNode,
+					nextPageInfo.pageOffset,
+					splitOffset,
+					shouldDedent,
+					shouldDeleteNextPage
+				);
 
 				// Find the amount of nodes that fit into the available space. If the node that
 				// would take up too much space is a paragraph, we have to discover where it would cause overflow,
@@ -491,7 +544,7 @@ export class PageLayoutManager {
 			);
 			const { splitOffset, shouldDedent } = splitOffsetInfo;
 
-			const addedPages = this.splitPageAtOffset(
+			const addedPages = this.paginateForwardFromOffset(
 				view,
 				pageNode,
 				pageNumber,
