@@ -327,7 +327,7 @@ export class PageLayoutManager {
 		nextPageNode: ProseMirrorNode,
 		nextPageOffset: number,
 		splitOffset: number,
-		shouldDedent: boolean,
+		_shouldDedent: boolean,
 		shouldDeleteNextPage: boolean
 	) {
 		const { tr } = view.state;
@@ -340,9 +340,9 @@ export class PageLayoutManager {
 			this.deletePage(tr, nextPageOffset, nextPageNode.nodeSize);
 		} else {
 			tr.replaceWith(nextPageOffset, nextPageOffset + nextPageNode.nodeSize, contentToKeep);
-			if (shouldDedent) {
-				tr.setNodeAttribute(pageOffset + contentToMoveBackward.nodeSize, 'indent', INDENT_MIN);
-			}
+			// if (shouldDedent) {
+			// 	tr.setNodeAttribute(nextPageOffset + contentToKeep.nodeSize, 'indent', INDENT_MIN);
+			// }
 		}
 		view.dispatch(tr);
 	}
@@ -480,12 +480,16 @@ export class PageLayoutManager {
 					continue;
 				}
 
+				console.log(availableSpace);
+				console.log(this.calculatePageTop(nextPageInfo.pageEl));
 				const nextPageOverflowingDetails = this.getOverflowingInformation(
 					view,
 					availableSpace + this.calculatePageTop(nextPageInfo.pageEl),
 					nextPageInfo.pageNode,
 					nextPageInfo.pageOffset
 				);
+
+				console.log(nextPageOverflowingDetails);
 
 				// Split offset means everything before it e.g. (0, offset) should be moved to the page
 				// and everything else after should stay on the page.
@@ -510,7 +514,7 @@ export class PageLayoutManager {
 						nextPageOverflowingDetails.overflowingEl
 					);
 
-					splitOffset = splitDetails.splitOffset ?? 0;
+					splitOffset = splitDetails.splitOffset;
 					shouldDedent = splitDetails.shouldDedent;
 				}
 
@@ -586,8 +590,6 @@ export class PageLayoutManager {
 		pageNode: ProseMirrorNode,
 		pageOffset: number
 	): OverflowingDetails | NotOverflowingDetails {
-		let overflowingEl: HTMLElement | null = null;
-		let overflowingNode: ProseMirrorNode | null = null;
 		let pos = 0;
 		let lastNodeSize = 0;
 
@@ -614,26 +616,20 @@ export class PageLayoutManager {
 
 			const { bottom } = el.getBoundingClientRect();
 			if (bottom >= maxBottom) {
-				overflowingNode = node;
-				overflowingEl = el;
-				break;
+				return {
+					overflowingNode: node,
+					overflowingNodeOffset: pos,
+					overflowingEl: el
+				};
 			}
 
 			pos += node.nodeSize;
 			lastNodeSize = node.nodeSize;
 		}
 
-		if (!overflowingEl || !overflowingNode) {
-			return {
-				hasDiscoveredPageEnd: false,
-				lastNodeOffset: pos - lastNodeSize
-			};
-		}
-
 		return {
-			overflowingNode,
-			overflowingNodeOffset: pos,
-			overflowingEl
+			hasDiscoveredPageEnd: false,
+			lastNodeOffset: pos - lastNodeSize
 		};
 	}
 
