@@ -327,23 +327,19 @@ export class PageLayoutManager {
 		nextPageNode: ProseMirrorNode,
 		nextPageOffset: number,
 		splitOffset: number,
-		_shouldDedent: boolean,
-		shouldDeleteNextPage: boolean
+		shouldDedent: boolean
 	) {
 		const { tr } = view.state;
 
 		const contentToMoveBackward = nextPageNode.cut(0, splitOffset - 1);
 		const contentToKeep = nextPageNode.cut(splitOffset - 1);
 
-		tr.insert(pageOffset + pageNode.nodeSize - 1, contentToMoveBackward.content);
-		if (shouldDeleteNextPage) {
-			this.deletePage(tr, nextPageOffset, nextPageNode.nodeSize);
-		} else {
-			tr.replaceWith(nextPageOffset, nextPageOffset + nextPageNode.nodeSize, contentToKeep);
-			// if (shouldDedent) {
-			// 	tr.setNodeAttribute(nextPageOffset + contentToKeep.nodeSize, 'indent', INDENT_MIN);
-			// }
+		tr.replaceWith(nextPageOffset, nextPageOffset + nextPageNode.nodeSize, contentToKeep);
+		if (shouldDedent) {
+			tr.setNodeAttribute(nextPageOffset + 1, 'indent', INDENT_MIN);
 		}
+		tr.insert(pageOffset + pageNode.nodeSize - 1, contentToMoveBackward.content);
+
 		view.dispatch(tr);
 	}
 
@@ -480,16 +476,12 @@ export class PageLayoutManager {
 					continue;
 				}
 
-				console.log(availableSpace);
-				console.log(this.calculatePageTop(nextPageInfo.pageEl));
 				const nextPageOverflowingDetails = this.getOverflowingInformation(
 					view,
 					availableSpace + this.calculatePageTop(nextPageInfo.pageEl),
 					nextPageInfo.pageNode,
 					nextPageInfo.pageOffset
 				);
-
-				console.log(nextPageOverflowingDetails);
 
 				// Split offset means everything before it e.g. (0, offset) should be moved to the page
 				// and everything else after should stay on the page.
@@ -509,10 +501,12 @@ export class PageLayoutManager {
 				} else {
 					// Calculate how much content we can move over to the current page.
 					const splitDetails = this.getSplitOffsetForOverflowingElement(
-						maxBottom,
+						availableSpace + this.calculatePageTop(nextPageInfo.pageEl),
 						nextPageOverflowingDetails.overflowingNode,
 						nextPageOverflowingDetails.overflowingEl
 					);
+
+					console.log(splitDetails.splitOffset);
 
 					splitOffset = splitDetails.splitOffset;
 					shouldDedent = splitDetails.shouldDedent;
