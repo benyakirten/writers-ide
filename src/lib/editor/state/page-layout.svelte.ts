@@ -373,6 +373,15 @@ export class PageLayoutManager {
 		}
 	}
 
+	paginate(view: EditorView, pageNumber: number) {
+		// TODO
+		const pageDetails = this.getPage(view, pageNumber);
+		// We've run out of pages.
+		if (!pageDetails) {
+			return null;
+		}
+	}
+
 	/**
 	 * Paginate from the given `from` position to the `to` position, non-inclusive.
 	 * This function is relatively complex since we need to use the DOM to measure
@@ -385,7 +394,7 @@ export class PageLayoutManager {
 	 * and yield to allow the UI to update if necessary. The data yielded is the number of the page,
 	 * which is 1 greater than the page index.
 	 */
-	*paginate(view: EditorView, from: number, to?: number): Generator<number, number, void> {
+	*paginateRange(view: EditorView, from: number, to?: number): Generator<number, number, void> {
 		let pageNumber = from;
 		// TODO: We should refactor this function when all functionality is implemented.
 		// Unfortunately tests can only be implemented in a browser environment, and everything's too volatile

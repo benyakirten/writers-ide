@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ToastManager from '$lib/services/toaster.svelte';
-	import Editors, { type EditorData } from '../prosemirror/prose-mirror-editor.svelte';
+	import Editors from '../prosemirror/prose-mirror-editor.svelte';
 	import TransferHandler, { type BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 	import PageLayout from '../state/page-layout.svelte';
@@ -45,7 +45,7 @@
 	function paginate() {
 		if (!gen) {
 			const [data] = Object.values(Editors.editors);
-			gen = PageLayout.paginate(data.view, 0);
+			gen = PageLayout.paginateRange(data.view, 0);
 		}
 		const t = performance.now();
 		[...gen];
