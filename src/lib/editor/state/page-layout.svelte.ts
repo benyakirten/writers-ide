@@ -333,9 +333,7 @@ export class PageLayoutManager {
 		const { tr } = view.state;
 
 		const contentToMoveBackward = nextPageNode.cut(0, splitOffset);
-		console.log(contentToMoveBackward);
 		const contentToKeep = nextPageNode.cut(splitOffset);
-		console.log(contentToKeep);
 
 		if (shouldDeleteNextPage) {
 			tr.delete(nextPageOffset, nextPageOffset + nextPageNode.nodeSize);
