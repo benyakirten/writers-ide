@@ -13,7 +13,7 @@
 	import type { TabComponentProps } from '@/editor/state/tab-state-registry.svelte';
 	import ProseMirrorPlugins from '../plugins.svelte';
 	import Editors from '../prose-mirror-editor.svelte';
-	import { multiplePages, shortPages, longPage } from './sample-data';
+	import { multiplePages, shortPages } from './sample-data';
 
 	let { id }: TabComponentProps = $props();
 
@@ -21,7 +21,7 @@
 	let host: HTMLElement;
 	let state: EditorState;
 	let view: EditorView;
-	let initialState = schema.node('doc', null, [longPage, longPage, longPage, longPage]);
+	let initialState = schema.node('doc', null, [...multiplePages, ...shortPages, ...multiplePages]);
 
 	function handleTransaction(view: EditorView, transaction: Transaction) {
 		let newState = view.state.apply(transaction);

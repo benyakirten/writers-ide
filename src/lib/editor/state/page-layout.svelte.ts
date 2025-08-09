@@ -14,7 +14,6 @@ import {
 } from '../prosemirror/view/constants';
 import { clamp } from '@/utils/numbers';
 import type { Transaction } from 'prosemirror-state';
-import { page } from '$app/state';
 
 export type Unit = 'in' | 'cm' | 'mm';
 
@@ -416,13 +415,116 @@ export class PageLayoutManager {
 				toDelta: addedPages
 			};
 		} else {
+			let pageDelta = 1;
+			let toDelta = 0;
 			// Check to see if we need to pull back content from the next page.
-		}
+			const { lastNodeOffset, hasDiscoveredPageEnd } = overflowingDetails;
+			// The page does not overflow - but we need to check for one of the following scenarios:
+			// Five possibile courses of action:
+			// 1. Page ends with page end node and no content after it - yield page number and continue.
+			// 2. Page ends with page end node and has content after it - move the content to the next page.
+			// 3. Page ends with any other block node but no remaining space on the page, yield page number and continue.
+			// 4. Page ends with any other block node and has remaining space on the page but we don't need to move content
+			//    from the next page back - yield page number and continue.
+			// 5. Page ends with any other block node and has remaining space on the page but we need to move content
+			//    from the next page back - move the content to the current page then yield the page number and continue.
 
-		return {
-			pageDelta: 1,
-			toDelta: 0
-		};
+			// Solve condition 1 and 2.
+			if (hasDiscoveredPageEnd) {
+				// If it's the lasts item on the page, we just move on.
+				// If the page node isn't the last item on the page, all of the content
+				// after the page end node should be moved to the next page. We don't
+				// care about line of text, just move everything over then we can worry
+				// about lines of text when we paginate that next page.
+				if (!this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
+					toDelta += this.paginateForwardFromOffset(
+						view,
+						pageDetails.pageNode,
+						pageNumber + 1,
+						lastNodeOffset + 1,
+						pageDetails.pageOffset,
+						false
+					);
+				}
+
+				return {
+					pageDelta: 1,
+					toDelta
+				};
+			}
+
+			const nextPageInfo = this.getPage(view, pageNumber + 1);
+			// No matter how much space remains on the page, if there is no next page,
+			// we are at the end of the document;
+			if (!nextPageInfo) {
+				return null;
+			}
+
+			const availableSpace = this.calculateUnusedSpace(view, pageDetails, lastNodeOffset);
+			// Situation #4
+			if (availableSpace === null || availableSpace <= 0) {
+				return {
+					pageDelta: 1,
+					toDelta: 0
+				};
+			}
+
+			const nextPageOverflowingDetails = this.getOverflowingInformation(
+				view,
+				availableSpace + this.calculatePageTop(nextPageInfo.pageEl),
+				nextPageInfo.pageNode,
+				nextPageInfo.pageOffset
+			);
+
+			// Split offset means everything before it e.g. (0, offset) should be moved to the page
+			// and everything else after should stay on the page.
+			let splitOffset: number;
+			let shouldDedent = false;
+			let shouldDeleteNextPage = false;
+			if (!this.isOverflowingDetails(nextPageOverflowingDetails)) {
+				if (nextPageOverflowingDetails.hasDiscoveredPageEnd) {
+					// Move everything up until after the page end node.
+					splitOffset = nextPageOverflowingDetails.lastNodeOffset + 1;
+				} else {
+					// Move all content over to the current page.
+					splitOffset = nextPageInfo.pageNode.nodeSize - 2;
+				}
+
+				if (nextPageInfo.pageNode.nodeSize - splitOffset - 2 <= 0) {
+					shouldDeleteNextPage = true;
+					// We could potentially want to add even more content to the page.
+					pageDelta--;
+				}
+			} else {
+				// Calculate how much content we can move over to the current page.
+				const lineHeight = getLineHeight(nextPageOverflowingDetails.overflowingEl);
+				const splitDetails = this.getSplitOffsetForOverflowingElement(
+					availableSpace + this.calculatePageTop(nextPageInfo.pageEl) - lineHeight,
+					nextPageOverflowingDetails.overflowingNode,
+					nextPageOverflowingDetails.overflowingEl
+				);
+
+				// The place to split is correctly identified - but the next page isn't getting split there.
+				splitOffset = splitDetails.splitOffset + nextPageOverflowingDetails.overflowingNodeOffset;
+				shouldDedent = splitDetails.shouldDedent;
+			}
+
+			this.paginateBackwardFromOffset(
+				view,
+				pageNode,
+				pageOffset,
+				nextPageInfo.pageNode,
+				nextPageInfo.pageOffset,
+				splitOffset,
+				shouldDedent,
+				shouldDeleteNextPage
+			);
+
+			return {
+				pageDelta,
+				toDelta
+			};
+		}
 	}
 
 	*paginateRangeFromFunc(
