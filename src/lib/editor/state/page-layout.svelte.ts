@@ -373,47 +373,65 @@ export class PageLayoutManager {
 		}
 	}
 
+	private handleOverflowingPage(
+		view: EditorView,
+		pageNode: ProseMirrorNode,
+		pageOffset: number,
+		pageNumber: number,
+		overflowingDetails: OverflowingDetails,
+		maxBottom: number
+	) {
+		const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
+
+		const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
+			maxBottom,
+			overflowingNode,
+			overflowingEl
+		);
+		const { splitOffset, shouldDedent } = splitOffsetInfo;
+
+		const addedPages = this.paginateForwardFromOffset(
+			view,
+			pageNode,
+			pageNumber + 1,
+			overflowingNodeOffset + splitOffset,
+			pageOffset,
+			shouldDedent
+		);
+
+		return {
+			pageDelta: 1,
+			toDelta: addedPages
+		};
+	}
+
 	paginate(view: EditorView, pageNumber: number): { pageDelta: number; toDelta: number } | null {
 		const pageDetails = this.getPage(view, pageNumber);
-		// We've run out of pages.
 		if (!pageDetails) {
+			// We've run out of pages.
 			return null;
 		}
 
 		const { pageNode, pageOffset, pageEl } = pageDetails;
 
 		const maxBottom = this.calculatePageBottom(pageEl);
-		const overflowingDetails = this.getOverflowingInformation(
+		// Find out if the current page overflows or has available space.
+		const overflowingDetails = this.getPageOverflowInformation(
 			view,
 			maxBottom,
 			pageNode,
 			pageOffset
 		);
 
-		if (this.isOverflowingDetails(overflowingDetails)) {
-			// Handle overflowing content - check to see how much we need to put on next page.
-			const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
-
-			const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
-				maxBottom,
-				overflowingNode,
-				overflowingEl
-			);
-			const { splitOffset, shouldDedent } = splitOffsetInfo;
-
-			const addedPages = this.paginateForwardFromOffset(
+		if (this.pageIsOverflowing(overflowingDetails)) {
+			return this.handleOverflowingPage(
 				view,
 				pageNode,
-				pageNumber + 1,
-				overflowingNodeOffset + splitOffset,
 				pageOffset,
-				shouldDedent
+				pageNumber,
+				overflowingDetails,
+				maxBottom
 			);
-
-			return {
-				pageDelta: 1,
-				toDelta: addedPages
-			};
 		} else {
 			let pageDelta = 1;
 			let toDelta = 0;
@@ -469,7 +487,7 @@ export class PageLayoutManager {
 				};
 			}
 
-			const nextPageOverflowingDetails = this.getOverflowingInformation(
+			const nextPageOverflowingDetails = this.getPageOverflowInformation(
 				view,
 				availableSpace + this.calculatePageTop(nextPageInfo.pageEl),
 				nextPageInfo.pageNode,
@@ -481,7 +499,7 @@ export class PageLayoutManager {
 			let splitOffset: number;
 			let shouldDedent = false;
 			let shouldDeleteNextPage = false;
-			if (!this.isOverflowingDetails(nextPageOverflowingDetails)) {
+			if (!this.pageIsOverflowing(nextPageOverflowingDetails)) {
 				if (nextPageOverflowingDetails.hasDiscoveredPageEnd) {
 					// Move everything up until after the page end node.
 					splitOffset = nextPageOverflowingDetails.lastNodeOffset + 1;
@@ -587,7 +605,7 @@ export class PageLayoutManager {
 
 			// TODO: Replace empty paragraphs with an page end node - configured by option.
 			const maxBottom = this.calculatePageBottom(pageEl);
-			const overflowingDetails = this.getOverflowingInformation(
+			const overflowingDetails = this.getPageOverflowInformation(
 				view,
 				maxBottom,
 				pageNode,
@@ -651,7 +669,7 @@ export class PageLayoutManager {
 					continue;
 				}
 
-				const nextPageOverflowingDetails = this.getOverflowingInformation(
+				const nextPageOverflowingDetails = this.getPageOverflowInformation(
 					view,
 					availableSpace + this.calculatePageTop(nextPageInfo.pageEl),
 					nextPageInfo.pageNode,
@@ -751,7 +769,7 @@ export class PageLayoutManager {
 		return this.calculateLineSplitAmount(numLines - overflowingLines, overflowingLines);
 	}
 
-	isOverflowingDetails(details: object): details is OverflowingDetails {
+	pageIsOverflowing(details: object): details is OverflowingDetails {
 		return 'overflowingNode' in details;
 	}
 
@@ -761,7 +779,7 @@ export class PageLayoutManager {
 	 * 2. The page ends with a `pageEnd` node. It returns the page end offset to check that the page ends with that node (`NotOverflowingDetails`).
 	 * 3. The page does not overflow and has no `pageEnd` node (last page of document). It returns `null`.
 	 */
-	getOverflowingInformation(
+	getPageOverflowInformation(
 		view: EditorView,
 		maxBottom: number,
 		pageNode: ProseMirrorNode,
