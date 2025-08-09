@@ -690,18 +690,13 @@ export class PageLayoutManager {
 	private identifyOffsetBasedOffOverflowingLines(
 		el: HTMLElement,
 		nodes: Node[],
-		maxBottom: number
-	) {
+		maxBottom: number,
+		lineHeight: number,
+		linesToKeepOnPage: number,
+		linesToPutOnNextPage: number
+	): number {
 		const range = document.createRange();
 		let offset = 0;
-
-		const lineHeight = getLineHeight(el);
-		const [linesToKeepOnPage, linesToPutOnNextPage] = this.getNodeLineSplitAmount(
-			nodes[0],
-			nodes[nodes.length - 1],
-			maxBottom,
-			lineHeight
-		);
 
 		if (linesToPutOnNextPage === 0) {
 			throw new Error('Overflow detected, but no lines should be moved to the next page.');
@@ -731,13 +726,17 @@ export class PageLayoutManager {
 		el: HTMLElement,
 		text: string,
 		maxBottom: number
-	): { offset: number; overflowDiscovered: boolean } {
+	): { offset: number; overflowDiscovered: boolean; shouldDedent: boolean } {
 		let pmOffset = 0;
 		let overflowDiscovered: boolean = false;
 
 		const sequentialTextNodes = [];
 		let remaining = text.length;
 		let potentialExtra = 0;
+
+		// If we are dedenting based on splitting text based on widow/orphan lines,
+		// we shouldn't dedent if we don't have any lines that we are keeping on the first page.
+		let shouldDedent = false;
 
 		while (remaining > 0) {
 			const nextTextNode = this.getNextTextNode(walker);
@@ -758,14 +757,31 @@ export class PageLayoutManager {
 		}
 
 		if (overflowDiscovered) {
-			pmOffset += this.identifyOffsetBasedOffOverflowingLines(el, sequentialTextNodes, maxBottom);
+			const lineHeight = getLineHeight(el);
+			const [linesToKeepOnPage, linesToPutOnNextPage] = this.getNodeLineSplitAmount(
+				sequentialTextNodes[0],
+				sequentialTextNodes[sequentialTextNodes.length - 1],
+				maxBottom,
+				lineHeight
+			);
+
+			pmOffset += this.identifyOffsetBasedOffOverflowingLines(
+				el,
+				sequentialTextNodes,
+				maxBottom,
+				lineHeight,
+				linesToKeepOnPage,
+				linesToPutOnNextPage
+			);
+			shouldDedent = linesToKeepOnPage > 0;
 		} else {
 			pmOffset += potentialExtra;
 		}
 
 		return {
 			overflowDiscovered,
-			offset: pmOffset
+			offset: pmOffset,
+			shouldDedent
 		};
 	}
 
@@ -787,20 +803,21 @@ export class PageLayoutManager {
 
 		let consecutiveTextNodeContent: string[] = [];
 
-		const moveForwardForNextNode = () => {
+		const moveForwardForNextTextNode = () => {
 			const result = this.advanceForTextNode(
 				walker,
 				overflowingEl,
 				consecutiveTextNodeContent.join(''),
 				pageBottom
 			);
-			const { offset, overflowDiscovered } = result;
+
+			const { offset, overflowDiscovered, shouldDedent: _shouldDedent } = result;
 
 			pmOffset += offset;
 			consecutiveTextNodeContent = [];
 
 			if (overflowDiscovered) {
-				shouldDedent = true;
+				shouldDedent = _shouldDedent;
 			}
 
 			return overflowDiscovered;
@@ -812,7 +829,7 @@ export class PageLayoutManager {
 				consecutiveTextNodeContent.push(child.text);
 			} else {
 				if (consecutiveTextNodeContent.length > 0) {
-					const overflowDiscovered = moveForwardForNextNode();
+					const overflowDiscovered = moveForwardForNextTextNode();
 					if (overflowDiscovered) {
 						return false;
 					}
@@ -825,7 +842,7 @@ export class PageLayoutManager {
 		});
 
 		if (consecutiveTextNodeContent.length > 0) {
-			moveForwardForNextNode();
+			moveForwardForNextTextNode();
 		}
 
 		return { splitOffset: pmOffset, shouldDedent };
