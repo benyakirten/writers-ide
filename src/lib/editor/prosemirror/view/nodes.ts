@@ -168,7 +168,12 @@ const page: NodeSpec = {
 	}
 };
 
-const pageEndDom: DOMOutputSpec = ['div', { class: PROSEMIRROR_PAGE_END_CLASS }];
+const pageEndDom: DOMOutputSpec = [
+	'div',
+	{
+		class: PROSEMIRROR_PAGE_END_CLASS
+	}
+];
 const pageEnd: NodeSpec = {
 	group: 'block',
 	selectable: false,

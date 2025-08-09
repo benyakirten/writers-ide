@@ -373,14 +373,6 @@ export class PageLayoutManager {
 		}
 	}
 
-	// replaceEmptyParagraphsWithPageEnd(
-	// 	view: EditorView,
-	// 	pageNode: ProseMirrorNode,
-	// 	pageOffset: number
-	// ): void {
-	// 	// TODO
-	// }
-
 	/**
 	 * Paginate from the given `from` position to the `to` position, non-inclusive.
 	 * This function is relatively complex since we need to use the DOM to measure
@@ -494,15 +486,14 @@ export class PageLayoutManager {
 				let shouldDeleteNextPage = false;
 				if ('hasDiscoveredPageEnd' in nextPageOverflowingDetails) {
 					if (nextPageOverflowingDetails.hasDiscoveredPageEnd) {
-						// Move everything up until the page end node.
-						splitOffset = nextPageOverflowingDetails.lastNodeOffset - 1;
+						// Move everything up until after the page end node.
+						splitOffset = nextPageOverflowingDetails.lastNodeOffset + 1;
 					} else {
 						// Move all content over to the current page.
 						splitOffset = nextPageInfo.pageNode.nodeSize - 2;
-						shouldDeleteNextPage = true;
 					}
 
-					if (nextPageInfo.pageNode.nodeSize - splitOffset - 1 <= 0) {
+					if (nextPageInfo.pageNode.nodeSize - splitOffset - 2 <= 0) {
 						shouldDeleteNextPage = true;
 						// We could potentially want to add even more content to the page.
 						pageNumber--;
@@ -531,7 +522,6 @@ export class PageLayoutManager {
 					shouldDedent,
 					shouldDeleteNextPage
 				);
-				pageNumber--;
 
 				// Find the amount of nodes that fit into the available space. If the node that
 				// would take up too much space is a paragraph, we have to discover where it would cause overflow,

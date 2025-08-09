@@ -50,4 +50,16 @@ const shortPage = schema.node('page', null, [
 	schema.node('paragraph', null, [schema.text('Short page content.')])
 ]);
 
-export const shortPages = [shortPage, shortPage, shortPage, shortPage, shortPage];
+const shortPageInterrupted = schema.node('page', null, [
+	schema.node('paragraph', null, [schema.text('Short page content.')]),
+	schema.node('pageEnd')
+]);
+
+export const shortPages = [
+	shortPage,
+	shortPage,
+	shortPage,
+	shortPageInterrupted,
+	shortPage,
+	shortPage
+];
