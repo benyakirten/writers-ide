@@ -333,7 +333,9 @@ export class PageLayoutManager {
 		const { tr } = view.state;
 
 		const contentToMoveBackward = nextPageNode.cut(0, splitOffset);
+		console.log(contentToMoveBackward);
 		const contentToKeep = nextPageNode.cut(splitOffset);
+		console.log(contentToKeep);
 
 		if (shouldDeleteNextPage) {
 			tr.delete(nextPageOffset, nextPageOffset + nextPageNode.nodeSize);
@@ -495,10 +497,11 @@ export class PageLayoutManager {
 				if ('hasDiscoveredPageEnd' in nextPageOverflowingDetails) {
 					if (nextPageOverflowingDetails.hasDiscoveredPageEnd) {
 						// Move everything up until the page end node.
-						splitOffset = nextPageOverflowingDetails.lastNodeOffset + 1;
+						splitOffset = nextPageOverflowingDetails.lastNodeOffset - 1;
 					} else {
 						// Move all content over to the current page.
-						splitOffset = nextPageInfo.pageNode.nodeSize - 1;
+						splitOffset = nextPageInfo.pageNode.nodeSize - 2;
+						shouldDeleteNextPage = true;
 					}
 
 					if (nextPageInfo.pageNode.nodeSize - splitOffset - 1 <= 0) {
@@ -530,6 +533,7 @@ export class PageLayoutManager {
 					shouldDedent,
 					shouldDeleteNextPage
 				);
+				pageNumber--;
 
 				// Find the amount of nodes that fit into the available space. If the node that
 				// would take up too much space is a paragraph, we have to discover where it would cause overflow,
