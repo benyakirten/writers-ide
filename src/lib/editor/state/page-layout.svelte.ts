@@ -332,8 +332,8 @@ export class PageLayoutManager {
 	) {
 		const { tr } = view.state;
 
-		const contentToMoveBackward = nextPageNode.cut(0, splitOffset - 1);
-		const contentToKeep = nextPageNode.cut(splitOffset - 1);
+		const contentToMoveBackward = nextPageNode.cut(0, splitOffset);
+		const contentToKeep = nextPageNode.cut(splitOffset);
 
 		if (shouldDeleteNextPage) {
 			tr.delete(nextPageOffset, nextPageOffset + nextPageNode.nodeSize);
@@ -505,14 +505,14 @@ export class PageLayoutManager {
 					shouldDeleteNextPage = nextPageInfo.pageNode.nodeSize - splitOffset - 1 <= 0;
 				} else {
 					// Calculate how much content we can move over to the current page.
+					const lineHeight = getLineHeight(nextPageOverflowingDetails.overflowingEl);
 					const splitDetails = this.getSplitOffsetForOverflowingElement(
-						availableSpace + this.calculatePageTop(nextPageInfo.pageEl),
+						availableSpace + this.calculatePageTop(nextPageInfo.pageEl) - lineHeight,
 						nextPageOverflowingDetails.overflowingNode,
 						nextPageOverflowingDetails.overflowingEl
 					);
 
-					console.log(splitDetails.splitOffset);
-
+					// The place to split is correctly identified - but the next page isn't getting split there.
 					splitOffset = splitDetails.splitOffset;
 					shouldDedent = splitDetails.shouldDedent;
 				}
@@ -655,6 +655,9 @@ export class PageLayoutManager {
 		range.setStart(el, 0);
 		range.setEnd(node, position);
 
+		console.log(range.toString());
+		console.log(range.getBoundingClientRect());
+
 		const { bottom } = range.getBoundingClientRect();
 		return bottom > maxBottom;
 	}
@@ -710,8 +713,12 @@ export class PageLayoutManager {
 				range.setStart(nodes[0], 0);
 				range.setEnd(node, i);
 
+				console.log(range.toString());
+
 				const rect = range.getBoundingClientRect();
+				console.log(rect);
 				const numLines = Math.round(rect.height / lineHeight);
+				console.log(numLines);
 				if (numLines - 1 >= linesToKeepOnPage) {
 					break outer;
 				}
