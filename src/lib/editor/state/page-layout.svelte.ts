@@ -434,16 +434,15 @@ export class PageLayoutManager {
 				//    from the next page back - yield page number and continue.
 				// 5. Page ends with any other block node and has remaining space on the page but we need to move content
 				//    from the next page back - move the content to the current page then yield the page number and continue.
-				// const lastNode = pageDetails.pageNode.lastChild;
 
 				// Solve condition 1 and 2.
 				if (hasDiscoveredPageEnd) {
 					// If it's the lasts item on the page, we just move on.
+					// If the page node isn't the last item on the page, all of the content
+					// after the page end node should be moved to the next page. We don't
+					// care about line of text, just move everything over then we can worry
+					// about lines of text when we paginate that next page.
 					if (!this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
-						// If the page node isn't the last item on the page, all of the content
-						// after the page end node should be moved to the next page. We don't
-						// care about line of text, just move everything over then we can worry
-						// about lines of text when we paginate that next page.
 						const addedPages = this.paginateForwardFromOffset(
 							view,
 							pageDetails.pageNode,
@@ -848,54 +847,6 @@ export class PageLayoutManager {
 		return { splitOffset: pmOffset, shouldDedent };
 	}
 }
-
-/**
- * we will paginate from page 0 to the current page the user is on + 1
- * which means there will be something like this:
- * [page]
- * [page]
- * [page]
- * [current page]
- * [page]
- * [rest of content]
- *
- * Whenever a page is modified, all pages from then to the current page + 1 need to be modified
- * All pages should cache the content they have
- * Also, we need to track where the user's viewport is
- *
- *
- * How will this work with multiple simultaneous users?
- * It should be possible for each user to have multiple pages open
- * and multiple users, each on different pages.
- *
- * To reduce time complexity but increase space complexity,
- * we will eep a reference to each page, including a last time modified
- * and a reference to the node (the PageData type)
- *
- * Every time a page is modified, we will search for the page and update
- * the last modified data after we have updated the node.
- *
- * We will want to update the pagination if any of the following occurs:
- * 1. Page size changes.
- * 2. Page orientation changes.
- * 3. Page margins change.
- * 4. Page bleed changes.
- * 5. Page padding changes.
- * 6. Page number of orphan lines changes.
- * 7. Page number of widow lines changes.
- * 8. Insertion of content
- * 9. Deletion of content
- * 10. Modification of content that affects layout
- *
- *
- * Any time a modification occurs that requires a reflow/checking of pagination,
- * then we will update the lastModified item
- *
- * When the user scrolls, if the page is already paginated according to
- * latest reflow, we will not act. However, if it is, we have to paginate.
- * We'll have to measure performance since it has to happen linearly - we cannot
- * calculate pagination for page 3 until page 2 is done, etc.
- */
 
 const PageLayout = new PageLayoutManager();
 export default PageLayout;

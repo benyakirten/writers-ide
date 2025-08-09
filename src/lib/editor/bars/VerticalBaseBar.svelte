@@ -47,7 +47,10 @@
 			const [data] = Object.values(Editors.editors);
 			gen = PageLayout.paginate(data.view, 0);
 		}
+		const t = performance.now();
 		[...gen];
+		const dt = performance.now() - t;
+		console.log(`Pagination took ${dt}ms`);
 		gen = null;
 	}
 
