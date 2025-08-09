@@ -1,6 +1,6 @@
 import { schema } from './schema';
 
-const longPage = schema.node('page', null, [
+export const longPage = schema.node('page', null, [
 	schema.node('paragraph', null, [
 		schema.text('8Lorem ipsum dolor sit amet, consectetur adipiscing elit.')
 	]),

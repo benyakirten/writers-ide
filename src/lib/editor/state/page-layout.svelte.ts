@@ -14,6 +14,7 @@ import {
 } from '../prosemirror/view/constants';
 import { clamp } from '@/utils/numbers';
 import type { Transaction } from 'prosemirror-state';
+import { page } from '$app/state';
 
 export type Unit = 'in' | 'cm' | 'mm';
 
@@ -373,7 +374,7 @@ export class PageLayoutManager {
 		}
 	}
 
-	paginate(view: EditorView, pageNumber: number) {
+	paginate(view: EditorView, pageNumber: number): { pageDelta: number; toDelta: number } | null {
 		const pageDetails = this.getPage(view, pageNumber);
 		// We've run out of pages.
 		if (!pageDetails) {
@@ -381,6 +382,47 @@ export class PageLayoutManager {
 		}
 
 		const { pageNode, pageOffset, pageEl } = pageDetails;
+
+		const maxBottom = this.calculatePageBottom(pageEl);
+		const overflowingDetails = this.getOverflowingInformation(
+			view,
+			maxBottom,
+			pageNode,
+			pageOffset
+		);
+
+		if (this.isOverflowingDetails(overflowingDetails)) {
+			// Handle overflowing content - check to see how much we need to put on next page.
+			const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
+
+			const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
+				maxBottom,
+				overflowingNode,
+				overflowingEl
+			);
+			const { splitOffset, shouldDedent } = splitOffsetInfo;
+
+			const addedPages = this.paginateForwardFromOffset(
+				view,
+				pageNode,
+				pageNumber + 1,
+				overflowingNodeOffset + splitOffset,
+				pageOffset,
+				shouldDedent
+			);
+
+			return {
+				pageDelta: 1,
+				toDelta: addedPages
+			};
+		} else {
+			// Check to see if we need to pull back content from the next page.
+		}
+
+		return {
+			pageDelta: 1,
+			toDelta: 0
+		};
 	}
 
 	*paginateRangeFromFunc(
@@ -398,7 +440,11 @@ export class PageLayoutManager {
 			if (deltas === null) {
 				break;
 			}
-			pageNumber++;
+
+			pageNumber += deltas.pageDelta;
+			if (to) {
+				to += deltas.toDelta;
+			}
 			yield pageNumber;
 		}
 		return pageNumber;
@@ -601,6 +647,10 @@ export class PageLayoutManager {
 
 		// TODO: Write overflowing logic to handle non-text overflowing elements and/or nodes with combined types.
 		return this.calculateLineSplitAmount(numLines - overflowingLines, overflowingLines);
+	}
+
+	isOverflowingDetails(details: object): details is OverflowingDetails {
+		return 'overflowingNode' in details;
 	}
 
 	/**
