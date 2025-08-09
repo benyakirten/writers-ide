@@ -405,6 +405,31 @@ export class PageLayoutManager {
 		};
 	}
 
+	private handlePageEndTermination(
+		view: EditorView,
+		pageNode: ProseMirrorNode,
+		pageOffset: number,
+		pageNumber: number,
+		lastNodeOffset: number
+	) {
+		let toDelta: number = 0;
+		if (!this.pageHasNoNodesAfter(pageNode, lastNodeOffset)) {
+			toDelta += this.paginateForwardFromOffset(
+				view,
+				pageNode,
+				pageNumber + 1,
+				lastNodeOffset + 1,
+				pageOffset,
+				false
+			);
+		}
+
+		return {
+			pageDelta: 1,
+			toDelta
+		};
+	}
+
 	paginate(view: EditorView, pageNumber: number): { pageDelta: number; toDelta: number } | null {
 		const pageDetails = this.getPage(view, pageNumber);
 		if (!pageDetails) {
@@ -434,7 +459,7 @@ export class PageLayoutManager {
 			);
 		} else {
 			let pageDelta = 1;
-			let toDelta = 0;
+			const toDelta = 0;
 			// Check to see if we need to pull back content from the next page.
 			const { lastNodeOffset, hasDiscoveredPageEnd } = overflowingDetails;
 			// The page does not overflow - but we need to check for one of the following scenarios:
@@ -449,26 +474,13 @@ export class PageLayoutManager {
 
 			// Solve condition 1 and 2.
 			if (hasDiscoveredPageEnd) {
-				// If it's the lasts item on the page, we just move on.
-				// If the page node isn't the last item on the page, all of the content
-				// after the page end node should be moved to the next page. We don't
-				// care about line of text, just move everything over then we can worry
-				// about lines of text when we paginate that next page.
-				if (!this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
-					toDelta += this.paginateForwardFromOffset(
-						view,
-						pageDetails.pageNode,
-						pageNumber + 1,
-						lastNodeOffset + 1,
-						pageDetails.pageOffset,
-						false
-					);
-				}
-
-				return {
-					pageDelta: 1,
-					toDelta
-				};
+				return this.handlePageEndTermination(
+					view,
+					pageNode,
+					pageOffset,
+					pageNumber,
+					lastNodeOffset
+				);
 			}
 
 			const nextPageInfo = this.getPage(view, pageNumber + 1);
