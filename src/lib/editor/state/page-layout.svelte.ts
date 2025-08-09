@@ -374,12 +374,34 @@ export class PageLayoutManager {
 	}
 
 	paginate(view: EditorView, pageNumber: number) {
-		// TODO
 		const pageDetails = this.getPage(view, pageNumber);
 		// We've run out of pages.
 		if (!pageDetails) {
 			return null;
 		}
+
+		const { pageNode, pageOffset, pageEl } = pageDetails;
+	}
+
+	*paginateRangeFromFunc(
+		view: EditorView,
+		from: number,
+		to?: number
+	): Generator<number, number, void> {
+		let pageNumber = from;
+		while (true) {
+			if (to !== undefined && pageNumber >= to) {
+				break;
+			}
+
+			const deltas = this.paginate(view, pageNumber);
+			if (deltas === null) {
+				break;
+			}
+			pageNumber++;
+			yield pageNumber;
+		}
+		return pageNumber;
 	}
 
 	/**
