@@ -407,7 +407,7 @@ export class PageLayoutManager {
 
 		return {
 			pageDelta: 1,
-			toDelta: addedPages
+			pagesAdded: addedPages
 		};
 	}
 
@@ -425,10 +425,10 @@ export class PageLayoutManager {
 		pageNumber: number,
 		lastNodeOffset: number
 	) {
-		let toDelta: number = 0;
+		let pagesAdded: number = 0;
 		if (!this.pageHasNoNodesAfter(pageNode, lastNodeOffset)) {
 			// Page has content after the page end node. Let's move it forward.
-			toDelta += this.paginateForwardFromOffset(
+			pagesAdded += this.paginateForwardFromOffset(
 				view,
 				pageNode,
 				pageNumber + 1,
@@ -442,11 +442,24 @@ export class PageLayoutManager {
 		// we hae to move say that the original `to` page is one further away.
 		return {
 			pageDelta: 1,
-			toDelta
+			pagesAdded
 		};
 	}
 
-	paginate(view: EditorView, pageNumber: number): { pageDelta: number; toDelta: number } | null {
+	/**
+	 * A method that will paginate the page parameter for the given editor view. If the current
+	 * page does not overflow, it finds the extra space on the page and tries to take all of
+	 * the content from the next page that fits on it. IF the page ends with a `pageEnd` node,
+	 * it will check for any content after it and move that to the next page.
+	 *
+	 * The function will return the number of pages added (`pagesAdded`) and which page should be paginated
+	 * next relative to the current (`pageDelta`).
+	 *
+	 * It returns `null` if there is no need to paginate again. This occurs in two situations:
+	 * 1. There is no page corresponding to the page number.
+	 * 2. The page does not overflow and the next page does not exist.
+	 */
+	paginate(view: EditorView, pageNumber: number): { pageDelta: number; pagesAdded: number } | null {
 		const pageDetails = this.getPage(view, pageNumber);
 		if (!pageDetails) {
 			// We've run out of pages.
@@ -475,7 +488,7 @@ export class PageLayoutManager {
 			);
 		} else {
 			let pageDelta = 1;
-			const toDelta = 0;
+			const pagesAdded = 0;
 			// Check to see if we need to pull back content from the next page.
 			const { lastNodeOffset, hasDiscoveredPageEnd } = overflowingDetails;
 			// The page does not overflow - but we need to check for one of the following scenarios:
@@ -500,8 +513,8 @@ export class PageLayoutManager {
 			}
 
 			const nextPageInfo = this.getPage(view, pageNumber + 1);
-			// No matter how much space remains on the page, if there is no next page,
-			// we are at the end of the document;
+			// If the page does not overflow and is the last page, we don't need to
+			// care anymore and return `null` to stop early.
 			if (!nextPageInfo) {
 				return null;
 			}
@@ -511,7 +524,7 @@ export class PageLayoutManager {
 			if (availableSpace === null || availableSpace <= 0) {
 				return {
 					pageDelta: 1,
-					toDelta: 0
+					pagesAdded: 0
 				};
 			}
 
@@ -568,7 +581,7 @@ export class PageLayoutManager {
 
 			return {
 				pageDelta,
-				toDelta
+				pagesAdded
 			};
 		}
 	}
@@ -591,7 +604,7 @@ export class PageLayoutManager {
 
 			pageNumber += deltas.pageDelta;
 			if (to) {
-				to += deltas.toDelta;
+				to += deltas.pagesAdded;
 			}
 			yield pageNumber;
 		}
