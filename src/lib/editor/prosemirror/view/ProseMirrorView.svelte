@@ -6,11 +6,11 @@
 	import { undo, redo, history } from 'prosemirror-history';
 	import { baseKeymap } from 'prosemirror-commands';
 
+	import type { TabComponentProps } from '$lib/editor/state/tab-state-registry.svelte';
 	import { schema } from './schema';
 	import { ActionUtilities } from './actions';
 	import TabState from '../../state/tab-state.svelte';
 	import { createShortcuts } from '../plugins/shortcut.plugin';
-	import type { TabComponentProps } from '@/editor/state/tab-state-registry.svelte';
 	import ProseMirrorPlugins from '../plugins.svelte';
 	import Editors from '../prose-mirror-editor.svelte';
 	import { multiplePages, shortPages } from './sample-data';

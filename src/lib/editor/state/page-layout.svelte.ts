@@ -1,5 +1,6 @@
 import type { EditorView } from 'prosemirror-view';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
+import type { Transaction } from 'prosemirror-state';
 
 import {
 	getLineHeight,
@@ -12,8 +13,7 @@ import {
 	INDENT_MIN,
 	PIXELS_PER_INCH
 } from '../prosemirror/view/constants';
-import { clamp } from '@/utils/numbers';
-import type { Transaction } from 'prosemirror-state';
+import { clamp } from '$lib/utils/numbers';
 
 export type Unit = 'in' | 'cm' | 'mm';
 

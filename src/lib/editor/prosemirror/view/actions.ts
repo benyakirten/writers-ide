@@ -13,7 +13,7 @@ import {
 	splitBlockAs
 } from 'prosemirror-commands';
 import { schema } from './schema';
-import PageLayout from '@/editor/state/page-layout.svelte';
+import PageLayout from '$lib/editor/state/page-layout.svelte';
 
 export type UseableMarkName = keyof typeof marks;
 export type TextAlignment = 'start' | 'end' | 'left' | 'center' | 'right' | 'justify';
