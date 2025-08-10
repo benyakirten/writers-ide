@@ -373,6 +373,12 @@ export class PageLayoutManager {
 		}
 	}
 
+	/**
+	 * If the page overflows, then we need to find the safe position to split the content,
+	 * replace the current page with the content that fits and move eerything else to the
+	 * beginning of the next page. If it overflows on a text node that needs to be split
+	 * across both pages, we will want to dedent the first paragraph of the next page.
+	 */
 	private handleOverflowingPage(
 		view: EditorView,
 		pageNode: ProseMirrorNode,
@@ -405,6 +411,13 @@ export class PageLayoutManager {
 		};
 	}
 
+	/**
+	 * If a page is not overflowing and ends with a page end node,
+	 * we either need to find out if there are any nodes after the page end.
+	 * If there aren't, we can safely move onto the next page.
+	 * If there are, we need to move everything after the page end node
+	 * to the next page.
+	 */
 	private handlePageEndTermination(
 		view: EditorView,
 		pageNode: ProseMirrorNode,
@@ -414,6 +427,7 @@ export class PageLayoutManager {
 	) {
 		let toDelta: number = 0;
 		if (!this.pageHasNoNodesAfter(pageNode, lastNodeOffset)) {
+			// Page has content after the page end node. Let's move it forward.
 			toDelta += this.paginateForwardFromOffset(
 				view,
 				pageNode,
@@ -424,6 +438,8 @@ export class PageLayoutManager {
 			);
 		}
 
+		// Either way, we move to the next page. However, if we created a new page then
+		// we hae to move say that the original `to` page is one further away.
 		return {
 			pageDelta: 1,
 			toDelta
