@@ -33,7 +33,6 @@
 			doc: initialState,
 			schema,
 			plugins: [
-				// TODO: Replace this
 				history(),
 				createShortcuts({
 					splitParagraph: (state, dispatch, view) =>
@@ -65,6 +64,8 @@
 					overline: (state, dispatch, view) =>
 						ActionUtilities.toggleTextMark('overline', state, dispatch, view)
 				}),
+				// TODO: We might want to write our own base commands
+				// instead of using prosemirror-commands.
 				keymap(baseKeymap),
 				...ProseMirrorPlugins.plugins
 			]

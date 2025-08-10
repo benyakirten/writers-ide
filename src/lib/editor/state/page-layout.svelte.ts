@@ -283,36 +283,33 @@ export class PageLayoutManager {
 	private paginateForwardFromOffset(
 		view: EditorView,
 		pageNode: ProseMirrorNode,
-		nextPageNumber: number,
-		splitOffset: number,
 		pageOffset: number,
+		pageSplitOffset: number,
+		hasNextPage: boolean,
 		shouldDedent: boolean
 	): number {
 		const { tr } = view.state;
 		// NOTE: node.cut WILL KEEP THE OUTER ELEMENT so if we only want the content
 		// and not the page too, we need to get cutContent.content instead of cutContent.
-		const contentToKeep = pageNode.cut(0, splitOffset);
-		const contentToMove = pageNode.cut(splitOffset);
-		let addedNewPage = false;
+		const contentToKeep = pageNode.cut(0, pageSplitOffset);
+		const contentToMove = pageNode.cut(pageSplitOffset);
 
 		tr.replaceWith(pageOffset, pageOffset + pageNode.nodeSize, contentToKeep);
 		// Create a new page with the content that was overflowing.
-		const nextPageDetails = this.getPage(view, nextPageNumber);
-		if (!nextPageDetails) {
-			// If there is no next page, we create it.
-			addedNewPage = true;
-			tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
-		} else {
+		if (hasNextPage) {
 			// If there is a next page, we insert the content there.
 			tr.insert(pageOffset + contentToKeep.nodeSize + 1, contentToMove.content);
+		} else {
+			// If there is no next page, we create it.
+			tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
 		}
+
 		if (shouldDedent) {
-			// Why is a paragraph made after a dedented one dedented too?
 			tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
 		}
 		view.dispatch(tr);
 
-		return addedNewPage ? 1 : 0;
+		return hasNextPage ? 1 : 0;
 	}
 
 	/**
@@ -326,14 +323,14 @@ export class PageLayoutManager {
 		pageOffset: number,
 		nextPageNode: ProseMirrorNode,
 		nextPageOffset: number,
-		splitOffset: number,
+		nextPageSplitOffset: number,
 		shouldDedent: boolean,
 		shouldDeleteNextPage: boolean
 	): number {
 		const { tr } = view.state;
 
-		const contentToMoveBackward = nextPageNode.cut(0, splitOffset);
-		const contentToKeep = nextPageNode.cut(splitOffset);
+		const contentToMoveBackward = nextPageNode.cut(0, nextPageSplitOffset);
+		const contentToKeep = nextPageNode.cut(nextPageSplitOffset);
 
 		if (shouldDeleteNextPage) {
 			tr.delete(nextPageOffset, nextPageOffset + nextPageNode.nodeSize);
@@ -396,13 +393,14 @@ export class PageLayoutManager {
 			overflowingEl
 		);
 		const { splitOffset, shouldDedent } = splitOffsetInfo;
+		const hasNextPage = this.getPage(view, pageNumber + 1) !== null;
 
 		return this.paginateForwardFromOffset(
 			view,
 			pageDetails.pageNode,
-			pageNumber + 1,
-			overflowingNodeOffset + splitOffset,
 			pageDetails.pageOffset,
+			overflowingNodeOffset + splitOffset,
+			hasNextPage,
 			shouldDedent
 		);
 	}
@@ -423,12 +421,13 @@ export class PageLayoutManager {
 		if (!this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
 			// Page has content after the page end node. Let's move it forward.
 			// If we create a new page, return it.
+			const hasNextPage = this.getPage(view, pageNumber + 1) !== null;
 			return this.paginateForwardFromOffset(
 				view,
 				pageDetails.pageNode,
-				pageNumber + 1,
-				lastNodeOffset + 1,
 				pageDetails.pageOffset,
+				lastNodeOffset + 1,
+				hasNextPage,
 				false
 			);
 		}
