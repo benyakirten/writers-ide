@@ -329,7 +329,7 @@ export class PageLayoutManager {
 		splitOffset: number,
 		shouldDedent: boolean,
 		shouldDeleteNextPage: boolean
-	) {
+	): number {
 		const { tr } = view.state;
 
 		const contentToMoveBackward = nextPageNode.cut(0, splitOffset);
@@ -346,6 +346,8 @@ export class PageLayoutManager {
 		tr.insert(pageOffset + pageNode.nodeSize - 1, contentToMoveBackward.content);
 
 		view.dispatch(tr);
+
+		return shouldDeleteNextPage ? -1 : 0;
 	}
 
 	private deletePage(tr: Transaction, pageOffset: number, pageSize: number): void {
@@ -444,15 +446,17 @@ export class PageLayoutManager {
 		};
 	}
 
+	/**
+	 * We need to see if the next page includes a `pageEnd` node or not.
+	 * If it doesn't, we take everything on the following page and put it.
+	 * If it does, we take everything before the `pageEnd` node and the node itself.
+	 */
 	private handleNextPageUnderflow(
 		view: EditorView,
 		pageDetails: PageDetails,
 		nextPageDetails: PageDetails,
 		nextPageUnderflowDetails: UnderflowingDetails
 	) {
-		let pageDelta = 1;
-		let pagesAdded = 0;
-
 		// If we've discovered a page end node, we want to take everything before it and the page end node.
 		// If not, we want everything on the page (-2 because of the start and end markers).
 		const splitOffset = nextPageUnderflowDetails.hasDiscoveredPageEnd
@@ -462,12 +466,7 @@ export class PageLayoutManager {
 		// If the next page has nothing after we've moved everything off, then we should delete it.
 		// Note the -2. We're ignoring the page start and end markers.
 		const shouldDeleteNextPage = nextPageDetails.pageNode.nodeSize - splitOffset - 2 <= 0;
-		if (shouldDeleteNextPage) {
-			pageDelta--;
-			pagesAdded--;
-		}
-
-		this.paginateBackwardFromOffset(
+		const delta = this.paginateBackwardFromOffset(
 			view,
 			pageDetails.pageNode,
 			pageDetails.pageOffset,
@@ -478,9 +477,11 @@ export class PageLayoutManager {
 			shouldDeleteNextPage
 		);
 
+		// No matter what, we're done with the current page. However, if we've deleted a page,
+		// then the original `to` page is one page closer.
 		return {
-			pageDelta,
-			pagesAdded
+			pageDelta: 1,
+			pagesAdded: 0 + delta
 		};
 	}
 
@@ -592,17 +593,19 @@ export class PageLayoutManager {
 			nextPageDetails
 		);
 
-		if (!this.pageIsOverflowing(nextPageOverflowingDetails)) {
-			return this.handleNextPageUnderflow(
+		if (this.pageIsOverflowing(nextPageOverflowingDetails)) {
+			// Situation #6. Similar behavior to if current page overflows.
+			return this.handleNextPageOverflow(
 				view,
+				maxBottom,
 				pageDetails,
 				nextPageDetails,
 				nextPageOverflowingDetails
 			);
 		} else {
-			return this.handleNextPageOverflow(
+			// Situation #5. This method handles both the case of a `pageEnd` node and no `pageEnd` node.
+			return this.handleNextPageUnderflow(
 				view,
-				maxBottom,
 				pageDetails,
 				nextPageDetails,
 				nextPageOverflowingDetails
