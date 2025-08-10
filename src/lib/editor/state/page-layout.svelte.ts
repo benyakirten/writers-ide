@@ -387,7 +387,7 @@ export class PageLayoutManager {
 		pageNumber: number,
 		overflowingDetails: OverflowingDetails,
 		maxBottom: number
-	) {
+	): number {
 		const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
 
 		const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
@@ -397,7 +397,7 @@ export class PageLayoutManager {
 		);
 		const { splitOffset, shouldDedent } = splitOffsetInfo;
 
-		const addedPages = this.paginateForwardFromOffset(
+		return this.paginateForwardFromOffset(
 			view,
 			pageDetails.pageNode,
 			pageNumber + 1,
@@ -405,11 +405,6 @@ export class PageLayoutManager {
 			pageDetails.pageOffset,
 			shouldDedent
 		);
-
-		return {
-			pageDelta: 1,
-			pagesAdded: addedPages
-		};
 	}
 
 	/**
@@ -424,11 +419,11 @@ export class PageLayoutManager {
 		pageDetails: PageDetails,
 		pageNumber: number,
 		lastNodeOffset: number
-	) {
-		let pagesAdded: number = 0;
+	): number {
 		if (!this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
 			// Page has content after the page end node. Let's move it forward.
-			pagesAdded += this.paginateForwardFromOffset(
+			// If we create a new page, return it.
+			return this.paginateForwardFromOffset(
 				view,
 				pageDetails.pageNode,
 				pageNumber + 1,
@@ -438,12 +433,8 @@ export class PageLayoutManager {
 			);
 		}
 
-		// Either way, we move to the next page. However, if we created a new page then
-		// we hae to move say that the original `to` page is one further away.
-		return {
-			pageDelta: 1,
-			pagesAdded
-		};
+		// Essentially a no-op. There is nothing to do on the page.
+		return 0;
 	}
 
 	/**
@@ -456,7 +447,7 @@ export class PageLayoutManager {
 		pageDetails: PageDetails,
 		nextPageDetails: PageDetails,
 		nextPageUnderflowDetails: UnderflowingDetails
-	) {
+	): number {
 		// If we've discovered a page end node, we want to take everything before it and the page end node.
 		// If not, we want everything on the page (-2 because of the start and end markers).
 		const splitOffset = nextPageUnderflowDetails.hasDiscoveredPageEnd
@@ -466,7 +457,9 @@ export class PageLayoutManager {
 		// If the next page has nothing after we've moved everything off, then we should delete it.
 		// Note the -2. We're ignoring the page start and end markers.
 		const shouldDeleteNextPage = nextPageDetails.pageNode.nodeSize - splitOffset - 2 <= 0;
-		const delta = this.paginateBackwardFromOffset(
+
+		// Returns -1 if we're removing a page or 0 in all other cases.
+		return this.paginateBackwardFromOffset(
 			view,
 			pageDetails.pageNode,
 			pageDetails.pageOffset,
@@ -476,13 +469,6 @@ export class PageLayoutManager {
 			false,
 			shouldDeleteNextPage
 		);
-
-		// No matter what, we're done with the current page. However, if we've deleted a page,
-		// then the original `to` page is one page closer.
-		return {
-			pageDelta: 1,
-			pagesAdded: 0 + delta
-		};
 	}
 
 	/**
@@ -495,7 +481,7 @@ export class PageLayoutManager {
 		pageDetails: PageDetails,
 		nextPageDetails: PageDetails,
 		nextPageOverflowingDetails: OverflowingDetails
-	) {
+	): number {
 		const lineHeight = getLineHeight(nextPageOverflowingDetails.overflowingEl);
 		// Since the method will over calculate by one line, this will account for that.
 		const nextPageBottom = maxBottom - lineHeight;
@@ -519,10 +505,9 @@ export class PageLayoutManager {
 			false
 		);
 
-		return {
-			pageDelta: 1,
-			pagesAdded: 0
-		};
+		// We've moved some but not all content from the next page. Therefore the page count
+		// did not change.
+		return 0;
 	}
 
 	/**
@@ -549,13 +534,17 @@ export class PageLayoutManager {
 	 *
 	 * 6. Page ends with any other block node, and the next page has more than enough content on it to move over.
 	 *    We need to move the appropriate amount of content back and remove it from the next page.
+	 *
+	 * This function returns the amount of pages added or returned. This will be 0 in most cases, but
+	 * if content needs to be moved over (situation #2), it will be 1 and in the case of situation #5
+	 * when we take all of the content from the following page, it will be -1.
 	 */
 	private handlePageUnderflow(
 		view: EditorView,
 		pageDetails: PageDetails,
 		pageNumber: number,
 		underflowingDetails: UnderflowingDetails
-	) {
+	): number | null {
 		const { lastNodeOffset, hasDiscoveredPageEnd } = underflowingDetails;
 
 		// Situation #1 and #2 - `pageEnd` node discovered. We don't care about
@@ -577,10 +566,7 @@ export class PageLayoutManager {
 		// Situation #4 - we dont' have any space left on the page so there's no use finding
 		// out how much to move over.
 		if (availableSpace === null || availableSpace <= 0) {
-			return {
-				pageDelta: 1,
-				pagesAdded: 0
-			};
+			return 0;
 		}
 
 		// Situation #5 and #6 - We need to find out how of the following page we can move
@@ -623,14 +609,14 @@ export class PageLayoutManager {
 	 * the content from the next page that fits on it. IF the page ends with a `pageEnd` node,
 	 * it will check for any content after it and move that to the next page.
 	 *
-	 * The function will return the number of pages added (`pagesAdded`) and which page should be paginated
-	 * next relative to the current (`pageDelta`).
+	 * The function will return the number of pages added (`pagesAdded`) or `null`. The pages
+	 * added will be `-1` | `0` | `1`.
 	 *
 	 * It returns `null` if there is no need to paginate again. This occurs in two situations:
 	 * 1. There is no page corresponding to the page number.
 	 * 2. The page does not overflow and the next page does not exist.
 	 */
-	paginate(view: EditorView, pageNumber: number): { pageDelta: number; pagesAdded: number } | null {
+	paginate(view: EditorView, pageNumber: number): number | null {
 		const pageDetails = this.getPage(view, pageNumber);
 		if (!pageDetails) {
 			// We've run out of pages.
@@ -668,14 +654,14 @@ export class PageLayoutManager {
 				break;
 			}
 
-			const deltas = this.paginate(view, pageNumber);
-			if (deltas === null) {
+			const toDelta = this.paginate(view, pageNumber);
+			if (toDelta === null) {
 				break;
 			}
 
-			pageNumber += deltas.pageDelta;
+			pageNumber++;
 			if (to) {
-				to += deltas.pagesAdded;
+				to += toDelta;
 			}
 			yield pageNumber;
 		}
