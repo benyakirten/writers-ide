@@ -676,7 +676,6 @@ export class PageLayoutManager {
 		const numLines = calculateTotalLinesOfText(overflowingEl, lineHeight);
 		const overflowingLines = calculateOverflowingLinesOfText(overflowingEl, pageBottom, lineHeight);
 
-		// TODO: Write overflowing logic to handle non-text overflowing elements and/or nodes with combined types.
 		return this.calculateLineSplitAmount(numLines - overflowingLines, overflowingLines);
 	}
 
@@ -790,9 +789,7 @@ export class PageLayoutManager {
 	 * We can use this amount to determine the offset position to split the page.
 	 */
 	private identifyOffsetBasedOffOverflowingLines(
-		el: HTMLElement,
 		nodes: Node[],
-		maxBottom: number,
 		lineHeight: number,
 		linesToKeepOnPage: number,
 		linesToPutOnNextPage: number
@@ -868,9 +865,7 @@ export class PageLayoutManager {
 			);
 
 			pmOffset += this.identifyOffsetBasedOffOverflowingLines(
-				el,
 				sequentialTextNodes,
-				maxBottom,
 				lineHeight,
 				linesToKeepOnPage,
 				linesToPutOnNextPage
