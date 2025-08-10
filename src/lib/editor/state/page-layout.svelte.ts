@@ -485,6 +485,10 @@ export class PageLayoutManager {
 		};
 	}
 
+	/**
+	 * Much like `handlePageOverflow`, but this time it's backwards.
+	 * We're moving the correct amount of content from the next page to the current page.
+	 */
 	private handleNextPageOverflow(
 		view: EditorView,
 		maxBottom: number,
