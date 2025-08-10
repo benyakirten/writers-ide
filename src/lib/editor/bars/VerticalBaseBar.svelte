@@ -54,18 +54,6 @@
 		gen = null;
 	}
 
-	function paginateFunc() {
-		if (!gen) {
-			const [data] = Object.values(Editors.editors);
-			gen = PageLayout.paginateRangeFromFunc(data.view, 0);
-		}
-		const t = performance.now();
-		[...gen];
-		const dt = performance.now() - t;
-		console.log(`Pagination took ${dt}ms`);
-		gen = null;
-	}
-
 	function deleteEmptyPages() {
 		const [data] = Object.values(Editors.editors);
 		PageLayout.deleteEmptyPages(data.view);
@@ -83,7 +71,6 @@
 	<button onclick={() => ToastManager.addToast(generateRandomMessage(), null)}> Add Toast </button>
 	<button onclick={() => tabState.create('prosemirror')}>Create Prosemirror</button>
 	<button onclick={() => paginate()}>Paginate</button>
-	<button onclick={() => paginateFunc()}>Paginate Func</button>
 	<button onclick={() => deleteEmptyPages()}>Delete empty pages</button>
 </div>
 
