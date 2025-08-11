@@ -9,9 +9,7 @@ export class DocumentObserver {
 				(entry) => entry.target.classList.contains(PROSEMIRROR_PAGE_CLASS) && entry.isIntersecting
 			).length - 1;
 
-		if (!PageObserver.scrollTo(this.doc, newPage)) {
-			// Some sort of toast? This should probably be logged.
-		}
+		PageObserver.scrollTo(this.doc, newPage);
 	};
 
 	constructor(
@@ -44,50 +42,53 @@ export class DocumentObserver {
 type ObservedPage = {
 	viewedPage: number;
 	paginatedThrough: number;
+	observers: DocumentObserver[];
 };
 
 class PageObserverManager {
 	private _map: Record<string, ObservedPage> = $state({});
 	public map = $derived(this._map);
 
-	scrollTo(doc: string, page: number): boolean {
+	observe(doc: string, obs: DocumentObserver, paginatedThrough?: number) {
 		const data = this._map[doc];
 		if (!data) {
-			return false;
+			const observedPage = {
+				viewedPage: 0,
+				paginatedThrough: paginatedThrough ?? 0,
+				observers: [obs]
+			};
+			this._map[doc] = observedPage;
+		} else {
+			data.observers.push(obs);
+		}
+	}
+
+	data(doc: string): ObservedPage {
+		const data = this._map[doc];
+		if (!data) {
+			throw new Error(`Document ${doc} is not being observed`);
 		}
 
-		const { paginatedThrough } = data;
-		if (page > paginatedThrough) {
-			// Handle pagination
-		}
+		return data;
+	}
 
+	scrollTo(doc: string, page: number) {
+		const data = this.data(doc);
 		data.viewedPage = page;
-		data.paginatedThrough = page;
+	}
 
-		return true;
+	paginateTo(doc: string, page: number) {
+		const data = this.data(doc);
+		data.paginatedThrough = page;
+	}
+
+	stopPagination(doc: string, page: number) {
+		// TODO
+	}
+
+	finishPagination(doc: string) {
+		const data = this.data(doc);
+		data.observers.forEach((obs) => obs.reset());
 	}
 }
 export const PageObserver = new PageObserverManager();
-
-type PaginationDetails = {
-	current: number;
-	target: number;
-};
-
-export class PaginatorHandler {
-	private _registry: Record<string, PaginationDetails> = $state({});
-	public registry = $derived(this._registry);
-
-	start(doc: string, page: number) {
-		this._registry[doc] = { current: 0, target: page };
-	}
-
-	update(doc: string, page: number) {
-		this._registry[doc].current = page;
-	}
-
-	remove(doc: string) {
-		delete this._registry[doc];
-	}
-}
-export const Paginator = new PaginatorHandler();
