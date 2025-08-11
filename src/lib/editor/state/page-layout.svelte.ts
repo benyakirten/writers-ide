@@ -602,6 +602,14 @@ export class PageLayoutManager {
 		}
 	}
 
+	pageCount(view: EditorView) {
+		let i = 0;
+		while (this.getPage(view, i) !== null) {
+			i++;
+		}
+		return i;
+	}
+
 	/**
 	 * A method that will paginate the page parameter for the given editor view. If the current
 	 * page does not overflow, it finds the extra space on the page and tries to take all of
@@ -616,6 +624,7 @@ export class PageLayoutManager {
 	 * 2. The page does not overflow and the next page does not exist.
 	 */
 	paginate(view: EditorView, pageNumber: number): number | null {
+		console.log(`Page ${pageNumber}/${this.pageCount(view)}`);
 		const pageDetails = this.getPage(view, pageNumber);
 		if (!pageDetails) {
 			// We've run out of pages.
