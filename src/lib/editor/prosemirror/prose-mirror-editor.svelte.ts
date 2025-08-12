@@ -1,4 +1,5 @@
 import type { EditorView } from 'prosemirror-view';
+import { PageObserver } from '../state/page-observer.svelte';
 
 export type ProsemirrorPage = {
 	view: EditorView;
@@ -15,7 +16,7 @@ export type EditorData = {
 export class ProseMirrorEditors {
 	editors = $state<Record<string, EditorData>>({});
 
-	register(id: string, view: EditorView): () => void {
+	register(id: string, view: EditorView, obsId: string, el: HTMLElement): () => void {
 		if (!this.editors[id]) {
 			const editor: EditorData = {
 				view,
@@ -25,7 +26,11 @@ export class ProseMirrorEditors {
 			this.editors[id] = editor;
 		}
 
-		return () => this.deregister(id);
+		const obsDeregister = PageObserver.register(obsId, el, id);
+		return () => {
+			this.deregister(id);
+			obsDeregister();
+		};
 	}
 
 	deregister(id: string): void {

@@ -9,11 +9,12 @@ export class DocumentObserver {
 				(entry) => entry.target.classList.contains(PROSEMIRROR_PAGE_CLASS) && entry.isIntersecting
 			).length - 1;
 
-		PageObserver.scrollTo(this.doc, newPage);
+		this.cb(newPage);
 	};
 
 	constructor(
-		private doc: string,
+		private readonly _id: string,
+		private readonly cb: (page: number) => void,
 		private el: HTMLElement,
 		options: Partial<IntersectionObserverInit> = {}
 	) {
@@ -25,6 +26,10 @@ export class DocumentObserver {
 		this.el
 			.querySelectorAll(`.${PROSEMIRROR_PAGE_CLASS}`)
 			.forEach((el) => this.observer?.observe(el));
+	}
+
+	get id() {
+		return this._id;
 	}
 
 	disconnect() {
@@ -49,45 +54,61 @@ class PageObserverManager {
 	private _map: Record<string, ObservedPage> = $state({});
 	public map = $derived(this._map);
 
-	observe(doc: string, obs: DocumentObserver, paginatedThrough?: number) {
-		const data = this._map[doc];
+	register(obsId: string, el: HTMLElement, docId: string, paginatedThrough?: number) {
+		const data = this._map[docId];
+		const obs = new DocumentObserver(obsId, (page) => this.scrollTo(docId, page), el);
+
 		if (!data) {
 			const observedPage = {
 				viewedPage: 0,
 				paginatedThrough: paginatedThrough ?? 0,
 				observers: [obs]
 			};
-			this._map[doc] = observedPage;
+			this._map[docId] = observedPage;
 		} else {
 			data.observers.push(obs);
 		}
+
+		return () => this.deregister(obs.id, docId);
 	}
 
-	data(doc: string): ObservedPage {
-		const data = this._map[doc];
+	deregister(id: string, docId: string) {
+		const data = this.data(docId);
+
+		data.observers = data.observers.filter((obs) => obs.id !== id);
+		if (data.observers.length === 0) {
+			delete this._map[docId];
+		}
+	}
+
+	data(docId: string): ObservedPage {
+		const data = this._map[docId];
 		if (!data) {
-			throw new Error(`Document ${doc} is not being observed`);
+			throw new Error(`Document ${docId} is not being observed`);
 		}
 
 		return data;
 	}
 
-	scrollTo(doc: string, page: number) {
-		const data = this.data(doc);
+	scrollTo(docId: string, page: number) {
+		const data = this.data(docId);
+		data.observers.forEach((obs) => obs.disconnect());
 		data.viewedPage = page;
 	}
 
-	paginateTo(doc: string, page: number) {
-		const data = this.data(doc);
+	paginateTo(docId: string, page: number) {
+		const data = this.data(docId);
 		data.paginatedThrough = page;
 	}
 
-	stopPagination(doc: string, page: number) {
-		// TODO
+	stopPagination(docId: string, page: number) {
+		const data = this.data(docId);
+		data.paginatedThrough = page;
+		data.observers.forEach((obs) => obs.reset());
 	}
 
-	finishPagination(doc: string) {
-		const data = this.data(doc);
+	finishPagination(docId: string) {
+		const data = this.data(docId);
 		data.observers.forEach((obs) => obs.reset());
 	}
 }

@@ -76,7 +76,8 @@
 			dispatchTransaction: (transaction) => handleTransaction(view, transaction)
 		});
 
-		const deregister = Editors.register(id, view);
+		const obsId = crypto.randomUUID();
+		const deregister = Editors.register(id, view, obsId, el.querySelector('.ProseMirror')!);
 		return () => deregister();
 	});
 </script>
