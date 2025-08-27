@@ -1,6 +1,5 @@
 import type { EditorView } from 'prosemirror-view';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
-import type { Transaction } from 'prosemirror-state';
 
 import {
 	getLineHeight,
@@ -347,31 +346,6 @@ export class PageLayoutManager {
 		return shouldDeleteNextPage ? -1 : 0;
 	}
 
-	private deletePage(tr: Transaction, pageOffset: number, pageSize: number): void {
-		tr.delete(pageOffset, pageOffset + pageSize);
-	}
-
-	deleteEmptyPages(view: EditorView) {
-		let pageNumber = 0;
-		while (true) {
-			const { tr } = view.state;
-			const currentPageDetails = this.getPage(view, pageNumber);
-			if (!currentPageDetails) {
-				break;
-			}
-
-			const nextPageDetails = this.getPage(view, pageNumber + 1);
-			if (
-				(nextPageDetails === null || nextPageDetails.pageNode.textContent === '') &&
-				currentPageDetails.pageNode.textContent === ''
-			) {
-				this.deletePage(tr, currentPageDetails.pageOffset, currentPageDetails.pageNode.nodeSize);
-			} else {
-				pageNumber++;
-			}
-		}
-	}
-
 	/**
 	 * If the page overflows, then we need to find the safe position to split the content,
 	 * replace the current page with the content that fits and move eerything else to the
@@ -381,9 +355,9 @@ export class PageLayoutManager {
 	private handlePageOverflow(
 		view: EditorView,
 		pageDetails: PageDetails,
-		pageNumber: number,
 		overflowingDetails: OverflowingDetails,
-		maxBottom: number
+		maxBottom: number,
+		hasNextPage: boolean
 	): number {
 		const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
 
@@ -393,7 +367,6 @@ export class PageLayoutManager {
 			overflowingEl
 		);
 		const { splitOffset, shouldDedent } = splitOffsetInfo;
-		const hasNextPage = this.getPage(view, pageNumber + 1) !== null;
 
 		return this.paginateForwardFromOffset(
 			view,
@@ -481,6 +454,7 @@ export class PageLayoutManager {
 		nextPageDetails: PageDetails,
 		nextPageOverflowingDetails: OverflowingDetails
 	): number {
+		console.log('OVERFLOW', pageDetails.pageNode.textContent.length);
 		const lineHeight = getLineHeight(nextPageOverflowingDetails.overflowingEl);
 		// Since the method will over calculate by one line, this will account for that.
 		const nextPageBottom = maxBottom - lineHeight;
@@ -542,8 +516,10 @@ export class PageLayoutManager {
 		view: EditorView,
 		pageDetails: PageDetails,
 		pageNumber: number,
-		underflowingDetails: UnderflowingDetails
+		underflowingDetails: UnderflowingDetails,
+		nextPageDetails: PageDetails | null
 	): number | null {
+		console.log('UNDERFLOW', pageDetails.pageNode.textContent.length);
 		const { lastNodeOffset, hasDiscoveredPageEnd } = underflowingDetails;
 
 		// Situation #1 and #2 - `pageEnd` node discovered. We don't care about
@@ -554,7 +530,6 @@ export class PageLayoutManager {
 			return this.handlePageEndTermination(view, pageDetails, pageNumber, lastNodeOffset);
 		}
 
-		const nextPageDetails = this.getPage(view, pageNumber + 1);
 		// Situation #3 - We don't have a `pageEnd` node and we don't have
 		// a next page. What else is there to think about?
 		if (!nextPageDetails) {
@@ -610,6 +585,19 @@ export class PageLayoutManager {
 		return i;
 	}
 
+	deletePage(view: EditorView, page: PageDetails): number {
+		const { tr } = view.state;
+		tr.delete(page.pageOffset, page.pageOffset + page.pageNode.nodeSize);
+		view.dispatch(tr);
+		return 0;
+	}
+
+	isEmptyPage(page: PageDetails): boolean {
+		return (
+			page.pageNode.textContent.length === 0 && page.pageNode.firstChild?.type.name !== 'pageEnd'
+		);
+	}
+
 	/**
 	 * A method that will paginate the page parameter for the given editor view. If the current
 	 * page does not overflow, it finds the extra space on the page and tries to take all of
@@ -617,17 +605,24 @@ export class PageLayoutManager {
 	 * it will check for any content after it and move that to the next page.
 	 *
 	 * The function will return the number of pages added (`pagesAdded`) or `null`. The pages
-	 * added will be `-1` | `0` | `1`.
+	 * added will be ``0` | `1`.
 	 *
 	 * It returns `null` if there is no need to paginate again. This occurs in two situations:
 	 * 1. There is no page corresponding to the page number.
 	 * 2. The page does not overflow and the next page does not exist.
+	 *
+	 * It returns 0 if the current page needs to be paginated again
+	 * TODO: Explain why
+	 *
+	 * It returns 1 if the page was paginated correctly and we should
+	 * move onto the next page.
 	 */
 	paginate(view: EditorView, pageNumber: number): number | null {
 		console.log(`Page ${pageNumber}/${this.pageCount(view)}`);
 		const pageDetails = this.getPage(view, pageNumber);
 		if (!pageDetails) {
-			// We've run out of pages.
+			// We've run out of pages. Since the doc can only contain pages,
+			// this means that there's nothing left to paginate.
 			return null;
 		}
 
@@ -636,10 +631,21 @@ export class PageLayoutManager {
 		// Find out if the current page overflows or has available space.
 		const overflowingDetails = this.getPageOverflowInformation(view, maxBottom, pageDetails);
 
+		const nextPage = this.getPage(view, pageNumber + 1);
+		if (this.isEmptyPage(pageDetails) && nextPage !== null) {
+			return this.deletePage(view, pageDetails);
+		}
+
 		if (this.pageIsOverflowing(overflowingDetails)) {
-			return this.handlePageOverflow(view, pageDetails, pageNumber, overflowingDetails, maxBottom);
+			return this.handlePageOverflow(
+				view,
+				pageDetails,
+				overflowingDetails,
+				maxBottom,
+				nextPage !== null
+			);
 		} else {
-			return this.handlePageUnderflow(view, pageDetails, pageNumber, overflowingDetails);
+			return this.handlePageUnderflow(view, pageDetails, pageNumber, overflowingDetails, nextPage);
 		}
 	}
 

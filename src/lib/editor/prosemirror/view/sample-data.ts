@@ -98,4 +98,6 @@ const shortPageInterrupted = schema.node('page', null, [
 	schema.node('pageEnd')
 ]);
 
+export const emptyPage = schema.node('page', null, [schema.node('paragraph', null, [])]);
+
 export const shortPages = [shortPage, shortPage, shortPageInterrupted, shortPage, shortPage];

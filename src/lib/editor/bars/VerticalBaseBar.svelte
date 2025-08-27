@@ -53,11 +53,6 @@
 		console.log(`Pagination took ${dt}ms`);
 		gen = null;
 	}
-
-	function deleteEmptyPages() {
-		const [data] = Object.values(Editors.editors);
-		PageLayout.deleteEmptyPages(data.view);
-	}
 </script>
 
 <div class="base-bar">
@@ -71,7 +66,6 @@
 	<button onclick={() => ToastManager.addToast(generateRandomMessage(), null)}> Add Toast </button>
 	<button onclick={() => tabState.create('prosemirror')}>Create Prosemirror</button>
 	<button onclick={() => paginate()}>Paginate</button>
-	<button onclick={() => deleteEmptyPages()}>Delete empty pages</button>
 </div>
 
 <style>

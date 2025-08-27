@@ -13,15 +13,14 @@
 	import { createShortcuts } from '../plugins/shortcut.plugin';
 	import ProseMirrorPlugins from '../plugins.svelte';
 	import Editors from '../prose-mirror-editor.svelte';
-	import { multiplePages, shortPages } from './sample-data';
+	import { emptyPage, multiplePages, shortPages } from './sample-data';
 
 	let { id }: TabComponentProps = $props();
 
 	let el: HTMLElement;
-	let host: HTMLElement;
 	let state: EditorState;
 	let view: EditorView;
-	let initialState = schema.node('doc', null, [...multiplePages, ...shortPages, ...multiplePages]);
+	let initialState = schema.node('doc', null, [emptyPage, ...multiplePages, emptyPage, ...shortPages, emptyPage, ...multiplePages]);
 
 	function handleTransaction(view: EditorView, transaction: Transaction) {
 		let newState = view.state.apply(transaction);
@@ -82,7 +81,7 @@
 	});
 </script>
 
-<div onfocusincapture={() => TabState.activate(id)} bind:this={host}>
+<div onfocusincapture={() => TabState.activate(id)}>
 	<div class="editor-host" bind:this={el}></div>
 </div>
 
