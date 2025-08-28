@@ -6,7 +6,8 @@ import {
 	INDENT_MIN,
 	INDENT_SIZE_PX,
 	PROSEMIRROR_PAGE_CLASS,
-	PROSEMIRROR_PAGE_END_CLASS
+	PROSEMIRROR_PAGE_END_CLASS,
+	PROSEMIRROR_PARAGRAPH_CLASS
 } from './constants';
 
 const doc: NodeSpec = {
@@ -55,7 +56,7 @@ const paragraph: NodeSpec = {
 		return [
 			'p',
 			{
-				class: 'paragraph',
+				class: PROSEMIRROR_PARAGRAPH_CLASS,
 				style: `text-indent: ${indent * INDENT_SIZE_PX}px; text-align: ${align};`
 			},
 			0

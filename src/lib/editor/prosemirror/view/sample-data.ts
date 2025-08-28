@@ -89,11 +89,11 @@ for (let i = 0; i < 2; i++) {
 	multiplePages.push(longPageWithBreak);
 }
 
-const shortPage = schema.node('page', null, [
+export const shortPage = schema.node('page', null, [
 	schema.node('paragraph', null, [schema.text('Short page content.')])
 ]);
 
-const shortPageInterrupted = schema.node('page', null, [
+export const shortPageInterrupted = schema.node('page', null, [
 	schema.node('paragraph', null, [schema.text('Short page content.')]),
 	schema.node('pageEnd')
 ]);

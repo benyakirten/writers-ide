@@ -10,7 +10,8 @@ import {
 	CM_PER_INCH,
 	INDENT_MAX,
 	INDENT_MIN,
-	PIXELS_PER_INCH
+	PIXELS_PER_INCH,
+	PROSEMIRROR_PARAGRAPH_CLASS
 } from '../prosemirror/view/constants';
 import { clamp } from '$lib/utils/numbers';
 
@@ -242,6 +243,24 @@ export class PageLayoutManager {
 		return [linesNotOverflowingPage, linesOverflowingPage];
 	}
 
+	getLastContentfulChildOfEl(el: HTMLElement) {
+		const children = Array.from(el.children).reverse();
+		if (children.length === 0) {
+			return el;
+		}
+
+		for (const child of children) {
+			if (
+				!child.classList.contains(PROSEMIRROR_PARAGRAPH_CLASS) ||
+				child.textContent.trim().length !== 0
+			) {
+				return child;
+			}
+		}
+
+		return el;
+	}
+
 	/**
 	 * Get the amount of unused space on the page in pixels.
 	 */
@@ -454,7 +473,6 @@ export class PageLayoutManager {
 		nextPageDetails: PageDetails,
 		nextPageOverflowingDetails: OverflowingDetails
 	): number {
-		console.log('OVERFLOW', pageDetails.pageNode.textContent.length);
 		const lineHeight = getLineHeight(nextPageOverflowingDetails.overflowingEl);
 		// Since the method will over calculate by one line, this will account for that.
 		const nextPageBottom = maxBottom - lineHeight;
@@ -519,7 +537,6 @@ export class PageLayoutManager {
 		underflowingDetails: UnderflowingDetails,
 		nextPageDetails: PageDetails | null
 	): number | null {
-		console.log('UNDERFLOW', pageDetails.pageNode.textContent.length);
 		const { lastNodeOffset, hasDiscoveredPageEnd } = underflowingDetails;
 
 		// Situation #1 and #2 - `pageEnd` node discovered. We don't care about
@@ -550,7 +567,7 @@ export class PageLayoutManager {
 
 		// We need to take the amount of content from the next page. The content starts
 		// from the page top (determined by `PageLayout.calculatePageTop)`.
-		const maxBottom = this.calculatePageTop(pageDetails.pageEl) + availableSpace;
+		const maxBottom = this.calculatePageTop(nextPageDetails.pageEl) + availableSpace;
 		const nextPageOverflowingDetails = this.getPageOverflowInformation(
 			view,
 			maxBottom,
@@ -594,7 +611,8 @@ export class PageLayoutManager {
 
 	isEmptyPage(page: PageDetails): boolean {
 		return (
-			page.pageNode.textContent.length === 0 && page.pageNode.firstChild?.type.name !== 'pageEnd'
+			page.pageNode.textContent.length === 0 &&
+			Array.from(page.pageNode.children).every((child) => child.type.name === 'paragraph')
 		);
 	}
 
@@ -605,17 +623,11 @@ export class PageLayoutManager {
 	 * it will check for any content after it and move that to the next page.
 	 *
 	 * The function will return the number of pages added (`pagesAdded`) or `null`. The pages
-	 * added will be ``0` | `1`.
+	 * added will be `-1` |`0` | `1` if a page is removed.
 	 *
 	 * It returns `null` if there is no need to paginate again. This occurs in two situations:
 	 * 1. There is no page corresponding to the page number.
 	 * 2. The page does not overflow and the next page does not exist.
-	 *
-	 * It returns 0 if the current page needs to be paginated again
-	 * TODO: Explain why
-	 *
-	 * It returns 1 if the page was paginated correctly and we should
-	 * move onto the next page.
 	 */
 	paginate(view: EditorView, pageNumber: number): number | null {
 		console.log(`Page ${pageNumber}/${this.pageCount(view)}`);
@@ -632,10 +644,6 @@ export class PageLayoutManager {
 		const overflowingDetails = this.getPageOverflowInformation(view, maxBottom, pageDetails);
 
 		const nextPage = this.getPage(view, pageNumber + 1);
-		if (this.isEmptyPage(pageDetails) && nextPage !== null) {
-			return this.deletePage(view, pageDetails);
-		}
-
 		if (this.pageIsOverflowing(overflowingDetails)) {
 			return this.handlePageOverflow(
 				view,
@@ -673,7 +681,12 @@ export class PageLayoutManager {
 				break;
 			}
 
-			pageNumber++;
+			// If we've deleted a page that means it's been absorbed into the current page.
+			// We might want to absorb another page so it should be repaginated.
+			if (toDelta !== -1) {
+				pageNumber++;
+			}
+
 			if (to) {
 				to += toDelta;
 			}
