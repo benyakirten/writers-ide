@@ -13,14 +13,38 @@
 	import { createShortcuts } from '../plugins/shortcut.plugin';
 	import ProseMirrorPlugins from '../plugins.svelte';
 	import Editors from '../prose-mirror-editor.svelte';
-	import { emptyPage, multiplePages, shortPages } from './sample-data';
+	import {
+		emptyPage,
+		longPage,
+		mediumPage,
+		multiplePages,
+		shortPage,
+		shortPageInterrupted,
+		shortPages
+	} from './sample-data';
 
 	let { id }: TabComponentProps = $props();
 
 	let el: HTMLElement;
 	let state: EditorState;
 	let view: EditorView;
-	let initialState = schema.node('doc', null, [emptyPage, ...multiplePages, emptyPage, ...shortPages, emptyPage, ...multiplePages]);
+	let initialState = schema.node('doc', null, [
+		emptyPage,
+		mediumPage,
+		mediumPage,
+		...multiplePages,
+		mediumPage,
+		emptyPage,
+		...shortPages,
+		emptyPage,
+		...multiplePages,
+		mediumPage,
+		shortPage,
+		shortPage,
+		shortPageInterrupted,
+		mediumPage,
+		longPage
+	]);
 
 	function handleTransaction(view: EditorView, transaction: Transaction) {
 		let newState = view.state.apply(transaction);

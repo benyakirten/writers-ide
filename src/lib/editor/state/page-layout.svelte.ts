@@ -681,8 +681,9 @@ export class PageLayoutManager {
 				break;
 			}
 
-			// If we've deleted a page that means it's been absorbed into the current page.
-			// We might want to absorb another page so it should be repaginated.
+			// This solves the apparent issue of pages that are blank. I do not know why empty pages
+			// cause problems but pages with one small paragraph dpn't.
+			// TODO: Determine this and repaginate only if we need it.
 			if (toDelta !== -1) {
 				pageNumber++;
 			}
