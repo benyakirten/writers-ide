@@ -822,7 +822,7 @@ export class PageLayoutManager {
 
 		const totalLines = Math.round(textRect.height / lineHeight);
 		const overflowingLines = Math.floor((textRect.bottom - maxBottom) / lineHeight);
-		console.log(totalLines, overflowingLines);
+
 		return this.calculateLineSplitAmount(totalLines - overflowingLines, overflowingLines);
 	}
 
@@ -841,7 +841,10 @@ export class PageLayoutManager {
 		let offset = 0;
 
 		if (linesToPutOnNextPage === 0) {
-			return nodes.reduce((sum, node) => sum + (node.textContent?.length ?? 0), 0);
+			for (const node of nodes) {
+				offset += node.textContent?.length ?? 0;
+			}
+			return offset;
 		}
 
 		// Go through the nodes and find out when we've achieved the correct number of lines.
@@ -917,8 +920,6 @@ export class PageLayoutManager {
 				linesToKeepOnPage,
 				linesToPutOnNextPage
 			);
-
-			console.log(offset);
 
 			pmOffset += offset;
 			shouldDedent = linesToKeepOnPage > 0;
