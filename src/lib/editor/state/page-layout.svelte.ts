@@ -395,7 +395,6 @@ export class PageLayoutManager {
 		const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
 
 		const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
-			view,
 			maxBottom,
 			overflowingNode,
 			overflowingEl
@@ -493,7 +492,6 @@ export class PageLayoutManager {
 		const nextPageBottom = maxBottom - lineHeight;
 
 		const splitDetails = this.getSplitOffsetForOverflowingElement(
-			view,
 			nextPageBottom,
 			nextPageOverflowingDetails.overflowingNode,
 			nextPageOverflowingDetails.overflowingEl
@@ -834,18 +832,10 @@ export class PageLayoutManager {
 	private identifyOffsetBasedOffOverflowingLines(
 		nodes: Node[],
 		lineHeight: number,
-		linesToKeepOnPage: number,
-		linesToPutOnNextPage: number
+		linesToKeepOnPage: number
 	): number {
 		const range = document.createRange();
 		let offset = 0;
-
-		if (linesToPutOnNextPage === 0) {
-			for (const node of nodes) {
-				offset += node.textContent?.length ?? 0;
-			}
-			return offset;
-		}
 
 		// Go through the nodes and find out when we've achieved the correct number of lines.
 		outer: for (const node of nodes) {
@@ -867,7 +857,6 @@ export class PageLayoutManager {
 	}
 
 	private advanceForTextNode(
-		view: EditorView,
 		walker: TreeWalker,
 		el: HTMLElement,
 		text: string,
@@ -914,11 +903,14 @@ export class PageLayoutManager {
 				null
 			);
 
+			if (linesToPutOnNextPage === 0) {
+				throw new Error('Element identified as overflowing but there are no overflowing lines');
+			}
+
 			const offset = this.identifyOffsetBasedOffOverflowingLines(
 				sequentialTextNodes,
 				lineHeight,
-				linesToKeepOnPage,
-				linesToPutOnNextPage
+				linesToKeepOnPage
 			);
 
 			pmOffset += offset;
@@ -938,7 +930,6 @@ export class PageLayoutManager {
 	 * Find the first position in the overflowing element that causes the overflow.
 	 */
 	getSplitOffsetForOverflowingElement(
-		view: EditorView,
 		pageBottom: number,
 		overflowingNode: ProseMirrorNode,
 		overflowingEl: HTMLElement
@@ -955,7 +946,6 @@ export class PageLayoutManager {
 
 		const moveForwardForNextTextNode = () => {
 			const result = this.advanceForTextNode(
-				view,
 				walker,
 				overflowingEl,
 				consecutiveTextNodeContent.join(''),
