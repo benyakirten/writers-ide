@@ -759,6 +759,7 @@ export class PageLayoutManager {
 
 			const { bottom } = el.getBoundingClientRect();
 			if (bottom >= maxBottom) {
+				console.log('HERE!');
 				return {
 					overflowingNode: node,
 					overflowingNodeOffset: pos,
