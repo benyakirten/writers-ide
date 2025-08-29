@@ -30,6 +30,7 @@
 	let state: EditorState;
 	let view: EditorView;
 	let initialState = schema.node('doc', null, [
+		emptyPage,
 		mediumPage,
 		mediumPage,
 		mediumPage,

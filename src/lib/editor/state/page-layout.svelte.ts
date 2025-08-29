@@ -13,8 +13,14 @@ import { clamp } from '$lib/utils/numbers';
 
 export type Unit = 'in' | 'cm' | 'mm';
 
+/**
+ * Information about the content that either overflows a page
+ * or cannot grow without causing overflow. The `doesNotOverflowPage`
+ * flag indicates that the content goes until the possible line page
+ * while otherwise this indicates that the content is indeed overflowing.
+ */
 type OverflowingDetails = {
-	isAtPageLimit: boolean;
+	doesNotOverflowPage: boolean;
 	overflowingNode: ProseMirrorNode;
 	overflowingNodeOffset: number;
 	overflowingEl: HTMLElement;
@@ -25,7 +31,11 @@ type UnderflowingDetails = {
 	lastNodeOffset: number;
 };
 
-type PageDetails = { pageEl: HTMLElement; pageNode: ProseMirrorNode; pageOffset: number };
+type PageDetails = {
+	pageEl: HTMLElement;
+	pageNode: ProseMirrorNode;
+	pageOffset: number;
+};
 
 export const PAGE_SIZES_INCHES = {
 	A4: {
@@ -529,13 +539,18 @@ export class PageLayoutManager {
 	 * 4. Page ends with any other block node but no remaining space on the page - move onto the next page.
 	 *
 	 * Then we need to look at the following page.
+	 *
 	 * 5. Page ends with any other block node but the following page does not exceed the available space
 	 *    on the current page.
 	 *
 	 * This can be broken down into one of two situations:
-	 * 5a. The next page has a `pageEnd` node - we move everything before the `pageEnd` node and the node itself
+	 *
+	 * -- 5a. The next page has a `pageEnd` node - we move everything before the `pageEnd` node and the node itself
 	 *     back onto the current page.
-	 * 5b. The next page does not have a `pageEnd` node - we move everything onto the current page.
+	 *
+	 * -- 5b. The next page does not have a `pageEnd` node - we move everything onto the current page.
+	 *
+	 * Finally:
 	 *
 	 * 6. Page ends with any other block node, and the next page has more than enough content on it to move over.
 	 *    We need to move the appropriate amount of content back and remove it from the next page.
@@ -594,6 +609,9 @@ export class PageLayoutManager {
 
 		if (this.pageIsOverflowing(nextPageOverflowingDetails)) {
 			// Situation #6. Similar behavior to if current page overflows.
+			// Note that here we don't care about if the page cannot fit another block of text
+			// without overflowing since at most we want to copy all of the content over
+			// to the current page.
 			return this.handleNextPageOverflow(
 				view,
 				maxBottom,
@@ -665,7 +683,10 @@ export class PageLayoutManager {
 		let toDelta: number | null;
 
 		if (this.pageIsOverflowing(overflowingDetails)) {
-			if (overflowingDetails.isAtPageLimit) {
+			// Since the page is not overflowing and cannot fit another line,
+			// the page does not need to have any content moved onto the next page.
+			// STOP! Just move on!
+			if (overflowingDetails.doesNotOverflowPage) {
 				return 0;
 			}
 
@@ -766,7 +787,7 @@ export class PageLayoutManager {
 			if (bottom >= maxBottom) {
 				const lineHeight = getLineHeight(el);
 				return {
-					isAtPageLimit: bottom - maxBottom - lineHeight < 0,
+					doesNotOverflowPage: bottom - maxBottom - lineHeight < 0,
 					overflowingNode: node,
 					overflowingNodeOffset: pos,
 					overflowingEl: el
@@ -902,17 +923,13 @@ export class PageLayoutManager {
 			// Account for peer paragraph
 			// If we have a peer paragraph, add all of its text nodes to this one.
 			const lineHeight = getLineHeight(el);
-			const [linesToKeepOnPage, linesToPutOnNextPage] = this.getNodeLineSplitAmount(
+			const [linesToKeepOnPage] = this.getNodeLineSplitAmount(
 				sequentialTextNodes[0],
 				sequentialTextNodes[sequentialTextNodes.length - 1],
 				maxBottom,
 				lineHeight,
 				null
 			);
-
-			if (linesToPutOnNextPage === 0) {
-				throw new Error('Element identified as overflowing but there are no overflowing lines');
-			}
 
 			const offset = this.identifyOffsetBasedOffOverflowingLines(
 				sequentialTextNodes,
