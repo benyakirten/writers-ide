@@ -1,11 +1,7 @@
 import type { EditorView } from 'prosemirror-view';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
 
-import {
-	getLineHeight,
-	calculateTotalLinesOfText,
-	calculateOverflowingLinesOfText
-} from '$lib/utils/css';
+import { getLineHeight } from '$lib/utils/css';
 import {
 	CM_PER_INCH,
 	INDENT_MAX,
@@ -365,6 +361,23 @@ export class PageLayoutManager {
 		return shouldDeleteNextPage ? -1 : 0;
 	}
 
+	private getPeerParagraph(
+		node: ProseMirrorNode,
+		nextPage: ProseMirrorNode | null
+	): ProseMirrorNode | null {
+		if (node.type.name !== 'paragraph') {
+			return null;
+		}
+
+		const firstChild = nextPage?.firstChild;
+
+		if (!firstChild) {
+			return null;
+		}
+
+		return null;
+	}
+
 	/**
 	 * If the page overflows, then we need to find the safe position to split the content,
 	 * replace the current page with the content that fits and move eerything else to the
@@ -382,11 +395,12 @@ export class PageLayoutManager {
 		const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
 
 		const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
+			view,
 			maxBottom,
 			overflowingNode,
-			overflowingEl,
-			null // Need to find peer paragraph to overflowing node
+			overflowingEl
 		);
+
 		const { splitOffset, shouldDedent } = splitOffsetInfo;
 
 		return this.paginateForwardFromOffset(
@@ -409,13 +423,12 @@ export class PageLayoutManager {
 	private handlePageEndTermination(
 		view: EditorView,
 		pageDetails: PageDetails,
-		pageNumber: number,
-		lastNodeOffset: number
+		lastNodeOffset: number,
+		hasNextPage: boolean
 	): number {
 		if (!this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
 			// Page has content after the page end node. Let's move it forward.
 			// If we create a new page, return it.
-			const hasNextPage = this.getPage(view, pageNumber + 1) !== null;
 			return this.paginateForwardFromOffset(
 				view,
 				pageDetails.pageNode,
@@ -480,10 +493,10 @@ export class PageLayoutManager {
 		const nextPageBottom = maxBottom - lineHeight;
 
 		const splitDetails = this.getSplitOffsetForOverflowingElement(
+			view,
 			nextPageBottom,
 			nextPageOverflowingDetails.overflowingNode,
-			nextPageOverflowingDetails.overflowingEl,
-			null
+			nextPageOverflowingDetails.overflowingEl
 		);
 
 		const absoluteSplitPoint =
@@ -536,7 +549,6 @@ export class PageLayoutManager {
 	private handlePageUnderflow(
 		view: EditorView,
 		pageDetails: PageDetails,
-		pageNumber: number,
 		underflowingDetails: UnderflowingDetails,
 		nextPageDetails: PageDetails | null
 	): number | null {
@@ -548,7 +560,12 @@ export class PageLayoutManager {
 		// we don't need to worry about the next page since we'll be paginating
 		// it next. We just want to dump any content after the `pageEnd` node onto it.
 		if (hasDiscoveredPageEnd) {
-			return this.handlePageEndTermination(view, pageDetails, pageNumber, lastNodeOffset);
+			return this.handlePageEndTermination(
+				view,
+				pageDetails,
+				lastNodeOffset,
+				nextPageDetails !== null
+			);
 		}
 
 		// Situation #3 - We don't have a `pageEnd` node and we don't have
@@ -652,13 +669,7 @@ export class PageLayoutManager {
 		if (this.pageIsOverflowing(overflowingDetails)) {
 			toDelta = this.handlePageOverflow(view, pageDetails, overflowingDetails, maxBottom, nextPage);
 		} else {
-			toDelta = this.handlePageUnderflow(
-				view,
-				pageDetails,
-				pageNumber,
-				overflowingDetails,
-				nextPage
-			);
+			toDelta = this.handlePageUnderflow(view, pageDetails, overflowingDetails, nextPage);
 		}
 
 		if (toDelta !== -1) {
@@ -707,17 +718,6 @@ export class PageLayoutManager {
 			yield pageNumber;
 		}
 		return pageNumber;
-	}
-
-	calculateTextOverflow(
-		pageBottom: number,
-		overflowingEl: HTMLElement,
-		lineHeight: number
-	): [linesToKeepOnPage: number, linesToPutOnNextPage: number] {
-		const numLines = calculateTotalLinesOfText(overflowingEl, lineHeight);
-		const overflowingLines = calculateOverflowingLinesOfText(overflowingEl, pageBottom, lineHeight);
-
-		return this.calculateLineSplitAmount(numLines - overflowingLines, overflowingLines);
 	}
 
 	pageIsOverflowing(details: object): details is OverflowingDetails {
@@ -809,7 +809,8 @@ export class PageLayoutManager {
 		firstNode: Node,
 		lastNode: Node,
 		maxBottom: number,
-		lineHeight: number
+		lineHeight: number,
+		_peerParagraphNodes: Node[] | null
 	) {
 		const range = document.createRange();
 
@@ -820,7 +821,8 @@ export class PageLayoutManager {
 		const textRect = range.getBoundingClientRect();
 
 		const totalLines = Math.round(textRect.height / lineHeight);
-		const overflowingLines = Math.min((textRect.bottom - maxBottom) / lineHeight);
+		const overflowingLines = Math.floor((textRect.bottom - maxBottom) / lineHeight);
+		console.log(totalLines, overflowingLines);
 		return this.calculateLineSplitAmount(totalLines - overflowingLines, overflowingLines);
 	}
 
@@ -839,7 +841,7 @@ export class PageLayoutManager {
 		let offset = 0;
 
 		if (linesToPutOnNextPage === 0) {
-			throw new Error('Overflow detected, but no lines should be moved to the next page.');
+			return nodes.reduce((sum, node) => sum + (node.textContent?.length ?? 0), 0);
 		}
 
 		// Go through the nodes and find out when we've achieved the correct number of lines.
@@ -862,6 +864,7 @@ export class PageLayoutManager {
 	}
 
 	private advanceForTextNode(
+		view: EditorView,
 		walker: TreeWalker,
 		el: HTMLElement,
 		text: string,
@@ -897,20 +900,27 @@ export class PageLayoutManager {
 		}
 
 		if (overflowDiscovered) {
+			// Account for peer paragraph
+			// If we have a peer paragraph, add all of its text nodes to this one.
 			const lineHeight = getLineHeight(el);
 			const [linesToKeepOnPage, linesToPutOnNextPage] = this.getNodeLineSplitAmount(
 				sequentialTextNodes[0],
 				sequentialTextNodes[sequentialTextNodes.length - 1],
 				maxBottom,
-				lineHeight
+				lineHeight,
+				null
 			);
 
-			pmOffset += this.identifyOffsetBasedOffOverflowingLines(
+			const offset = this.identifyOffsetBasedOffOverflowingLines(
 				sequentialTextNodes,
 				lineHeight,
 				linesToKeepOnPage,
 				linesToPutOnNextPage
 			);
+
+			console.log(offset);
+
+			pmOffset += offset;
 			shouldDedent = linesToKeepOnPage > 0;
 		} else {
 			pmOffset += potentialExtra;
@@ -927,10 +937,10 @@ export class PageLayoutManager {
 	 * Find the first position in the overflowing element that causes the overflow.
 	 */
 	getSplitOffsetForOverflowingElement(
+		view: EditorView,
 		pageBottom: number,
 		overflowingNode: ProseMirrorNode,
-		overflowingEl: HTMLElement,
-		_peerParagraph: ProseMirrorNode | null
+		overflowingEl: HTMLElement
 	): { splitOffset: number; shouldDedent: boolean } {
 		const walker = document.createTreeWalker(
 			overflowingEl,
@@ -944,6 +954,7 @@ export class PageLayoutManager {
 
 		const moveForwardForNextTextNode = () => {
 			const result = this.advanceForTextNode(
+				view,
 				walker,
 				overflowingEl,
 				consecutiveTextNodeContent.join(''),
@@ -969,6 +980,7 @@ export class PageLayoutManager {
 			} else {
 				if (consecutiveTextNodeContent.length > 0) {
 					const overflowDiscovered = moveForwardForNextTextNode();
+
 					if (overflowDiscovered) {
 						return false;
 					}
