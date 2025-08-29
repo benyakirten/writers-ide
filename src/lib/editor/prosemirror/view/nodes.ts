@@ -157,15 +157,27 @@ const inlineBreak: NodeSpec = {
 	}
 };
 
-const pageDom: DOMOutputSpec = ['div', { class: PROSEMIRROR_PAGE_CLASS }, 0];
 const page: NodeSpec = {
 	content: 'block+',
 	group: 'block',
 	selectable: false,
 	draggable: false,
 	parseDOM: [{ tag: `div.${PROSEMIRROR_PAGE_CLASS}` }],
-	toDOM() {
-		return pageDom;
+	attrs: {
+		index: {
+			default: -1,
+			validate: (val) => {
+				const _val = parseInt(val);
+				if (isNaN(_val) || _val < -1) {
+					throw new Error('Page index must be an integer greater than or equal to 0');
+				}
+			}
+		}
+	},
+	toDOM(node) {
+		const { index } = node.attrs;
+
+		return ['div', { class: PROSEMIRROR_PAGE_CLASS, 'data-page-index': index }, 0];
 	}
 };
 

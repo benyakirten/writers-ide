@@ -17,6 +17,7 @@
 		emptyPage,
 		longPage,
 		mediumPage,
+		mediumPageInterrupted,
 		multiplePages,
 		shortPage,
 		shortPageInterrupted,
@@ -29,21 +30,11 @@
 	let state: EditorState;
 	let view: EditorView;
 	let initialState = schema.node('doc', null, [
-		emptyPage,
 		mediumPage,
 		mediumPage,
-		...multiplePages,
 		mediumPage,
-		emptyPage,
-		...shortPages,
-		emptyPage,
-		...multiplePages,
 		mediumPage,
-		shortPage,
-		shortPage,
-		shortPageInterrupted,
-		mediumPage,
-		longPage
+		mediumPage
 	]);
 
 	function handleTransaction(view: EditorView, transaction: Transaction) {

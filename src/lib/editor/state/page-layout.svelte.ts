@@ -376,14 +376,16 @@ export class PageLayoutManager {
 		pageDetails: PageDetails,
 		overflowingDetails: OverflowingDetails,
 		maxBottom: number,
-		hasNextPage: boolean
+		nextPage: PageDetails | null
 	): number {
+		console.log('OVERFLOW');
 		const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
 
 		const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
 			maxBottom,
 			overflowingNode,
-			overflowingEl
+			overflowingEl,
+			null // Need to find peer paragraph to overflowing node
 		);
 		const { splitOffset, shouldDedent } = splitOffsetInfo;
 
@@ -392,7 +394,7 @@ export class PageLayoutManager {
 			pageDetails.pageNode,
 			pageDetails.pageOffset,
 			overflowingNodeOffset + splitOffset,
-			hasNextPage,
+			nextPage !== null,
 			shouldDedent
 		);
 	}
@@ -480,7 +482,8 @@ export class PageLayoutManager {
 		const splitDetails = this.getSplitOffsetForOverflowingElement(
 			nextPageBottom,
 			nextPageOverflowingDetails.overflowingNode,
-			nextPageOverflowingDetails.overflowingEl
+			nextPageOverflowingDetails.overflowingEl,
+			null
 		);
 
 		const absoluteSplitPoint =
@@ -537,6 +540,7 @@ export class PageLayoutManager {
 		underflowingDetails: UnderflowingDetails,
 		nextPageDetails: PageDetails | null
 	): number | null {
+		console.log('UNDERFLOW');
 		const { lastNodeOffset, hasDiscoveredPageEnd } = underflowingDetails;
 
 		// Situation #1 and #2 - `pageEnd` node discovered. We don't care about
@@ -644,17 +648,26 @@ export class PageLayoutManager {
 		const overflowingDetails = this.getPageOverflowInformation(view, maxBottom, pageDetails);
 
 		const nextPage = this.getPage(view, pageNumber + 1);
+		let toDelta: number | null;
 		if (this.pageIsOverflowing(overflowingDetails)) {
-			return this.handlePageOverflow(
+			toDelta = this.handlePageOverflow(view, pageDetails, overflowingDetails, maxBottom, nextPage);
+		} else {
+			toDelta = this.handlePageUnderflow(
 				view,
 				pageDetails,
+				pageNumber,
 				overflowingDetails,
-				maxBottom,
-				nextPage !== null
+				nextPage
 			);
-		} else {
-			return this.handlePageUnderflow(view, pageDetails, pageNumber, overflowingDetails, nextPage);
 		}
+
+		if (toDelta !== -1) {
+			const { tr } = view.state;
+			tr.setNodeAttribute(pageDetails.pageOffset, 'index', pageNumber);
+			view.dispatch(tr);
+		}
+
+		return toDelta;
 	}
 
 	/**
@@ -916,7 +929,8 @@ export class PageLayoutManager {
 	getSplitOffsetForOverflowingElement(
 		pageBottom: number,
 		overflowingNode: ProseMirrorNode,
-		overflowingEl: HTMLElement
+		overflowingEl: HTMLElement,
+		_peerParagraph: ProseMirrorNode | null
 	): { splitOffset: number; shouldDedent: boolean } {
 		const walker = document.createTreeWalker(
 			overflowingEl,
