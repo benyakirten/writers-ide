@@ -14,6 +14,7 @@ import { clamp } from '$lib/utils/numbers';
 export type Unit = 'in' | 'cm' | 'mm';
 
 type OverflowingDetails = {
+	isAtPageLimit: boolean;
 	overflowingNode: ProseMirrorNode;
 	overflowingNodeOffset: number;
 	overflowingEl: HTMLElement;
@@ -391,7 +392,6 @@ export class PageLayoutManager {
 		maxBottom: number,
 		nextPage: PageDetails | null
 	): number {
-		console.log('OVERFLOW');
 		const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
 
 		const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
@@ -550,7 +550,6 @@ export class PageLayoutManager {
 		underflowingDetails: UnderflowingDetails,
 		nextPageDetails: PageDetails | null
 	): number | null {
-		console.log('UNDERFLOW');
 		const { lastNodeOffset, hasDiscoveredPageEnd } = underflowingDetails;
 
 		// Situation #1 and #2 - `pageEnd` node discovered. We don't care about
@@ -664,7 +663,12 @@ export class PageLayoutManager {
 
 		const nextPage = this.getPage(view, pageNumber + 1);
 		let toDelta: number | null;
+
 		if (this.pageIsOverflowing(overflowingDetails)) {
+			if (overflowingDetails.isAtPageLimit) {
+				return 0;
+			}
+
 			toDelta = this.handlePageOverflow(view, pageDetails, overflowingDetails, maxBottom, nextPage);
 		} else {
 			toDelta = this.handlePageUnderflow(view, pageDetails, overflowingDetails, nextPage);
@@ -758,9 +762,11 @@ export class PageLayoutManager {
 			}
 
 			const { bottom } = el.getBoundingClientRect();
+
 			if (bottom >= maxBottom) {
-				console.log('HERE!');
+				const lineHeight = getLineHeight(el);
 				return {
+					isAtPageLimit: bottom - maxBottom - lineHeight < 0,
 					overflowingNode: node,
 					overflowingNodeOffset: pos,
 					overflowingEl: el
