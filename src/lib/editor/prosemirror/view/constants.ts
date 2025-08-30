@@ -9,3 +9,5 @@ export const PIXELS_PER_INCH = 96;
 export const PROSEMIRROR_PAGE_CLASS = 'prosemirror-page';
 export const PROSEMIRROR_PAGE_END_CLASS = 'prosemirror-page-end';
 export const PROSEMIRROR_PARAGRAPH_CLASS = 'prosemirror-paragraph';
+
+export const PROSEMIRROR_PAGINATION_TRANSACTION_META_KEY = 'pagination';

@@ -17,5 +17,6 @@ export class ProseMirrorPluginManager {
 		return this.record[name] ?? null;
 	}
 }
+
 const ProseMirrorPlugins = new ProseMirrorPluginManager();
 export default ProseMirrorPlugins;
