@@ -3,7 +3,12 @@ import { type EditorState, type Transaction } from 'prosemirror-state';
 
 import { clamp } from '$lib/utils/numbers';
 import { SelectionUtilities } from './selection';
-import { INDENT_MAX, INDENT_MIN } from './constants';
+import {
+	INDENT_MAX,
+	INDENT_MIN,
+	PEERED_TRANSACTION_BOTH_META_KEY,
+	PEERED_TRANSACTION_FIRST_META_KEY
+} from './constants';
 import type { marks } from './marks';
 import {
 	chainCommands,
@@ -72,6 +77,7 @@ export class ActionUtilities {
 		}
 		const { from, to } = state.selection;
 		const tr = state.tr;
+		tr.setMeta(PEERED_TRANSACTION_FIRST_META_KEY, direction);
 
 		state.doc.nodesBetween(from, to, (node, pos) => {
 			if (node.type.name === 'paragraph') {
@@ -106,6 +112,7 @@ export class ActionUtilities {
 
 		const { from, to } = state.selection;
 		const tr = state.tr;
+		tr.setMeta(PEERED_TRANSACTION_BOTH_META_KEY, alignment);
 
 		state.doc.nodesBetween(from, to, (node, pos) => {
 			if (node.type.name === 'paragraph') {

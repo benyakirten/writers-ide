@@ -23,6 +23,7 @@
 		shortPageInterrupted,
 		shortPages
 	} from './sample-data';
+	import { handleTransaction } from './transaction-handler';
 
 	let { id }: TabComponentProps = $props();
 
@@ -38,11 +39,6 @@
 		mediumPage
 	]);
 
-	function handleTransaction(view: EditorView, transaction: Transaction) {
-		let newState = view.state.apply(transaction);
-		view.updateState(newState);
-	}
-
 	onMount(() => {
 		state = EditorState.create({
 			doc: initialState,
@@ -50,8 +46,7 @@
 			plugins: [
 				history(),
 				createShortcuts({
-					splitParagraph: (state, dispatch, view) =>
-						ActionUtilities.splitParagraph(state, dispatch),
+					splitParagraph: (state, dispatch) => ActionUtilities.splitParagraph(state, dispatch),
 					subscript: (state, dispatch, view) =>
 						ActionUtilities.toggleTextMark('superscript', state, dispatch, view, 'subscript'),
 					superscript: (state, dispatch, view) =>

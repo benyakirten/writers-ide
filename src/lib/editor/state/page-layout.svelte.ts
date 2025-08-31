@@ -7,7 +7,7 @@ import {
 	INDENT_MAX,
 	INDENT_MIN,
 	PIXELS_PER_INCH,
-	PROSEMIRROR_PAGINATION_TRANSACTION_META_KEY,
+	PAGINATION_TRANSACTION_META_KEY,
 	PROSEMIRROR_PARAGRAPH_CLASS
 } from '../prosemirror/view/constants';
 import { clamp } from '$lib/utils/numbers';
@@ -734,7 +734,7 @@ export class PageLayoutManager {
 		const { tr, delta } = paginationTransaction;
 
 		tr.setNodeAttribute(pageDetails.pageOffset, 'index', pageNumber);
-		tr.setMeta(PROSEMIRROR_PAGINATION_TRANSACTION_META_KEY, { pageNumber });
+		tr.setMeta(PAGINATION_TRANSACTION_META_KEY, { pageNumber });
 		view.dispatch(tr);
 
 		return delta;

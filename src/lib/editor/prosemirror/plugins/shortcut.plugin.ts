@@ -3,7 +3,7 @@ import type { EditorView } from 'prosemirror-view';
 
 import Shortcuts from '$lib/services/shortcuts.svelte';
 
-export const shortcutKey = new PluginKey('shortcut-plugin');
+export const shortcutKey = new PluginKey('wide-shortcut-plugin');
 
 /**
  * Create a ProseMirror plugin that handles keyboard shortcuts.

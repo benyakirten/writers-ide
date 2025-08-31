@@ -10,4 +10,9 @@ export const PROSEMIRROR_PAGE_CLASS = 'prosemirror-page';
 export const PROSEMIRROR_PAGE_END_CLASS = 'prosemirror-page-end';
 export const PROSEMIRROR_PARAGRAPH_CLASS = 'prosemirror-paragraph';
 
-export const PROSEMIRROR_PAGINATION_TRANSACTION_META_KEY = 'pagination';
+export const PAGINATION_TRANSACTION_META_KEY = 'wide-pagination-transaction';
+
+export const PEERED_TRANSACTION_HANDLED_META_KEY = 'wide-peer-handled-transaction';
+export const PEERED_TRANSACTION_BOTH_META_KEY = 'wide-peer-both-transaction';
+export const PEERED_TRANSACTION_FIRST_META_KEY = 'wide-peer-first-transaction';
+export const PEERED_TRANSACTION_LAST_META_KEY = 'wide-peer-last-transaction';
