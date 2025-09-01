@@ -336,10 +336,8 @@ export class PageLayoutManager {
 			tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
 		}
 
-		tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'peer', true);
-
 		if (shouldDedent) {
-			tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
+			this.setPeer(tr, pageOffset + contentToKeep.nodeSize + 1);
 		}
 
 		return hasNextPage ? 1 : 0;
@@ -368,12 +366,17 @@ export class PageLayoutManager {
 		} else {
 			tr.replaceWith(nextPageOffset, nextPageOffset + nextPageNode.nodeSize, contentToKeep);
 			if (shouldDedent) {
-				tr.setNodeAttribute(nextPageOffset + 1, 'indent', INDENT_MIN);
+				this.setPeer(tr, nextPageOffset + 1);
 			}
 		}
 		tr.insert(pageOffset + pageNode.nodeSize - 1, contentToMoveBackward.content);
 
 		return shouldDeleteNextPage ? -1 : 0;
+	}
+
+	private setPeer(tr: Transaction, offset: number) {
+		tr.setNodeAttribute(offset, 'indent', INDENT_MIN);
+		tr.setNodeAttribute(offset, 'peer', true);
 	}
 
 	// getParentPage(node: ProseMirrorNode): ProseMirrorNode {}

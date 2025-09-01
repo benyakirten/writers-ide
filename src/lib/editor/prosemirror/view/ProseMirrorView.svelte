@@ -24,6 +24,7 @@
 		shortPages
 	} from './sample-data';
 	import { handleTransaction } from './transaction-handler';
+	import PageLayout from '@/editor/state/page-layout.svelte';
 
 	let { id }: TabComponentProps = $props();
 
@@ -88,6 +89,7 @@
 
 		const obsId = crypto.randomUUID();
 		const deregister = Editors.register(id, view, obsId, el.querySelector('.ProseMirror')!);
+		[...PageLayout.paginateRange(view, 0)];
 		return () => deregister();
 	});
 </script>

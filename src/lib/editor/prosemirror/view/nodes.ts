@@ -49,16 +49,24 @@ const paragraph: NodeSpec = {
 				const indent = node.style.textIndent.split('px')[INDENT_MIN];
 				const align = node.style.textAlign;
 				const peer = node.getAttribute('data-peer') === 'true';
-				const _indent = parseInt(indent);
+				let _indent = parseInt(indent);
 				if (isNaN(_indent)) {
-					return { indent: INDENT_MIN };
+					_indent = INDENT_MIN;
 				}
-				return { indent: clamp(_indent, INDENT_MIN, INDENT_MAX), peer, align };
+
+				const data = {
+					indent: clamp(_indent, INDENT_MIN, INDENT_MAX),
+					align,
+					peer
+				};
+
+				return data;
 			}
 		}
 	],
 	toDOM(node) {
 		const { indent, align, peer } = node.attrs;
+		console.log(node.attrs);
 		return [
 			'p',
 			{
@@ -183,7 +191,7 @@ const page: NodeSpec = {
 		}
 	],
 	toDOM(node) {
-		const index = node.attrs['index'] ?? null;
+		const { index } = node.attrs;
 		return ['div', { class: PROSEMIRROR_PAGE_CLASS, 'data-index': index }, 0];
 	}
 };
