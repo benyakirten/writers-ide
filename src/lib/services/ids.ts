@@ -1,5 +1,5 @@
 export class IdGenerator {
-	static ids = new Set<string>();
+	private static ids = new Set<string>();
 	static generate(): string {
 		let id: string = crypto.randomUUID();
 		while (this.ids.has(id)) {

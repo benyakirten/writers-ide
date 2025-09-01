@@ -39,16 +39,6 @@ type PageDetails = {
 	pageOffset: number;
 };
 
-/**
- * A `null` value represents a noop - there's no transaction to dispatch
- * and no need pages to add/remove to the count.
- */
-type PaginationTransaction = ContinuePaginationTransaction | null;
-type ContinuePaginationTransaction = {
-	tr: Transaction;
-	delta: number;
-};
-
 // enum PositionInPage {
 // 	First = 1,
 // 	Last = 2,
@@ -324,14 +314,13 @@ export class PageLayoutManager {
 	 * If the next page does not exist, it will be created.
 	 */
 	private paginateForwardFromOffset(
-		view: EditorView,
+		tr: Transaction,
 		pageNode: ProseMirrorNode,
 		pageOffset: number,
 		pageSplitOffset: number,
 		hasNextPage: boolean,
 		shouldDedent: boolean
-	): PaginationTransaction {
-		const { tr } = view.state;
+	): number {
 		// NOTE: node.cut WILL KEEP THE OUTER ELEMENT so if we only want the content
 		// and not the page too, we need to get cutContent.content instead of cutContent.
 		const contentToKeep = pageNode.cut(0, pageSplitOffset);
@@ -340,22 +329,20 @@ export class PageLayoutManager {
 		tr.replaceWith(pageOffset, pageOffset + pageNode.nodeSize, contentToKeep);
 		// Create a new page with the content that was overflowing.
 		if (hasNextPage) {
-			// If there is a next page, we insert the content there.
+			// If there is a next page, we insert the content there
 			tr.insert(pageOffset + contentToKeep.nodeSize + 1, contentToMove.content);
 		} else {
 			// If there is no next page, we create it.
 			tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
 		}
 
+		tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'peer', true);
+
 		if (shouldDedent) {
 			tr.setNodeAttribute(pageOffset + contentToKeep.nodeSize + 1, 'indent', INDENT_MIN);
 		}
 
-		const toDelta = hasNextPage ? 1 : 0;
-		return {
-			tr,
-			delta: toDelta
-		};
+		return hasNextPage ? 1 : 0;
 	}
 
 	/**
@@ -364,7 +351,7 @@ export class PageLayoutManager {
 	 * definitely calling the wrong function.
 	 */
 	private paginateBackwardFromOffset(
-		view: EditorView,
+		tr: Transaction,
 		pageNode: ProseMirrorNode,
 		pageOffset: number,
 		nextPageNode: ProseMirrorNode,
@@ -372,9 +359,7 @@ export class PageLayoutManager {
 		nextPageSplitOffset: number,
 		shouldDedent: boolean,
 		shouldDeleteNextPage: boolean
-	): PaginationTransaction {
-		const { tr } = view.state;
-
+	): number {
 		const contentToMoveBackward = nextPageNode.cut(0, nextPageSplitOffset);
 		const contentToKeep = nextPageNode.cut(nextPageSplitOffset);
 
@@ -388,11 +373,7 @@ export class PageLayoutManager {
 		}
 		tr.insert(pageOffset + pageNode.nodeSize - 1, contentToMoveBackward.content);
 
-		const delta = shouldDeleteNextPage ? -1 : 0;
-		return {
-			tr,
-			delta
-		};
+		return shouldDeleteNextPage ? -1 : 0;
 	}
 
 	// getParentPage(node: ProseMirrorNode): ProseMirrorNode {}
@@ -421,12 +402,12 @@ export class PageLayoutManager {
 	 * across both pages, we will want to dedent the first paragraph of the next page.
 	 */
 	private handlePageOverflow(
-		view: EditorView,
+		tr: Transaction,
 		pageDetails: PageDetails,
 		overflowingDetails: OverflowingDetails,
 		maxBottom: number,
 		nextPage: PageDetails | null
-	): PaginationTransaction {
+	): number {
 		const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
 
 		const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
@@ -438,7 +419,7 @@ export class PageLayoutManager {
 		const { splitOffset, shouldDedent } = splitOffsetInfo;
 
 		return this.paginateForwardFromOffset(
-			view,
+			tr,
 			pageDetails.pageNode,
 			pageDetails.pageOffset,
 			overflowingNodeOffset + splitOffset,
@@ -455,16 +436,16 @@ export class PageLayoutManager {
 	 * to the next page.
 	 */
 	private handlePageEndTermination(
-		view: EditorView,
+		tr: Transaction,
 		pageDetails: PageDetails,
 		lastNodeOffset: number,
 		hasNextPage: boolean
-	): PaginationTransaction {
+	): number {
 		if (!this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
 			// Page has content after the page end node. Let's move it forward.
 			// If we create a new page, return it.
 			return this.paginateForwardFromOffset(
-				view,
+				tr,
 				pageDetails.pageNode,
 				pageDetails.pageOffset,
 				lastNodeOffset + 1,
@@ -473,7 +454,7 @@ export class PageLayoutManager {
 			);
 		}
 
-		return null;
+		return 0;
 	}
 
 	/**
@@ -482,11 +463,11 @@ export class PageLayoutManager {
 	 * If it does, we take everything before the `pageEnd` node and the node itself.
 	 */
 	private handleNextPageUnderflow(
-		view: EditorView,
+		tr: Transaction,
 		pageDetails: PageDetails,
 		nextPageDetails: PageDetails,
 		nextPageUnderflowDetails: UnderflowingDetails
-	): PaginationTransaction {
+	): number {
 		// If we've discovered a page end node, we want to take everything before it and the page end node.
 		// If not, we want everything on the page (-2 because of the start and end markers).
 		const splitOffset = nextPageUnderflowDetails.hasDiscoveredPageEnd
@@ -499,7 +480,7 @@ export class PageLayoutManager {
 
 		// Returns -1 if we're removing a page or 0 in all other cases.
 		return this.paginateBackwardFromOffset(
-			view,
+			tr,
 			pageDetails.pageNode,
 			pageDetails.pageOffset,
 			nextPageDetails.pageNode,
@@ -515,12 +496,12 @@ export class PageLayoutManager {
 	 * We're moving the correct amount of content from the next page to the current page.
 	 */
 	private handleNextPageOverflow(
-		view: EditorView,
+		tr: Transaction,
 		maxBottom: number,
 		pageDetails: PageDetails,
 		nextPageDetails: PageDetails,
 		nextPageOverflowingDetails: OverflowingDetails
-	): PaginationTransaction {
+	): number {
 		const lineHeight = getLineHeight(nextPageOverflowingDetails.overflowingEl);
 		// Since the method will over calculate by one line, this will account for that.
 		const nextPageBottom = maxBottom - lineHeight;
@@ -535,7 +516,7 @@ export class PageLayoutManager {
 			splitDetails.splitOffset + nextPageOverflowingDetails.overflowingNodeOffset;
 
 		return this.paginateBackwardFromOffset(
-			view,
+			tr,
 			pageDetails.pageNode,
 			pageDetails.pageOffset,
 			nextPageDetails.pageNode,
@@ -582,10 +563,11 @@ export class PageLayoutManager {
 	 */
 	private handlePageUnderflow(
 		view: EditorView,
+		tr: Transaction,
 		pageDetails: PageDetails,
 		underflowingDetails: UnderflowingDetails,
 		nextPageDetails: PageDetails | null
-	): PaginationTransaction {
+	): number {
 		const { lastNodeOffset, hasDiscoveredPageEnd } = underflowingDetails;
 
 		// Situation #1 and #2 - `pageEnd` node discovered. We don't care about
@@ -594,7 +576,7 @@ export class PageLayoutManager {
 		// it next. We just want to dump any content after the `pageEnd` node onto it.
 		if (hasDiscoveredPageEnd) {
 			return this.handlePageEndTermination(
-				view,
+				tr,
 				pageDetails,
 				lastNodeOffset,
 				nextPageDetails !== null
@@ -604,14 +586,14 @@ export class PageLayoutManager {
 		// Situation #3 - We don't have a `pageEnd` node and we don't have
 		// a next page. What else is there to think about?
 		if (!nextPageDetails) {
-			return null;
+			return 0;
 		}
 
 		const availableSpace = this.calculateUnusedSpace(view, pageDetails, lastNodeOffset);
 		// Situation #4 - we dont' have any space left on the page so there's no use finding
 		// out how much to move over.
 		if (availableSpace === null || availableSpace <= 0) {
-			return null;
+			return 0;
 		}
 
 		// Situation #5 and #6 - We need to find out how of the following page we can move
@@ -634,7 +616,7 @@ export class PageLayoutManager {
 			// without overflowing since at most we want to copy all of the content over
 			// to the current page.
 			return this.handleNextPageOverflow(
-				view,
+				tr,
 				maxBottom,
 				pageDetails,
 				nextPageDetails,
@@ -643,7 +625,7 @@ export class PageLayoutManager {
 		} else {
 			// Situation #5. This method handles both the case of a `pageEnd` node and no `pageEnd` node.
 			return this.handleNextPageUnderflow(
-				view,
+				tr,
 				pageDetails,
 				nextPageDetails,
 				nextPageOverflowingDetails
@@ -701,37 +683,19 @@ export class PageLayoutManager {
 		const overflowingDetails = this.getPageOverflowInformation(view, maxBottom, pageDetails);
 
 		const nextPage = this.getPage(view, pageNumber + 1);
-		let paginationTransaction: PaginationTransaction;
+		const { tr } = view.state;
+		let delta: number;
 
 		if (this.pageIsOverflowing(overflowingDetails)) {
-			// Since the page is not overflowing and cannot fit another line,
-			// the page does not need to have any content moved onto the next page.
-			// STOP! Just move on!
+			// If we are right at the limit of the page, we don't need to do anything at all.
 			if (overflowingDetails.doesNotOverflowPage) {
-				return 0;
+				delta = 0;
+			} else {
+				delta = this.handlePageOverflow(tr, pageDetails, overflowingDetails, maxBottom, nextPage);
 			}
-
-			paginationTransaction = this.handlePageOverflow(
-				view,
-				pageDetails,
-				overflowingDetails,
-				maxBottom,
-				nextPage
-			);
 		} else {
-			paginationTransaction = this.handlePageUnderflow(
-				view,
-				pageDetails,
-				overflowingDetails,
-				nextPage
-			);
+			delta = this.handlePageUnderflow(view, tr, pageDetails, overflowingDetails, nextPage);
 		}
-
-		if (paginationTransaction === null) {
-			return 0;
-		}
-
-		const { tr, delta } = paginationTransaction;
 
 		tr.setNodeAttribute(pageDetails.pageOffset, 'index', pageNumber);
 		tr.setMeta(PAGINATION_TRANSACTION_META_KEY, { pageNumber });
@@ -871,8 +835,7 @@ export class PageLayoutManager {
 		firstNode: Node,
 		lastNode: Node,
 		maxBottom: number,
-		lineHeight: number,
-		_peerParagraphNodes: Node[] | null
+		lineHeight: number
 	) {
 		const range = document.createRange();
 
@@ -963,8 +926,7 @@ export class PageLayoutManager {
 				sequentialTextNodes[0],
 				sequentialTextNodes[sequentialTextNodes.length - 1],
 				maxBottom,
-				lineHeight,
-				null
+				lineHeight
 			);
 
 			const offset = this.identifyOffsetBasedOffOverflowingLines(

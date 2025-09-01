@@ -6,8 +6,9 @@ import { SelectionUtilities } from './selection';
 import {
 	INDENT_MAX,
 	INDENT_MIN,
-	PEERED_TRANSACTION_BOTH_META_KEY,
-	PEERED_TRANSACTION_FIRST_META_KEY
+	PEERED_TRANSACTION_BOTH_META_VALUE,
+	PEERED_TRANSACTION_FIRST_META_VALUE,
+	PEERED_TRANSACTION_META_KEY
 } from './constants';
 import type { marks } from './marks';
 import {
@@ -77,7 +78,7 @@ export class ActionUtilities {
 		}
 		const { from, to } = state.selection;
 		const tr = state.tr;
-		tr.setMeta(PEERED_TRANSACTION_FIRST_META_KEY, direction);
+		tr.setMeta(PEERED_TRANSACTION_META_KEY, PEERED_TRANSACTION_FIRST_META_VALUE);
 
 		state.doc.nodesBetween(from, to, (node, pos) => {
 			if (node.type.name === 'paragraph') {
@@ -112,7 +113,7 @@ export class ActionUtilities {
 
 		const { from, to } = state.selection;
 		const tr = state.tr;
-		tr.setMeta(PEERED_TRANSACTION_BOTH_META_KEY, alignment);
+		tr.setMeta(PEERED_TRANSACTION_META_KEY, PEERED_TRANSACTION_BOTH_META_VALUE);
 
 		state.doc.nodesBetween(from, to, (node, pos) => {
 			if (node.type.name === 'paragraph') {

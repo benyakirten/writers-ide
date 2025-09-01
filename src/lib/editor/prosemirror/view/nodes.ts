@@ -19,8 +19,8 @@ const paragraph: NodeSpec = {
 	group: 'block',
 	attrs: {
 		peer: {
-			default: null,
-			validate: 'string|null'
+			default: false,
+			validate: 'boolean'
 		},
 		indent: {
 			default: 1,
@@ -47,21 +47,24 @@ const paragraph: NodeSpec = {
 			tag: 'p',
 			getAttrs: (node) => {
 				const indent = node.style.textIndent.split('px')[INDENT_MIN];
+				const align = node.style.textAlign;
+				const peer = node.getAttribute('data-peer') === 'true';
 				const _indent = parseInt(indent);
 				if (isNaN(_indent)) {
 					return { indent: INDENT_MIN };
 				}
-				return { indent: clamp(_indent, INDENT_MIN, INDENT_MAX) };
+				return { indent: clamp(_indent, INDENT_MIN, INDENT_MAX), peer, align };
 			}
 		}
 	],
 	toDOM(node) {
-		const { indent, align } = node.attrs;
+		const { indent, align, peer } = node.attrs;
 		return [
 			'p',
 			{
 				class: PROSEMIRROR_PARAGRAPH_CLASS,
-				style: `text-indent: ${indent * INDENT_SIZE_PX}px; text-align: ${align};`
+				style: `text-indent: ${indent * INDENT_SIZE_PX}px; text-align: ${align};`,
+				'data-peer': peer
 			},
 			0
 		];
@@ -161,15 +164,27 @@ const inlineBreak: NodeSpec = {
 	}
 };
 
-const pageDom: DOMOutputSpec = ['div', { class: PROSEMIRROR_PAGE_CLASS }, 0];
 const page: NodeSpec = {
 	content: 'block+',
+	attrs: {
+		index: { default: null, validate: 'number|null' }
+	},
 	group: 'block',
 	selectable: false,
 	draggable: false,
-	parseDOM: [{ tag: `div.${PROSEMIRROR_PAGE_CLASS}` }],
-	toDOM() {
-		return pageDom;
+	parseDOM: [
+		{
+			tag: `div.${PROSEMIRROR_PAGE_CLASS}`,
+			getAttrs: (dom) => {
+				const indexRaw = dom.getAttribute('data-index');
+				const index = parseInt(indexRaw ?? '');
+				return { index: isNaN(index) ? null : index };
+			}
+		}
+	],
+	toDOM(node) {
+		const index = node.attrs['index'] ?? null;
+		return ['div', { class: PROSEMIRROR_PAGE_CLASS, 'data-index': index }, 0];
 	}
 };
 
