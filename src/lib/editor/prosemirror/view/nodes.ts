@@ -66,7 +66,6 @@ const paragraph: NodeSpec = {
 	],
 	toDOM(node) {
 		const { indent, align, peer } = node.attrs;
-		console.log(node.attrs);
 		return [
 			'p',
 			{

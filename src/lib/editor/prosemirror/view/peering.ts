@@ -34,3 +34,5 @@ function applyPeerTransactionToFirstPeer(view: EditorView, transaction: Transact
 function applyPeerTransactionToLastPeer(view: EditorView, transaction: Transaction): Transaction {
 	return transaction;
 }
+
+// TODO: Function that detects when peering is no longer necessary

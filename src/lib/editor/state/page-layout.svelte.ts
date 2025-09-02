@@ -567,6 +567,7 @@ export class PageLayoutManager {
 	private handlePageUnderflow(
 		view: EditorView,
 		tr: Transaction,
+		pageNumber: number,
 		pageDetails: PageDetails,
 		underflowingDetails: UnderflowingDetails,
 		nextPageDetails: PageDetails | null
@@ -606,6 +607,8 @@ export class PageLayoutManager {
 
 		// We need to take the amount of content from the next page. The content starts
 		// from the page top (determined by `PageLayout.calculatePageTop)`.
+
+		// TODO: Determine how to work with peered paragraphs.
 		const maxBottom = this.calculatePageTop(nextPageDetails.pageEl) + availableSpace;
 		const nextPageOverflowingDetails = this.getPageOverflowInformation(
 			view,
@@ -618,6 +621,14 @@ export class PageLayoutManager {
 			// Note that here we don't care about if the page cannot fit another block of text
 			// without overflowing since at most we want to copy all of the content over
 			// to the current page.
+
+			// If we are borrowing most of the next page and get to the last node then we want to
+			// reunite it with a peered paragraph to determine how many lines to move over.
+			if (nextPageDetails.pageNode.lastChild?.eq(nextPageOverflowingDetails.overflowingNode)) {
+				const pageAfterThat = this.getPage(view, pageNumber + 2);
+				this.reunitePeeredParagraphs(view, nextPageDetails, pageAfterThat);
+			}
+
 			return this.handleNextPageOverflow(
 				tr,
 				maxBottom,
@@ -636,12 +647,8 @@ export class PageLayoutManager {
 		}
 	}
 
-	pageCount(view: EditorView) {
-		let i = 0;
-		while (this.getPage(view, i) !== null) {
-			i++;
-		}
-		return i;
+	pageCount(view: EditorView): number {
+		return view.state.doc.childCount;
 	}
 
 	deletePage(view: EditorView, page: PageDetails): number {
@@ -658,17 +665,12 @@ export class PageLayoutManager {
 		);
 	}
 
-	private prepareForPagination(
+	private reunitePeeredParagraphs(
 		view: EditorView,
 		pageDetails: PageDetails,
 		nextPageDetails: PageDetails | null
 	): void {
 		const { tr } = view.state;
-		pageDetails.pageNode.forEach((child, offset) => {
-			if (child.type.name === 'paragraph') {
-				tr.setNodeAttribute(offset + pageDetails.pageOffset + 1, 'peer', false);
-			}
-		});
 		if (pageDetails.pageNode.lastChild?.type.name === 'paragraph' && nextPageDetails) {
 			const potentialPeer = nextPageDetails.pageNode.firstChild;
 			if (potentialPeer?.attrs['peer'] === true) {
@@ -704,7 +706,7 @@ export class PageLayoutManager {
 			return null;
 		}
 		const nextPage = this.getPage(view, pageNumber + 1);
-		this.prepareForPagination(view, pageDetails, nextPage);
+		this.reunitePeeredParagraphs(view, pageDetails, nextPage);
 
 		const maxBottom = this.calculatePageBottom(pageDetails.pageEl);
 
@@ -722,7 +724,14 @@ export class PageLayoutManager {
 				delta = this.handlePageOverflow(tr, pageDetails, overflowingDetails, maxBottom, nextPage);
 			}
 		} else {
-			delta = this.handlePageUnderflow(view, tr, pageDetails, overflowingDetails, nextPage);
+			delta = this.handlePageUnderflow(
+				view,
+				tr,
+				pageNumber,
+				pageDetails,
+				overflowingDetails,
+				nextPage
+			);
 		}
 
 		tr.setNodeAttribute(pageDetails.pageOffset, 'index', pageNumber);
