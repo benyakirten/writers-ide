@@ -658,6 +658,30 @@ export class PageLayoutManager {
 		);
 	}
 
+	private prepareForPagination(
+		view: EditorView,
+		pageDetails: PageDetails,
+		nextPageDetails: PageDetails | null
+	): void {
+		const { tr } = view.state;
+		pageDetails.pageNode.forEach((child, offset) => {
+			if (child.type.name === 'paragraph') {
+				tr.setNodeAttribute(offset + pageDetails.pageOffset + 1, 'peer', false);
+			}
+		});
+		if (pageDetails.pageNode.lastChild?.type.name === 'paragraph' && nextPageDetails) {
+			const potentialPeer = nextPageDetails.pageNode.firstChild;
+			if (potentialPeer?.attrs['peer'] === true) {
+				const potentialPeerOffset = nextPageDetails.pageOffset + 1;
+				// Copy all content into the pageNode's last child
+				tr.insert(potentialPeerOffset, potentialPeer.copy());
+				// Delete the peer node.
+				tr.delete(potentialPeerOffset, potentialPeerOffset + potentialPeer.nodeSize);
+			}
+		}
+		view.dispatch(tr);
+	}
+
 	/**
 	 * A method that will paginate the page parameter for the given editor view. If the current
 	 * page does not overflow, it finds the extra space on the page and tries to take all of
@@ -679,13 +703,14 @@ export class PageLayoutManager {
 			// this means that there's nothing left to paginate.
 			return null;
 		}
+		const nextPage = this.getPage(view, pageNumber + 1);
+		this.prepareForPagination(view, pageDetails, nextPage);
 
 		const maxBottom = this.calculatePageBottom(pageDetails.pageEl);
 
 		// Find out if the current page overflows or has available space.
 		const overflowingDetails = this.getPageOverflowInformation(view, maxBottom, pageDetails);
 
-		const nextPage = this.getPage(view, pageNumber + 1);
 		const { tr } = view.state;
 		let delta: number;
 

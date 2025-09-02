@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { EditorState, type Transaction } from 'prosemirror-state';
+	import { EditorState } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import { keymap } from 'prosemirror-keymap';
 	import { undo, redo, history } from 'prosemirror-history';
@@ -89,7 +89,7 @@
 
 		const obsId = crypto.randomUUID();
 		const deregister = Editors.register(id, view, obsId, el.querySelector('.ProseMirror')!);
-		[...PageLayout.paginateRange(view, 0)];
+		// [...PageLayout.paginateRange(view, 0)];
 		return () => deregister();
 	});
 </script>
