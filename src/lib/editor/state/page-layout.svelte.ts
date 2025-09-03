@@ -617,14 +617,6 @@ export class PageLayoutManager {
 			// Note that here we don't care about if the page cannot fit another block of text
 			// without overflowing since at most we want to copy all of the content over
 			// to the current page.
-
-			// If we are borrowing most of the next page and get to the last node then we want to
-			// reunite it with a peered paragraph to determine how many lines to move over.
-			if (nextPageDetails.pageNode.lastChild?.eq(nextPageOverflowingDetails.overflowingNode)) {
-				const pageAfterThat = this.getPage(view, pageNumber + 2);
-				this.reunitePeeredParagraphs(view, nextPageDetails, pageAfterThat);
-			}
-
 			return this.handleNextPageOverflow(
 				tr,
 				maxBottom,
@@ -669,14 +661,17 @@ export class PageLayoutManager {
 	private reunitePeeredParagraphs(
 		view: EditorView,
 		pageDetails: PageDetails,
-		nextPageDetails: PageDetails | null
+		nextPageNumber: number
 	): void {
+		const nextPageDetails = this.getPage(view, nextPageNumber);
+		if (!nextPageDetails) {
+			return;
+		}
+
 		const lastChild = pageDetails.pageNode.lastChild;
 		if (lastChild?.type.name === 'paragraph' && nextPageDetails) {
 			const potentialPeer = nextPageDetails.pageNode.firstChild;
 			if (potentialPeer?.attrs['peer'] === true) {
-				console.log('PEER FOUND');
-
 				const lastParagraphInsertPosition = nextPageDetails.pageOffset - 2;
 				const peerParagraphPosition = nextPageDetails.pageOffset + 1;
 
@@ -689,8 +684,6 @@ export class PageLayoutManager {
 				tr.setMeta(PEERED_TRANSACTION_META_KEY, PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE);
 
 				view.dispatch(tr);
-
-				throw new Error('LOL');
 			}
 		}
 	}
@@ -717,7 +710,6 @@ export class PageLayoutManager {
 			return null;
 		}
 		const nextPage = this.getPage(view, pageNumber + 1);
-		this.reunitePeeredParagraphs(view, pageDetails, nextPage);
 
 		const maxBottom = this.calculatePageBottom(pageDetails.pageEl);
 
@@ -766,6 +758,14 @@ export class PageLayoutManager {
 	 */
 	*paginateRange(view: EditorView, from: number, to?: number): Generator<number, number, void> {
 		let pageNumber = from;
+		for (let i = 0; ; i++) {
+			const page = this.getPage(view, i);
+			if (!page) {
+				break;
+			}
+
+			this.reunitePeeredParagraphs(view, page, i + 1);
+		}
 		while (true) {
 			if (to !== undefined && pageNumber >= to) {
 				break;
