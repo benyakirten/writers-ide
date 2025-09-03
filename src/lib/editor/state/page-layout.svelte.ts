@@ -8,7 +8,9 @@ import {
 	INDENT_MIN,
 	PIXELS_PER_INCH,
 	PAGINATION_TRANSACTION_META_KEY,
-	PROSEMIRROR_PARAGRAPH_CLASS
+	PROSEMIRROR_PARAGRAPH_CLASS,
+	PEERED_TRANSACTION_META_KEY,
+	PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE
 } from '../prosemirror/view/constants';
 import { clamp } from '$lib/utils/numbers';
 import type { Transaction } from 'prosemirror-state';
@@ -38,12 +40,6 @@ type PageDetails = {
 	pageNode: ProseMirrorNode;
 	pageOffset: number;
 };
-
-// enum PositionInPage {
-// 	First = 1,
-// 	Last = 2,
-// 	Intermediate = 3
-// }
 
 export const PAGE_SIZES_INCHES = {
 	A4: {
@@ -665,23 +661,38 @@ export class PageLayoutManager {
 		);
 	}
 
+	/**
+	 * Check if the last paragraph of the current page has a peered paragraph as the first paragraph
+	 * of the next page. If so, we want to put all of the content of the peered paragraph at the end of the last
+	 * paragraph of the current page and delete it.
+	 */
 	private reunitePeeredParagraphs(
 		view: EditorView,
 		pageDetails: PageDetails,
 		nextPageDetails: PageDetails | null
 	): void {
-		const { tr } = view.state;
-		if (pageDetails.pageNode.lastChild?.type.name === 'paragraph' && nextPageDetails) {
+		const lastChild = pageDetails.pageNode.lastChild;
+		if (lastChild?.type.name === 'paragraph' && nextPageDetails) {
 			const potentialPeer = nextPageDetails.pageNode.firstChild;
 			if (potentialPeer?.attrs['peer'] === true) {
-				const potentialPeerOffset = nextPageDetails.pageOffset + 1;
-				// Copy all content into the pageNode's last child
-				tr.insert(potentialPeerOffset, potentialPeer.copy());
-				// Delete the peer node.
-				tr.delete(potentialPeerOffset, potentialPeerOffset + potentialPeer.nodeSize);
+				console.log('PEER FOUND');
+
+				const lastParagraphInsertPosition = nextPageDetails.pageOffset - 2;
+				const peerParagraphPosition = nextPageDetails.pageOffset + 1;
+
+				const { tr } = view.state;
+
+				const lastParagraphInsertPositionMapped = tr.mapping.map(lastParagraphInsertPosition);
+
+				tr.deleteRange(peerParagraphPosition, peerParagraphPosition + potentialPeer.nodeSize);
+				tr.insert(lastParagraphInsertPositionMapped, potentialPeer.content);
+				tr.setMeta(PEERED_TRANSACTION_META_KEY, PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE);
+
+				view.dispatch(tr);
+
+				throw new Error('LOL');
 			}
 		}
-		view.dispatch(tr);
 	}
 
 	/**
