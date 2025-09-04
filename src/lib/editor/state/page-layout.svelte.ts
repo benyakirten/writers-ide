@@ -375,25 +375,6 @@ export class PageLayoutManager {
 		tr.setNodeAttribute(offset, 'peer', true);
 	}
 
-	// getParentPage(node: ProseMirrorNode): ProseMirrorNode {}
-
-	// private getPeerParagraph(
-	// 	node: ProseMirrorNode,
-	// 	nextPage: ProseMirrorNode | null
-	// ): ProseMirrorNode | null {
-	// 	if (node.type.name !== 'paragraph') {
-	// 		return null;
-	// 	}
-
-	// 	const firstChild = nextPage?.firstChild;
-
-	// 	if (!firstChild) {
-	// 		return null;
-	// 	}
-
-	// 	return null;
-	// }
-
 	/**
 	 * If the page overflows, then we need to find the safe position to split the content,
 	 * replace the current page with the content that fits and move eerything else to the
@@ -658,7 +639,8 @@ export class PageLayoutManager {
 	 * of the next page. If so, we want to put all of the content of the peered paragraph at the end of the last
 	 * paragraph of the current page and delete it.
 	 */
-	private reunitePeeredParagraphs(
+	reunitePeeredParagraphs(
+		tr: Transaction,
 		view: EditorView,
 		pageDetails: PageDetails,
 		nextPageNumber: number
@@ -675,17 +657,29 @@ export class PageLayoutManager {
 				const lastParagraphInsertPosition = nextPageDetails.pageOffset - 2;
 				const peerParagraphPosition = nextPageDetails.pageOffset + 1;
 
-				const { tr } = view.state;
-
 				const lastParagraphInsertPositionMapped = tr.mapping.map(lastParagraphInsertPosition);
 
 				tr.deleteRange(peerParagraphPosition, peerParagraphPosition + potentialPeer.nodeSize);
 				tr.insert(lastParagraphInsertPositionMapped, potentialPeer.content);
 				tr.setMeta(PEERED_TRANSACTION_META_KEY, PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE);
-
-				view.dispatch(tr);
 			}
 		}
+	}
+
+	reunitePeerParagraphsInRange(view: EditorView, from: number, to?: number): void {
+		const { tr } = view.state;
+		for (
+			let i = from, page = this.getPage(view, i);
+			page != null;
+			i++, page = this.getPage(view, i)
+		) {
+			if (to !== undefined && i >= to) {
+				break;
+			}
+
+			this.reunitePeeredParagraphs(tr, view, page, i + 1);
+		}
+		view.dispatch(tr);
 	}
 
 	/**
@@ -709,7 +703,12 @@ export class PageLayoutManager {
 			// this means that there's nothing left to paginate.
 			return null;
 		}
+
 		const nextPage = this.getPage(view, pageNumber + 1);
+		if (this.isEmptyPage(pageDetails) && !nextPage) {
+			this.deletePage(view, pageDetails);
+			return 0;
+		}
 
 		const maxBottom = this.calculatePageBottom(pageDetails.pageEl);
 
@@ -757,15 +756,9 @@ export class PageLayoutManager {
 	 * which is 1 greater than the page index.
 	 */
 	*paginateRange(view: EditorView, from: number, to?: number): Generator<number, number, void> {
+		this.reunitePeerParagraphsInRange(view, from, to);
 		let pageNumber = from;
-		for (let i = 0; ; i++) {
-			const page = this.getPage(view, i);
-			if (!page) {
-				break;
-			}
 
-			this.reunitePeeredParagraphs(view, page, i + 1);
-		}
 		while (true) {
 			if (to !== undefined && pageNumber >= to) {
 				break;
@@ -967,8 +960,6 @@ export class PageLayoutManager {
 		}
 
 		if (overflowDiscovered) {
-			// Account for peer paragraph
-			// If we have a peer paragraph, add all of its text nodes to this one.
 			const lineHeight = getLineHeight(el);
 			const [linesToKeepOnPage] = this.getNodeLineSplitAmount(
 				sequentialTextNodes[0],
