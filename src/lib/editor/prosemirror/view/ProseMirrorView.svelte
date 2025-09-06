@@ -34,7 +34,7 @@
 	let view: EditorView;
 	let initialState = schema.node('doc', null, [
 		// emptyPage,
-		// barelyTooLongPage,
+		barelyTooLongPage,
 		barelyTooLongPage,
 		// mediumPageInterrupted,
 		// shortPage,

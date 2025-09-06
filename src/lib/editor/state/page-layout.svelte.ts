@@ -688,6 +688,9 @@ export class PageLayoutManager {
 	 * Check if the last paragraph of the current page has a peered paragraph as the first paragraph
 	 * of the next page. If so, we want to put all of the content of the peered paragraph at the end of the last
 	 * paragraph of the current page and delete it.
+	 *
+	 * A peered paragraph is when a paragraph is split between two pages. The first part will have no special attributes,
+	 * but the second part will have the `peer` attribute set to `true`.
 	 */
 	reunitePeeredParagraphs(
 		tr: Transaction,
@@ -710,13 +713,17 @@ export class PageLayoutManager {
 		}
 	}
 
+	/**
+	 * A helper function that will reunite peered paragraphs between the given
+	 * range of pages, inclusive of the `from` page and exclusive of the `to` page.
+	 */
 	reunitePeerParagraphsInRange(view: EditorView, from: number, to?: number): void {
-		const { tr } = view.state;
 		for (
 			let i = from, page = this.getPage(view, i);
 			page != null;
 			i++, page = this.getPage(view, i)
 		) {
+			const { tr } = view.state;
 			if (to !== undefined && i >= to) {
 				break;
 			}
@@ -726,8 +733,8 @@ export class PageLayoutManager {
 				break;
 			}
 			this.reunitePeeredParagraphs(tr, page, nextPage);
+			view.dispatch(tr);
 		}
-		view.dispatch(tr);
 	}
 
 	/**
