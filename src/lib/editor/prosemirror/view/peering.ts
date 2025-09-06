@@ -1,6 +1,6 @@
 import type { Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
-import { ReplaceAroundStep } from 'prosemirror-transform';
+import { ReplaceAroundStep, Step } from 'prosemirror-transform';
 
 import {
 	PEERED_TRANSACTION_BOTH_META_VALUE,
@@ -37,12 +37,47 @@ function applyPeerTransactionToFirstPeer(view: EditorView, transaction: Transact
 		return !node?.attrs['peer'];
 	});
 
-	const { tr } = view.state;
-	newSteps.forEach((step) => tr.step(step));
-
-	return tr;
+	return remapToNewTransaction(view, newSteps);
 }
 
 function applyPeerTransactionToLastPeer(view: EditorView, transaction: Transaction): Transaction {
-	return transaction;
+	const steps: Step[] = [];
+	for (let i = 0; i < transaction.steps.length - 1; i++) {
+		const step = transaction.steps[i];
+		if (!(step instanceof ReplaceAroundStep)) {
+			steps.push(step);
+			continue;
+		}
+
+		const node = view.state.doc.nodeAt(step.from);
+		if (!node) {
+			steps.push(step);
+			continue;
+		}
+
+		const nextStep = transaction.steps[i + 1];
+		if (!(nextStep instanceof ReplaceAroundStep)) {
+			steps.push(step);
+			continue;
+		}
+
+		const nextNode = view.state.doc.nodeAt(nextStep.from);
+		if (!nextNode) {
+			steps.push(step);
+			continue;
+		}
+
+		if (!node.attrs['peer'] && nextNode.attrs['peer']) {
+			steps.push(nextStep);
+			i++;
+		}
+	}
+
+	return remapToNewTransaction(view, steps);
+}
+
+function remapToNewTransaction(view: EditorView, steps: Step[]): Transaction {
+	const { tr } = view.state;
+	steps.forEach((step) => tr.step(step));
+	return tr;
 }
