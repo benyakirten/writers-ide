@@ -22,7 +22,7 @@
 		multiplePages,
 		shortPage,
 		shortPageInterrupted,
-		shortPages
+		shortPages,
 	} from './sample-data';
 	import { handleTransaction } from './transaction-handler';
 	import PageLayout from '@/editor/state/page-layout.svelte';
@@ -33,18 +33,23 @@
 	let state: EditorState;
 	let view: EditorView;
 	let initialState = schema.node('doc', null, [
+		emptyPage,
 		barelyTooLongPage,
-		barelyTooLongPage
-		// mediumPageInterrupted,
-		// shortPage,
-		// shortPage,
-		// mediumPage,
-		// shortPage,
-		// ...multiplePages,
-		// longPage,
-		// shortPage,
-		// shortPageInterrupted,
-		// mediumPage
+		barelyTooLongPage,
+		mediumPageInterrupted,
+		shortPage,
+		shortPage,
+		emptyPage,
+		mediumPage,
+		shortPage,
+		...multiplePages,
+		longPage,
+		shortPage,
+		emptyPage,
+		shortPageInterrupted,
+		...shortPages,
+		mediumPage,
+		emptyPage,
 	]);
 
 	onMount(() => {
@@ -80,18 +85,18 @@
 					underline: (state, dispatch, view) =>
 						ActionUtilities.toggleTextMark('underline', state, dispatch, view),
 					overline: (state, dispatch, view) =>
-						ActionUtilities.toggleTextMark('overline', state, dispatch, view)
+						ActionUtilities.toggleTextMark('overline', state, dispatch, view),
 				}),
 				// TODO: We might want to write our own base commands
 				// instead of using prosemirror-commands.
 				keymap(baseKeymap),
-				...ProseMirrorPlugins.plugins
-			]
+				...ProseMirrorPlugins.plugins,
+			],
 		});
 
 		view = new EditorView(el, {
 			state,
-			dispatchTransaction: (transaction) => handleTransaction(view, transaction)
+			dispatchTransaction: (transaction) => handleTransaction(view, transaction),
 		});
 
 		const obsId = crypto.randomUUID();

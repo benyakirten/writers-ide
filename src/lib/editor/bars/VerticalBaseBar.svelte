@@ -78,6 +78,7 @@
 		gap: 8px;
 		padding: 8px 4px;
 		align-content: baseline;
+		position: relative;
 		position: sticky;
 		top: 0;
 	}
