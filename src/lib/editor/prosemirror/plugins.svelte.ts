@@ -1,4 +1,5 @@
 import { Plugin } from 'prosemirror-state';
+import { createUpdatePlugin } from './plugins/event-bus.plugin';
 
 export class ProseMirrorPluginManager {
 	record = $state<Record<string, Plugin>>({});
@@ -19,4 +20,6 @@ export class ProseMirrorPluginManager {
 }
 
 const ProseMirrorPlugins = new ProseMirrorPluginManager();
+ProseMirrorPlugins.register('event-bus', createUpdatePlugin('global'));
+
 export default ProseMirrorPlugins;

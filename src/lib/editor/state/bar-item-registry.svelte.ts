@@ -19,6 +19,10 @@ export class BarItemRegistry {
 		return [id, () => this.deregister(id)];
 	}
 
+	clear() {
+		this.items = {};
+	}
+
 	deregister(id: string) {
 		delete this.items[id];
 	}

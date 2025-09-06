@@ -4,9 +4,9 @@
 	import type { EditorView } from 'prosemirror-view';
 	import type { Selection } from 'prosemirror-state';
 
-	import type { ModularComponentProps } from '$lib/editor/state/bar-item-registry.svelte';
-	import type { TextMarkPresence } from '../../view/selection';
+	import type { ModularComponentProps } from '$lib/editor/state/shared.types';
 	import { blockMarkButtons, textMarkButtons } from './Snippets.svelte';
+	import type { TextMarkPresence } from '../../view/selection';
 
 	let activeCodeMarks = $state<TextMarkPresence>();
 	let editorView = $state<EditorView | null>(null);
