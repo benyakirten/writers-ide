@@ -996,10 +996,6 @@ export class PageLayoutManager {
 
 		return { splitOffset: pmOffset, shouldDedent };
 	}
-
-	// getPeeredParagraphForSelection(view: EditorView) {
-	// 	//
-	// }
 }
 
 const PageLayout = new PageLayoutManager();

@@ -23,8 +23,6 @@
 		canMoveForward: boolean;
 	} = $props();
 
-	$inspect(index, items);
-
 	let shouldInvert = HorizontalBarState.shouldInvert(position);
 	let height = $derived(HorizontalBarState.height(bar, position));
 	let resizeLabel = $derived.by(() =>

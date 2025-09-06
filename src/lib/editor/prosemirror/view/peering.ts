@@ -1,5 +1,7 @@
 import type { Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
+import { ReplaceAroundStep } from 'prosemirror-transform';
+
 import {
 	PEERED_TRANSACTION_BOTH_META_VALUE,
 	PEERED_TRANSACTION_FIRST_META_VALUE,
@@ -26,14 +28,21 @@ function applyPeerTransactionToBothPeers(view: EditorView, transaction: Transact
 }
 
 function applyPeerTransactionToFirstPeer(view: EditorView, transaction: Transaction): Transaction {
-	console.log('REP');
-	transaction.steps.forEach((step) => console.log(step));
-	// const page =
-	return transaction;
+	const newSteps = transaction.steps.filter((step) => {
+		if (!(step instanceof ReplaceAroundStep)) {
+			return true;
+		}
+
+		const node = view.state.doc.nodeAt(step.from);
+		return !node?.attrs['peer'];
+	});
+
+	const { tr } = view.state;
+	newSteps.forEach((step) => tr.step(step));
+
+	return tr;
 }
 
 function applyPeerTransactionToLastPeer(view: EditorView, transaction: Transaction): Transaction {
 	return transaction;
 }
-
-// TODO: Function that detects when peering is no longer necessary
