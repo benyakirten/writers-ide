@@ -9,6 +9,8 @@ import {
 	PIXELS_PER_INCH,
 	PAGINATION_TRANSACTION_META_KEY,
 	PROSEMIRROR_PARAGRAPH_CLASS,
+	PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE,
+	PEERED_TRANSACTION_META_KEY,
 } from '../prosemirror/view/constants';
 import { clamp } from '$lib/utils/numbers';
 import type { Transaction } from 'prosemirror-state';
@@ -542,7 +544,6 @@ export class PageLayoutManager {
 	private handlePageUnderflow(
 		view: EditorView,
 		tr: Transaction,
-		pageNumber: number,
 		pageDetails: PageDetails,
 		underflowingDetails: UnderflowingDetails,
 		nextPageDetails: PageDetails | null,
@@ -673,14 +674,7 @@ export class PageLayoutManager {
 				delta = this.handlePageOverflow(tr, pageDetails, overflowingDetails, maxBottom, nextPage);
 			}
 		} else {
-			delta = this.handlePageUnderflow(
-				view,
-				tr,
-				pageNumber,
-				pageDetails,
-				overflowingDetails,
-				nextPage,
-			);
+			delta = this.handlePageUnderflow(view, tr, pageDetails, overflowingDetails, nextPage);
 		}
 
 		tr.setNodeAttribute(pageDetails.pageOffset, 'index', pageNumber);
@@ -688,6 +682,52 @@ export class PageLayoutManager {
 		view.dispatch(tr);
 
 		return delta;
+	}
+
+	/**
+	 * Check if the last paragraph of the current page has a peered paragraph as the first paragraph
+	 * of the next page. If so, we want to put all of the content of the peered paragraph at the end of the last
+	 * paragraph of the current page and delete it.
+	 */
+	reunitePeeredParagraphs(
+		tr: Transaction,
+		pageDetails: PageDetails,
+		nextPageDetails: PageDetails,
+	): void {
+		const lastChild = pageDetails.pageNode.lastChild;
+		if (lastChild?.type.name === 'paragraph' && nextPageDetails) {
+			const potentialPeer = nextPageDetails.pageNode.firstChild;
+			if (potentialPeer?.attrs['peer'] === true) {
+				const lastParagraphInsertPosition = nextPageDetails.pageOffset - 2;
+				const peerParagraphPosition = nextPageDetails.pageOffset + 1;
+
+				const lastParagraphInsertPositionMapped = tr.mapping.map(lastParagraphInsertPosition);
+
+				tr.deleteRange(peerParagraphPosition, peerParagraphPosition + potentialPeer.nodeSize);
+				tr.insert(lastParagraphInsertPositionMapped, potentialPeer.content);
+				tr.setMeta(PEERED_TRANSACTION_META_KEY, PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE);
+			}
+		}
+	}
+
+	reunitePeerParagraphsInRange(view: EditorView, from: number, to?: number): void {
+		const { tr } = view.state;
+		for (
+			let i = from, page = this.getPage(view, i);
+			page != null;
+			i++, page = this.getPage(view, i)
+		) {
+			if (to !== undefined && i >= to) {
+				break;
+			}
+
+			const nextPage = this.getPage(view, i + 1);
+			if (!nextPage) {
+				break;
+			}
+			this.reunitePeeredParagraphs(tr, page, nextPage);
+		}
+		view.dispatch(tr);
 	}
 
 	/**
@@ -704,6 +744,10 @@ export class PageLayoutManager {
 	 */
 	*paginateRange(view: EditorView, from: number, to?: number): Generator<number, number, void> {
 		let pageNumber = from;
+
+		// This makes it so if a paragraph is broken over two pages, we correctly identify text content
+		// and where to split for orphan/widow lines.
+		this.reunitePeerParagraphsInRange(view, from, to);
 
 		while (true) {
 			if (to !== undefined && pageNumber >= to) {
