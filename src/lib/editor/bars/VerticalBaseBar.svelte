@@ -56,24 +56,29 @@
 </script>
 
 <div class="base-bar">
-	<select bind:value={selectValue}>
-		<option value="vertical">Vertical Bar</option>
-		<option value="horizontal">Horizontal Bar</option>
-		<option value="floating">Floating Bar</option>
-	</select>
-	<button onclick={() => addNullToBar()}>Add null to bar</button>
-	<button onclick={() => addBasicMenuToBar()}>Add basic menu to bar</button>
-	<button onclick={() => ToastManager.addToast(generateRandomMessage(), null)}> Add Toast </button>
-	<button onclick={() => tabState.create('prosemirror')}>Create Prosemirror</button>
-	<button onclick={() => paginate()}>Paginate</button>
+	<div class="sticky-part">
+		<select bind:value={selectValue}>
+			<option value="vertical">Vertical Bar</option>
+			<option value="horizontal">Horizontal Bar</option>
+			<option value="floating">Floating Bar</option>
+		</select>
+		<button onclick={() => addNullToBar()}>Add null to bar</button>
+		<button onclick={() => addBasicMenuToBar()}>Add basic menu to bar</button>
+		<button onclick={() => ToastManager.addToast(generateRandomMessage(), null)}>
+			Add Toast
+		</button>
+		<button onclick={() => tabState.create('prosemirror')}>Create Prosemirror</button>
+		<button onclick={() => paginate()}>Paginate</button>
+	</div>
 </div>
 
 <style>
-	.base-bar {
-		width: min-content;
+	.sticky-part {
 		display: grid;
 		gap: 8px;
 		padding: 8px 4px;
 		align-content: baseline;
+		position: sticky;
+		top: 0;
 	}
 </style>

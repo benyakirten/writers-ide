@@ -33,19 +33,18 @@
 	let state: EditorState;
 	let view: EditorView;
 	let initialState = schema.node('doc', null, [
-		emptyPage,
 		barelyTooLongPage,
-		mediumPage,
-		mediumPageInterrupted,
-		shortPage,
-		shortPage,
-		mediumPage,
-		shortPage,
-		...multiplePages,
-		longPage,
-		shortPage,
-		shortPageInterrupted,
-		mediumPage
+		barelyTooLongPage
+		// mediumPageInterrupted,
+		// shortPage,
+		// shortPage,
+		// mediumPage,
+		// shortPage,
+		// ...multiplePages,
+		// longPage,
+		// shortPage,
+		// shortPageInterrupted,
+		// mediumPage
 	]);
 
 	onMount(() => {

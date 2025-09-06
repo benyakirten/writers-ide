@@ -156,7 +156,12 @@ export const barelyTooLongPage = schema.node('page', null, [
 	]),
 	schema.node('paragraph', null, [
 		schema.text(
-			'10Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed eu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus.'
+			'10Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed lu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus.'
+		)
+	]),
+	schema.node('paragraph', null, [
+		schema.text(
+			'11Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi consequat viverra lacus non maximus. Nunc vestibulum semper sodales. Mauris feugiat tortor et auctor malesuada. Phasellus nisi quam, lacinia et malesuada a, pulvinar a leo. Sed lu hendrerit felis. Sed ut ipsum accumsan, ullamcorper lorem id, eleifend risus.'
 		)
 	]),
 	schema.node('pageEnd')

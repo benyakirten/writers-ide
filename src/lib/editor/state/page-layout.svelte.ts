@@ -628,10 +628,7 @@ export class PageLayoutManager {
 	}
 
 	isEmptyPage(page: PageDetails): boolean {
-		return (
-			page.pageNode.textContent.length === 0 &&
-			Array.from(page.pageNode.children).every((child) => child.type.name === 'paragraph')
-		);
+		return page.pageNode.content.size === 0;
 	}
 
 	/**
@@ -641,15 +638,9 @@ export class PageLayoutManager {
 	 */
 	reunitePeeredParagraphs(
 		tr: Transaction,
-		view: EditorView,
 		pageDetails: PageDetails,
-		nextPageNumber: number
+		nextPageDetails: PageDetails
 	): void {
-		const nextPageDetails = this.getPage(view, nextPageNumber);
-		if (!nextPageDetails) {
-			return;
-		}
-
 		const lastChild = pageDetails.pageNode.lastChild;
 		if (lastChild?.type.name === 'paragraph' && nextPageDetails) {
 			const potentialPeer = nextPageDetails.pageNode.firstChild;
@@ -677,7 +668,11 @@ export class PageLayoutManager {
 				break;
 			}
 
-			this.reunitePeeredParagraphs(tr, view, page, i + 1);
+			const nextPage = this.getPage(view, i + 1);
+			if (!nextPage) {
+				break;
+			}
+			this.reunitePeeredParagraphs(tr, page, nextPage);
 		}
 		view.dispatch(tr);
 	}
@@ -707,7 +702,7 @@ export class PageLayoutManager {
 		const nextPage = this.getPage(view, pageNumber + 1);
 		if (this.isEmptyPage(pageDetails) && !nextPage) {
 			this.deletePage(view, pageDetails);
-			return 0;
+			return -1;
 		}
 
 		const maxBottom = this.calculatePageBottom(pageDetails.pageEl);
@@ -756,7 +751,7 @@ export class PageLayoutManager {
 	 * which is 1 greater than the page index.
 	 */
 	*paginateRange(view: EditorView, from: number, to?: number): Generator<number, number, void> {
-		this.reunitePeerParagraphsInRange(view, from, to);
+		// this.reunitePeerParagraphsInRange(view, from, to);
 		let pageNumber = from;
 
 		while (true) {
