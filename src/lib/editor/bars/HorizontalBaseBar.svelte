@@ -1,7 +1,11 @@
 <script lang="ts">
+	import TransferHandler from '../state/bar-transfer-handler.svelte';
 	import FloaterBarState from '../state/floater-state.svelte';
 	import HorizontalBarState, { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 	import VerticalBarState, { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
+
+	const id = HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart);
+	TransferHandler.append(HorizontalBarPosition.WindowBlockStart, 0, 'basic-menu');
 </script>
 
 <div class="base-bar">

@@ -33,23 +33,23 @@
 	let state: EditorState;
 	let view: EditorView;
 	let initialState = schema.node('doc', null, [
-		emptyPage,
+		// emptyPage,
+		// barelyTooLongPage,
 		barelyTooLongPage,
-		barelyTooLongPage,
-		mediumPageInterrupted,
-		shortPage,
-		shortPage,
-		emptyPage,
-		mediumPage,
-		shortPage,
-		...multiplePages,
-		longPage,
-		shortPage,
-		emptyPage,
-		shortPageInterrupted,
-		...shortPages,
-		mediumPage,
-		emptyPage,
+		// mediumPageInterrupted,
+		// shortPage,
+		// shortPage,
+		// emptyPage,
+		// mediumPage,
+		// shortPage,
+		// ...multiplePages,
+		// longPage,
+		// shortPage,
+		// emptyPage,
+		// shortPageInterrupted,
+		// ...shortPages,
+		// mediumPage,
+		// emptyPage,
 	]);
 
 	onMount(() => {
@@ -101,7 +101,7 @@
 
 		const obsId = crypto.randomUUID();
 		const deregister = Editors.register(id, view, obsId, el.querySelector('.ProseMirror')!);
-		// [...PageLayout.paginateRange(view, 0)];
+		[...PageLayout.paginateRange(view, 0)];
 		return () => deregister();
 	});
 </script>

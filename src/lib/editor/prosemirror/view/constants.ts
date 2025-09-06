@@ -16,4 +16,3 @@ export const PEERED_TRANSACTION_META_KEY = 'wide-peer-transaction';
 export const PEERED_TRANSACTION_BOTH_META_VALUE = 'both';
 export const PEERED_TRANSACTION_FIRST_META_VALUE = 'first';
 export const PEERED_TRANSACTION_LAST_META_VALUE = 'last';
-export const PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE = 'reunite-peers';

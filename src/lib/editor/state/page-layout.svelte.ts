@@ -9,8 +9,6 @@ import {
 	PIXELS_PER_INCH,
 	PAGINATION_TRANSACTION_META_KEY,
 	PROSEMIRROR_PARAGRAPH_CLASS,
-	PEERED_TRANSACTION_META_KEY,
-	PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE
 } from '../prosemirror/view/constants';
 import { clamp } from '$lib/utils/numbers';
 import type { Transaction } from 'prosemirror-state';
@@ -44,71 +42,71 @@ type PageDetails = {
 export const PAGE_SIZES_INCHES = {
 	A4: {
 		width: 8.27,
-		height: 11.69
+		height: 11.69,
 	},
 	A5: {
 		width: 5.83,
-		height: 8.27
+		height: 8.27,
 	},
 	A6: {
 		width: 4.13,
-		height: 5.83
+		height: 5.83,
 	},
 	A7: {
 		width: 2.91,
-		height: 4.13
+		height: 4.13,
 	},
 	A8: {
 		width: 2.05,
-		height: 2.91
+		height: 2.91,
 	},
 	Ledger: {
 		width: 17,
-		height: 11
+		height: 11,
 	},
 	Letter: {
 		width: 8.5,
-		height: 11
+		height: 11,
 	},
 	Legal: {
 		width: 8.5,
-		height: 14
-	}
+		height: 14,
+	},
 } as const;
 
 export const PAGE_SIZES_MM = {
 	A4: {
 		width: 210,
-		height: 297
+		height: 297,
 	},
 	A5: {
 		width: 148,
-		height: 210
+		height: 210,
 	},
 	A6: {
 		width: 105,
-		height: 148
+		height: 148,
 	},
 	A7: {
 		width: 74,
-		height: 105
+		height: 105,
 	},
 	A8: {
 		width: 52,
-		height: 74
+		height: 74,
 	},
 	Ledger: {
 		width: 432,
-		height: 279
+		height: 279,
 	},
 	Letter: {
 		width: 216,
-		height: 279
+		height: 279,
 	},
 	Legal: {
 		width: 216,
-		height: 356
-	}
+		height: 356,
+	},
 };
 
 export class PageLayoutManager {
@@ -142,7 +140,7 @@ export class PageLayoutManager {
 
 	getPredefinedPageSize(
 		units: Unit,
-		size: keyof typeof PAGE_SIZES_MM
+		size: keyof typeof PAGE_SIZES_MM,
 	): { width: number; height: number } {
 		if (units === 'in') {
 			return PAGE_SIZES_INCHES[size];
@@ -150,7 +148,7 @@ export class PageLayoutManager {
 			const { width, height } = PAGE_SIZES_MM[size];
 			return {
 				width: width / 10,
-				height: height / 10
+				height: height / 10,
 			};
 		} else {
 			return PAGE_SIZES_MM[size];
@@ -229,7 +227,7 @@ export class PageLayoutManager {
 	 */
 	calculateLineSplitAmount(
 		linesNotOverflowingPage: number,
-		linesOverflowingPage: number
+		linesOverflowingPage: number,
 	): [linesToKeepOnPage: number, linesToPutOnNextPage: number] {
 		// If either is 0, we don't need to think about widow/orphan lines.
 		if (linesOverflowingPage == 0) {
@@ -278,7 +276,7 @@ export class PageLayoutManager {
 	private calculateUnusedSpace(
 		view: EditorView,
 		pageDetails: PageDetails,
-		lastNodeOffset: number
+		lastNodeOffset: number,
 	): number | null {
 		const { pageEl, pageOffset } = pageDetails;
 
@@ -315,7 +313,7 @@ export class PageLayoutManager {
 		pageOffset: number,
 		pageSplitOffset: number,
 		hasNextPage: boolean,
-		shouldDedent: boolean
+		shouldDedent: boolean,
 	): number {
 		// NOTE: node.cut WILL KEEP THE OUTER ELEMENT so if we only want the content
 		// and not the page too, we need to get cutContent.content instead of cutContent.
@@ -352,7 +350,7 @@ export class PageLayoutManager {
 		nextPageOffset: number,
 		nextPageSplitOffset: number,
 		shouldDedent: boolean,
-		shouldDeleteNextPage: boolean
+		shouldDeleteNextPage: boolean,
 	): number {
 		const contentToMoveBackward = nextPageNode.cut(0, nextPageSplitOffset);
 		const contentToKeep = nextPageNode.cut(nextPageSplitOffset);
@@ -386,14 +384,14 @@ export class PageLayoutManager {
 		pageDetails: PageDetails,
 		overflowingDetails: OverflowingDetails,
 		maxBottom: number,
-		nextPage: PageDetails | null
+		nextPage: PageDetails | null,
 	): number {
 		const { overflowingNode, overflowingEl, overflowingNodeOffset } = overflowingDetails;
 
 		const splitOffsetInfo = this.getSplitOffsetForOverflowingElement(
 			maxBottom,
 			overflowingNode,
-			overflowingEl
+			overflowingEl,
 		);
 
 		const { splitOffset, shouldDedent } = splitOffsetInfo;
@@ -404,7 +402,7 @@ export class PageLayoutManager {
 			pageDetails.pageOffset,
 			overflowingNodeOffset + splitOffset,
 			nextPage !== null,
-			shouldDedent
+			shouldDedent,
 		);
 	}
 
@@ -419,7 +417,7 @@ export class PageLayoutManager {
 		tr: Transaction,
 		pageDetails: PageDetails,
 		lastNodeOffset: number,
-		hasNextPage: boolean
+		hasNextPage: boolean,
 	): number {
 		if (!this.pageHasNoNodesAfter(pageDetails.pageNode, lastNodeOffset)) {
 			// Page has content after the page end node. Let's move it forward.
@@ -430,7 +428,7 @@ export class PageLayoutManager {
 				pageDetails.pageOffset,
 				lastNodeOffset + 1,
 				hasNextPage,
-				false
+				false,
 			);
 		}
 
@@ -446,7 +444,7 @@ export class PageLayoutManager {
 		tr: Transaction,
 		pageDetails: PageDetails,
 		nextPageDetails: PageDetails,
-		nextPageUnderflowDetails: UnderflowingDetails
+		nextPageUnderflowDetails: UnderflowingDetails,
 	): number {
 		// If we've discovered a page end node, we want to take everything before it and the page end node.
 		// If not, we want everything on the page (-2 because of the start and end markers).
@@ -467,7 +465,7 @@ export class PageLayoutManager {
 			nextPageDetails.pageOffset,
 			splitOffset,
 			false,
-			shouldDeleteNextPage
+			shouldDeleteNextPage,
 		);
 	}
 
@@ -480,7 +478,7 @@ export class PageLayoutManager {
 		maxBottom: number,
 		pageDetails: PageDetails,
 		nextPageDetails: PageDetails,
-		nextPageOverflowingDetails: OverflowingDetails
+		nextPageOverflowingDetails: OverflowingDetails,
 	): number {
 		const lineHeight = getLineHeight(nextPageOverflowingDetails.overflowingEl);
 		// Since the method will over calculate by one line, this will account for that.
@@ -489,7 +487,7 @@ export class PageLayoutManager {
 		const splitDetails = this.getSplitOffsetForOverflowingElement(
 			nextPageBottom,
 			nextPageOverflowingDetails.overflowingNode,
-			nextPageOverflowingDetails.overflowingEl
+			nextPageOverflowingDetails.overflowingEl,
 		);
 
 		const absoluteSplitPoint =
@@ -503,7 +501,7 @@ export class PageLayoutManager {
 			nextPageDetails.pageOffset,
 			absoluteSplitPoint,
 			splitDetails.shouldDedent,
-			false
+			false,
 		);
 	}
 
@@ -547,7 +545,7 @@ export class PageLayoutManager {
 		pageNumber: number,
 		pageDetails: PageDetails,
 		underflowingDetails: UnderflowingDetails,
-		nextPageDetails: PageDetails | null
+		nextPageDetails: PageDetails | null,
 	): number {
 		const { lastNodeOffset, hasDiscoveredPageEnd } = underflowingDetails;
 
@@ -560,7 +558,7 @@ export class PageLayoutManager {
 				tr,
 				pageDetails,
 				lastNodeOffset,
-				nextPageDetails !== null
+				nextPageDetails !== null,
 			);
 		}
 
@@ -590,7 +588,7 @@ export class PageLayoutManager {
 		const nextPageOverflowingDetails = this.getPageOverflowInformation(
 			view,
 			maxBottom,
-			nextPageDetails
+			nextPageDetails,
 		);
 
 		if (this.pageIsOverflowing(nextPageOverflowingDetails)) {
@@ -603,7 +601,7 @@ export class PageLayoutManager {
 				maxBottom,
 				pageDetails,
 				nextPageDetails,
-				nextPageOverflowingDetails
+				nextPageOverflowingDetails,
 			);
 		} else {
 			// Situation #5. This method handles both the case of a `pageEnd` node and no `pageEnd` node.
@@ -611,7 +609,7 @@ export class PageLayoutManager {
 				tr,
 				pageDetails,
 				nextPageDetails,
-				nextPageOverflowingDetails
+				nextPageOverflowingDetails,
 			);
 		}
 	}
@@ -629,52 +627,6 @@ export class PageLayoutManager {
 
 	isEmptyPage(page: PageDetails): boolean {
 		return page.pageNode.content.size === 0;
-	}
-
-	/**
-	 * Check if the last paragraph of the current page has a peered paragraph as the first paragraph
-	 * of the next page. If so, we want to put all of the content of the peered paragraph at the end of the last
-	 * paragraph of the current page and delete it.
-	 */
-	reunitePeeredParagraphs(
-		tr: Transaction,
-		pageDetails: PageDetails,
-		nextPageDetails: PageDetails
-	): void {
-		const lastChild = pageDetails.pageNode.lastChild;
-		if (lastChild?.type.name === 'paragraph' && nextPageDetails) {
-			const potentialPeer = nextPageDetails.pageNode.firstChild;
-			if (potentialPeer?.attrs['peer'] === true) {
-				const lastParagraphInsertPosition = nextPageDetails.pageOffset - 2;
-				const peerParagraphPosition = nextPageDetails.pageOffset + 1;
-
-				const lastParagraphInsertPositionMapped = tr.mapping.map(lastParagraphInsertPosition);
-
-				tr.deleteRange(peerParagraphPosition, peerParagraphPosition + potentialPeer.nodeSize);
-				tr.insert(lastParagraphInsertPositionMapped, potentialPeer.content);
-				tr.setMeta(PEERED_TRANSACTION_META_KEY, PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE);
-			}
-		}
-	}
-
-	reunitePeerParagraphsInRange(view: EditorView, from: number, to?: number): void {
-		const { tr } = view.state;
-		for (
-			let i = from, page = this.getPage(view, i);
-			page != null;
-			i++, page = this.getPage(view, i)
-		) {
-			if (to !== undefined && i >= to) {
-				break;
-			}
-
-			const nextPage = this.getPage(view, i + 1);
-			if (!nextPage) {
-				break;
-			}
-			this.reunitePeeredParagraphs(tr, page, nextPage);
-		}
-		view.dispatch(tr);
 	}
 
 	/**
@@ -727,7 +679,7 @@ export class PageLayoutManager {
 				pageNumber,
 				pageDetails,
 				overflowingDetails,
-				nextPage
+				nextPage,
 			);
 		}
 
@@ -751,7 +703,6 @@ export class PageLayoutManager {
 	 * which is 1 greater than the page index.
 	 */
 	*paginateRange(view: EditorView, from: number, to?: number): Generator<number, number, void> {
-		// this.reunitePeerParagraphsInRange(view, from, to);
 		let pageNumber = from;
 
 		while (true) {
@@ -792,7 +743,7 @@ export class PageLayoutManager {
 	getPageOverflowInformation(
 		view: EditorView,
 		maxBottom: number,
-		pageDetails: PageDetails
+		pageDetails: PageDetails,
 	): OverflowingDetails | UnderflowingDetails {
 		let pos = 0;
 		let lastNodeSize = 0;
@@ -826,7 +777,7 @@ export class PageLayoutManager {
 					doesNotOverflowPage: bottom - maxBottom - lineHeight < 0,
 					overflowingNode: node,
 					overflowingNodeOffset: pos,
-					overflowingEl: el
+					overflowingEl: el,
 				};
 			}
 
@@ -836,7 +787,7 @@ export class PageLayoutManager {
 
 		return {
 			hasDiscoveredPageEnd: false,
-			lastNodeOffset: pos - lastNodeSize
+			lastNodeOffset: pos - lastNodeSize,
 		};
 	}
 
@@ -857,7 +808,7 @@ export class PageLayoutManager {
 		el: HTMLElement,
 		node: Node,
 		position: number,
-		maxBottom: number
+		maxBottom: number,
 	) {
 		const range = document.createRange();
 		range.setStart(el, 0);
@@ -871,7 +822,7 @@ export class PageLayoutManager {
 		firstNode: Node,
 		lastNode: Node,
 		maxBottom: number,
-		lineHeight: number
+		lineHeight: number,
 	) {
 		const range = document.createRange();
 
@@ -895,7 +846,7 @@ export class PageLayoutManager {
 	private identifyOffsetBasedOffOverflowingLines(
 		nodes: Node[],
 		lineHeight: number,
-		linesToKeepOnPage: number
+		linesToKeepOnPage: number,
 	): number {
 		const range = document.createRange();
 		let offset = 0;
@@ -923,7 +874,7 @@ export class PageLayoutManager {
 		walker: TreeWalker,
 		el: HTMLElement,
 		text: string,
-		maxBottom: number
+		maxBottom: number,
 	): { offset: number; overflowDiscovered: boolean; shouldDedent: boolean } {
 		let pmOffset = 0;
 		let overflowDiscovered: boolean = false;
@@ -940,7 +891,7 @@ export class PageLayoutManager {
 			const nextTextNode = this.getNextTextNode(walker);
 			if (!nextTextNode) {
 				throw new Error(
-					`HTML Walker and PM descendents lost coordination. No text node discovered but expected finding one containing part of ${text}`
+					`HTML Walker and PM descendents lost coordination. No text node discovered but expected finding one containing part of ${text}`,
 				);
 			}
 			sequentialTextNodes.push(nextTextNode);
@@ -960,13 +911,13 @@ export class PageLayoutManager {
 				sequentialTextNodes[0],
 				sequentialTextNodes[sequentialTextNodes.length - 1],
 				maxBottom,
-				lineHeight
+				lineHeight,
 			);
 
 			const offset = this.identifyOffsetBasedOffOverflowingLines(
 				sequentialTextNodes,
 				lineHeight,
-				linesToKeepOnPage
+				linesToKeepOnPage,
 			);
 
 			pmOffset += offset;
@@ -978,7 +929,7 @@ export class PageLayoutManager {
 		return {
 			overflowDiscovered,
 			offset: pmOffset,
-			shouldDedent
+			shouldDedent,
 		};
 	}
 
@@ -988,11 +939,11 @@ export class PageLayoutManager {
 	getSplitOffsetForOverflowingElement(
 		pageBottom: number,
 		overflowingNode: ProseMirrorNode,
-		overflowingEl: HTMLElement
+		overflowingEl: HTMLElement,
 	): { splitOffset: number; shouldDedent: boolean } {
 		const walker = document.createTreeWalker(
 			overflowingEl,
-			NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT
+			NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
 		);
 
 		let pmOffset = 0;
@@ -1005,7 +956,7 @@ export class PageLayoutManager {
 				walker,
 				overflowingEl,
 				consecutiveTextNodeContent.join(''),
-				pageBottom
+				pageBottom,
 			);
 
 			const { offset, overflowDiscovered, shouldDedent: _shouldDedent } = result;
@@ -1020,7 +971,7 @@ export class PageLayoutManager {
 			return overflowDiscovered;
 		};
 
-		// TODO: Change this to a while loop with the position
+		// TODO: Change this to a while loop with the position?
 		overflowingNode.descendants((child) => {
 			if (child.isText && child.text) {
 				consecutiveTextNodeContent.push(child.text);
@@ -1045,6 +996,10 @@ export class PageLayoutManager {
 
 		return { splitOffset: pmOffset, shouldDedent };
 	}
+
+	// getPeeredParagraphForSelection(view: EditorView) {
+	// 	//
+	// }
 }
 
 const PageLayout = new PageLayoutManager();

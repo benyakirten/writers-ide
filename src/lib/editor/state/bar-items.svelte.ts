@@ -1,10 +1,8 @@
 import type { Component } from 'svelte';
 
 import * as m from '$lib/paraglide/messages';
-import Registry, {
-	type ModularComponentProps,
-	type BarItemSection
-} from './bar-item-registry.svelte';
+import Registry, { type BarItemSection } from './bar-item-registry.svelte';
+import type { ModularComponentProps } from './shared.types';
 
 export type BarItemData = {
 	id: string;
@@ -16,7 +14,7 @@ export class BarItems {
 	constructor(
 		public isVertical: boolean,
 		items: string[] = [],
-		public readonly maxSize = 3
+		public readonly maxSize = 3,
 	) {
 		items.forEach((id) => this.append(id));
 	}
@@ -32,7 +30,7 @@ export class BarItems {
 			let size: BarItemData['size'] = 1;
 			let title = m.unknown_menu_title();
 
-			const item = Registry.items.get(id);
+			const item = Registry.items[id];
 			if (item) {
 				Component = this.isVertical ? item.vertical.Component : item.horizontal.Component;
 				size = this.isVertical ? item.vertical.size : item.horizontal.size;
@@ -43,11 +41,11 @@ export class BarItems {
 				id,
 				Component,
 				size,
-				title
+				title,
 			};
 
 			return data;
-		})
+		}),
 	);
 
 	availableSpace = $derived.by(() => {

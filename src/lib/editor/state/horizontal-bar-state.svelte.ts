@@ -3,7 +3,7 @@ import { BarItems } from './bar-items.svelte';
 
 export enum HorizontalBarPosition {
 	WindowBlockStart = 'WINDOW_BLOCK_START',
-	WindowBlockEnd = 'WINDOW_BLOCK_END'
+	WindowBlockEnd = 'WINDOW_BLOCK_END',
 }
 
 export type HorizontalBar = {
@@ -16,7 +16,7 @@ export type HorizontalBar = {
 export class HorizontalBarState {
 	constructor(
 		public readonly windowMinSize = 100,
-		public readonly editorMinSize = 100
+		public readonly editorMinSize = 100,
 	) {}
 
 	windowBlockStart = $state<HorizontalBar[]>([]);
@@ -34,10 +34,10 @@ export class HorizontalBarState {
 			height,
 			id = IdGenerator.generate(),
 			visible = true,
-			data
+			data,
 		}: Partial<Omit<HorizontalBar, 'data'>> & { data?: string[] },
 		position: HorizontalBarPosition,
-		index: number = -1
+		index: number = -1,
 	): HorizontalBar {
 		const bars = this.bars(position);
 		const existingBar = bars.find((bar) => bar.id === id);

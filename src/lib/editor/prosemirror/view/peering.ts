@@ -4,7 +4,7 @@ import {
 	PEERED_TRANSACTION_BOTH_META_VALUE,
 	PEERED_TRANSACTION_FIRST_META_VALUE,
 	PEERED_TRANSACTION_LAST_META_VALUE,
-	PEERED_TRANSACTION_META_KEY
+	PEERED_TRANSACTION_META_KEY,
 } from './constants';
 
 export function peerHandler(view: EditorView, transaction: Transaction): Transaction {
@@ -26,8 +26,9 @@ function applyPeerTransactionToBothPeers(view: EditorView, transaction: Transact
 }
 
 function applyPeerTransactionToFirstPeer(view: EditorView, transaction: Transaction): Transaction {
-	console.log(view);
-	console.log(transaction);
+	console.log('REP');
+	transaction.steps.forEach((step) => console.log(step));
+	// const page =
 	return transaction;
 }
 
