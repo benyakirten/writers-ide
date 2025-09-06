@@ -25,7 +25,7 @@
 		onrelocate,
 		onmove,
 		moveDetails,
-		position
+		position,
 	}: {
 		onrelocate: (to: BarTransferLocation) => void;
 		onmove: (direction: 'up' | 'down' | 'left' | 'right') => void;
@@ -56,7 +56,7 @@
 			'move-bar-inline-end': () => open && onrelocate(VerticalBarPosition.InlineEnd),
 			'move-bar-block-start': () => open && onrelocate(HorizontalBarPosition.WindowBlockStart),
 			'move-bar-block-end': () => open && onrelocate(HorizontalBarPosition.WindowBlockEnd),
-			'move-bar-floating': () => open && onrelocate('floating')
+			'move-bar-floating': () => open && onrelocate('floating'),
 		});
 		return unsub;
 	});

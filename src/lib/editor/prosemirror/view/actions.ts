@@ -8,7 +8,7 @@ import {
 	INDENT_MIN,
 	PEERED_TRANSACTION_BOTH_META_VALUE,
 	PEERED_TRANSACTION_FIRST_META_VALUE,
-	PEERED_TRANSACTION_META_KEY
+	PEERED_TRANSACTION_META_KEY,
 } from './constants';
 import type { marks } from './marks';
 import {
@@ -16,7 +16,7 @@ import {
 	createParagraphNear,
 	liftEmptyBlock,
 	newlineInCode,
-	splitBlockAs
+	splitBlockAs,
 } from 'prosemirror-commands';
 import { schema } from './schema';
 import PageLayout from '$lib/editor/state/page-layout.svelte';
@@ -38,7 +38,7 @@ export class ActionUtilities {
 		state: EditorState,
 		dispatch?: (tr: Transaction) => void,
 		view?: EditorView,
-		exclusiveWith?: UseableMarkName
+		exclusiveWith?: UseableMarkName,
 	): boolean {
 		if (!view || !dispatch) {
 			return false;
@@ -71,7 +71,7 @@ export class ActionUtilities {
 	static dent(
 		direction: 'indent' | 'dedent',
 		state: EditorState,
-		dispatch?: (tr: Transaction) => void
+		dispatch?: (tr: Transaction) => void,
 	) {
 		if (!dispatch) {
 			return false;
@@ -88,7 +88,7 @@ export class ActionUtilities {
 						: (node.attrs.indent || INDENT_MIN) + 1;
 				tr.setNodeMarkup(pos, undefined, {
 					...node.attrs,
-					indent: clamp(newIndent, INDENT_MIN, INDENT_MAX)
+					indent: clamp(newIndent, INDENT_MIN, INDENT_MAX),
 				});
 			}
 		});
@@ -105,7 +105,7 @@ export class ActionUtilities {
 	static setTextAlignment(
 		alignment: TextAlignment,
 		state: EditorState,
-		dispatch?: (tr: Transaction) => void
+		dispatch?: (tr: Transaction) => void,
 	) {
 		if (!dispatch) {
 			return false;
@@ -139,6 +139,6 @@ export class ActionUtilities {
 		liftEmptyBlock,
 		splitBlockAs(() => {
 			return schema.node('paragraph', { indent: PageLayout.defaultParagraphIndent });
-		})
+		}),
 	);
 }

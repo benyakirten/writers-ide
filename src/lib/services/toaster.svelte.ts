@@ -17,7 +17,7 @@ export class Toast implements BaseToast {
 	constructor(
 		base: BaseToast,
 		id: string,
-		private dismiss: () => void
+		private dismiss: () => void,
 	) {
 		this.timeLeft = this.duration = base.duration ?? null;
 		this.message = base.message;
@@ -71,7 +71,7 @@ export class ToasterState {
 	addToast(
 		message: BaseToast['message'],
 		duration: number | null = ToasterState.DEFAULT_DURATION,
-		id?: string
+		id?: string,
 	) {
 		const _id = id ?? IdGenerator.generate();
 		const toastInstance = new Toast({ message, duration }, _id, () => this.removeToast(_id));

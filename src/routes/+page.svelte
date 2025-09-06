@@ -11,9 +11,9 @@
 	Registry.register(MenuItem.item, MenuItem.id);
 	TabRegistry.register(
 		{
-			component: ProseMirrorView
+			component: ProseMirrorView,
 		},
-		'prosemirror'
+		'prosemirror',
 	);
 </script>
 

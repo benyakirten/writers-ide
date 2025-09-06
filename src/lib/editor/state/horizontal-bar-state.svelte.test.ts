@@ -13,7 +13,7 @@ describe('HorizontalBarState', () => {
 
 	function makeEvent(
 		clientY: number,
-		{ top = 0, bottom = 0 }: { top: number; bottom: number }
+		{ top = 0, bottom = 0 }: { top: number; bottom: number },
 	): MouseEvent {
 		const target = document.createElement('div');
 		const getBoundingClientRect = () => ({ top, bottom });
@@ -24,7 +24,7 @@ describe('HorizontalBarState', () => {
 		// @ts-expect-error: Test Object
 		return {
 			clientY,
-			target
+			target,
 		};
 	}
 
@@ -33,7 +33,7 @@ describe('HorizontalBarState', () => {
 			const windowStartBar = {
 				id: 'window-start-1',
 				visible: true,
-				height: 100
+				height: 100,
 			};
 
 			state.add(windowStartBar, HorizontalBarPosition.WindowBlockStart);
@@ -45,7 +45,7 @@ describe('HorizontalBarState', () => {
 			const windowEndBar = {
 				id: 'window-end-1',
 				visible: true,
-				height: 100
+				height: 100,
 			};
 
 			state.add(windowEndBar, HorizontalBarPosition.WindowBlockEnd);
@@ -58,7 +58,7 @@ describe('HorizontalBarState', () => {
 		it('should add a bar to the window start list if the position is WindowBlockStart', () => {
 			const bar = state.add(
 				{ height: 100, id: 'window-start-1' },
-				HorizontalBarPosition.WindowBlockStart
+				HorizontalBarPosition.WindowBlockStart,
 			);
 			expect(state.windowBlockStart).toEqual([bar]);
 		});
@@ -66,7 +66,7 @@ describe('HorizontalBarState', () => {
 		it('should add a bar to the window end list if the position is WindowBlockEnd', () => {
 			const bar = state.add(
 				{ height: 100, id: 'window-end-1' },
-				HorizontalBarPosition.WindowBlockEnd
+				HorizontalBarPosition.WindowBlockEnd,
 			);
 			expect(state.windowBlockEnd).toEqual([bar]);
 		});
@@ -74,12 +74,12 @@ describe('HorizontalBarState', () => {
 		it('should add a bar at the designated index if it is specified and a valid index', () => {
 			const bar1 = state.add(
 				{ height: 100, id: 'inline-start-1' },
-				HorizontalBarPosition.WindowBlockEnd
+				HorizontalBarPosition.WindowBlockEnd,
 			);
 			const bar2 = state.add(
 				{ height: 200, id: 'inline-start-2' },
 				HorizontalBarPosition.WindowBlockEnd,
-				0
+				0,
 			);
 			expect(state.windowBlockEnd).toEqual([bar2, bar1]);
 		});
@@ -87,19 +87,19 @@ describe('HorizontalBarState', () => {
 		it('should add a bar at the end of the list if the index is -1 or too great', () => {
 			const bar1 = state.add(
 				{ height: 100, id: 'inline-start-1' },
-				HorizontalBarPosition.WindowBlockEnd
+				HorizontalBarPosition.WindowBlockEnd,
 			);
 			const bar2 = state.add(
 				{ height: 200, id: 'inline-start-2' },
 				HorizontalBarPosition.WindowBlockEnd,
-				-1
+				-1,
 			);
 			expect(state.windowBlockEnd).toEqual([bar1, bar2]);
 
 			const bar3 = state.add(
 				{ height: 300, id: 'inline-start-3' },
 				HorizontalBarPosition.WindowBlockEnd,
-				10
+				10,
 			);
 			expect(state.windowBlockEnd).toEqual([bar1, bar2, bar3]);
 		});
@@ -109,7 +109,7 @@ describe('HorizontalBarState', () => {
 		it('should find a bar by id if given a number', () => {
 			const bar = state.add(
 				{ height: 100, id: 'window-start-1' },
-				HorizontalBarPosition.WindowBlockStart
+				HorizontalBarPosition.WindowBlockStart,
 			);
 			expect(state.bar(0, HorizontalBarPosition.WindowBlockStart)).toEqual(bar);
 		});
@@ -117,7 +117,7 @@ describe('HorizontalBarState', () => {
 		it('should find a bar by id if given a string', () => {
 			const bar = state.add(
 				{ height: 100, id: 'window-end-1' },
-				HorizontalBarPosition.WindowBlockEnd
+				HorizontalBarPosition.WindowBlockEnd,
 			);
 			expect(state.bar('window-end-1', HorizontalBarPosition.WindowBlockEnd)).toEqual(bar);
 		});
@@ -133,7 +133,7 @@ describe('HorizontalBarState', () => {
 				data: new BarItems(false),
 				height: 100,
 				id: 'window-start-1',
-				visible: true
+				visible: true,
 			};
 
 			const got = state.height(bar, HorizontalBarPosition.WindowBlockStart);
@@ -145,7 +145,7 @@ describe('HorizontalBarState', () => {
 				data: new BarItems(false),
 				height: 100,
 				id: 'window-start-1',
-				visible: false
+				visible: false,
 			};
 
 			const got = state.height(bar, HorizontalBarPosition.WindowBlockEnd);
@@ -157,7 +157,7 @@ describe('HorizontalBarState', () => {
 				height: WINDOW_MIN_SIZE / 2,
 				id: 'window-start-1',
 				visible: true,
-				data: new BarItems(false)
+				data: new BarItems(false),
 			};
 			const got = state.height(bar, HorizontalBarPosition.WindowBlockStart);
 			expect(got).toBe(0);
@@ -168,7 +168,7 @@ describe('HorizontalBarState', () => {
 		it('should toggle the visibility of a bar', () => {
 			const bar = state.add(
 				{ id: 'window-start-1', visible: true },
-				HorizontalBarPosition.WindowBlockStart
+				HorizontalBarPosition.WindowBlockStart,
 			);
 
 			state.toggleBar(bar, HorizontalBarPosition.WindowBlockStart);
@@ -183,7 +183,7 @@ describe('HorizontalBarState', () => {
 				data: new BarItems(false),
 				height: 0,
 				id: 'window-start-1',
-				visible: false
+				visible: false,
 			};
 
 			state.toggleBar(bar, HorizontalBarPosition.WindowBlockStart);
@@ -238,7 +238,7 @@ describe('HorizontalBarState', () => {
 				id: 'window-start-1',
 				position: HorizontalBarPosition.WindowBlockStart,
 				y: 100,
-				resized: false
+				resized: false,
 			});
 		});
 	});
@@ -248,7 +248,7 @@ describe('HorizontalBarState', () => {
 			height: number,
 			y: number,
 			position: HorizontalBarPosition,
-			visible = true
+			visible = true,
 		) {
 			const id = crypto.randomUUID();
 			const bar = state.add({ height, id, visible }, position);
@@ -319,7 +319,7 @@ describe('HorizontalBarState', () => {
 			createBarAndStartResizing(150, 150, HorizontalBarPosition.WindowBlockStart);
 			const evt = {
 				clientY: 100,
-				target: { getBoundingClientRect: () => ({ top: 225, bottom: 275 }) }
+				target: { getBoundingClientRect: () => ({ top: 225, bottom: 275 }) },
 			} as unknown as MouseEvent;
 			const got = await state.resize(evt);
 			expect(got).toBe(false);

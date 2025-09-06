@@ -8,7 +8,7 @@
 		useSensors,
 		type DragEndEvent,
 		type DragOverEvent,
-		type DragStartEvent
+		type DragStartEvent,
 	} from '@dnd-kit-svelte/core';
 	import { SortableContext } from '@dnd-kit-svelte/sortable';
 
@@ -41,7 +41,7 @@
 	const sensors = useSensors(
 		useSensor(TouchSensor),
 		useSensor(KeyboardSensor),
-		useSensor(MouseSensor)
+		useSensor(MouseSensor),
 	);
 
 	function handleDragEnd(e: DragEndEvent) {

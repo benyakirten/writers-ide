@@ -8,13 +8,13 @@
 	import ToastManager from '$lib/services/toaster.svelte';
 
 	let {
-		toast
+		toast,
 	}: {
 		toast: Toast;
 	} = $props();
 
 	const percentage = $derived.by(() =>
-		toast.timeLeft && toast.duration ? (toast.timeLeft / toast.duration) * 100 : 0
+		toast.timeLeft && toast.duration ? (toast.timeLeft / toast.duration) * 100 : 0,
 	);
 </script>
 

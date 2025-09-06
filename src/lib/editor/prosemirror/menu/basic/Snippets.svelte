@@ -16,7 +16,7 @@
 		TextAlignLeft,
 		TextAlignCenter,
 		TextAlignRight,
-		TextAlignJustify
+		TextAlignJustify,
 	} from '@steeze-ui/phosphor-icons';
 
 	import IconButton from '$lib/components/IconButton.svelte';
@@ -49,7 +49,7 @@
 				view.focus();
 			},
 			markName: 'bold',
-			translateMark: (m) => m.bold()
+			translateMark: (m) => m.bold(),
 		},
 		{
 			iconSrc: TextItalic,
@@ -61,7 +61,7 @@
 				view.focus();
 			},
 			markName: 'italic',
-			translateMark: (m) => m.italic()
+			translateMark: (m) => m.italic(),
 		},
 		{
 			iconSrc: TextSuperscript,
@@ -73,7 +73,7 @@
 				view.focus();
 			},
 			markName: 'superscript',
-			translateMark: (m) => m.superscript()
+			translateMark: (m) => m.superscript(),
 		},
 		{
 			iconSrc: TextSubscript,
@@ -85,7 +85,7 @@
 				view.focus();
 			},
 			markName: 'subscript',
-			translateMark: (m) => m.subscript()
+			translateMark: (m) => m.subscript(),
 		},
 		{
 			iconSrc: TextUnderline,
@@ -97,7 +97,7 @@
 				view.focus();
 			},
 			markName: 'underline',
-			translateMark: (m) => m.underline()
+			translateMark: (m) => m.underline(),
 		},
 		{
 			iconSrc: TextOverline,
@@ -109,7 +109,7 @@
 				view.focus();
 			},
 			markName: 'overline',
-			translateMark: (m) => m.overline()
+			translateMark: (m) => m.overline(),
 		},
 		{
 			iconSrc: TextStrikethrough,
@@ -121,8 +121,8 @@
 				view.focus();
 			},
 			markName: 'strikethrough',
-			translateMark: (m) => m.strikethrough()
-		}
+			translateMark: (m) => m.strikethrough(),
+		},
 	] as const;
 
 	type BlockMenuIcon = {
@@ -133,7 +133,7 @@
 		determineInversion: (
 			selection: Selection,
 			doc: Node,
-			utils: typeof SelectionUtilities
+			utils: typeof SelectionUtilities,
 		) => number;
 	};
 
@@ -152,7 +152,7 @@
 			determineInversion: (selection, doc, utils) => {
 				const ratio = utils.getIndentRatio(selection, doc);
 				return ratio ?? 0;
-			}
+			},
 		},
 		{
 			id: 'indent_less',
@@ -168,7 +168,7 @@
 			determineInversion: (selection, doc, utils) => {
 				const ratio = utils.getIndentRatio(selection, doc);
 				return ratio === null ? 0 : 1 - ratio;
-			}
+			},
 		},
 		{
 			id: 'align_left',
@@ -187,8 +187,8 @@
 					doc,
 					'align',
 					// TODO: Add method to detect default alignment value
-					(value) => value === 'left' || value === 'start'
-				)
+					(value) => value === 'left' || value === 'start',
+				),
 		},
 		{
 			id: 'align_center',
@@ -202,7 +202,7 @@
 				view.focus();
 			},
 			determineInversion: (selection, doc, utils) =>
-				utils.getBlockAttributeRatio(selection, doc, 'align', 'center')
+				utils.getBlockAttributeRatio(selection, doc, 'align', 'center'),
 		},
 		{
 			id: 'align_right',
@@ -220,8 +220,8 @@
 					selection,
 					doc,
 					'align',
-					(value) => value === 'right' || value === 'end'
-				)
+					(value) => value === 'right' || value === 'end',
+				),
 		},
 		{
 			id: 'align_justify',
@@ -235,8 +235,8 @@
 				view.focus();
 			},
 			determineInversion: (selection, doc, utils) =>
-				utils.getBlockAttributeRatio(selection, doc, 'align', 'justify')
-		}
+				utils.getBlockAttributeRatio(selection, doc, 'align', 'justify'),
+		},
 	];
 
 	export { textMarkButtons, blockMarkButtons };
@@ -247,7 +247,7 @@
 	m: Internationalizator,
 	editorView: EditorView | null,
 	actionUtils: typeof ActionUtilities,
-	tooltipDirection: TooltipData['calibrateFor']
+	tooltipDirection: TooltipData['calibrateFor'],
 )}
 	{#each textMarks as { iconSrc, onclick, markName, translateMark } (markName)}
 		{@const inversion = activeCodeMarks?.get(markName) ?? 0}
@@ -275,7 +275,7 @@
 	m: Internationalizator,
 	actionUtils: typeof ActionUtilities,
 	selectionUtils: typeof SelectionUtilities,
-	tooltipDirection: TooltipData['calibrateFor']
+	tooltipDirection: TooltipData['calibrateFor'],
 )}
 	{#each blockMarks as { id, generateLabel, iconSrc, onclick, determineInversion } (id)}
 		{@const inversion =

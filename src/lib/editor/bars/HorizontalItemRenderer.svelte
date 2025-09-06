@@ -22,7 +22,7 @@
 		moveDetails,
 		onremove,
 		onrelocate,
-		onmove
+		onmove,
 	}: {
 		Component: BarItemData['Component'];
 		size: BarItemData['size'];
@@ -44,12 +44,12 @@
 					actions: ActionUtilities,
 					selections: SelectionUtilities,
 					eventBus: ProseMirrorEventBus,
-					schema
+					schema,
 				}}
 				bars={{
 					vertical: VerticalBarState,
 					horizontal: HorizontalBarState,
-					floater: FloaterBarState
+					floater: FloaterBarState,
 				}}
 				tabs={TabState}
 				locale={LocaleManager.locale}

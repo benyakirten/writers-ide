@@ -14,13 +14,13 @@ describe('BarItems', () => {
 			vertical: {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				Component: null as any,
-				size: 1
+				size: 1,
 			},
 			horizontal: {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				Component: null as any,
-				size: 2
-			}
+				size: 2,
+			},
 		})[0];
 
 		item2Key = Registry.register({
@@ -28,13 +28,13 @@ describe('BarItems', () => {
 			vertical: {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				Component: null as any,
-				size: 2
+				size: 2,
 			},
 			horizontal: {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				Component: null as any,
-				size: 1
-			}
+				size: 1,
+			},
 		})[0];
 
 		item3Key = Registry.register({
@@ -42,13 +42,13 @@ describe('BarItems', () => {
 			vertical: {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				Component: null as any,
-				size: 3
+				size: 3,
 			},
 			horizontal: {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				Component: null as any,
-				size: 3
-			}
+				size: 3,
+			},
 		})[0];
 	});
 
@@ -154,7 +154,7 @@ describe('BarItems', () => {
 			[0, 2],
 			[-1, 0],
 			[2, 1],
-			[1, 1]
+			[1, 1],
 		])('should return false for invalid indexes %i and %i', (index1, index2) => {
 			barItems = new BarItems(true, [item1Key, item2Key]);
 			expect(barItems.canSwap(index1, index2)).toBe(false);

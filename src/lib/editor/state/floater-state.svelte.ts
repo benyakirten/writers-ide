@@ -121,7 +121,7 @@ export class FloaterBarState {
 		if (left) {
 			const nearbyBar = this.bars.find(
 				(bar) =>
-					bar.position.left - this.TOLERANCE < left && bar.position.left + this.TOLERANCE > left
+					bar.position.left - this.TOLERANCE < left && bar.position.left + this.TOLERANCE > left,
 			);
 			const nearbyTop = nearbyBar?.position.top ?? 0;
 			return { top: nearbyTop + this.DEFAULT_TOP_PX, left };
@@ -143,7 +143,7 @@ export class FloaterBarState {
 
 	determineStartingMeasurements(
 		startingWidth?: number,
-		startingHeight?: number
+		startingHeight?: number,
 	): { width: number; height: number } {
 		if (startingWidth && startingHeight) {
 			return { width: startingWidth, height: startingHeight };
@@ -190,17 +190,17 @@ export class FloaterBarState {
 			id?: string;
 			minimized?: boolean;
 			title?: string;
-		} = {}
+		} = {},
 	): FloatingBar {
 		const position = this.determineStartingCoordinates({
 			top: startingInformation.top,
-			left: startingInformation.left
+			left: startingInformation.left,
 		});
 
 		const z = this.determineStartingZ(startingInformation.z);
 		const { width, height } = this.determineStartingMeasurements(
 			startingInformation.width,
-			startingInformation.height
+			startingInformation.height,
 		);
 
 		const barData = new BarItems(true, startingInformation.data);
@@ -208,13 +208,13 @@ export class FloaterBarState {
 			position: {
 				...position,
 				width,
-				height
+				height,
 			},
 			z,
 			data: barData,
 			id: startingInformation.id ?? IdGenerator.generate(),
 			minimized: !!startingInformation.minimized,
-			title: startingInformation.title ?? 'New Bar'
+			title: startingInformation.title ?? 'New Bar',
 		};
 
 		this.bars.push(bar);
@@ -266,7 +266,7 @@ export class FloaterBarState {
 				? clamp(
 						height,
 						this.MIN_HEIGHT_PX,
-						(this.MAX_HEIGHT_PERCENT * this.root.clientHeight) / 100
+						(this.MAX_HEIGHT_PERCENT * this.root.clientHeight) / 100,
 					)
 				: Math.max(height, this.MIN_HEIGHT_PX);
 		bar.position.height = newHeight;
@@ -283,7 +283,7 @@ export class FloaterBarState {
 		this.dragging = {
 			id: bar.id,
 			x: e.clientX,
-			y: e.clientY
+			y: e.clientY,
 		};
 		return true;
 	}
@@ -354,7 +354,7 @@ export class FloaterBarState {
 	update<Key extends 'title' | 'minimized', Value extends FloatingBar[Key]>(
 		id: string | number,
 		key: Key,
-		value: Value
+		value: Value,
 	) {
 		const bar = this.bar(id);
 		if (!bar) {

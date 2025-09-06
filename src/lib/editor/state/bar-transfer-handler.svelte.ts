@@ -4,11 +4,11 @@ import type { BarItems } from './bar-items.svelte';
 import FloatingBarState, { type FloatingBar } from './floater-state.svelte';
 import HorizontalBarState, {
 	HorizontalBarPosition,
-	type HorizontalBar
+	type HorizontalBar,
 } from './horizontal-bar-state.svelte';
 import VerticalBarState, {
 	VerticalBarPosition,
-	type VerticalBar
+	type VerticalBar,
 } from './vertical-bar-state.svelte';
 
 export type PossibleSlot = 0 | 1 | 2;
@@ -268,7 +268,7 @@ export class BarTransferHandler {
 	swapBarPosition(
 		fromId: string | number,
 		position: BarTransferLocation,
-		toId: string | number
+		toId: string | number,
 	): boolean {
 		if (position === 'floating') {
 			return false;

@@ -108,7 +108,7 @@ export class SelectionUtilities {
 		{ from, to }: Selection,
 		doc: Node,
 		attribute: string,
-		value: TextAlignment | ((val: Value) => boolean)
+		value: TextAlignment | ((val: Value) => boolean),
 	): number {
 		let totalBlocks = 0;
 		let occurrences = 0;

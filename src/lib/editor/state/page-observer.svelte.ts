@@ -6,7 +6,7 @@ export class DocumentObserver {
 	intersectionCallback: IntersectionObserverCallback = (entries) => {
 		const newPage =
 			entries.filter(
-				(entry) => entry.target.classList.contains(PROSEMIRROR_PAGE_CLASS) && entry.isIntersecting
+				(entry) => entry.target.classList.contains(PROSEMIRROR_PAGE_CLASS) && entry.isIntersecting,
 			).length - 1;
 
 		this.cb(newPage);
@@ -16,7 +16,7 @@ export class DocumentObserver {
 		private readonly _id: string,
 		private readonly cb: (page: number) => void,
 		private el: HTMLElement,
-		options: Partial<IntersectionObserverInit> = {}
+		options: Partial<IntersectionObserverInit> = {},
 	) {
 		options.root ??= el;
 		options.rootMargin ??= '800px';
@@ -62,7 +62,7 @@ class PageObserverManager {
 			const observedPage = {
 				viewedPage: 0,
 				paginatedThrough: paginatedThrough ?? 0,
-				observers: [obs]
+				observers: [obs],
 			};
 			this._map[docId] = observedPage;
 		} else {

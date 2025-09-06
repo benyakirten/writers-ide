@@ -106,7 +106,7 @@ export class Registry<T> {
 
 	on(
 		event: RegistryAction | RegistryAction[],
-		action: RegistryListener<T>['action']
+		action: RegistryListener<T>['action'],
 	): { id: string; unsubscribe: () => void } {
 		const id = IdGenerator.generate();
 		const eventTypes = Array.isArray(event) ? [...event] : [event];

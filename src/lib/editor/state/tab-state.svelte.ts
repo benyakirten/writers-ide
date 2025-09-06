@@ -10,8 +10,8 @@ export class TabState {
 	windows = $state<TabData[]>([
 		{
 			id: '1',
-			name: 'prosemirror'
-		}
+			name: 'prosemirror',
+		},
 	]);
 
 	#active = $state<string | null>(null);

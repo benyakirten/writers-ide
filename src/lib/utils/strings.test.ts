@@ -13,7 +13,7 @@ describe('capitalize', () => {
 			['über', 'Über'],
 			['привет', 'Привет'],
 			['你好', '你好'],
-			['こんにちは', 'こんにちは']
+			['こんにちは', 'こんにちは'],
 		])('should capitalize the first letter of the string "%s" to "%s"', (input, expected) => {
 			expect(capitalize(input)).toBe(expected);
 		});
@@ -29,7 +29,7 @@ describe('capitalizeAllWords', () => {
 		['über alles', 'Über Alles'],
 		['привет мир', 'Привет Мир'],
 		['你好 世界', '你好 世界'],
-		['こんにちは 世界', 'こんにちは 世界']
+		['こんにちは 世界', 'こんにちは 世界'],
 	])('should convert string "%s" to title case "%s"', (input, expected) => {
 		expect(capitalizeAllWords(input)).toBe(expected);
 	});

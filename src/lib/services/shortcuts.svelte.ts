@@ -46,7 +46,7 @@ export class ShortcutService extends Observable<string> {
 		enter: 'enter',
 		backspace: 'backspace',
 		delete: 'delete',
-		escape: 'esc'
+		escape: 'esc',
 	};
 
 	MAC_SPECIAL_KEYS = {
@@ -61,7 +61,7 @@ export class ShortcutService extends Observable<string> {
 		enter: '↩',
 		backspace: 'delete',
 		delete: 'fn delete',
-		escape: 'escape'
+		escape: 'escape',
 	};
 
 	MAC_SEPARATOR = '';
@@ -102,7 +102,7 @@ export class ShortcutService extends Observable<string> {
 		}
 
 		const finalKey = cmd.find(
-			(key) => key !== 'ctrl' && key !== 'meta' && key !== 'alt' && key !== 'shift'
+			(key) => key !== 'ctrl' && key !== 'meta' && key !== 'alt' && key !== 'shift',
 		);
 
 		if (finalKey) {

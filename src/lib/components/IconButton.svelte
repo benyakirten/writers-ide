@@ -13,7 +13,7 @@
 		inversion = 0,
 		disabled = false,
 		tooltip,
-		tooltipDirection
+		tooltipDirection,
 	}: {
 		icon: Snippet;
 		label: string;

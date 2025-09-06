@@ -63,16 +63,16 @@
 			{
 				location: 'floating',
 				barId: index,
-				itemId
+				itemId,
 			},
-			to
+			to,
 		);
 	}
 
 	function handleItemMove(
 		direction: 'up' | 'down' | 'left' | 'right',
 		itemId: string,
-		itemIndex: number
+		itemIndex: number,
 	) {
 		if (direction === 'left' || direction === 'right') {
 			return;
@@ -82,9 +82,9 @@
 			{
 				location: 'floating',
 				barId: index,
-				itemId
+				itemId,
 			},
-			direction === 'up' ? itemIndex - 1 : itemIndex + 1
+			direction === 'up' ? itemIndex - 1 : itemIndex + 1,
 		);
 	}
 
@@ -93,7 +93,7 @@
 			up: index > 0,
 			down: index < numItems - 1,
 			left: null,
-			right: null
+			right: null,
 		};
 	}
 </script>

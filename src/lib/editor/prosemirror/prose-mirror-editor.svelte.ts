@@ -21,7 +21,7 @@ export class ProseMirrorEditors {
 			const editor: EditorData = {
 				view,
 				pages: [],
-				remainingView: view
+				remainingView: view,
 			};
 			this.editors[id] = editor;
 		}

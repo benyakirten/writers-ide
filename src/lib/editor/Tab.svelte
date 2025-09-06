@@ -14,7 +14,7 @@
 		index,
 		id,
 		data,
-		Component
+		Component,
 	}: { index: number; id: string; data?: object; Component: TabComponent } = $props();
 </script>
 
@@ -28,12 +28,12 @@
 			actions: ActionUtilities,
 			selections: SelectionUtilities,
 			eventBus: ProseMirrorEventBus,
-			schema
+			schema,
 		}}
 		bars={{
 			vertical: VerticalBarState,
 			horizontal: HorizontalBarState,
-			floater: FloaterBarState
+			floater: FloaterBarState,
 		}}
 		tabs={TabState}
 		locale={LocaleManager.locale}

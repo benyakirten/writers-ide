@@ -18,7 +18,7 @@
 		const unsub = props.proseMirror.eventBus.subscribe(({ view }) => {
 			activeCodeMarks = props.proseMirror.selections.findTextMarks(
 				view.state.selection,
-				view.state.doc
+				view.state.doc,
 			);
 			editorView = view;
 			selection = view.state.selection;
@@ -35,7 +35,7 @@
 			m,
 			editorView,
 			props.proseMirror.actions,
-			'horizontal'
+			'horizontal',
 		)}
 	</div>
 	<div class="grouping">
@@ -45,7 +45,7 @@
 			m,
 			props.proseMirror.actions,
 			props.proseMirror.selections,
-			'horizontal'
+			'horizontal',
 		)}
 	</div>
 </div>

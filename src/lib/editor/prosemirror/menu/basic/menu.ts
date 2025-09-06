@@ -11,11 +11,11 @@ export const MenuItem: {
 		title: 'Basic Menu',
 		vertical: {
 			Component: BasicMenuVertical,
-			size: 1
+			size: 1,
 		},
 		horizontal: {
 			Component: BasicMenuHorizontal,
-			size: 2
-		}
-	}
+			size: 2,
+		},
+	},
 };

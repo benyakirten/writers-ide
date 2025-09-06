@@ -58,7 +58,7 @@ export function calculateTotalLinesOfText(el: HTMLElement, lineHeight: number): 
 export function calculateOverflowingLinesOfText(
 	el: HTMLElement,
 	pageBottom: number,
-	lineHeight: number
+	lineHeight: number,
 ): number {
 	const elBottom = el.getBoundingClientRect().bottom;
 	if (elBottom <= pageBottom) {

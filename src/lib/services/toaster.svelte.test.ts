@@ -26,7 +26,7 @@ describe('Toast', () => {
 			const toast = new Toast(
 				{ duration: toastDuration, message: 'Message' },
 				'test-id',
-				dismissMock
+				dismissMock,
 			);
 
 			expect(toast.duration).toBe(toastDuration);
@@ -99,7 +99,7 @@ describe('Toast', () => {
 			const toast = new Toast(
 				{ message: 'Message', duration: toastDuration },
 				'test-id',
-				dismissMock
+				dismissMock,
 			);
 			vi.advanceTimersByTime(toastDuration / 2);
 
@@ -131,7 +131,7 @@ describe('Toast', () => {
 			const toast = new Toast(
 				{ message: 'Message', duration: toastDuration },
 				'test-id',
-				dismissMock
+				dismissMock,
 			);
 
 			vi.advanceTimersByTime(toastDuration / 2);

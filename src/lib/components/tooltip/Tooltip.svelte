@@ -6,7 +6,7 @@
 	let {
 		children,
 		tooltip,
-		calibrateFor
+		calibrateFor,
 	}: { children: Snippet; tooltip: Snippet | string; calibrateFor: TooltipData['calibrateFor'] } =
 		$props();
 

@@ -12,7 +12,7 @@ const strikethroughDom: DOMOutputSpec = ['span', { style: 'text-decoration: line
 const link: MarkSpec = {
 	attrs: {
 		href: { validate: 'string' },
-		title: { default: null, validate: 'string|null' }
+		title: { default: null, validate: 'string|null' },
 	},
 	inclusive: false,
 	parseDOM: [
@@ -20,13 +20,13 @@ const link: MarkSpec = {
 			tag: 'a[href]',
 			getAttrs(dom: HTMLElement) {
 				return { href: dom.getAttribute('href'), title: dom.getAttribute('title') };
-			}
-		}
+			},
+		},
 	],
 	toDOM(node) {
 		const { href, title } = node.attrs;
 		return ['a', { href, title }, 0];
-	}
+	},
 };
 
 const italic: MarkSpec = {
@@ -34,11 +34,11 @@ const italic: MarkSpec = {
 		{ tag: 'i' },
 		{ tag: 'em' },
 		{ style: 'font-style=italic' },
-		{ style: 'font-style=normal', clearMark: (m) => m.type.name === 'italic' }
+		{ style: 'font-style=normal', clearMark: (m) => m.type.name === 'italic' },
 	],
 	toDOM() {
 		return emDOM;
-	}
+	},
 };
 
 const bold: MarkSpec = {
@@ -46,18 +46,18 @@ const bold: MarkSpec = {
 		{ tag: 'b' },
 		{ tag: 'strong' },
 		{ style: 'font-weight=bold' },
-		{ style: 'font-weight=normal', clearMark: (m) => m.type.name === 'bold' }
+		{ style: 'font-weight=normal', clearMark: (m) => m.type.name === 'bold' },
 	],
 	toDOM() {
 		return boldDOM;
-	}
+	},
 };
 
 const inlineCode: MarkSpec = {
 	parseDOM: [{ tag: 'inline-code' }],
 	toDOM() {
 		return inlineCodeDOM;
-	}
+	},
 };
 
 // TODO: Add support for vertical-align +/- amount
@@ -66,52 +66,52 @@ const superscript: MarkSpec = {
 	parseDOM: [
 		{ tag: 'sup' },
 		{ style: 'vertical-align=super' },
-		{ style: 'vertical-align=baseline', clearMark: (m) => m.type.name === 'superscript' }
+		{ style: 'vertical-align=baseline', clearMark: (m) => m.type.name === 'superscript' },
 	],
 	toDOM() {
 		return supDOM;
-	}
+	},
 };
 
 const subscript: MarkSpec = {
 	parseDOM: [
 		{ tag: 'sub' },
 		{ style: 'vertical-align=sub' },
-		{ style: 'vertical-align=baseline', clearMark: (m) => m.type.name === 'subscript' }
+		{ style: 'vertical-align=baseline', clearMark: (m) => m.type.name === 'subscript' },
 	],
 	toDOM() {
 		return subDOM;
-	}
+	},
 };
 
 const underline: MarkSpec = {
 	parseDOM: [
 		{ style: 'text-decoration-line=underline' },
-		{ style: 'text-decoration=none', clearMark: (m) => m.type.name === 'underline' }
+		{ style: 'text-decoration=none', clearMark: (m) => m.type.name === 'underline' },
 	],
 	toDOM() {
 		return underlineDOM;
-	}
+	},
 };
 
 const overline: MarkSpec = {
 	parseDOM: [
 		{ style: 'text-decoration-line=overline' },
-		{ style: 'text-decoration=none', clearMark: (m) => m.type.name === 'overline' }
+		{ style: 'text-decoration=none', clearMark: (m) => m.type.name === 'overline' },
 	],
 	toDOM() {
 		return overlineDom;
-	}
+	},
 };
 
 const strikethrough: MarkSpec = {
 	parseDOM: [
 		{ style: 'text-decoration-line=strike-through' },
-		{ style: 'text-decoration=none', clearMark: (m) => m.type.name === 'strikethrough' }
+		{ style: 'text-decoration=none', clearMark: (m) => m.type.name === 'strikethrough' },
 	],
 	toDOM() {
 		return strikethroughDom;
-	}
+	},
 };
 
 export const marks = {
@@ -123,5 +123,5 @@ export const marks = {
 	subscript,
 	underline,
 	overline,
-	strikethrough
+	strikethrough,
 } as const;

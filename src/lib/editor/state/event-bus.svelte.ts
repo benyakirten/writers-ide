@@ -11,9 +11,9 @@ export const createUpdatePlugin = (id: string) =>
 			return {
 				update(view) {
 					proseMirrorEventBus.update({ id, view });
-				}
+				},
 			};
-		}
+		},
 	});
 
 export class ProseMirrorEventBus extends Observable<{ id: string; view: EditorView }> {}

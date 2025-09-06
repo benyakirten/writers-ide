@@ -35,7 +35,7 @@
 				m,
 				editorView,
 				props.proseMirror.actions,
-				'vertical'
+				'vertical',
 			)}
 		</div>
 	</div>
@@ -48,7 +48,7 @@
 				m,
 				props.proseMirror.actions,
 				props.proseMirror.selections,
-				'vertical'
+				'vertical',
 			)}
 		</div>
 	</div>

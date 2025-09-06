@@ -12,7 +12,7 @@
 		moveCaretUpOneLine,
 		moveToNextBlock,
 		moveToPrevBlock,
-		caretIsAtEndOfEl
+		caretIsAtEndOfEl,
 	} from './caret';
 	import { nextAnimationFrame } from './utils';
 
@@ -128,7 +128,7 @@
 						selection,
 						prevBlock,
 						caretPosition,
-						prevBlock.textContent?.length ?? 0
+						prevBlock.textContent?.length ?? 0,
 					);
 				}
 				break;
@@ -160,7 +160,7 @@
 			id: `a${Math.random().toString(36).substring(7)}`,
 			classes: [],
 			properties: {},
-			children: []
+			children: [],
 		};
 		blocks.splice(index + 1, 0, newBlock);
 		caretPosition = 0;

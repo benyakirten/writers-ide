@@ -25,6 +25,6 @@ const builtInShortcuts = {
 	'move-bar-up': 'meta-shift-arrowup',
 	'move-bar-down': 'meta-shift-arrowdown',
 	'move-bar-left': 'meta-shift-arrowleft',
-	'move-bar-right': 'meta-shift-arrowright'
+	'move-bar-right': 'meta-shift-arrowright',
 } as const;
 export { builtInShortcuts };

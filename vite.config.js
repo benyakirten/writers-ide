@@ -15,13 +15,13 @@ export default defineConfig(async () => ({
 			// We could route things based on a user settings - but should it come from the OS or the app?
 			// Should the user be able to override OS settings?
 			// @ts-expect-error TODO: Fix paraglide
-			strategy: ['preferredLanguage']
-		})
+			strategy: ['preferredLanguage'],
+		}),
 	],
 
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}'],
-		environment: 'jsdom'
+		environment: 'jsdom',
 	},
 
 	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
@@ -37,12 +37,12 @@ export default defineConfig(async () => ({
 			? {
 					protocol: 'ws',
 					host,
-					port: 1421
+					port: 1421,
 				}
 			: undefined,
 		watch: {
 			// 3. tell vite to ignore watching `src-tauri`
-			ignored: ['**/src-tauri/**']
-		}
-	}
+			ignored: ['**/src-tauri/**'],
+		},
+	},
 }));

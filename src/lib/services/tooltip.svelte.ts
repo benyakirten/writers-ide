@@ -17,7 +17,7 @@ export class TooltipState {
 				this.dismiss();
 			}
 		},
-		{ delay: this.TIMEOUT_DURATION }
+		{ delay: this.TIMEOUT_DURATION },
 	);
 
 	open = $state(false);
@@ -27,7 +27,7 @@ export class TooltipState {
 	set(
 		tooltip: TooltipData['data'],
 		calibrateFor: TooltipData['calibrateFor'],
-		target: HTMLElement
+		target: HTMLElement,
 	) {
 		this.tooltipDebouncer.update(true);
 		if (this.tooltip?.target === target) {
@@ -70,7 +70,7 @@ export class TooltipState {
 	calibratePosition(
 		calibrateFor: TooltipData['calibrateFor'],
 		hostEl: HTMLElement,
-		tooltipEl: HTMLElement
+		tooltipEl: HTMLElement,
 	) {
 		// TODO: Add the pointer to the tooltip.
 		if (calibrateFor === 'vertical') {

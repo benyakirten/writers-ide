@@ -13,7 +13,7 @@
 		position,
 		index,
 		items,
-		canMoveForward
+		canMoveForward,
 	}: {
 		bar: VerticalBar;
 		position: VerticalBarPosition;
@@ -27,20 +27,20 @@
 	let resizeLabel = $derived.by(() =>
 		position === VerticalBarPosition.InlineStart
 			? m.resize_inline_start_bar({ num: index + 1 })
-			: m.resize_inline_end_bar({ num: index + 1 })
+			: m.resize_inline_end_bar({ num: index + 1 }),
 	);
 
 	function determineMoveDetails(
 		itemIndex: number,
 		numItems: number,
 		barIndex: number,
-		canMoveForward: boolean
+		canMoveForward: boolean,
 	): MoveDetails {
 		return {
 			up: itemIndex > 0,
 			down: itemIndex < numItems - 1,
 			left: barIndex > 0,
-			right: canMoveForward
+			right: canMoveForward,
 		};
 	}
 
@@ -49,34 +49,34 @@
 			{
 				location: position,
 				barId: index,
-				itemId
+				itemId,
 			},
-			to
+			to,
 		);
 	}
 
 	function handleItemMove(
 		direction: 'up' | 'down' | 'left' | 'right',
 		itemId: string,
-		itemIndex: number
+		itemIndex: number,
 	) {
 		if (direction === 'up' || direction === 'down') {
 			TransferHandler.swap(
 				{
 					location: position,
 					barId: index,
-					itemId
+					itemId,
 				},
-				direction === 'up' ? itemIndex - 1 : itemIndex + 1
+				direction === 'up' ? itemIndex - 1 : itemIndex + 1,
 			);
 		} else {
 			TransferHandler.nudge(
 				{
 					location: position,
 					barId: index,
-					itemId
+					itemId,
 				},
-				direction === 'left' ? -1 : 1
+				direction === 'left' ? -1 : 1,
 			);
 		}
 	}

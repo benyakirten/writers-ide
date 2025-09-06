@@ -84,7 +84,7 @@ describe('FloaterBarState', () => {
 			const got = floaterState.findNextOpenPosition();
 			expect(got).toEqual({
 				top: floaterState.DEFAULT_TOP_PX,
-				left: floaterState.DEFAULT_LEFT_PX
+				left: floaterState.DEFAULT_LEFT_PX,
 			});
 		});
 
@@ -216,7 +216,7 @@ describe('FloaterBarState', () => {
 			const got = floaterState.determineStartingMeasurements();
 			expect(got).toEqual({
 				width: floaterState.MIN_WIDTH_PX,
-				height: floaterState.MIN_HEIGHT_PX
+				height: floaterState.MIN_HEIGHT_PX,
 			});
 		});
 
@@ -254,7 +254,7 @@ describe('FloaterBarState', () => {
 			const got = floaterState.determineStartingMeasurements();
 			expect(got).toEqual({
 				width: floaterState.MIN_WIDTH_PX,
-				height: floaterState.MIN_HEIGHT_PX
+				height: floaterState.MIN_HEIGHT_PX,
 			});
 		});
 
@@ -566,7 +566,7 @@ describe('FloaterBarState', () => {
 				left: 1500,
 				top: 3000,
 				height: barHeight,
-				width: barWidth
+				width: barWidth,
 			});
 			const event1 = new MouseEvent('mousemove', { clientX: 1000, clientY: 1000 });
 

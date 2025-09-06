@@ -10,7 +10,7 @@ import { schema as realSchema } from './schema';
 function createEditorView(
 	nodes: Node[],
 	schema: Schema,
-	selection?: { start?: number; end?: number }
+	selection?: { start?: number; end?: number },
 ) {
 	const element = document.createElement('div');
 
@@ -18,7 +18,7 @@ function createEditorView(
 	const state = EditorState.create({
 		doc,
 		schema,
-		selection: TextSelection.create(doc, selection?.start ?? 0, selection?.end ?? doc.content.size)
+		selection: TextSelection.create(doc, selection?.start ?? 0, selection?.end ?? doc.content.size),
 	});
 	return new EditorView(element, { state });
 }
@@ -27,18 +27,18 @@ const schema = new Schema({
 	nodes: {
 		doc: { content: 'block+' },
 		paragraph: { group: 'block', content: 'text*', toDOM: () => ['p', 0] },
-		text: { inline: true, group: 'inline' }
+		text: { inline: true, group: 'inline' },
 	},
 	marks: {
 		bOlD: {
 			parseDom: [{ tag: 'strong' }],
-			toDOM: () => ['strong']
+			toDOM: () => ['strong'],
 		},
 		itaLIC: {
 			parseDOM: [{ tag: 'em' }],
-			toDOM: () => ['em']
-		}
-	}
+			toDOM: () => ['em'],
+		},
+	},
 });
 
 describe('findTextMarks', () => {
@@ -46,9 +46,9 @@ describe('findTextMarks', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bOlD')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('itaLIC')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('itaLIC')])]),
 			],
-			schema
+			schema,
 		);
 
 		const got = SelectionUtilities.findTextMarks(view.state.selection, view.state.doc);
@@ -62,12 +62,12 @@ describe('findTextMarks', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [
-					schema.text('First Item', [schema.mark('bOlD'), schema.mark('itaLIC')])
+					schema.text('First Item', [schema.mark('bOlD'), schema.mark('itaLIC')]),
 				]),
 				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('itaLIC')])]),
-				schema.node('paragraph', null, [schema.text('Third item')])
+				schema.node('paragraph', null, [schema.text('Third item')]),
 			],
-			schema
+			schema,
 		);
 		const got = SelectionUtilities.findTextMarks(view.state.selection, view.state.doc);
 
@@ -79,7 +79,7 @@ describe('findTextMarks', () => {
 	it('should identify complete marks', () => {
 		const view = createEditorView(
 			[schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bOlD')])])],
-			schema
+			schema,
 		);
 
 		const got = SelectionUtilities.findTextMarks(view.state.selection, view.state.doc);
@@ -91,9 +91,9 @@ describe('findTextMarks', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bOlD')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('bOlD')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('bOlD')])]),
 			],
-			schema
+			schema,
 		);
 
 		const got = SelectionUtilities.findTextMarks(view.state.selection, view.state.doc);
@@ -106,10 +106,10 @@ describe('findTextMarks', () => {
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bOlD')])]),
 				schema.node('paragraph', null, [
-					schema.text('Second item', [schema.mark('bOlD'), schema.mark('itaLIC')])
-				])
+					schema.text('Second item', [schema.mark('bOlD'), schema.mark('itaLIC')]),
+				]),
 			],
-			schema
+			schema,
 		);
 
 		const got = SelectionUtilities.findTextMarks(view.state.selection, view.state.doc);
@@ -123,10 +123,10 @@ describe('findTextMarks', () => {
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bOlD')])]),
 				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('itaLIC')])]),
-				schema.node('paragraph', null, [schema.text('Third item')])
+				schema.node('paragraph', null, [schema.text('Third item')]),
 			],
 			schema,
-			{ start: 3 }
+			{ start: 3 },
 		);
 		const got = SelectionUtilities.findTextMarks(view.state.selection, view.state.doc);
 		expect(got.size).toBe(2);
@@ -139,14 +139,14 @@ describe('findTextMarks', () => {
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bOlD')])]),
 				schema.node('paragraph', null, [
-					schema.text('Second item', [schema.mark('bOlD'), schema.mark('itaLIC')])
-				])
+					schema.text('Second item', [schema.mark('bOlD'), schema.mark('itaLIC')]),
+				]),
 			],
 			schema,
 			{
 				start: 5,
-				end: 5
-			}
+				end: 5,
+			},
 		);
 
 		const got = SelectionUtilities.findTextMarks(view.state.selection, view.state.doc);
@@ -160,16 +160,16 @@ describe('doesSelectionHaveTextMark', () => {
 			[
 				schema.node('paragraph', null, [schema.text('Bold text', [schema.mark('bOlD')])]),
 				schema.node('paragraph', null, [schema.text('Bolder text', [schema.mark('bOlD')])]),
-				schema.node('paragraph', null, [schema.text('Boldest text', [schema.mark('bOlD')])])
+				schema.node('paragraph', null, [schema.text('Boldest text', [schema.mark('bOlD')])]),
 			],
 
-			schema
+			schema,
 		);
 
 		const result = SelectionUtilities.doesSelectionHaveTextMark(
 			view.state.selection,
 			view.state.doc,
-			'BoLD'
+			'BoLD',
 		);
 		expect(result).toBe(true);
 	});
@@ -177,13 +177,13 @@ describe('doesSelectionHaveTextMark', () => {
 	it('should return false if the entire selection is not bold', () => {
 		const view = createEditorView(
 			[schema.node('paragraph', null, [schema.text('Not bold text')])],
-			schema
+			schema,
 		);
 
 		const result = SelectionUtilities.doesSelectionHaveTextMark(
 			view.state.selection,
 			view.state.doc,
-			'BOLD'
+			'BOLD',
 		);
 		expect(result).toBe(false);
 	});
@@ -193,16 +193,16 @@ describe('doesSelectionHaveTextMark', () => {
 			[
 				schema.node('paragraph', null, [
 					schema.text('Bold text', [schema.mark('bOlD')]),
-					schema.text(' and not bold text')
-				])
+					schema.text(' and not bold text'),
+				]),
 			],
-			schema
+			schema,
 		);
 
 		const result = SelectionUtilities.doesSelectionHaveTextMark(
 			view.state.selection,
 			view.state.doc,
-			'bolD'
+			'bolD',
 		);
 		expect(result).toBe(false);
 	});
@@ -211,13 +211,13 @@ describe('doesSelectionHaveTextMark', () => {
 		const view = createEditorView(
 			[schema.node('paragraph', null, [schema.text('Bold text', [schema.mark('bOlD')])])],
 			schema,
-			{ start: 1, end: 4 }
+			{ start: 1, end: 4 },
 		);
 
 		const result = SelectionUtilities.doesSelectionHaveTextMark(
 			view.state.selection,
 			view.state.doc,
-			'bold'
+			'bold',
 		);
 		expect(result).toBe(true);
 	});
@@ -226,13 +226,13 @@ describe('doesSelectionHaveTextMark', () => {
 		const view = createEditorView(
 			[schema.node('paragraph', null, [schema.text('Bold text', [schema.mark('bOlD')])])],
 			schema,
-			{ start: 0, end: 0 }
+			{ start: 0, end: 0 },
 		);
 
 		const result = SelectionUtilities.doesSelectionHaveTextMark(
 			view.state.selection,
 			view.state.doc,
-			'beLD'
+			'beLD',
 		);
 		expect(result).toBe(false);
 	});
@@ -242,7 +242,7 @@ describe('getIndentRatio', () => {
 	it('should return null if there are no paragraphs', () => {
 		const view = createEditorView(
 			[realSchema.node('codeBlock', null, [realSchema.text('First paragraph')])],
-			realSchema
+			realSchema,
 		);
 		const result = SelectionUtilities.getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBeNull();
@@ -252,9 +252,9 @@ describe('getIndentRatio', () => {
 		const view = createEditorView(
 			[
 				realSchema.node('paragraph', null, [realSchema.text('First paragraph')]),
-				realSchema.node('paragraph', null, [realSchema.text('Second paragraph')])
+				realSchema.node('paragraph', null, [realSchema.text('Second paragraph')]),
 			],
-			realSchema
+			realSchema,
 		);
 		const result = SelectionUtilities.getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe(0);
@@ -264,9 +264,9 @@ describe('getIndentRatio', () => {
 		const view = createEditorView(
 			[
 				realSchema.node('paragraph', { indent: 2 }, [realSchema.text('First paragraph')]),
-				realSchema.node('paragraph', { indent: 1 }, [realSchema.text('Second paragraph')])
+				realSchema.node('paragraph', { indent: 1 }, [realSchema.text('Second paragraph')]),
 			],
-			realSchema
+			realSchema,
 		);
 		const result = SelectionUtilities.getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe((2 + 1) / (INDENT_MAX * 2));
@@ -277,9 +277,9 @@ describe('getIndentRatio', () => {
 			[
 				realSchema.node('paragraph', { indent: 2 }, [realSchema.text('First paragraph')]),
 				realSchema.node('paragraph', null, [realSchema.text('Second paragraph')]),
-				realSchema.node('paragraph', { indent: 1 }, [realSchema.text('Third paragraph')])
+				realSchema.node('paragraph', { indent: 1 }, [realSchema.text('Third paragraph')]),
 			],
-			realSchema
+			realSchema,
 		);
 		const result = SelectionUtilities.getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe((2 + 1) / (INDENT_MAX * 3));
@@ -290,10 +290,10 @@ describe('getIndentRatio', () => {
 			[
 				realSchema.node('paragraph', { indent: 2 }, [realSchema.text('First paragraph')]),
 				realSchema.node('paragraph', { indent: 1 }, [realSchema.text('Second paragraph')]),
-				realSchema.node('paragraph', null, [realSchema.text('Third paragraph')])
+				realSchema.node('paragraph', null, [realSchema.text('Third paragraph')]),
 			],
 			realSchema,
-			{ start: 0, end: 2 }
+			{ start: 0, end: 2 },
 		);
 		const result = SelectionUtilities.getIndentRatio(view.state.selection, view.state.doc);
 		expect(result).toBe(2 / INDENT_MAX);
@@ -304,13 +304,13 @@ describe('getBlockAttributeRatio', () => {
 	it('should return 0 if there are no paragraphs', () => {
 		const view = createEditorView(
 			[realSchema.node('codeBlock', null, [realSchema.text('Code block text')])],
-			realSchema
+			realSchema,
 		);
 		const result = SelectionUtilities.getBlockAttributeRatio(
 			view.state.selection,
 			view.state.doc,
 			'align',
-			'center'
+			'center',
 		);
 		expect(result).toBe(0);
 	});
@@ -319,15 +319,15 @@ describe('getBlockAttributeRatio', () => {
 		const view = createEditorView(
 			[
 				realSchema.node('paragraph', { align: 'left' }, [realSchema.text('First paragraph')]),
-				realSchema.node('paragraph', { align: 'left' }, [realSchema.text('Second paragraph')])
+				realSchema.node('paragraph', { align: 'left' }, [realSchema.text('Second paragraph')]),
 			],
-			realSchema
+			realSchema,
 		);
 		const result = SelectionUtilities.getBlockAttributeRatio(
 			view.state.selection,
 			view.state.doc,
 			'align',
-			'center'
+			'center',
 		);
 		expect(result).toBe(0);
 	});
@@ -337,15 +337,15 @@ describe('getBlockAttributeRatio', () => {
 			[
 				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('First paragraph')]),
 				realSchema.node('paragraph', { align: 'left' }, [realSchema.text('Second paragraph')]),
-				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')])
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')]),
 			],
-			realSchema
+			realSchema,
 		);
 		const result = SelectionUtilities.getBlockAttributeRatio(
 			view.state.selection,
 			view.state.doc,
 			'align',
-			'center'
+			'center',
 		);
 		expect(result).toBe(2 / 3);
 	});
@@ -355,15 +355,15 @@ describe('getBlockAttributeRatio', () => {
 			[
 				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('First paragraph')]),
 				realSchema.node('paragraph', null, [realSchema.text('Second paragraph')]),
-				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')])
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')]),
 			],
-			realSchema
+			realSchema,
 		);
 		const result = SelectionUtilities.getBlockAttributeRatio(
 			view.state.selection,
 			view.state.doc,
 			'align',
-			'center'
+			'center',
 		);
 		expect(result).toBe(2 / 3);
 	});
@@ -373,16 +373,16 @@ describe('getBlockAttributeRatio', () => {
 			[
 				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('First paragraph')]),
 				realSchema.node('paragraph', { align: 'left' }, [realSchema.text('Second paragraph')]),
-				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')])
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')]),
 			],
 			realSchema,
-			{ start: 0, end: 2 }
+			{ start: 0, end: 2 },
 		);
 		const result = SelectionUtilities.getBlockAttributeRatio(
 			view.state.selection,
 			view.state.doc,
 			'align',
-			'center'
+			'center',
 		);
 		expect(result).toBe(1);
 	});
@@ -392,15 +392,15 @@ describe('getBlockAttributeRatio', () => {
 			[
 				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('First paragraph')]),
 				realSchema.node('paragraph', { align: 'left' }, [realSchema.text('Second paragraph')]),
-				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')])
+				realSchema.node('paragraph', { align: 'center' }, [realSchema.text('Third paragraph')]),
 			],
-			realSchema
+			realSchema,
 		);
 		const result = SelectionUtilities.getBlockAttributeRatio(
 			view.state.selection,
 			view.state.doc,
 			'align',
-			(val) => val === 'center'
+			(val) => val === 'center',
 		);
 		expect(result).toBe(2 / 3);
 	});

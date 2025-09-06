@@ -14,18 +14,18 @@ export default ts.config(
 		languageOptions: {
 			globals: {
 				...globals.browser,
-				...globals.node
-			}
-		}
+				...globals.node,
+			},
+		},
 	},
 	{
 		files: ['**/*.svelte'],
 
 		languageOptions: {
 			parserOptions: {
-				parser: ts.parser
-			}
-		}
+				parser: ts.parser,
+			},
+		},
 	},
 	{
 		ignores: ['src-tauri/', '.svelte-kit/', 'dist/', 'src/lib/paraglide/'],
@@ -35,9 +35,9 @@ export default ts.config(
 				{
 					argsIgnorePattern: '^_',
 					varsIgnorePattern: '^_',
-					caughtErrorsIgnorePattern: '^_'
-				}
-			]
-		}
-	}
+					caughtErrorsIgnorePattern: '^_',
+				},
+			],
+		},
+	},
 );

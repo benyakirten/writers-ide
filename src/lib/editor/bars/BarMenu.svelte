@@ -15,7 +15,7 @@
 		index,
 		position,
 		onminimize,
-		onclose
+		onclose,
 	}: {
 		canMoveForward: boolean;
 		draggable: boolean;
@@ -30,7 +30,7 @@
 			up: null,
 			down: null,
 			left: null,
-			right: null
+			right: null,
 		};
 		if (
 			position === VerticalBarPosition.InlineStart ||

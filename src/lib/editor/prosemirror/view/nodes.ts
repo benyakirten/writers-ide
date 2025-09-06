@@ -7,11 +7,11 @@ import {
 	INDENT_SIZE_PX,
 	PROSEMIRROR_PAGE_CLASS,
 	PROSEMIRROR_PAGE_END_CLASS,
-	PROSEMIRROR_PARAGRAPH_CLASS
+	PROSEMIRROR_PARAGRAPH_CLASS,
 } from './constants';
 
 const doc: NodeSpec = {
-	content: 'page+'
+	content: 'page+',
 };
 
 const paragraph: NodeSpec = {
@@ -20,7 +20,7 @@ const paragraph: NodeSpec = {
 	attrs: {
 		peer: {
 			default: false,
-			validate: 'boolean'
+			validate: 'boolean',
 		},
 		indent: {
 			default: 1,
@@ -29,7 +29,7 @@ const paragraph: NodeSpec = {
 				if (isNaN(_value) || _value < INDENT_MIN || _value > INDENT_MAX) {
 					throw new Error('Indent must be an integer between INDENT_MIN and INDENT_MAX');
 				}
-			}
+			},
 		},
 		align: {
 			default: 'start',
@@ -39,8 +39,8 @@ const paragraph: NodeSpec = {
 				value === 'left' ||
 				value === 'center' ||
 				value === 'right' ||
-				value === 'justify'
-		}
+				value === 'justify',
+		},
 	},
 	parseDOM: [
 		{
@@ -57,12 +57,12 @@ const paragraph: NodeSpec = {
 				const data = {
 					indent: clamp(_indent, INDENT_MIN, INDENT_MAX),
 					align,
-					peer
+					peer,
 				};
 
 				return data;
-			}
-		}
+			},
+		},
 	],
 	toDOM(node) {
 		const { indent, align, peer } = node.attrs;
@@ -71,11 +71,11 @@ const paragraph: NodeSpec = {
 			{
 				class: PROSEMIRROR_PARAGRAPH_CLASS,
 				style: `text-indent: ${indent * INDENT_SIZE_PX}px; text-align: ${align};`,
-				'data-peer': peer
+				'data-peer': peer,
 			},
-			0
+			0,
 		];
-	}
+	},
 };
 
 const blockquoteDOM: DOMOutputSpec = ['blockquote', 0];
@@ -86,7 +86,7 @@ const blockquote: NodeSpec = {
 	parseDOM: [{ tag: 'blockquote' }],
 	toDOM() {
 		return blockquoteDOM;
-	}
+	},
 };
 
 const hrDOM: DOMOutputSpec = ['hr'];
@@ -95,7 +95,7 @@ const horizontalRule: NodeSpec = {
 	parseDOM: [{ tag: 'hr' }],
 	toDOM() {
 		return hrDOM;
-	}
+	},
 };
 
 const heading: NodeSpec = {
@@ -109,11 +109,11 @@ const heading: NodeSpec = {
 		{ tag: 'h3', attrs: { level: 3 } },
 		{ tag: 'h4', attrs: { level: 4 } },
 		{ tag: 'h5', attrs: { level: 5 } },
-		{ tag: 'h6', attrs: { level: 6 } }
+		{ tag: 'h6', attrs: { level: 6 } },
 	],
 	toDOM(node) {
 		return ['h' + node.attrs.level, 0];
-	}
+	},
 };
 
 const preDOM: DOMOutputSpec = ['pre', ['code', 0]];
@@ -126,11 +126,11 @@ const code: NodeSpec = {
 	parseDOM: [{ tag: 'pre', preserveWhitespace: 'full' }],
 	toDOM() {
 		return preDOM;
-	}
+	},
 };
 
 const text: NodeSpec = {
-	group: 'inline'
+	group: 'inline',
 };
 
 const image: NodeSpec = {
@@ -138,7 +138,7 @@ const image: NodeSpec = {
 	attrs: {
 		src: { validate: 'string' },
 		alt: { default: null, validate: 'string|null' },
-		title: { default: null, validate: 'string|null' }
+		title: { default: null, validate: 'string|null' },
 	},
 	group: 'inline',
 	draggable: true,
@@ -149,15 +149,15 @@ const image: NodeSpec = {
 				return {
 					src: dom.getAttribute('src'),
 					title: dom.getAttribute('title'),
-					alt: dom.getAttribute('alt')
+					alt: dom.getAttribute('alt'),
 				};
-			}
-		}
+			},
+		},
 	],
 	toDOM(node) {
 		const { src, alt, title } = node.attrs;
 		return ['img', { src, alt, title }];
-	}
+	},
 };
 
 const brDOM: DOMOutputSpec = ['br'];
@@ -168,13 +168,13 @@ const inlineBreak: NodeSpec = {
 	parseDOM: [{ tag: 'br' }],
 	toDOM() {
 		return brDOM;
-	}
+	},
 };
 
 const page: NodeSpec = {
 	content: 'block+',
 	attrs: {
-		index: { default: null, validate: 'number|null' }
+		index: { default: null, validate: 'number|null' },
 	},
 	group: 'block',
 	selectable: false,
@@ -186,20 +186,20 @@ const page: NodeSpec = {
 				const indexRaw = dom.getAttribute('data-index');
 				const index = parseInt(indexRaw ?? '');
 				return { index: isNaN(index) ? null : index };
-			}
-		}
+			},
+		},
 	],
 	toDOM(node) {
 		const { index } = node.attrs;
 		return ['div', { class: PROSEMIRROR_PAGE_CLASS, 'data-index': index }, 0];
-	}
+	},
 };
 
 const pageEndDom: DOMOutputSpec = [
 	'div',
 	{
-		class: PROSEMIRROR_PAGE_END_CLASS
-	}
+		class: PROSEMIRROR_PAGE_END_CLASS,
+	},
 ];
 const pageEnd: NodeSpec = {
 	group: 'block',
@@ -210,7 +210,7 @@ const pageEnd: NodeSpec = {
 	parseDOM: [{ tag: `div.${PROSEMIRROR_PAGE_END_CLASS}` }],
 	toDOM() {
 		return pageEndDom;
-	}
+	},
 };
 
 const headerDom: DOMOutputSpec = ['div', { class: 'page-header' }, 0];
@@ -222,9 +222,9 @@ export const header: NodeSpec = {
 	toDOM: () => headerDom,
 	parseDOM: [
 		{
-			tag: 'div.page-header'
-		}
-	]
+			tag: 'div.page-header',
+		},
+	],
 };
 
 const footerDom: DOMOutputSpec = ['div', { class: 'page-footer' }, 0];
@@ -234,9 +234,9 @@ export const footer: NodeSpec = {
 	toDOM: () => footerDom,
 	parseDOM: [
 		{
-			tag: 'div.page-footer'
-		}
-	]
+			tag: 'div.page-footer',
+		},
+	],
 };
 
 export const nodes = {
@@ -251,5 +251,5 @@ export const nodes = {
 	image,
 	inlineBreak,
 	pageEnd,
-	header
+	header,
 } as const;

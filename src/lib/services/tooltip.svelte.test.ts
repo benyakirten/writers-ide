@@ -39,7 +39,7 @@ describe('TooltipSTate', () => {
 			state.tooltip = {
 				data: 'Old Tooltip',
 				target: mockTooltipEl,
-				calibrateFor: 'horizontal'
+				calibrateFor: 'horizontal',
 			};
 
 			const tooltipData: TooltipData['data'] = 'Test Tooltip';
@@ -50,7 +50,7 @@ describe('TooltipSTate', () => {
 			expect(state.tooltip).toEqual({
 				data: tooltipData,
 				target: mockTarget,
-				calibrateFor
+				calibrateFor,
 			});
 
 			expect(state.open).toBe(false);
@@ -67,7 +67,7 @@ describe('TooltipSTate', () => {
 			state.tooltip = {
 				data: 'Old Tooltip',
 				target: mockTarget,
-				calibrateFor: 'horizontal'
+				calibrateFor: 'horizontal',
 			};
 
 			mockTarget.setAttribute('aria-describedby', state.TOOLTIP_ID);
@@ -80,7 +80,7 @@ describe('TooltipSTate', () => {
 			expect(state.tooltip).toEqual({
 				data: 'Old Tooltip',
 				target: mockTarget,
-				calibrateFor: 'horizontal'
+				calibrateFor: 'horizontal',
 			});
 
 			expect(state.open).toBe(true);
@@ -97,7 +97,7 @@ describe('TooltipSTate', () => {
 			state.tooltip = {
 				data: 'Test Tooltip',
 				target: mockTarget,
-				calibrateFor: 'vertical'
+				calibrateFor: 'vertical',
 			};
 
 			state.show();
@@ -117,7 +117,7 @@ describe('TooltipSTate', () => {
 			state.tooltip = {
 				data: 'Test Tooltip',
 				target: mockTarget,
-				calibrateFor: 'vertical'
+				calibrateFor: 'vertical',
 			};
 			state.open = true;
 			mockTarget.setAttribute('aria-describedby', state.TOOLTIP_ID);
@@ -148,7 +148,7 @@ describe('TooltipSTate', () => {
 				width: 50,
 				height: hostHeight,
 				right: 250,
-				bottom: 150
+				bottom: 150,
 			}));
 
 			const tooltipWidth = 20;
@@ -159,7 +159,7 @@ describe('TooltipSTate', () => {
 				width: tooltipWidth,
 				height: 50,
 				right: 100,
-				bottom: 50
+				bottom: 50,
 			}));
 
 			state.calibratePosition('horizontal', mockTarget, mockTooltipEl);
@@ -185,7 +185,7 @@ describe('TooltipSTate', () => {
 				width: 50,
 				height: hostHeight,
 				right: 250,
-				bottom: 150
+				bottom: 150,
 			}));
 
 			const tooltipWidth = 20;
@@ -196,7 +196,7 @@ describe('TooltipSTate', () => {
 				width: tooltipWidth,
 				height: 50,
 				right: 100,
-				bottom: 50
+				bottom: 50,
 			}));
 
 			state.calibratePosition('horizontal', mockTarget, mockTooltipEl);
@@ -222,7 +222,7 @@ describe('TooltipSTate', () => {
 				width: hostWidth,
 				height: hostHeight,
 				right: 250,
-				bottom: 150
+				bottom: 150,
 			}));
 
 			const tooltipHeight = 20;
@@ -233,7 +233,7 @@ describe('TooltipSTate', () => {
 				width: 50,
 				height: tooltipHeight,
 				right: 50,
-				bottom: 100
+				bottom: 100,
 			}));
 
 			state.calibratePosition('vertical', mockTarget, mockTooltipEl);
@@ -259,7 +259,7 @@ describe('TooltipSTate', () => {
 				width: hostWidth,
 				height: hostHeight,
 				right: 250,
-				bottom: hostBottom
+				bottom: hostBottom,
 			}));
 
 			const tooltipHeight = 20;
@@ -270,7 +270,7 @@ describe('TooltipSTate', () => {
 				width: 50,
 				height: tooltipHeight,
 				right: 50,
-				bottom: 100
+				bottom: 100,
 			}));
 
 			state.calibratePosition('vertical', mockTarget, mockTooltipEl);

@@ -11,7 +11,7 @@ describe('BarItemRegistry', () => {
 			// @ts-expect-error: Test mock
 			vertical: { Component: () => null, size: 2 },
 			// @ts-expect-error: Test mock
-			horizontal: { Component: () => null, size: 3 }
+			horizontal: { Component: () => null, size: 3 },
 		};
 	});
 
