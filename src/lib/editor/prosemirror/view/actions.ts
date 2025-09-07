@@ -3,13 +3,7 @@ import { type EditorState, type Transaction } from 'prosemirror-state';
 
 import { clamp } from '$lib/utils/numbers';
 import { SelectionUtilities } from './selection';
-import {
-	INDENT_MAX,
-	INDENT_MIN,
-	PEERED_TRANSACTION_BOTH_META_VALUE,
-	PEERED_TRANSACTION_FIRST_META_VALUE,
-	PEERED_TRANSACTION_META_KEY,
-} from './constants';
+import { INDENT_MAX, INDENT_MIN } from './constants';
 import type { marks } from './marks';
 import {
 	chainCommands,
@@ -19,7 +13,7 @@ import {
 	splitBlockAs,
 } from 'prosemirror-commands';
 import { schema } from './schema';
-import PageLayout from '$lib/editor/state/page-layout.svelte';
+import PageLayout, { PeerSelection } from '$lib/editor/state/page-layout.svelte';
 
 export type UseableMarkName = keyof typeof marks;
 export type TextAlignment = 'start' | 'end' | 'left' | 'center' | 'right' | 'justify';
@@ -76,22 +70,32 @@ export class ActionUtilities {
 		if (!dispatch) {
 			return false;
 		}
-		const { from, to } = state.selection;
-		const tr = state.tr;
-		tr.setMeta(PEERED_TRANSACTION_META_KEY, PEERED_TRANSACTION_FIRST_META_VALUE);
 
-		state.doc.nodesBetween(from, to, (node, pos) => {
-			if (node.type.name === 'paragraph') {
+		const { tr } = state;
+		const peerGroups = PageLayout.groupPeerParagraphs(state);
+		for (const group of peerGroups) {
+			if (group.type === PeerSelection.Peered) {
+				const { head } = group;
 				const newIndent =
 					direction === 'dedent'
-						? (node.attrs.indent || 0) - 1
-						: (node.attrs.indent || INDENT_MIN) + 1;
-				tr.setNodeMarkup(pos, undefined, {
-					...node.attrs,
+						? (head.node.attrs.indent || 0) - 1
+						: (head.node.attrs.indent || INDENT_MIN) + 1;
+				tr.setNodeMarkup(head.position, null, {
+					...head.node.attrs,
+					indent: clamp(newIndent, INDENT_MIN, INDENT_MAX),
+				});
+			} else {
+				const { node } = group;
+				const newIndent =
+					direction === 'dedent'
+						? (node.node.attrs.indent || 0) - 1
+						: (node.node.attrs.indent || INDENT_MIN) + 1;
+				tr.setNodeMarkup(node.position, null, {
+					...node.node.attrs,
 					indent: clamp(newIndent, INDENT_MIN, INDENT_MAX),
 				});
 			}
-		});
+		}
 
 		if (tr.docChanged) {
 			dispatch(tr);
@@ -113,7 +117,6 @@ export class ActionUtilities {
 
 		const { from, to } = state.selection;
 		const tr = state.tr;
-		tr.setMeta(PEERED_TRANSACTION_META_KEY, PEERED_TRANSACTION_BOTH_META_VALUE);
 
 		state.doc.nodesBetween(from, to, (node, pos) => {
 			if (node.type.name === 'paragraph') {

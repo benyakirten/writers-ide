@@ -11,11 +11,36 @@ import {
 	PROSEMIRROR_PARAGRAPH_CLASS,
 	PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE,
 	PEERED_TRANSACTION_META_KEY,
+	PAGE_DEPTH,
+	BLOCK_DEPTH,
 } from '../prosemirror/view/constants';
 import { clamp } from '$lib/utils/numbers';
-import type { Transaction } from 'prosemirror-state';
+import type { EditorState, Transaction } from 'prosemirror-state';
 
 export type Unit = 'in' | 'cm' | 'mm';
+
+export enum PeerSelection {
+	Peered = 'peered',
+	NotPeered = 'not-peered',
+}
+
+export type PeerIdentification = PeerGroup | NotPeerGroup;
+
+type NodeDetails = {
+	node: ProseMirrorNode;
+	position: number;
+};
+
+type PeerGroup = {
+	type: PeerSelection.Peered;
+	head: NodeDetails;
+	peer: NodeDetails;
+};
+
+type NotPeerGroup = {
+	type: PeerSelection.NotPeered;
+	node: NodeDetails;
+};
 
 /**
  * Information about the content that either overflows a page
@@ -1046,6 +1071,93 @@ export class PageLayoutManager {
 		}
 
 		return { splitOffset: pmOffset, shouldDedent };
+	}
+
+	groupPeerParagraphs(state: EditorState): PeerIdentification[] {
+		const peerIdentifications: PeerIdentification[] = [];
+
+		const { from, to } = state.selection;
+		let pos = from;
+		while (pos <= to) {
+			const { identification, position } = this.identifyPeerGroup(state, pos);
+			peerIdentifications.push(identification);
+			pos = position;
+		}
+
+		return peerIdentifications;
+	}
+
+	identifyPeerGroup(
+		state: EditorState,
+		pos: number,
+	): { identification: PeerIdentification; position: number } {
+		const resolvedPosition = state.doc.resolve(pos);
+
+		const pageElement = resolvedPosition.node(PAGE_DEPTH);
+		const pageIndex = pageElement.attrs['index'];
+
+		const blockElement = resolvedPosition.node(BLOCK_DEPTH);
+		const blockStart = resolvedPosition.start(BLOCK_DEPTH) - 1;
+		const position = blockStart + blockElement.nodeSize;
+
+		const blockDetails: NodeDetails = {
+			node: blockElement,
+			position: blockStart,
+		};
+
+		if (blockElement.attrs['peer']) {
+			const previousPage = state.doc.child(pageIndex - 1);
+			const headNode = previousPage?.lastChild;
+			if (headNode) {
+				const head: NodeDetails = {
+					node: headNode,
+					position: blockStart - headNode.nodeSize - 2,
+				};
+
+				const peerGroup: PeerGroup = {
+					type: PeerSelection.Peered,
+					head,
+					peer: blockDetails,
+				};
+
+				return {
+					identification: peerGroup,
+					position,
+				};
+			}
+		}
+
+		if (pageElement.lastChild?.eq(blockElement)) {
+			// If the next page's first element is peered, return the peer group.
+			// Otherwise, return not peered
+			const nextPage = state.doc.child(pageIndex + 1);
+			const peerNode = nextPage?.firstChild;
+			if (peerNode?.attrs['peer']) {
+				const peer: NodeDetails = {
+					node: peerNode,
+					position: position + 1,
+				};
+				const peerGroup: PeerGroup = {
+					type: PeerSelection.Peered,
+					head: blockDetails,
+					peer,
+				};
+
+				return {
+					identification: peerGroup,
+					position: position + peerNode.nodeSize + 1,
+				};
+			}
+		}
+
+		const notPeeredGroup: NotPeerGroup = {
+			type: PeerSelection.NotPeered,
+			node: blockDetails,
+		};
+		return {
+			identification: notPeeredGroup,
+			position,
+		};
 	}
 }
 

@@ -13,7 +13,8 @@ export const PROSEMIRROR_PARAGRAPH_CLASS = 'prosemirror-paragraph';
 export const PAGINATION_TRANSACTION_META_KEY = 'wide-pagination-transaction';
 
 export const PEERED_TRANSACTION_META_KEY = 'wide-peer-transaction';
-export const PEERED_TRANSACTION_BOTH_META_VALUE = 'both';
-export const PEERED_TRANSACTION_FIRST_META_VALUE = 'first';
-export const PEERED_TRANSACTION_LAST_META_VALUE = 'last';
 export const PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE = 'reunite-peers';
+
+export const DOC_DEPTH = 0;
+export const PAGE_DEPTH = 1;
+export const BLOCK_DEPTH = 2;
