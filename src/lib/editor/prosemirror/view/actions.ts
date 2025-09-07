@@ -1,5 +1,6 @@
 import type { EditorView } from 'prosemirror-view';
 import { type EditorState, type Transaction } from 'prosemirror-state';
+import type { Node as ProseMirrorNode } from 'prosemirror-model';
 
 import { clamp } from '$lib/utils/numbers';
 import { SelectionUtilities } from './selection';
@@ -72,28 +73,24 @@ export class ActionUtilities {
 		}
 
 		const { tr } = state;
+
+		function setMarkupForNode(node: ProseMirrorNode, pos: number) {
+			const newIndent =
+				direction === 'dedent'
+					? (node.attrs.indent || 0) - 1
+					: (node.attrs.indent || INDENT_MIN) + 1;
+			tr.setNodeMarkup(pos, null, {
+				...node.attrs,
+				indent: clamp(newIndent, INDENT_MIN, INDENT_MAX),
+			});
+		}
+
 		const peerGroups = PageLayout.groupPeerParagraphs(state);
 		for (const group of peerGroups) {
 			if (group.type === PeerSelection.Peered) {
-				const { head } = group;
-				const newIndent =
-					direction === 'dedent'
-						? (head.node.attrs.indent || 0) - 1
-						: (head.node.attrs.indent || INDENT_MIN) + 1;
-				tr.setNodeMarkup(head.position, null, {
-					...head.node.attrs,
-					indent: clamp(newIndent, INDENT_MIN, INDENT_MAX),
-				});
+				setMarkupForNode(group.head.node, group.head.position);
 			} else {
-				const { node } = group;
-				const newIndent =
-					direction === 'dedent'
-						? (node.node.attrs.indent || 0) - 1
-						: (node.node.attrs.indent || INDENT_MIN) + 1;
-				tr.setNodeMarkup(node.position, null, {
-					...node.node.attrs,
-					indent: clamp(newIndent, INDENT_MIN, INDENT_MAX),
-				});
+				setMarkupForNode(group.details.node, group.details.position);
 			}
 		}
 

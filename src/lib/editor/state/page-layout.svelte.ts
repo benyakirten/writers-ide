@@ -39,7 +39,7 @@ type PeerGroup = {
 
 type NotPeerGroup = {
 	type: PeerSelection.NotPeered;
-	node: NodeDetails;
+	details: NodeDetails;
 };
 
 /**
@@ -1152,7 +1152,7 @@ export class PageLayoutManager {
 
 		const notPeeredGroup: NotPeerGroup = {
 			type: PeerSelection.NotPeered,
-			node: blockDetails,
+			details: blockDetails,
 		};
 		return {
 			identification: notPeeredGroup,
