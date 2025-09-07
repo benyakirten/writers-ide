@@ -1078,19 +1078,19 @@ export class PageLayoutManager {
 
 		const { from, to } = state.selection;
 		let pos = from;
+		console.log({ from, to });
 		while (pos <= to) {
-			const { identification, position } = this.identifyPeerGroup(state, pos);
+			const identification = this.identifyPeerGroup(state, pos);
 			peerIdentifications.push(identification);
-			pos = position;
+			const nodeDetails =
+				identification.type === PeerSelection.Peered ? identification.peer : identification.details;
+			pos = nodeDetails.position + nodeDetails.node.nodeSize + 1;
 		}
 
 		return peerIdentifications;
 	}
 
-	identifyPeerGroup(
-		state: EditorState,
-		pos: number,
-	): { identification: PeerIdentification; position: number } {
+	identifyPeerGroup(state: EditorState, pos: number): PeerIdentification {
 		const resolvedPosition = state.doc.resolve(pos);
 
 		const pageElement = resolvedPosition.node(PAGE_DEPTH);
@@ -1114,15 +1114,10 @@ export class PageLayoutManager {
 					position: blockStart - headNode.nodeSize - 2,
 				};
 
-				const peerGroup: PeerGroup = {
+				return {
 					type: PeerSelection.Peered,
 					head,
 					peer: blockDetails,
-				};
-
-				return {
-					identification: peerGroup,
-					position,
 				};
 			}
 		}
@@ -1137,26 +1132,17 @@ export class PageLayoutManager {
 					node: peerNode,
 					position: position + 1,
 				};
-				const peerGroup: PeerGroup = {
+				return {
 					type: PeerSelection.Peered,
 					head: blockDetails,
 					peer,
 				};
-
-				return {
-					identification: peerGroup,
-					position: position + peerNode.nodeSize + 1,
-				};
 			}
 		}
 
-		const notPeeredGroup: NotPeerGroup = {
+		return {
 			type: PeerSelection.NotPeered,
 			details: blockDetails,
-		};
-		return {
-			identification: notPeeredGroup,
-			position,
 		};
 	}
 }
