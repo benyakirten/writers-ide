@@ -75,6 +75,10 @@ export class ActionUtilities {
 		const { tr } = state;
 
 		function setMarkupForNode(node: ProseMirrorNode, pos: number) {
+			if (node.type.name !== 'paragraph') {
+				return;
+			}
+
 			const newIndent =
 				direction === 'dedent'
 					? (node.attrs.indent || 0) - 1

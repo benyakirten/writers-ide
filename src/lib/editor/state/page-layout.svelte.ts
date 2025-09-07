@@ -1073,6 +1073,11 @@ export class PageLayoutManager {
 		return { splitOffset: pmOffset, shouldDedent };
 	}
 
+	/**
+	 * Helper method to identify whether the blocks in the selection are peered or not
+	 * on a per-block basis. This is for actions that affect block nodes. These methods
+	 * will not work on any other type of node since pages must contain block nodes.
+	 */
 	groupPeerParagraphs(state: EditorState): PeerIdentification[] {
 		const peerIdentifications: PeerIdentification[] = [];
 
@@ -1080,6 +1085,10 @@ export class PageLayoutManager {
 		let pos = from;
 		while (pos <= to) {
 			const identification = this.identifyPeerGroup(state, pos);
+			if (!identification) {
+				break;
+			}
+
 			peerIdentifications.push(identification);
 			const nodeDetails =
 				identification.type === PeerSelection.Peered ? identification.peer : identification.details;
@@ -1089,22 +1098,69 @@ export class PageLayoutManager {
 		return peerIdentifications;
 	}
 
-	identifyPeerGroup(state: EditorState, pos: number): PeerIdentification {
-		const resolvedPosition = state.doc.resolve(pos);
+	/**
+	 * If the user selects before the first block node, it's because they selected all and did the action.
+	 * We can't use the typical selection methods to figure it out so we have a special way of handling it.
+	 */
+	private getPeerGroupDetails(state: EditorState, pos: number) {
+		if (pos < 2) {
+			const pageIndex = 0;
+			const pageNode = state.doc.firstChild;
+			if (!pageNode) {
+				return null;
+			}
 
-		const pageElement = resolvedPosition.node(PAGE_DEPTH);
-		const pageIndex = pageElement.attrs['index'];
+			const blockStart = 1;
+			const blockNode = state.doc.nodeAt(blockStart);
+			if (!blockNode) {
+				return null;
+			}
 
-		const blockStart = resolvedPosition.start(BLOCK_DEPTH) - 1;
-		const blockElement = state.doc.nodeAt(blockStart)!;
-		const position = blockStart + blockElement.nodeSize;
+			const position = blockStart + blockNode.nodeSize + 1;
+
+			return { pageNode, pageIndex, blockStart, blockNode, position };
+		} else {
+			const resolvedPosition = state.doc.resolve(pos);
+
+			const pageNode = resolvedPosition.node(PAGE_DEPTH);
+			const pageIndex = pageNode.attrs['index'];
+
+			const blockStart = resolvedPosition.start(BLOCK_DEPTH) - 1;
+			const blockNode = state.doc.nodeAt(blockStart);
+			if (!blockNode) {
+				return null;
+			}
+			const position = blockStart + blockNode.nodeSize;
+
+			return { pageNode, pageIndex, blockStart, blockNode, position };
+		}
+	}
+
+	/**
+	 * Given a position in the EditorState, identify whether it's a peered group or not.
+	 * If so, get the block node and its peer, otherwise just the block node.
+	 *
+	 * There are three possible situations:
+	 * 1. The position is at the peer paragraph. We must look back and find the head prior to it.
+	 * 2. The position is at the end of the page and the first block element of the next page is a peer.
+	 *   We must look forward and find the peer after it.
+	 * 3. The position is at a block element that is not peered. We just return the block element.
+	 */
+	identifyPeerGroup(state: EditorState, pos: number): PeerIdentification | null {
+		const groupDetails = this.getPeerGroupDetails(state, pos);
+
+		if (!groupDetails) {
+			return null;
+		}
+
+		const { pageNode, pageIndex, blockStart, blockNode, position } = groupDetails;
 
 		const blockDetails: NodeDetails = {
-			node: blockElement,
+			node: blockNode,
 			position: blockStart,
 		};
 
-		if (blockElement.attrs['peer']) {
+		if (blockNode.attrs['peer']) {
 			const previousPage = state.doc.child(pageIndex - 1);
 			const headNode = previousPage?.lastChild;
 			if (headNode) {
@@ -1121,7 +1177,7 @@ export class PageLayoutManager {
 			}
 		}
 
-		if (pageElement.lastChild?.eq(blockElement)) {
+		if (pageNode.lastChild?.eq(blockNode)) {
 			// If the next page's first element is peered, return the peer group.
 			// Otherwise, return not peered
 			const nextPage = state.doc.child(pageIndex + 1);

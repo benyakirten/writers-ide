@@ -28,11 +28,8 @@ export function keydownHandler(bindings: {
 		let anyCommand = false;
 		for (const command of commands) {
 			const binding = bindings[command];
-			if (!anyCommand && typeof binding === 'function') {
-				anyCommand = true;
-			}
-
-			binding(view.state, view.dispatch, view);
+			anyCommand ||= typeof binding === 'function';
+			binding?.(view.state, view.dispatch, view);
 		}
 
 		return anyCommand;
