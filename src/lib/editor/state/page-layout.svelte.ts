@@ -1078,7 +1078,6 @@ export class PageLayoutManager {
 
 		const { from, to } = state.selection;
 		let pos = from;
-		console.log({ from, to });
 		while (pos <= to) {
 			const identification = this.identifyPeerGroup(state, pos);
 			peerIdentifications.push(identification);
@@ -1096,8 +1095,8 @@ export class PageLayoutManager {
 		const pageElement = resolvedPosition.node(PAGE_DEPTH);
 		const pageIndex = pageElement.attrs['index'];
 
-		const blockElement = resolvedPosition.node(BLOCK_DEPTH);
 		const blockStart = resolvedPosition.start(BLOCK_DEPTH) - 1;
+		const blockElement = state.doc.nodeAt(blockStart)!;
 		const position = blockStart + blockElement.nodeSize;
 
 		const blockDetails: NodeDetails = {
