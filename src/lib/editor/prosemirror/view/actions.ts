@@ -116,14 +116,24 @@ export class ActionUtilities {
 			return false;
 		}
 
-		const { from, to } = state.selection;
 		const tr = state.tr;
 
-		state.doc.nodesBetween(from, to, (node, pos) => {
-			if (node.type.name === 'paragraph') {
-				tr.setNodeMarkup(pos, undefined, { ...node.attrs, align: alignment });
+		function align(node: ProseMirrorNode, pos: number) {
+			if (node.type.name !== 'paragraph') {
+				return;
 			}
-		});
+			tr.setNodeMarkup(pos, null, { ...node.attrs, indent: INDENT_MIN, align: alignment });
+		}
+
+		const peerGroups = PageLayout.groupPeerParagraphs(state);
+		for (const group of peerGroups) {
+			if (group.type === PeerSelection.Peered) {
+				align(group.head.node, group.head.position);
+				align(group.peer.node, group.peer.position);
+			} else {
+				align(group.details.node, group.details.position);
+			}
+		}
 
 		if (tr.docChanged) {
 			dispatch(tr);

@@ -1095,12 +1095,15 @@ export class PageLayoutManager {
 			pos = nodeDetails.position + nodeDetails.node.nodeSize + 1;
 		}
 
+		console.log(peerIdentifications);
 		return peerIdentifications;
 	}
 
 	/**
 	 * If the user selects before the first block node, it's because they selected all and did the action.
 	 * We can't use the typical selection methods to figure it out so we have a special way of handling it.
+	 *
+	 * This feels incredibly hacky, and I may revise it in the future.
 	 */
 	private getPeerGroupDetails(state: EditorState, pos: number) {
 		if (pos < 2) {
@@ -1185,7 +1188,7 @@ export class PageLayoutManager {
 			if (peerNode?.attrs['peer']) {
 				const peer: NodeDetails = {
 					node: peerNode,
-					position: position + 1,
+					position: position + 2,
 				};
 				return {
 					type: PeerSelection.Peered,
