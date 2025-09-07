@@ -1203,6 +1203,35 @@ export class PageLayoutManager {
 			details: blockDetails,
 		};
 	}
+
+	/**
+	 * A command that unsets peering of a block node if the selection is right at the start.
+	 */
+	breakPeering(state: EditorState, dispatch?: (tr: Transaction) => void): boolean {
+		if (!dispatch) {
+			return false;
+		}
+		const { from } = state.selection;
+		const blockNode = state.doc.resolve(from).node(BLOCK_DEPTH);
+
+		if (!blockNode || !blockNode.isBlock || !blockNode.attrs['peer']) {
+			return false;
+		}
+
+		const pos = state.doc.resolve(from).start(BLOCK_DEPTH) - 1;
+		// The pos above selects the block node, but we want to check if we're selecting right at the beginning.
+		if (pos !== from - 1) {
+			return false;
+		}
+
+		const tr = state.tr;
+
+		tr.setNodeAttribute(pos, 'peer', false);
+		tr.setNodeAttribute(pos, 'indent', PageLayout.defaultParagraphIndent);
+		dispatch(tr);
+
+		return true;
+	}
 }
 
 const PageLayout = new PageLayoutManager();

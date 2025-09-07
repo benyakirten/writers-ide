@@ -151,6 +151,7 @@ export class ActionUtilities {
 		newlineInCode,
 		createParagraphNear,
 		liftEmptyBlock,
+		PageLayout.breakPeering,
 		splitBlockAs(() => {
 			return schema.node('paragraph', { indent: PageLayout.defaultParagraphIndent });
 		}),
