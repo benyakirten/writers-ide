@@ -11,7 +11,6 @@
 	import type { TabComponent } from './state/tab-state-registry.svelte';
 
 	let {
-		index,
 		id,
 		data,
 		Component,

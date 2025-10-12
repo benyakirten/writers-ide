@@ -5,6 +5,7 @@
 	import type { Selection } from 'prosemirror-state';
 
 	import type { ModularComponentProps } from '$lib/editor/state/shared.types';
+	import { ProseMirrorEventBusEventType } from '$lib/editor/state/event-bus.svelte';
 	import { blockMarkButtons, textMarkButtons } from './Snippets.svelte';
 	import type { TextMarkPresence } from '../../view/selection';
 
@@ -15,7 +16,16 @@
 	let props: ModularComponentProps = $props();
 
 	onMount(() => {
-		const unsub = props.proseMirror.eventBus.subscribe(({ view }) => {
+		// TODO: Handle multiple editors - Make sure we are showing for the focused editor
+		const unsub = props.proseMirror.eventBus.subscribe(({ event }) => {
+			if (
+				event.type !== ProseMirrorEventBusEventType.Init &&
+				event.type !== ProseMirrorEventBusEventType.Update
+			) {
+				return;
+			}
+
+			const { view } = event;
 			activeCodeMarks = props.proseMirror.selections.findTextMarks(
 				view.state.selection,
 				view.state.doc,

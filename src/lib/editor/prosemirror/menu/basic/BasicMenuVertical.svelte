@@ -4,7 +4,8 @@
 	import type { EditorView } from 'prosemirror-view';
 	import type { Selection } from 'prosemirror-state';
 
-	import type { ModularComponentProps } from '$lib/editor/state/bar-item-registry.svelte';
+	import { ProseMirrorEventBusEventType } from '$lib/editor/state/event-bus.svelte';
+	import type { ModularComponentProps } from '$lib/editor/state/shared.types';
 	import type { TextMarkPresence } from '../../view/selection';
 	import { blockMarkButtons, textMarkButtons } from './Snippets.svelte';
 
@@ -15,7 +16,15 @@
 	let props: ModularComponentProps = $props();
 
 	onMount(() => {
-		const unsub = props.proseMirror.eventBus.subscribe(({ view }) => {
+		const unsub = props.proseMirror.eventBus.subscribe(({ event }) => {
+			if (
+				event.type !== ProseMirrorEventBusEventType.Init &&
+				event.type !== ProseMirrorEventBusEventType.Update
+			) {
+				return;
+			}
+
+			const { view } = event;
 			const marks =
 				view && props.proseMirror.selections.findTextMarks(view.state.selection, view.state.doc);
 			activeCodeMarks = marks;

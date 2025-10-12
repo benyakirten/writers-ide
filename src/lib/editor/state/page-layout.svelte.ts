@@ -16,6 +16,7 @@ import {
 } from '../prosemirror/view/constants';
 import { clamp } from '$lib/utils/numbers';
 import type { EditorState, Transaction } from 'prosemirror-state';
+import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.svelte';
 
 export type Unit = 'in' | 'cm' | 'mm';
 
@@ -774,7 +775,12 @@ export class PageLayoutManager {
 	 * and yield to allow the UI to update if necessary. The data yielded is the number of the page,
 	 * which is 1 greater than the page index.
 	 */
-	*paginateRange(view: EditorView, from: number, to?: number): Generator<number, number, void> {
+	*paginateRange(
+		id: string,
+		view: EditorView,
+		from: number,
+		to?: number,
+	): Generator<number, number, void> {
 		let pageNumber = from;
 
 		// This makes it so if a paragraph is broken over two pages, we correctly identify text content
@@ -803,6 +809,11 @@ export class PageLayoutManager {
 			}
 			yield pageNumber;
 		}
+
+		proseMirrorEventBus.update({
+			id,
+			event: { type: ProseMirrorEventBusEventType.Paginate, paginatedTo: pageNumber },
+		});
 		return pageNumber;
 	}
 

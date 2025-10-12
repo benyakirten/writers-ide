@@ -1,12 +1,14 @@
 import { Plugin } from 'prosemirror-state';
-import { createUpdatePlugin } from './plugins/event-bus.plugin';
+import { createEventBusPlugin } from './plugins/event-bus.plugin';
+
+type CreatePluginFn = (id: string) => Plugin;
 
 export class ProseMirrorPluginManager {
-	record = $state<Record<string, Plugin>>({});
-	plugins = $derived.by(() => Object.values(this.record));
+	record = $state<Record<string, CreatePluginFn>>({});
+	pluginRegistryFunctions = $derived.by(() => Object.values(this.record));
 
-	register(name: string, plugin: Plugin): () => void {
-		this.record[name] = plugin;
+	register(name: string, fn: CreatePluginFn): () => void {
+		this.record[name] = fn;
 		return () => this.deregister(name);
 	}
 
@@ -14,12 +16,12 @@ export class ProseMirrorPluginManager {
 		delete this.record[name];
 	}
 
-	get(name: string): Plugin | null {
+	get(name: string): CreatePluginFn | null {
 		return this.record[name] ?? null;
 	}
 }
 
 const ProseMirrorPlugins = new ProseMirrorPluginManager();
-ProseMirrorPlugins.register('event-bus', createUpdatePlugin('global'));
+ProseMirrorPlugins.register('event-bus', createEventBusPlugin);
 
 export default ProseMirrorPlugins;

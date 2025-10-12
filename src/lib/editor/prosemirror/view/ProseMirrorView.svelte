@@ -7,6 +7,7 @@
 	import { baseKeymap } from 'prosemirror-commands';
 
 	import type { TabComponentProps } from '$lib/editor/state/tab-state-registry.svelte';
+	import PageLayout from '$lib/editor/state/page-layout.svelte';
 	import { schema } from './schema';
 	import { ActionUtilities } from './actions';
 	import TabState from '../../state/tab-state.svelte';
@@ -25,7 +26,6 @@
 		shortPages,
 	} from './sample-data';
 	import { handleTransaction } from './transaction-handler';
-	import PageLayout from '@/editor/state/page-layout.svelte';
 
 	let { id }: TabComponentProps = $props();
 
@@ -51,6 +51,8 @@
 		// mediumPage,
 		// emptyPage,
 	]);
+
+	const plugins = ProseMirrorPlugins.pluginRegistryFunctions.map((fn) => fn(id));
 
 	onMount(() => {
 		state = EditorState.create({
@@ -90,7 +92,7 @@
 				// TODO: We might want to write our own base commands
 				// instead of using prosemirror-commands.
 				keymap(baseKeymap),
-				...ProseMirrorPlugins.plugins,
+				...plugins,
 			],
 		});
 
@@ -101,7 +103,7 @@
 
 		const obsId = crypto.randomUUID();
 		const deregister = Editors.register(id, view, obsId, el.querySelector('.ProseMirror')!);
-		[...PageLayout.paginateRange(view, 0)];
+		// [...PageLayout.paginateRange(view, 0)];
 		return () => deregister();
 	});
 </script>

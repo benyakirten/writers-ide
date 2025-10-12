@@ -8,7 +8,6 @@ import type { HorizontalBarState } from './horizontal-bar-state.svelte';
 import type { FloaterBarState } from './floater-state.svelte';
 import type { TabState } from './tab-state.svelte';
 import type { schema } from '../prosemirror/view/schema';
-import type { EditorView } from 'prosemirror-view';
 
 export type BarItem = {
 	id: string;
@@ -26,7 +25,6 @@ type ProseMirrorUtils = {
 	selections: typeof SelectionUtilities;
 	eventBus: ProseMirrorEventBus;
 	schema: typeof schema;
-	view: EditorView | null;
 };
 
 export type ModularComponentProps = {

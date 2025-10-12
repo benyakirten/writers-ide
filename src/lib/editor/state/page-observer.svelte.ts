@@ -1,4 +1,5 @@
 import { PROSEMIRROR_PAGE_CLASS } from '../prosemirror/view/constants';
+import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.svelte';
 
 export class DocumentObserver {
 	private observer: IntersectionObserver | null = $state(null);
@@ -16,12 +17,20 @@ export class DocumentObserver {
 		private readonly _id: string,
 		private readonly cb: (page: number) => void,
 		private el: HTMLElement,
+		private _docId: string,
 		options: Partial<IntersectionObserverInit> = {},
 	) {
 		options.root ??= el;
 		options.rootMargin ??= '800px';
 		options.threshold ??= 0;
 		this.observer = new IntersectionObserver(this.intersectionCallback, options);
+		proseMirrorEventBus.subscribe(({ id, event }) => {
+			if (id !== this.docId || event.type !== ProseMirrorEventBusEventType.Paginate) {
+				return;
+			}
+
+			console.log('CALLED PAGINATE');
+		});
 
 		this.el
 			.querySelectorAll(`.${PROSEMIRROR_PAGE_CLASS}`)
@@ -30,6 +39,10 @@ export class DocumentObserver {
 
 	get id() {
 		return this._id;
+	}
+
+	get docId() {
+		return this._docId;
 	}
 
 	disconnect() {
@@ -56,7 +69,7 @@ class PageObserverManager {
 
 	register(obsId: string, el: HTMLElement, docId: string, paginatedThrough?: number) {
 		const data = this._map[docId];
-		const obs = new DocumentObserver(obsId, (page) => this.scrollTo(docId, page), el);
+		const obs = new DocumentObserver(obsId, (page) => this.scrollTo(docId, page), el, docId);
 
 		if (!data) {
 			const observedPage = {

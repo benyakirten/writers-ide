@@ -1,15 +1,20 @@
 import { Plugin } from 'prosemirror-state';
 
-import proseMirrorEventBus from '$lib/editor/state/event-bus.svelte';
+import proseMirrorEventBus, {
+	ProseMirrorEventBusEventType,
+} from '$lib/editor/state/event-bus.svelte';
 
-export const createUpdatePlugin = (id: string) =>
+export const createEventBusPlugin = (id: string) =>
 	new Plugin({
 		view(view) {
-			proseMirrorEventBus.update({ id, view });
+			proseMirrorEventBus.update({ id, event: { view, type: ProseMirrorEventBusEventType.Init } });
 
 			return {
 				update(view) {
-					proseMirrorEventBus.update({ id, view });
+					proseMirrorEventBus.update({
+						id,
+						event: { view, type: ProseMirrorEventBusEventType.Update },
+					});
 				},
 			};
 		},

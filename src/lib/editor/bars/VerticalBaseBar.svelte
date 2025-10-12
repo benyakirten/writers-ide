@@ -44,8 +44,8 @@
 	let gen: Generator<number, number, void> | null = null;
 	function paginate() {
 		if (!gen) {
-			const [data] = Object.values(Editors.editors);
-			gen = PageLayout.paginateRange(data.view, 0);
+			const [id, data] = Object.entries(Editors.editors)[0];
+			gen = PageLayout.paginateRange(id, data, 0);
 		}
 		const t = performance.now();
 		[...gen];
