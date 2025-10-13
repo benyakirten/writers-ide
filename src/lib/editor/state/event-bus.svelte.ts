@@ -6,6 +6,7 @@ export enum ProseMirrorEventBusEventType {
 	Init = 'EVENT_BUS_INIT',
 	Update = 'EVENT_BUS_UPDATE',
 	Paginate = 'EVENT_BUS_PAGINATE',
+	SetActiveTab = 'EVENT_BUS_SET_ACTIVE_TAB',
 }
 
 type PaginationEvent = {
@@ -22,7 +23,15 @@ type UpdateEvent = {
 	view: EditorView;
 };
 
-export type ProseMirrorEventBusEvent = PaginationEvent | InitEvent | UpdateEvent;
+type SetActiveTabEvent = {
+	type: ProseMirrorEventBusEventType.SetActiveTab;
+};
+
+export type ProseMirrorEventBusEvent =
+	| PaginationEvent
+	| InitEvent
+	| UpdateEvent
+	| SetActiveTabEvent;
 
 export class ProseMirrorEventBus extends Observable<{
 	id: string;

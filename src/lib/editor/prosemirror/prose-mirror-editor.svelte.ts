@@ -2,13 +2,6 @@ import type { EditorView } from 'prosemirror-view';
 import { PageObserver } from '../state/page-observer.svelte';
 import tabState from '../state/tab-state.svelte';
 
-export type ProsemirrorPage = {
-	view: EditorView;
-	raw: object;
-	container: HTMLElement;
-	modified: Date;
-};
-
 export class ProseMirrorEditors {
 	editors = $state<Record<string, EditorView>>({});
 

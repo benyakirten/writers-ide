@@ -10,7 +10,6 @@
 	import PageLayout from '$lib/editor/state/page-layout.svelte';
 	import { schema } from './schema';
 	import { ActionUtilities } from './actions';
-	import TabState from '../../state/tab-state.svelte';
 	import { createShortcuts } from '../plugins/shortcut.plugin';
 	import ProseMirrorPlugins from '../plugins.svelte';
 	import Editors from '../prose-mirror-editor.svelte';
@@ -26,8 +25,9 @@
 		shortPages,
 	} from './sample-data';
 	import { handleTransaction } from './transaction-handler';
+	import { ProseMirrorEventBusEventType } from '@/editor/state/event-bus.svelte';
 
-	let { id }: TabComponentProps = $props();
+	let { id, proseMirror }: TabComponentProps = $props();
 
 	let el: HTMLElement;
 	let state: EditorState;
@@ -106,9 +106,13 @@
 		// [...PageLayout.paginateRange(view, 0)];
 		return () => deregister();
 	});
+
+	function setThisToActiveTab() {
+		proseMirror.eventBus.update({ id, event: { type: ProseMirrorEventBusEventType.SetActiveTab } });
+	}
 </script>
 
-<div onfocusincapture={() => TabState.activate(id)}>
+<div onfocusincapture={() => setThisToActiveTab()}>
 	<div class="editor-host" bind:this={el}></div>
 </div>
 

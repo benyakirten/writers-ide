@@ -1,4 +1,5 @@
 import { IdGenerator } from '$lib/services/ids';
+import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.svelte';
 
 export type TabData = {
 	id: string;
@@ -8,9 +9,22 @@ export type TabData = {
 
 export class TabState {
 	windows = $state<TabData[]>([]);
+	private unsub: () => void;
 
 	#active = $state<string | null>(null);
 	active = $derived.by(() => this.windows.find((window) => window.id === this.#active)?.id);
+
+	constructor() {
+		this.unsub = proseMirrorEventBus.subscribe(({ id, event }) => {
+			if (event.type === ProseMirrorEventBusEventType.SetActiveTab) {
+				this.activate(id);
+			}
+		});
+	}
+
+	close() {
+		this.unsub();
+	}
 
 	activate(id: string | number): boolean {
 		if (typeof id === 'number') {
