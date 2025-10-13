@@ -13,6 +13,7 @@
 	import type { BarTransferLocation } from '$lib/editor/state/bar-transfer-handler.svelte';
 	import ItemRendererMenu from './ItemRendererMenu.svelte';
 	import type { MoveDetails } from './BarLocation.svelte';
+	import Editors from '../prosemirror/prose-mirror-editor.svelte';
 
 	let {
 		Component,
@@ -45,6 +46,7 @@
 					selections: SelectionUtilities,
 					eventBus: ProseMirrorEventBus,
 					schema,
+					editors: Editors,
 				}}
 				bars={{
 					vertical: VerticalBarState,

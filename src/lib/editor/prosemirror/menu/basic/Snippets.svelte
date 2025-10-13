@@ -243,7 +243,7 @@
 </script>
 
 {#snippet textMarkButtons(
-	activeCodeMarks: TextMarkPresence | undefined,
+	activeCodeMarks: TextMarkPresence | null,
 	m: Internationalizator,
 	editorView: EditorView | null,
 	actionUtils: typeof ActionUtilities,

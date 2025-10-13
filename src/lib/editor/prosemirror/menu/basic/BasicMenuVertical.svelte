@@ -8,31 +8,58 @@
 	import type { ModularComponentProps } from '$lib/editor/state/shared.types';
 	import type { TextMarkPresence } from '../../view/selection';
 	import { blockMarkButtons, textMarkButtons } from './Snippets.svelte';
-
-	let activeCodeMarks = $state<TextMarkPresence>();
+	let activeCodeMarks = $state<TextMarkPresence | null>(null);
 	let editorView = $state<EditorView | null>(null);
 	let selection = $state<Selection | null>(null);
 
 	let props: ModularComponentProps = $props();
 
+	function getNeededInformation(view: EditorView) {
+		activeCodeMarks = props.proseMirror.selections.findTextMarks(
+			view.state.selection,
+			view.state.doc,
+		);
+		editorView = view;
+		selection = view.state.selection;
+	}
+
 	onMount(() => {
-		const unsub = props.proseMirror.eventBus.subscribe(({ event }) => {
-			if (
+		const unsub = props.proseMirror.eventBus.subscribe(({ id, event }) => {
+			const isNotInitOrUpdate =
 				event.type !== ProseMirrorEventBusEventType.Init &&
-				event.type !== ProseMirrorEventBusEventType.Update
-			) {
+				event.type !== ProseMirrorEventBusEventType.Update;
+			if (id !== props.tabs.active || isNotInitOrUpdate) {
 				return;
 			}
 
 			const { view } = event;
-			const marks =
-				view && props.proseMirror.selections.findTextMarks(view.state.selection, view.state.doc);
-			activeCodeMarks = marks;
-			editorView = view;
-			selection = view.state.selection;
+			getNeededInformation(view);
 		});
 
 		return () => unsub();
+	});
+
+	function resetState() {
+		activeCodeMarks = null;
+		editorView = null;
+		selection = null;
+	}
+
+	$effect(() => {
+		const activeId = props.tabs.active;
+
+		if (!activeId) {
+			resetState();
+			return;
+		}
+
+		const editor = props.proseMirror.editors.get(activeId);
+		if (!editor) {
+			resetState();
+			return;
+		}
+
+		getNeededInformation(editor);
 	});
 </script>
 
