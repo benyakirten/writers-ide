@@ -1,5 +1,6 @@
 import type { EditorView } from 'prosemirror-view';
 import { PageObserver } from '../state/page-observer.svelte';
+import tabState from '../state/tab-state.svelte';
 
 export type ProsemirrorPage = {
 	view: EditorView;
@@ -16,8 +17,11 @@ export class ProseMirrorEditors {
 			this.editors[id] = view;
 		}
 
+		const deregisterTab = tabState.create(id);
 		const obsDeregister = PageObserver.register(obsId, el, id);
+
 		return () => {
+			deregisterTab();
 			this.deregister(id);
 			obsDeregister();
 		};

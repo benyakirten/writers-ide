@@ -7,19 +7,14 @@ export type TabData = {
 };
 
 export class TabState {
-	windows = $state<TabData[]>([
-		{
-			id: '1',
-			name: 'prosemirror',
-		},
-	]);
+	windows = $state<TabData[]>([]);
 
 	#active = $state<string | null>(null);
 	active = $derived.by(() => this.windows.find((window) => window.id === this.#active)?.id);
 
-	activate = (id: string | number): boolean => {
+	activate(id: string | number): boolean {
 		if (typeof id === 'number') {
-			if (id > this.windows.length) {
+			if (id >= this.windows.length) {
 				return false;
 			}
 
@@ -34,18 +29,31 @@ export class TabState {
 
 		this.#active = active.id;
 		return true;
-	};
+	}
 
 	deactivate(): void {
 		this.#active = null;
 	}
 
-	create(name: string, id: string = IdGenerator.generate(), data?: object): string {
+	create(name: string, id: string = IdGenerator.generate(), data?: object): () => void {
+		if (this.windows.find((item) => item.id === id)) {
+			throw new Error(`Tab with id ${id} already exists`);
+		}
+
 		this.windows.push({ id, name, data });
-		return id;
+
+		if (this.windows.length === 1) {
+			this.#active = id;
+		}
+
+		return () => this.remove(id);
 	}
 
 	remove(id: string): void {
+		if (this.#active === id) {
+			this.#active = this.windows.length > 0 ? this.windows[0].id : null;
+		}
+
 		const index = this.windows.findIndex((item) => item.id === id);
 		this.windows.splice(index, 1);
 	}

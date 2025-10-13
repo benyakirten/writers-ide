@@ -3,6 +3,7 @@ import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.s
 
 export class DocumentObserver {
 	private observer: IntersectionObserver | null = $state(null);
+	private unsub: () => void;
 
 	intersectionCallback: IntersectionObserverCallback = (entries) => {
 		const newPage =
@@ -23,13 +24,12 @@ export class DocumentObserver {
 		options.root ??= el;
 		options.rootMargin ??= '800px';
 		options.threshold ??= 0;
-		this.observer = new IntersectionObserver(this.intersectionCallback, options);
-		proseMirrorEventBus.subscribe(({ id, event }) => {
-			if (id !== this.docId || event.type !== ProseMirrorEventBusEventType.Paginate) {
-				return;
-			}
 
-			console.log('CALLED PAGINATE');
+		this.observer = new IntersectionObserver(this.intersectionCallback, options);
+		this.unsub = proseMirrorEventBus.subscribe(({ id, event }) => {
+			if (event.type === ProseMirrorEventBusEventType.Paginate && id === this._docId) {
+				this.reset();
+			}
 		});
 
 		this.el
@@ -54,6 +54,11 @@ export class DocumentObserver {
 		this.el
 			.querySelectorAll(`.${PROSEMIRROR_PAGE_CLASS}`)
 			.forEach((el) => this.observer?.observe(el));
+	}
+
+	close() {
+		this.disconnect();
+		this.unsub();
 	}
 }
 
@@ -88,9 +93,17 @@ class PageObserverManager {
 	deregister(id: string, docId: string) {
 		const data = this.data(docId);
 
-		data.observers = data.observers.filter((obs) => obs.id !== id);
+		const obsIndex = data.observers.findIndex((o) => o.id === id);
+		if (obsIndex === -1) {
+			throw new Error(`Observer ${id} not found for document ${docId}`);
+		}
+		const observer = data.observers[obsIndex];
+		observer.close();
+
 		if (data.observers.length === 0) {
 			delete this._map[docId];
+		} else {
+			data.observers.splice(obsIndex, 1);
 		}
 	}
 
