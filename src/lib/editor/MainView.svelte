@@ -17,6 +17,7 @@
 
 <style>
 	.main-view {
+		display: flex;
 		flex: 1;
 	}
 </style>

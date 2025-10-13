@@ -5,6 +5,7 @@
 	import Shortcuts from '$lib/services/shortcuts.svelte';
 	import TabRegistry from '$lib/editor/state/tab-state-registry.svelte';
 	import ProseMirrorView from '$lib/editor/prosemirror/view/ProseMirrorView.svelte';
+	import tabState from '$lib/editor/state/tab-state.svelte';
 	import { builtInShortcuts } from './shortcuts';
 
 	Shortcuts.add(builtInShortcuts);
@@ -15,6 +16,7 @@
 		},
 		'prosemirror',
 	);
+	tabState.create('prosemirror');
 </script>
 
 <Editor />
