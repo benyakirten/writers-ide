@@ -1,14 +1,15 @@
 import { Node as ProseMirrorNode } from 'prosemirror-model';
-import ProseMirrorPlugins from '../plugins.svelte';
 import { baseKeymap } from 'prosemirror-commands';
-import { undo, redo, history } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
+import { EditorView } from 'prosemirror-view';
+
+import { Registry } from '$lib/utils/registry';
+import ProseMirrorPlugins from '../plugins.svelte';
+import { undo, redo, history } from 'prosemirror-history';
 import { EditorState, Transaction } from 'prosemirror-state';
 import { createShortcuts } from '../plugins/shortcut.plugin';
 import { ActionUtilities } from './actions';
 import { schema } from './schema';
-import { EditorView } from 'prosemirror-view';
-import { Registry } from '@/utils/registry';
 import Editors from '../prose-mirror-editor.svelte';
 
 function createProseMirrorState(id: string, initialState: ProseMirrorNode) {
@@ -18,6 +19,7 @@ function createProseMirrorState(id: string, initialState: ProseMirrorNode) {
 		schema,
 		plugins: [
 			history(),
+			// TODO: There should be global shortcuts
 			createShortcuts({
 				splitParagraph: (state, dispatch) => ActionUtilities.splitParagraph(state, dispatch),
 				subscript: (state, dispatch, view) =>
