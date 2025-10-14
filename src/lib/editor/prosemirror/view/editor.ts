@@ -4,6 +4,9 @@ import { keymap } from 'prosemirror-keymap';
 import { EditorView } from 'prosemirror-view';
 
 import { Registry } from '$lib/utils/registry';
+import proseMirrorEventBus, {
+	ProseMirrorEventBusEventType,
+} from '$lib/editor/state/event-bus.svelte';
 import ProseMirrorPlugins from '../plugins.svelte';
 import { undo, redo, history } from 'prosemirror-history';
 import { EditorState, Transaction } from 'prosemirror-state';
@@ -61,7 +64,7 @@ export function createView(id: string, initialState: ProseMirrorNode, el: HTMLEl
 	const state = createProseMirrorState(id, initialState);
 	const view = new EditorView(el, {
 		state,
-		dispatchTransaction: (transaction) => handleTransaction(view, transaction),
+		dispatchTransaction: (transaction) => handleTransaction(id, view, transaction),
 	});
 
 	const obsId = crypto.randomUUID();
@@ -73,12 +76,16 @@ export const TransactionHandlerRegistry = new Registry<
 	(view: EditorView, tr: Transaction) => Transaction
 >();
 
-function handleTransaction(view: EditorView, transaction: Transaction) {
+function handleTransaction(id: string, view: EditorView, transaction: Transaction) {
 	for (const handler of TransactionHandlerRegistry.values()) {
 		transaction = handler(view, transaction);
 	}
 
-	console.log({ ...transaction });
+	proseMirrorEventBus.update({
+		id,
+		event: { type: ProseMirrorEventBusEventType.PreUpdate, view, tr: transaction },
+	});
+
 	const newState = view.state.apply(transaction);
 	view.updateState(newState);
 }

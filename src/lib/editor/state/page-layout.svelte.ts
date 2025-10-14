@@ -18,6 +18,13 @@ import { clamp } from '$lib/utils/numbers';
 import type { EditorState, Transaction } from 'prosemirror-state';
 import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.svelte';
 
+export enum PageLayoutMetaTransactionType {
+	Paginate = 'PAGE_LAYOUT_PAGINATE',
+	BreakPeering = 'PAGE_LAYOUT_BREAK_PEERING',
+	DeletePage = 'PAGE_LAYOUT_DELETE_PAGE',
+	ReunitePeers = 'PAGE_LAYOUT_REUNITE_PEERS',
+}
+
 export type Unit = 'in' | 'cm' | 'mm';
 
 export enum PeerSelection {
@@ -648,6 +655,12 @@ export class PageLayoutManager {
 	deletePage(view: EditorView, page: PageDetails): number {
 		const { tr } = view.state;
 		tr.delete(page.pageOffset, page.pageOffset + page.pageNode.nodeSize);
+		tr.setMeta(PAGINATION_TRANSACTION_META_KEY, {
+			type: PageLayoutMetaTransactionType.DeletePage,
+			from: page.pageOffset,
+			to: page.pageOffset + page.pageNode.nodeSize,
+		});
+
 		view.dispatch(tr);
 		return 0;
 	}
@@ -704,7 +717,10 @@ export class PageLayoutManager {
 		}
 
 		tr.setNodeAttribute(pageDetails.pageOffset, 'index', pageNumber);
-		tr.setMeta(PAGINATION_TRANSACTION_META_KEY, { pageNumber });
+		tr.setMeta(PAGINATION_TRANSACTION_META_KEY, {
+			type: PageLayoutMetaTransactionType.Paginate,
+			pageNumber,
+		});
 		view.dispatch(tr);
 
 		return delta;
@@ -759,6 +775,11 @@ export class PageLayoutManager {
 				break;
 			}
 			this.reunitePeeredParagraphs(tr, page, nextPage);
+			tr.setMeta(PAGINATION_TRANSACTION_META_KEY, {
+				type: PageLayoutMetaTransactionType.ReunitePeers,
+				from: page.pageOffset,
+				to: page.pageOffset + page.pageNode.nodeSize,
+			});
 			view.dispatch(tr);
 		}
 	}
@@ -1239,9 +1260,20 @@ export class PageLayoutManager {
 
 		tr.setNodeAttribute(pos, 'peer', false);
 		tr.setNodeAttribute(pos, 'indent', PageLayout.defaultParagraphIndent);
+		tr.setMeta(PAGINATION_TRANSACTION_META_KEY, {
+			type: PageLayoutMetaTransactionType.BreakPeering,
+			from,
+		});
 		dispatch(tr);
 
 		return true;
+	}
+
+	/**
+	 * Determine which pages are affected by a given transaction
+	 */
+	getAffectedPageRangeFromTransaction(_: EditorView, _2: Transaction): [number, number] {
+		return [0, 0];
 	}
 }
 

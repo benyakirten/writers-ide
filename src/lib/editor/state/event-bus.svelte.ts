@@ -1,10 +1,11 @@
 import type { EditorView } from 'prosemirror-view';
+import type { Transaction } from 'prosemirror-state';
 
 import { Observable } from '$lib/utils/observable';
 
 export enum ProseMirrorEventBusEventType {
 	Init = 'EVENT_BUS_INIT',
-	Transaction = 'EVENT_BUS_TRANSACTION',
+	PreUpdate = 'EVENT_BUS_PRE_UPDATE',
 	Update = 'EVENT_BUS_UPDATE',
 	Paginate = 'EVENT_BUS_PAGINATE',
 	SetActiveTab = 'EVENT_BUS_SET_ACTIVE_TAB',
@@ -28,10 +29,10 @@ type SetActiveTabEvent = {
 	type: ProseMirrorEventBusEventType.SetActiveTab;
 };
 
-type TransactionEvent = {
-	type: ProseMirrorEventBusEventType.Transaction;
-	startPage: number;
-	endPage: number;
+type PreUpdateEvent = {
+	type: ProseMirrorEventBusEventType.PreUpdate;
+	view: EditorView;
+	tr: Transaction;
 };
 
 export type ProseMirrorEventBusEvent =
@@ -39,7 +40,7 @@ export type ProseMirrorEventBusEvent =
 	| InitEvent
 	| UpdateEvent
 	| SetActiveTabEvent
-	| TransactionEvent;
+	| PreUpdateEvent;
 
 export class ProseMirrorEventBus extends Observable<{
 	id: string;
