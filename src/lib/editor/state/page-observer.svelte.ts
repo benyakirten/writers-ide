@@ -27,7 +27,7 @@ export class DocumentObserver {
 
 		this.observer = new IntersectionObserver(this.intersectionCallback, options);
 		this.unsub = proseMirrorEventBus.subscribe(({ id, event }) => {
-			if (event.type === ProseMirrorEventBusEventType.Paginate && id === this._docId) {
+			if (event.type === ProseMirrorEventBusEventType.Update && id === this._docId) {
 				this.reset();
 			}
 		});
@@ -62,28 +62,62 @@ export class DocumentObserver {
 	}
 }
 
-type ObservedPage = {
+export type ObservedPage = {
 	viewedPage: number;
-	paginatedThrough: number;
+	obsPage: Record<string, number>;
+	paginatedTo: number;
+	needsPagination: boolean;
 	observers: DocumentObserver[];
 };
 
 class PageObserverManager {
 	private _map: Record<string, ObservedPage> = $state({});
+	private unsub: () => void;
 	public map = $derived(this._map);
 
-	register(obsId: string, el: HTMLElement, docId: string, paginatedThrough?: number) {
+	constructor() {
+		this.unsub = proseMirrorEventBus.subscribe(({ id, event }) => {
+			if (event.type === ProseMirrorEventBusEventType.Paginate) {
+				const data = this._map[id];
+				if (data) {
+					data.paginatedTo = event.paginatedTo;
+				}
+			}
+		});
+	}
+
+	close() {
+		this.unsub();
+		Object.values(this._map).forEach((data) => data.observers.forEach((obs) => obs.close()));
+		this._map = {};
+	}
+
+	getMaxPage(data: ObservedPage): number {
+		return Math.max(...Object.values(data.obsPage));
+	}
+
+	register(
+		obsId: string,
+		el: HTMLElement,
+		docId: string,
+		viewedPage: number = 0,
+		paginatedTo: number = 0,
+	) {
 		const data = this._map[docId];
-		const obs = new DocumentObserver(obsId, (page) => this.scrollTo(docId, page), el, docId);
+		const obs = new DocumentObserver(obsId, (page) => this.scrollTo(obsId, docId, page), el, docId);
 
 		if (!data) {
 			const observedPage = {
-				viewedPage: 0,
-				paginatedThrough: paginatedThrough ?? 0,
+				viewedPage,
+				paginatedTo,
 				observers: [obs],
+				needsPagination: false,
+				obsPage: { [obsId]: viewedPage },
 			};
 			this._map[docId] = observedPage;
 		} else {
+			data.obsPage[obsId] = viewedPage;
+			data.paginatedTo = this.getMaxPage(data);
 			data.observers.push(obs);
 		}
 
@@ -116,20 +150,20 @@ class PageObserverManager {
 		return data;
 	}
 
-	scrollTo(docId: string, page: number) {
+	scrollTo(obsId: string, docId: string, page: number) {
 		const data = this.data(docId);
-		data.observers.forEach((obs) => obs.disconnect());
-		data.viewedPage = page;
+		data.obsPage[obsId] = page;
+		data.viewedPage = this.getMaxPage(data);
 	}
 
 	paginateTo(docId: string, page: number) {
 		const data = this.data(docId);
-		data.paginatedThrough = page;
+		data.paginatedTo = page;
 	}
 
 	stopPagination(docId: string, page: number) {
 		const data = this.data(docId);
-		data.paginatedThrough = page;
+		data.paginatedTo = page;
 		data.observers.forEach((obs) => obs.reset());
 	}
 
