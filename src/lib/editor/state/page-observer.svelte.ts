@@ -66,14 +66,30 @@ export type ObservedPage = {
 	viewedPage: number;
 	obsPage: Record<string, number>;
 	paginatedTo: number;
-	needsPagination: boolean;
+	lastChangedPage: number | null;
 	observers: DocumentObserver[];
 };
+
+export type ToPaginateRange = [string, number, number];
 
 class PageObserverManager {
 	private _map: Record<string, ObservedPage> = $state({});
 	private unsub: () => void;
 	public map = $derived(this._map);
+
+	// TODO: ToPaginateRange[] - pages that should be paginated
+	// Pages should be paginated if their paginatedTo < viewedPage
+	// OR lastChangedPage is not null and < viewedPage
+	public toPaginate = $derived(
+		Object.entries(this._map).reduce<ToPaginateRange[]>((acc, [id, data]) => {
+			if (data.paginatedTo < data.viewedPage) {
+				acc.push([id, data.paginatedTo, data.viewedPage + 1]);
+			} else if (data.lastChangedPage !== null && data.lastChangedPage < data.viewedPage) {
+				acc.push([id, data.lastChangedPage, data.viewedPage + 1]);
+			}
+			return acc;
+		}, []),
+	);
 
 	constructor() {
 		this.unsub = proseMirrorEventBus.subscribe(({ id, event }) => {
@@ -113,6 +129,7 @@ class PageObserverManager {
 				observers: [obs],
 				needsPagination: false,
 				obsPage: { [obsId]: viewedPage },
+				lastChangedPage: null,
 			};
 			this._map[docId] = observedPage;
 		} else {
@@ -159,11 +176,13 @@ class PageObserverManager {
 	paginateTo(docId: string, page: number) {
 		const data = this.data(docId);
 		data.paginatedTo = page;
+		data.lastChangedPage = page;
 	}
 
 	stopPagination(docId: string, page: number) {
 		const data = this.data(docId);
 		data.paginatedTo = page;
+		data.lastChangedPage = null;
 		data.observers.forEach((obs) => obs.reset());
 	}
 
