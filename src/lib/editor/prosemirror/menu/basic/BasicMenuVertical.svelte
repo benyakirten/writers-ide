@@ -59,7 +59,7 @@
 			return;
 		}
 
-		getNeededInformation(editor);
+		getNeededInformation(editor.view);
 	});
 </script>
 

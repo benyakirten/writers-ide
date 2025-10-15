@@ -1,11 +1,8 @@
 <script lang="ts">
-	import { PageObserver, type ObservedPage } from '$lib/editor/state/page-observer.svelte';
+	import { PageObserver } from '$lib/editor/state/page-observer.svelte';
+	import Modal from '../Modal.svelte';
 
-	function getViewsThatNeedPagination(map: Record<string, ObservedPage>) {
-		return Object.entries(map)
-			.filter(([_, data]) => data.viewedPage > data.paginatedTo)
-			.map(([id]) => id);
-	}
-
-	let idsToPaginate = $derived.by(() => getViewsThatNeedPagination(PageObserver.map));
+	let open = $state(false);
 </script>
+
+<Modal {open} />

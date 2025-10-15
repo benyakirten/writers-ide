@@ -1,5 +1,9 @@
+import type { Transaction } from 'prosemirror-state';
+
 import { PROSEMIRROR_PAGE_CLASS } from '../prosemirror/view/constants';
 import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.svelte';
+import PageLayout from './page-layout.svelte';
+import type { EditorView } from 'prosemirror-view';
 
 export class DocumentObserver {
 	private observer: IntersectionObserver | null = $state(null);
@@ -27,7 +31,7 @@ export class DocumentObserver {
 
 		this.observer = new IntersectionObserver(this.intersectionCallback, options);
 		this.unsub = proseMirrorEventBus.subscribe(({ id, event }) => {
-			if (event.type === ProseMirrorEventBusEventType.Update && id === this._docId) {
+			if (event.type === ProseMirrorEventBusEventType.Paginate && id === this._docId) {
 				this.reset();
 			}
 		});
@@ -70,16 +74,13 @@ export type ObservedPage = {
 	observers: DocumentObserver[];
 };
 
-export type ToPaginateRange = [string, number, number];
+export type ToPaginateRange = [id: string, from: number, to: number];
 
 class PageObserverManager {
 	private _map: Record<string, ObservedPage> = $state({});
 	private unsub: () => void;
 	public map = $derived(this._map);
 
-	// TODO: ToPaginateRange[] - pages that should be paginated
-	// Pages should be paginated if their paginatedTo < viewedPage
-	// OR lastChangedPage is not null and < viewedPage
 	public toPaginate = $derived(
 		Object.entries(this._map).reduce<ToPaginateRange[]>((acc, [id, data]) => {
 			if (data.paginatedTo < data.viewedPage) {
@@ -93,13 +94,25 @@ class PageObserverManager {
 
 	constructor() {
 		this.unsub = proseMirrorEventBus.subscribe(({ id, event }) => {
-			if (event.type === ProseMirrorEventBusEventType.Paginate) {
-				const data = this._map[id];
-				if (data) {
+			const data = this._map[id];
+			if (!data) {
+				return;
+			}
+
+			switch (event.type) {
+				case ProseMirrorEventBusEventType.Paginate:
 					data.paginatedTo = event.paginatedTo;
-				}
+					break;
+				case ProseMirrorEventBusEventType.PreUpdate:
+					this.updateLastUpdatedPage(data, event.view, event.tr);
+					break;
 			}
 		});
+	}
+
+	updateLastUpdatedPage(data: ObservedPage, view: EditorView, tr: Transaction) {
+		const [firstPage] = PageLayout.getAffectedPageRangeFromTransaction(view, tr);
+		data.lastChangedPage = firstPage;
 	}
 
 	close() {

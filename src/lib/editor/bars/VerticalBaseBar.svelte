@@ -45,7 +45,7 @@
 	function paginate() {
 		if (!gen) {
 			const [id, data] = Object.entries(Editors.editors)[0];
-			gen = PageLayout.paginateRange(id, data, 0);
+			gen = PageLayout.paginateRange(id, data.view, 0);
 		}
 		const t = performance.now();
 		[...gen];

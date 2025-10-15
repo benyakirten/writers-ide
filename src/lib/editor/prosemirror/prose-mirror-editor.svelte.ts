@@ -1,12 +1,23 @@
 import type { EditorView } from 'prosemirror-view';
 import { PageObserver } from '../state/page-observer.svelte';
 
-export class ProseMirrorEditors {
-	editors = $state<Record<string, EditorView>>({});
+type EditorDetails = {
+	name: string;
+	view: EditorView;
+};
 
-	register(id: string, view: EditorView, obsId: string, el: HTMLElement): () => void {
+export class ProseMirrorEditors {
+	editors = $state<Record<string, EditorDetails>>({});
+
+	register(
+		id: string,
+		fileName: string,
+		view: EditorView,
+		obsId: string,
+		el: HTMLElement,
+	): () => void {
 		if (!this.editors[id]) {
-			this.editors[id] = view;
+			this.editors[id] = { name: fileName, view };
 		}
 
 		const obsDeregister = PageObserver.register(obsId, el, id);
@@ -18,11 +29,11 @@ export class ProseMirrorEditors {
 	}
 
 	deregister(id: string): void {
-		this.editors[id]?.destroy();
+		this.editors[id]?.view.destroy();
 		delete this.editors[id];
 	}
 
-	get(id: string): EditorView | null {
+	get(id: string): EditorDetails | null {
 		return this.editors[id] ?? null;
 	}
 }

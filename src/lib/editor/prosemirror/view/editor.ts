@@ -60,7 +60,12 @@ function createProseMirrorState(id: string, initialState: ProseMirrorNode) {
 	});
 }
 
-export function createView(id: string, initialState: ProseMirrorNode, el: HTMLElement): () => void {
+export function createView(
+	id: string,
+	fileName: string,
+	initialState: ProseMirrorNode,
+	el: HTMLElement,
+): () => void {
 	const state = createProseMirrorState(id, initialState);
 	const view = new EditorView(el, {
 		state,
@@ -68,7 +73,7 @@ export function createView(id: string, initialState: ProseMirrorNode, el: HTMLEl
 	});
 
 	const obsId = crypto.randomUUID();
-	const deregister = Editors.register(id, view, obsId, el.querySelector('.ProseMirror')!);
+	const deregister = Editors.register(id, fileName, view, obsId, el.querySelector('.ProseMirror')!);
 	return () => deregister();
 }
 

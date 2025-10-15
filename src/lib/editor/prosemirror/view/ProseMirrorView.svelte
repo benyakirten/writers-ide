@@ -41,7 +41,7 @@
 	]);
 
 	onMount(() => {
-		const deregister = createView(id, initialState, el);
+		const deregister = createView(id, 'Test', initialState, el);
 		return () => deregister();
 	});
 
