@@ -1,24 +1,35 @@
 import type { DOMOutputSpec, NodeSpec } from 'prosemirror-model';
 
-import { clamp } from '$lib/utils/numbers.js';
-import { INDENT_MAX, INDENT_MIN, INDENT_SIZE_PX } from './constants.js';
+import { clamp } from '$lib/utils/numbers';
+import {
+	INDENT_MAX,
+	INDENT_MIN,
+	INDENT_SIZE_PX,
+	PROSEMIRROR_PAGE_CLASS,
+	PROSEMIRROR_PAGE_END_CLASS,
+	PROSEMIRROR_PARAGRAPH_CLASS,
+} from './constants';
 
 const doc: NodeSpec = {
-	content: 'block+'
+	content: 'page+',
 };
 
 const paragraph: NodeSpec = {
 	content: 'inline*',
 	group: 'block',
 	attrs: {
+		peer: {
+			default: false,
+			validate: 'boolean',
+		},
 		indent: {
-			default: 0,
+			default: 1,
 			validate: (value) => {
 				const _value = parseInt(value);
 				if (isNaN(_value) || _value < INDENT_MIN || _value > INDENT_MAX) {
 					throw new Error('Indent must be an integer between INDENT_MIN and INDENT_MAX');
 				}
-			}
+			},
 		},
 		align: {
 			default: 'start',
@@ -28,33 +39,43 @@ const paragraph: NodeSpec = {
 				value === 'left' ||
 				value === 'center' ||
 				value === 'right' ||
-				value === 'justify'
-		}
+				value === 'justify',
+		},
 	},
 	parseDOM: [
 		{
 			tag: 'p',
 			getAttrs: (node) => {
 				const indent = node.style.textIndent.split('px')[INDENT_MIN];
-				const _indent = parseInt(indent);
+				const align = node.style.textAlign;
+				const peer = node.getAttribute('data-peer') === 'true';
+				let _indent = parseInt(indent);
 				if (isNaN(_indent)) {
-					return { indent: INDENT_MIN };
+					_indent = INDENT_MIN;
 				}
-				return { indent: clamp(_indent, INDENT_MIN, INDENT_MAX) };
-			}
-		}
+
+				const data = {
+					indent: clamp(_indent, INDENT_MIN, INDENT_MAX),
+					align,
+					peer,
+				};
+
+				return data;
+			},
+		},
 	],
 	toDOM(node) {
-		const { indent, align } = node.attrs;
+		const { indent, align, peer } = node.attrs;
 		return [
 			'p',
 			{
-				class: 'paragraph',
-				style: `text-indent: ${indent * INDENT_SIZE_PX}px; text-align: ${align};`
+				class: PROSEMIRROR_PARAGRAPH_CLASS,
+				style: `text-indent: ${indent * INDENT_SIZE_PX}px; text-align: ${align};`,
+				'data-peer': peer,
 			},
-			0
+			0,
 		];
-	}
+	},
 };
 
 const blockquoteDOM: DOMOutputSpec = ['blockquote', 0];
@@ -65,7 +86,7 @@ const blockquote: NodeSpec = {
 	parseDOM: [{ tag: 'blockquote' }],
 	toDOM() {
 		return blockquoteDOM;
-	}
+	},
 };
 
 const hrDOM: DOMOutputSpec = ['hr'];
@@ -74,7 +95,7 @@ const horizontalRule: NodeSpec = {
 	parseDOM: [{ tag: 'hr' }],
 	toDOM() {
 		return hrDOM;
-	}
+	},
 };
 
 const heading: NodeSpec = {
@@ -88,15 +109,15 @@ const heading: NodeSpec = {
 		{ tag: 'h3', attrs: { level: 3 } },
 		{ tag: 'h4', attrs: { level: 4 } },
 		{ tag: 'h5', attrs: { level: 5 } },
-		{ tag: 'h6', attrs: { level: 6 } }
+		{ tag: 'h6', attrs: { level: 6 } },
 	],
 	toDOM(node) {
 		return ['h' + node.attrs.level, 0];
-	}
+	},
 };
 
 const preDOM: DOMOutputSpec = ['pre', ['code', 0]];
-const codeBlock: NodeSpec = {
+const code: NodeSpec = {
 	content: 'text*',
 	marks: '',
 	group: 'block',
@@ -105,11 +126,11 @@ const codeBlock: NodeSpec = {
 	parseDOM: [{ tag: 'pre', preserveWhitespace: 'full' }],
 	toDOM() {
 		return preDOM;
-	}
+	},
 };
 
 const text: NodeSpec = {
-	group: 'inline'
+	group: 'inline',
 };
 
 const image: NodeSpec = {
@@ -117,7 +138,7 @@ const image: NodeSpec = {
 	attrs: {
 		src: { validate: 'string' },
 		alt: { default: null, validate: 'string|null' },
-		title: { default: null, validate: 'string|null' }
+		title: { default: null, validate: 'string|null' },
 	},
 	group: 'inline',
 	draggable: true,
@@ -128,36 +149,107 @@ const image: NodeSpec = {
 				return {
 					src: dom.getAttribute('src'),
 					title: dom.getAttribute('title'),
-					alt: dom.getAttribute('alt')
+					alt: dom.getAttribute('alt'),
 				};
-			}
-		}
+			},
+		},
 	],
 	toDOM(node) {
 		const { src, alt, title } = node.attrs;
 		return ['img', { src, alt, title }];
-	}
+	},
 };
 
 const brDOM: DOMOutputSpec = ['br'];
-const hardBreak: NodeSpec = {
+const inlineBreak: NodeSpec = {
 	inline: true,
 	group: 'inline',
 	selectable: false,
 	parseDOM: [{ tag: 'br' }],
 	toDOM() {
 		return brDOM;
-	}
+	},
+};
+
+const page: NodeSpec = {
+	content: 'block+',
+	attrs: {
+		index: { default: null, validate: 'number|null' },
+	},
+	group: 'block',
+	selectable: false,
+	draggable: false,
+	parseDOM: [
+		{
+			tag: `div.${PROSEMIRROR_PAGE_CLASS}`,
+			getAttrs: (dom) => {
+				const indexRaw = dom.getAttribute('data-index');
+				const index = parseInt(indexRaw ?? '');
+				return { index: isNaN(index) ? null : index };
+			},
+		},
+	],
+	toDOM(node) {
+		const { index } = node.attrs;
+		return ['div', { class: PROSEMIRROR_PAGE_CLASS, 'data-index': index }, 0];
+	},
+};
+
+const pageEndDom: DOMOutputSpec = [
+	'div',
+	{
+		class: PROSEMIRROR_PAGE_END_CLASS,
+	},
+];
+const pageEnd: NodeSpec = {
+	group: 'block',
+	selectable: false,
+	atom: true,
+	draggable: false,
+	defining: true,
+	parseDOM: [{ tag: `div.${PROSEMIRROR_PAGE_END_CLASS}` }],
+	toDOM() {
+		return pageEndDom;
+	},
+};
+
+const headerDom: DOMOutputSpec = ['div', { class: 'page-header' }, 0];
+export const header: NodeSpec = {
+	content: 'block+',
+	group: 'footer',
+	defining: true,
+	isolating: true,
+	toDOM: () => headerDom,
+	parseDOM: [
+		{
+			tag: 'div.page-header',
+		},
+	],
+};
+
+const footerDom: DOMOutputSpec = ['div', { class: 'page-footer' }, 0];
+export const footer: NodeSpec = {
+	content: 'block+',
+	group: 'footer',
+	toDOM: () => footerDom,
+	parseDOM: [
+		{
+			tag: 'div.page-footer',
+		},
+	],
 };
 
 export const nodes = {
 	doc,
+	page,
 	paragraph,
 	blockquote,
 	horizontalRule,
 	heading,
-	codeBlock,
+	code,
 	text,
 	image,
-	hardBreak
+	inlineBreak,
+	pageEnd,
+	header,
 } as const;

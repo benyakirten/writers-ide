@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
 	VerticalBarState,
 	VerticalBarPosition,
-	type VerticalBar
+	type VerticalBar,
 } from './vertical-bar-state.svelte';
-import { BarItems } from './bar-items.svelte.js';
+import { BarItems } from './bar-items.svelte';
 
 describe('VerticalBarState', () => {
 	let state: VerticalBarState;
@@ -16,7 +16,7 @@ describe('VerticalBarState', () => {
 
 	function makeEvent(
 		clientX: number,
-		{ left = 0, right = 0 }: { left: number; right: number }
+		{ left = 0, right = 0 }: { left: number; right: number },
 	): MouseEvent {
 		const target = document.createElement('div');
 		const getBoundingClientRect = () => ({ left, right });
@@ -27,7 +27,7 @@ describe('VerticalBarState', () => {
 		// @ts-expect-error: Test Object
 		return {
 			clientX,
-			target
+			target,
 		};
 	}
 
@@ -37,22 +37,22 @@ describe('VerticalBarState', () => {
 				data: new BarItems(true),
 				id: 'inline-start-1',
 				visible: true,
-				width: 200
+				width: 200,
 			},
 			{
 				data: new BarItems(true),
 				id: 'inline-start-2',
 				visible: true,
-				width: 200
-			}
+				width: 200,
+			},
 		];
 		const inlineEndBars: VerticalBar[] = [
 			{
 				data: new BarItems(true),
 				id: 'inline-end-1',
 				visible: true,
-				width: 200
-			}
+				width: 200,
+			},
 		];
 
 		beforeEach(() => {
@@ -87,7 +87,7 @@ describe('VerticalBarState', () => {
 			const bar2 = state.add(
 				{ width: 200, id: 'inline-start-2' },
 				VerticalBarPosition.InlineStart,
-				0
+				0,
 			);
 			expect(state.inlineStart).toEqual([bar2, bar1]);
 		});
@@ -97,14 +97,14 @@ describe('VerticalBarState', () => {
 			const bar2 = state.add(
 				{ width: 200, id: 'inline-start-2' },
 				VerticalBarPosition.InlineStart,
-				-1
+				-1,
 			);
 			expect(state.inlineStart).toEqual([bar1, bar2]);
 
 			const bar3 = state.add(
 				{ width: 300, id: 'inline-start-3' },
 				VerticalBarPosition.InlineStart,
-				10
+				10,
 			);
 			expect(state.inlineStart).toEqual([bar1, bar2, bar3]);
 		});
@@ -135,7 +135,7 @@ describe('VerticalBarState', () => {
 		it('should return 0 if the bar is not visible', () => {
 			const bar = state.add(
 				{ width: 100, id: 'inline-start-1', visible: false },
-				VerticalBarPosition.InlineEnd
+				VerticalBarPosition.InlineEnd,
 			);
 			expect(state.width(bar)).toBe(0);
 		});
@@ -143,7 +143,7 @@ describe('VerticalBarState', () => {
 		it('should return 0 if the bar is visible but the width is below the minimum size', () => {
 			const bar = state.add(
 				{ width: MIN_SIZE / 2, id: 'inline-start-1' },
-				VerticalBarPosition.InlineStart
+				VerticalBarPosition.InlineStart,
 			);
 			expect(state.width(bar)).toBe(0);
 		});
@@ -164,7 +164,7 @@ describe('VerticalBarState', () => {
 		it('should toggle the visibility of a bar', () => {
 			const bar = state.add(
 				{ id: 'inline-start-1', visible: true },
-				VerticalBarPosition.InlineStart
+				VerticalBarPosition.InlineStart,
 			);
 			state.toggleBar(bar);
 			expect(bar.visible).toBe(false);
@@ -221,7 +221,7 @@ describe('VerticalBarState', () => {
 				id: 'inline-start-1',
 				position: VerticalBarPosition.InlineStart,
 				x: 100,
-				resized: false
+				resized: false,
 			});
 		});
 	});
@@ -231,7 +231,7 @@ describe('VerticalBarState', () => {
 			width: number,
 			x: number,
 			position: VerticalBarPosition,
-			visible = true
+			visible = true,
 		) {
 			const id = crypto.randomUUID();
 			const bar = state.add({ width, id, visible }, position);
@@ -302,7 +302,7 @@ describe('VerticalBarState', () => {
 			createBarAndStartResizing(150, 150, VerticalBarPosition.InlineStart);
 			const evt = {
 				clientX: 100,
-				target: { getBoundingClientRect: () => ({ left: 225, right: 275 }) }
+				target: { getBoundingClientRect: () => ({ left: 225, right: 275 }) },
 			} as unknown as MouseEvent;
 			const got = await state.resize(evt);
 			expect(got).toBe(false);

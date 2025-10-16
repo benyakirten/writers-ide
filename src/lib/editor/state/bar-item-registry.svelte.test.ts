@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { BarItemRegistry, type BarItem } from './bar-item-registry.svelte.js';
+import { BarItemRegistry, type BarItem } from './bar-item-registry.svelte';
 
 describe('BarItemRegistry', () => {
 	let registry: BarItemRegistry;
@@ -11,7 +11,7 @@ describe('BarItemRegistry', () => {
 			// @ts-expect-error: Test mock
 			vertical: { Component: () => null, size: 2 },
 			// @ts-expect-error: Test mock
-			horizontal: { Component: () => null, size: 3 }
+			horizontal: { Component: () => null, size: 3 },
 		};
 	});
 

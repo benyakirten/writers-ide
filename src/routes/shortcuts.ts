@@ -1,6 +1,7 @@
 // TODO: These will be saved into a system-wide config file
 // that will be editable when the user has initially set up the system.
 const builtInShortcuts = {
+	splitParagraph: 'enter',
 	subscript: 'ctrl-shift-+',
 	superscript: 'ctrl-shift-_',
 	strikethrough: 'meta-shift-x',
@@ -24,6 +25,6 @@ const builtInShortcuts = {
 	'move-bar-up': 'meta-shift-arrowup',
 	'move-bar-down': 'meta-shift-arrowdown',
 	'move-bar-left': 'meta-shift-arrowleft',
-	'move-bar-right': 'meta-shift-arrowright'
+	'move-bar-right': 'meta-shift-arrowright',
 } as const;
 export { builtInShortcuts };

@@ -12,12 +12,12 @@
 			backgroundColor: { control: 'color' },
 			size: {
 				control: { type: 'select' },
-				options: ['small', 'medium', 'large']
-			}
+				options: ['small', 'medium', 'large'],
+			},
 		},
 		args: {
-			onClick: fn()
-		}
+			onClick: fn(),
+		},
 	});
 </script>
 

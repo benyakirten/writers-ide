@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { DivProps } from '$lib/types/block.js';
+	import type { DivProps } from '$lib/types/block';
 
 	let props: DivProps = $props();
 </script>

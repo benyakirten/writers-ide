@@ -1,30 +1,66 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import * as m from '$lib/paraglide/messages.js';
+	import * as m from '$lib/paraglide/messages';
 	import type { EditorView } from 'prosemirror-view';
 	import type { Selection } from 'prosemirror-state';
 
-	import type { BarItemComponentProps } from '$lib/editor/state/bar-item-registry.svelte.js';
-	import type { TextMarkPresence } from '../../view/selection.js';
+	import type { ModularComponentProps } from '$lib/editor/state/shared.types';
+	import { ProseMirrorEventBusEventType } from '$lib/editor/state/event-bus.svelte';
 	import { blockMarkButtons, textMarkButtons } from './Snippets.svelte';
+	import type { TextMarkPresence } from '../../view/selection';
 
-	let activeCodeMarks = $state<TextMarkPresence>();
+	let activeCodeMarks = $state<TextMarkPresence | null>(null);
 	let editorView = $state<EditorView | null>(null);
 	let selection = $state<Selection | null>(null);
 
-	let props: BarItemComponentProps = $props();
+	let props: ModularComponentProps = $props();
+
+	function getNeededInformation(view: EditorView) {
+		activeCodeMarks = props.proseMirror.selections.findTextMarks(
+			view.state.selection,
+			view.state.doc,
+		);
+		editorView = view;
+		selection = view.state.selection;
+	}
 
 	onMount(() => {
-		const unsub = props.proseMirror.eventBus.subscribe(({ view }) => {
-			activeCodeMarks = props.proseMirror.selections.findTextMarks(
-				view.state.selection,
-				view.state.doc
-			);
-			editorView = view;
-			selection = view.state.selection;
+		const unsub = props.proseMirror.eventBus.subscribe(({ id, event }) => {
+			const isNotInitOrUpdate =
+				event.type !== ProseMirrorEventBusEventType.Init &&
+				event.type !== ProseMirrorEventBusEventType.Update;
+			if (id !== props.tabs.active || isNotInitOrUpdate) {
+				return;
+			}
+
+			const { view } = event;
+			getNeededInformation(view);
 		});
 
 		return () => unsub();
+	});
+
+	function resetState() {
+		activeCodeMarks = null;
+		editorView = null;
+		selection = null;
+	}
+
+	$effect(() => {
+		const activeId = props.tabs.active;
+
+		if (!activeId) {
+			resetState();
+			return;
+		}
+
+		const editor = props.proseMirror.editors.get(activeId);
+		if (!editor) {
+			resetState();
+			return;
+		}
+
+		getNeededInformation(editor.view);
 	});
 </script>
 
@@ -35,7 +71,7 @@
 			m,
 			editorView,
 			props.proseMirror.actions,
-			'horizontal'
+			'horizontal',
 		)}
 	</div>
 	<div class="grouping">
@@ -45,7 +81,7 @@
 			m,
 			props.proseMirror.actions,
 			props.proseMirror.selections,
-			'horizontal'
+			'horizontal',
 		)}
 	</div>
 </div>

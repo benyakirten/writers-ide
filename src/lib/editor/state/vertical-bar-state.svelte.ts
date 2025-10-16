@@ -1,4 +1,5 @@
-import { BarItems } from './bar-items.svelte.js';
+import { IdGenerator } from '$lib/services/ids';
+import { BarItems } from './bar-items.svelte';
 
 export type VerticalBar = {
 	width: number;
@@ -9,12 +10,12 @@ export type VerticalBar = {
 
 export enum HorizontalTextDirection {
 	LTR = 'LTR',
-	RTL = 'RTL'
+	RTL = 'RTL',
 }
 
 export enum VerticalBarPosition {
 	InlineStart = 'INLINE_START',
-	InlineEnd = 'INLINE_END'
+	InlineEnd = 'INLINE_END',
 }
 
 export class VerticalBarState {
@@ -30,7 +31,7 @@ export class VerticalBarState {
 	constructor(
 		public readonly minSize = 200,
 		inlineStart: VerticalBar[] = [],
-		inlineEnd: VerticalBar[] = []
+		inlineEnd: VerticalBar[] = [],
 	) {
 		this.inlineStart = this.inlineStart.concat(inlineStart);
 		this.inlineEnd = this.inlineEnd.concat(inlineEnd);
@@ -39,12 +40,12 @@ export class VerticalBarState {
 	add(
 		{
 			width = this.minSize,
-			id = crypto.randomUUID(),
+			id = IdGenerator.generate(),
 			visible = true,
-			data
+			data,
 		}: Partial<Omit<VerticalBar, 'data'>> & { data?: string[] },
 		position: VerticalBarPosition,
-		index: number = -1
+		index: number = -1,
 	): VerticalBar {
 		const bars = this.bars(position);
 		const existingBar = bars.find((bar) => bar.id === id);

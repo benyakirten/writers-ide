@@ -12,7 +12,7 @@
 		moveDetails,
 		onremove,
 		onrelocate,
-		onmove
+		onmove,
 	}: {
 		title: string;
 		position: BarTransferLocation;

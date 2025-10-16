@@ -11,11 +11,11 @@ export class Debouncer<Item> {
 	private timeout: NodeJS.Timeout | null = null;
 	constructor(
 		private readonly callback: (value: Item) => void | Promise<void>,
-		options: Partial<DebounceOptions> = {}
+		options: Partial<DebounceOptions> = {},
 	) {
 		this.options = {
 			delay: options.delay ?? Debouncer.DEFAULT_DELAY_MS,
-			resetIfSameValue: options.resetIfSameValue ?? false
+			resetIfSameValue: options.resetIfSameValue ?? false,
 		};
 	}
 

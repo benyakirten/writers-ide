@@ -4,6 +4,7 @@ import { capitalize } from '$lib/utils/strings';
 
 export class ShortcutService extends Observable<string> {
 	commandsToShortcuts = $state<Record<string, string>>({});
+
 	shortcutsToCommands = $derived.by(() => {
 		const shortcuts: Record<string, string[]> = {};
 		for (const [command, shortcut] of Object.entries(this.commandsToShortcuts)) {
@@ -18,6 +19,7 @@ export class ShortcutService extends Observable<string> {
 
 		return shortcuts;
 	});
+
 	commandsToDisplayedShortcuts = $derived.by(() => {
 		const displayShortcuts: Record<string, string> = {};
 		const useMacShortcuts = isMac();
@@ -26,6 +28,7 @@ export class ShortcutService extends Observable<string> {
 		}
 		return displayShortcuts;
 	});
+
 	SEPARATOR = '-';
 
 	deactivated = $state(false);
@@ -43,7 +46,7 @@ export class ShortcutService extends Observable<string> {
 		enter: 'enter',
 		backspace: 'backspace',
 		delete: 'delete',
-		escape: 'esc'
+		escape: 'esc',
 	};
 
 	MAC_SPECIAL_KEYS = {
@@ -58,7 +61,7 @@ export class ShortcutService extends Observable<string> {
 		enter: '↩',
 		backspace: 'delete',
 		delete: 'fn delete',
-		escape: 'escape'
+		escape: 'escape',
 	};
 
 	MAC_SEPARATOR = '';
@@ -99,7 +102,7 @@ export class ShortcutService extends Observable<string> {
 		}
 
 		const finalKey = cmd.find(
-			(key) => key !== 'ctrl' && key !== 'meta' && key !== 'alt' && key !== 'shift'
+			(key) => key !== 'ctrl' && key !== 'meta' && key !== 'alt' && key !== 'shift',
 		);
 
 		if (finalKey) {
@@ -137,8 +140,10 @@ export class ShortcutService extends Observable<string> {
 		}
 	}
 
-	#hasCtrlMetaOrAltKeys(cmd: string): boolean {
-		return cmd.includes('ctrl') || cmd.includes('meta') || cmd.includes('alt');
+	#isValidShortcutSetting(cmd: string): boolean {
+		return (
+			cmd.includes('ctrl') || cmd.includes('meta') || cmd.includes('alt') || cmd.includes('enter')
+		);
 	}
 
 	addCommand(name: string) {
@@ -159,10 +164,10 @@ export class ShortcutService extends Observable<string> {
 
 	register(name: string, shortcut: Set<string> | string[] | string): boolean {
 		const key = this.parse(shortcut);
-		if (!this.#hasCtrlMetaOrAltKeys(key)) {
+
+		if (!this.#isValidShortcutSetting(key)) {
 			return false;
 		}
-
 		this.commandsToShortcuts[name] = key;
 		return true;
 	}
@@ -170,6 +175,7 @@ export class ShortcutService extends Observable<string> {
 	/** Return a shortcut from a key event. */
 	process(e: KeyboardEvent): string {
 		const shortcut = [e.key];
+
 		if (e.shiftKey) {
 			shortcut.push('shift');
 		}

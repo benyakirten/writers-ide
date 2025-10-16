@@ -1,3 +1,5 @@
+import { IdGenerator } from '$lib/services/ids';
+
 /**
  * Base class for making a value and its change into an observable. It does not store the current value.
  */
@@ -8,7 +10,7 @@ export class Observable<Data> {
 	 * Subscribe to this observable for every this it's called. Returns a function to unsubscribe.
 	 */
 	subscribe(callback: (data: Data) => void | Promise<void>): () => void {
-		const id = crypto.randomUUID();
+		const id = IdGenerator.generate();
 		this.#subscribers.set(id, callback);
 		return () => this.#subscribers.delete(id);
 	}

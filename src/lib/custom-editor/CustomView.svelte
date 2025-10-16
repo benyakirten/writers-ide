@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { EditorProps, ParagraphData } from '$lib/types/block.js';
+	import type { EditorProps, ParagraphData } from '$lib/types/block';
 	import { tick } from 'svelte';
 	import Block from './blocks/Block.svelte';
 	import {
@@ -12,9 +12,9 @@
 		moveCaretUpOneLine,
 		moveToNextBlock,
 		moveToPrevBlock,
-		caretIsAtEndOfEl
-	} from './caret.js';
-	import { nextAnimationFrame } from './utils.js';
+		caretIsAtEndOfEl,
+	} from './caret';
+	import { nextAnimationFrame } from './utils';
 
 	// let blocks: Blocks = $state([
 	// 	{
@@ -128,7 +128,7 @@
 						selection,
 						prevBlock,
 						caretPosition,
-						prevBlock.textContent?.length ?? 0
+						prevBlock.textContent?.length ?? 0,
 					);
 				}
 				break;
@@ -160,7 +160,7 @@
 			id: `a${Math.random().toString(36).substring(7)}`,
 			classes: [],
 			properties: {},
-			children: []
+			children: [],
 		};
 		blocks.splice(index + 1, 0, newBlock);
 		caretPosition = 0;

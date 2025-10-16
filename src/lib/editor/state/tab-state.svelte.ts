@@ -1,26 +1,34 @@
-import type { EditorView } from 'prosemirror-view';
+import { IdGenerator } from '$lib/services/ids';
+import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.svelte';
 
-export type WindowData = {
+export type TabData = {
 	id: string;
-	view?: EditorView | null;
+	data?: object;
+	name: string;
 };
 
 export class TabState {
-	windows = $state<WindowData[]>([
-		{
-			id: 'my-1',
-			view: null
-		}
-	]);
+	windows = $state<TabData[]>([]);
+	private unsub: () => void;
 
 	#active = $state<string | null>(null);
-	active = $derived.by(
-		() => this.windows.find((window) => window.id === this.#active)?.view ?? null
-	);
+	active = $derived.by(() => this.windows.find((window) => window.id === this.#active)?.id);
 
-	activate = (id: string | number): boolean => {
+	constructor() {
+		this.unsub = proseMirrorEventBus.subscribe(({ id, event }) => {
+			if (event.type === ProseMirrorEventBusEventType.SetActiveTab) {
+				this.activate(id);
+			}
+		});
+	}
+
+	close() {
+		this.unsub();
+	}
+
+	activate(id: string | number): boolean {
 		if (typeof id === 'number') {
-			if (id > this.windows.length) {
+			if (id >= this.windows.length) {
 				return false;
 			}
 
@@ -35,34 +43,31 @@ export class TabState {
 
 		this.#active = active.id;
 		return true;
-	};
+	}
 
 	deactivate(): void {
 		this.#active = null;
 	}
 
-	// Other types of tabs?
-	registerEditor(id: string, view: EditorView | null): () => void {
-		const index = this.windows.findIndex((item) => item.id === id);
-		if (index === -1) {
-			return () => {};
+	create(name: string, id: string = IdGenerator.generate(), data?: object): () => void {
+		if (this.windows.find((item) => item.id === id)) {
+			throw new Error(`Tab with id ${id} already exists`);
 		}
-		this.windows[index].view = view;
-		return () => this.windows.splice(index, 1);
-	}
 
-	createTab(): string {
-		const id = crypto.randomUUID();
-		this.windows.push({ id });
-		return id;
-	}
+		this.windows.push({ id, name, data });
 
-	createEditor(): void {
-		const id = this.createTab();
-		this.registerEditor(id, null);
+		if (this.windows.length === 1) {
+			this.#active = id;
+		}
+
+		return () => this.remove(id);
 	}
 
 	remove(id: string): void {
+		if (this.#active === id) {
+			this.#active = this.windows.length > 0 ? this.windows[0].id : null;
+		}
+
 		const index = this.windows.findIndex((item) => item.id === id);
 		this.windows.splice(index, 1);
 	}

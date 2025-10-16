@@ -17,7 +17,7 @@
 	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index';
 	import TransferHandler from '../state/bar-transfer-handler.svelte';
 	import Shortcuts from '$lib/services/shortcuts.svelte';
 
@@ -25,7 +25,7 @@
 		onrelocate,
 		onmove,
 		moveDetails,
-		position
+		position,
 	}: {
 		onrelocate: (to: BarTransferLocation) => void;
 		onmove: (direction: 'up' | 'down' | 'left' | 'right') => void;
@@ -56,7 +56,7 @@
 			'move-bar-inline-end': () => open && onrelocate(VerticalBarPosition.InlineEnd),
 			'move-bar-block-start': () => open && onrelocate(HorizontalBarPosition.WindowBlockStart),
 			'move-bar-block-end': () => open && onrelocate(HorizontalBarPosition.WindowBlockEnd),
-			'move-bar-floating': () => open && onrelocate('floating')
+			'move-bar-floating': () => open && onrelocate('floating'),
 		});
 		return unsub;
 	});

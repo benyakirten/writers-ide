@@ -6,7 +6,7 @@
 	let {
 		id,
 		data,
-		children
+		children,
 	}: {
 		id: string;
 		data: Record<string, unknown>;
@@ -24,18 +24,18 @@
 		transition,
 		isDragging,
 		isSorting,
-		isOver
+		isOver,
 	} = useSortable({
 		id: id,
-		data
+		data,
 	});
 
 	const style = $derived(
 		styleObjectToString({
 			transform: CSS.Transform.toString(transform.current),
 			transition: isSorting.current ? transition.current : undefined,
-			zIndex: isDragging.current ? 1 : undefined
-		})
+			zIndex: isDragging.current ? 1 : undefined,
+		}),
 	);
 </script>
 

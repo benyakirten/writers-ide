@@ -1,15 +1,15 @@
-import { swap } from '$lib/utils/arrays.js';
-import { clamp } from '$lib/utils/numbers.js';
-import type { BarItems } from './bar-items.svelte.js';
-import FloatingBarState, { type FloatingBar } from './floater-state.svelte.js';
+import { swap } from '$lib/utils/arrays';
+import { clamp } from '$lib/utils/numbers';
+import type { BarItems } from './bar-items.svelte';
+import FloatingBarState, { type FloatingBar } from './floater-state.svelte';
 import HorizontalBarState, {
 	HorizontalBarPosition,
-	type HorizontalBar
-} from './horizontal-bar-state.svelte.js';
+	type HorizontalBar,
+} from './horizontal-bar-state.svelte';
 import VerticalBarState, {
 	VerticalBarPosition,
-	type VerticalBar
-} from './vertical-bar-state.svelte.js';
+	type VerticalBar,
+} from './vertical-bar-state.svelte';
 
 export type PossibleSlot = 0 | 1 | 2;
 export type BarTransferLocation = HorizontalBarPosition | VerticalBarPosition | 'floating';
@@ -268,7 +268,7 @@ export class BarTransferHandler {
 	swapBarPosition(
 		fromId: string | number,
 		position: BarTransferLocation,
-		toId: string | number
+		toId: string | number,
 	): boolean {
 		if (position === 'floating') {
 			return false;

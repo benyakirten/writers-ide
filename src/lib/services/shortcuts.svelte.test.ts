@@ -46,7 +46,7 @@ describe('ShortcutService', () => {
 		it('should render mac equivalents and not have a separator if the user agent is mac', () => {
 			const got = service.display(
 				'meta-ctrl-alt-shift-arrowup-arrowdown-arrowleft-arrowright-enter-backspace-delete',
-				true
+				true,
 			);
 			expect(got).toEqual('⌘⌃⌥⇧↑↓←→↩DeleteFnDelete');
 		});
@@ -54,10 +54,10 @@ describe('ShortcutService', () => {
 		it('should render windows equivalents and have a separator if the user agent is not mac', () => {
 			const got = service.display(
 				'meta-ctrl-alt-shift-arrowup-arrowdown-arrowleft-arrowright-enter-backspace-delete',
-				false
+				false,
 			);
 			expect(got).toEqual(
-				'Win+Ctrl+Alt+Shift+UpArrow+DownArrow+LeftArrow+RightArrow+Enter+Backspace+Delete'
+				'Win+Ctrl+Alt+Shift+UpArrow+DownArrow+LeftArrow+RightArrow+Enter+Backspace+Delete',
 			);
 		});
 	});
@@ -119,7 +119,7 @@ describe('ShortcutService', () => {
 			service.register('copy', 'ctrl-c');
 			const event = new KeyboardEvent('keydown', {
 				key: 'C',
-				ctrlKey: true
+				ctrlKey: true,
 			});
 
 			service.listen(event);
@@ -129,7 +129,7 @@ describe('ShortcutService', () => {
 		it('should not emit an update if the command has not been registered', () => {
 			const event = new KeyboardEvent('keydown', {
 				key: 'C',
-				ctrlKey: true
+				ctrlKey: true,
 			});
 
 			service.listen(event);
@@ -154,13 +154,13 @@ describe('ShortcutService', () => {
 
 			emitSub = service.on({
 				cmd1: cmd1Spy,
-				cmd2: cmd2Spy
+				cmd2: cmd2Spy,
 			});
 
 			const event = new KeyboardEvent('keydown', {
 				key: 'A',
 				ctrlKey: true,
-				shiftKey: true
+				shiftKey: true,
 			});
 			service.listen(event);
 
@@ -170,7 +170,7 @@ describe('ShortcutService', () => {
 			const event2 = new KeyboardEvent('keydown', {
 				key: 'B',
 				ctrlKey: true,
-				shiftKey: true
+				shiftKey: true,
 			});
 			service.listen(event2);
 
@@ -180,7 +180,7 @@ describe('ShortcutService', () => {
 			const event3 = new KeyboardEvent('keydown', {
 				key: 'C',
 				ctrlKey: true,
-				shiftKey: true
+				shiftKey: true,
 			});
 			service.listen(event3);
 
@@ -226,7 +226,7 @@ describe('ShortcutService', () => {
 			service.register('copy', 'ctrl-c');
 			const e = new KeyboardEvent('keydown', {
 				key: 'C',
-				ctrlKey: true
+				ctrlKey: true,
 			});
 			const got = service.get(e);
 			expect(got).toEqual(['copy']);
@@ -235,7 +235,7 @@ describe('ShortcutService', () => {
 		it("should return null if the shortcut doesn't exist", () => {
 			const e = new KeyboardEvent('keydown', {
 				key: 'C',
-				ctrlKey: true
+				ctrlKey: true,
 			});
 			const got = service.get(e);
 			expect(got).toBe(null);
@@ -249,7 +249,7 @@ describe('ShortcutService', () => {
 				ctrlKey: true,
 				altKey: true,
 				shiftKey: true,
-				metaKey: true
+				metaKey: true,
 			});
 			const got = service.process(e);
 			expect(got).toBe('meta-alt-ctrl-shift-c');
@@ -273,7 +273,7 @@ describe('ShortcutService', () => {
 		it('should add multiple shortcuts to the service', () => {
 			const shortcuts = {
 				copy: 'ctrl-c',
-				paste: 'ctrl-v'
+				paste: 'ctrl-v',
 			};
 
 			service.add(shortcuts);

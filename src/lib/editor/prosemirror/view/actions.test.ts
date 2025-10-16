@@ -3,14 +3,14 @@ import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import type { Schema, Node } from 'prosemirror-model';
 
-import { schema } from './schema.js';
-import { ActionUtilities } from './actions.js';
-import { INDENT_MIN, INDENT_MAX } from './constants.js';
+import { schema } from './schema';
+import { ActionUtilities } from './actions';
+import { INDENT_MIN, INDENT_MAX } from './constants';
 
 function createEditorView(
 	nodes: Node[],
 	schema: Schema,
-	selection?: { start?: number; end?: number }
+	selection?: { start?: number; end?: number },
 ) {
 	const element = document.createElement('div');
 
@@ -18,7 +18,7 @@ function createEditorView(
 	const state = EditorState.create({
 		doc,
 		schema,
-		selection: TextSelection.create(doc, selection?.start ?? 0, selection?.end ?? doc.content.size)
+		selection: TextSelection.create(doc, selection?.start ?? 0, selection?.end ?? doc.content.size),
 	});
 	return new EditorView(element, { state });
 }
@@ -28,9 +28,9 @@ describe('toggleTextMark', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state);
@@ -49,13 +49,13 @@ describe('toggleTextMark', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])]),
 			],
 			schema,
 			{
 				start: 0,
-				end: 0
-			}
+				end: 0,
+			},
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
@@ -75,10 +75,10 @@ describe('toggleTextMark', () => {
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
 				schema.node('paragraph', null, [
-					schema.text('Second item', [schema.mark('bold'), schema.mark('italic')])
-				])
+					schema.text('Second item', [schema.mark('bold'), schema.mark('italic')]),
+				]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
@@ -96,9 +96,9 @@ describe('toggleTextMark', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item')]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
@@ -118,9 +118,9 @@ describe('toggleTextMark', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
@@ -140,9 +140,9 @@ describe('toggleTextMark', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view, 'italic');
@@ -162,10 +162,10 @@ describe('toggleTextMark', () => {
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
 				schema.node('paragraph', null, [
-					schema.text('Second item', [schema.mark('bold'), schema.mark('italic')])
-				])
+					schema.text('Second item', [schema.mark('bold'), schema.mark('italic')]),
+				]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view, 'italic');
@@ -185,9 +185,9 @@ describe('dent', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { indent: 1 }, [schema.text('First Item')]),
-				schema.node('paragraph', { indent: 2 }, [schema.text('Second item')])
+				schema.node('paragraph', { indent: 2 }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.dent('indent', view.state);
@@ -204,9 +204,9 @@ describe('dent', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { indent: INDENT_MAX - 2 }, [schema.text('First Item')]),
-				schema.node('paragraph', { indent: INDENT_MAX - 1 }, [schema.text('Second item')])
+				schema.node('paragraph', { indent: INDENT_MAX - 1 }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.dent('indent', view.state, view.dispatch);
@@ -223,9 +223,9 @@ describe('dent', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { indent: INDENT_MIN + 1 }, [schema.text('First Item')]),
-				schema.node('paragraph', { indent: INDENT_MIN + 2 }, [schema.text('Second item')])
+				schema.node('paragraph', { indent: INDENT_MIN + 2 }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.dent('dedent', view.state, view.dispatch);
@@ -242,9 +242,9 @@ describe('dent', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { indent: INDENT_MIN }, [schema.text('First Item')]),
-				schema.node('paragraph', { indent: INDENT_MAX }, [schema.text('Second item')])
+				schema.node('paragraph', { indent: INDENT_MAX }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.dent('dedent', view.state, view.dispatch);
@@ -261,9 +261,9 @@ describe('dent', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { indent: INDENT_MIN }, [schema.text('First Item')]),
-				schema.node('paragraph', { indent: INDENT_MAX }, [schema.text('Second item')])
+				schema.node('paragraph', { indent: INDENT_MAX }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.dent('indent', view.state, view.dispatch);
@@ -282,9 +282,9 @@ describe('setTextAlignment', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { align: 'left' }, [schema.text('First Item')]),
-				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')])
+				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.setTextAlignment('center', view.state);
@@ -301,9 +301,9 @@ describe('setTextAlignment', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { align: 'left' }, [schema.text('First Item')]),
-				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')])
+				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.setTextAlignment('center', view.state, view.dispatch);
@@ -320,13 +320,13 @@ describe('setTextAlignment', () => {
 		const view = createEditorView(
 			[
 				schema.node('heading', [schema.text('First Item')]),
-				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')])
+				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')]),
 			],
 			schema,
 			{
 				start: 0,
-				end: 2
-			}
+				end: 2,
+			},
 		);
 
 		const got = ActionUtilities.setTextAlignment('center', view.state, view.dispatch);
