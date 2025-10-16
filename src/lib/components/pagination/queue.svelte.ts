@@ -11,8 +11,6 @@ type ToPaginate = {
 };
 
 type CurrentPagination = ToPaginate & {
-	time: number;
-	progress: number;
 	iter: Generator<number, void, unknown>;
 };
 
@@ -50,8 +48,6 @@ export class PaginationQueue {
 			name,
 			from,
 			to,
-			progress: 0,
-			time: 0,
 			iter,
 		};
 	}
