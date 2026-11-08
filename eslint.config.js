@@ -5,6 +5,9 @@ import globals from 'globals';
 import ts from 'typescript-eslint';
 
 export default ts.config(
+	{
+		ignores: ['src-tauri/', '.svelte-kit/', 'dist/', 'src/lib/paraglide/', 'build/'],
+	},
 	js.configs.recommended,
 	...ts.configs.recommended,
 	...svelte.configs['flat/recommended'],
@@ -28,7 +31,6 @@ export default ts.config(
 		},
 	},
 	{
-		ignores: ['src-tauri/', '.svelte-kit/', 'dist/', 'src/lib/paraglide/'],
 		rules: {
 			'@typescript-eslint/no-unused-vars': [
 				'error',

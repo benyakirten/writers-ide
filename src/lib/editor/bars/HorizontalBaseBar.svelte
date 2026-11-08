@@ -4,7 +4,7 @@
 	import HorizontalBarState, { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 	import VerticalBarState, { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
 
-	const id = HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart);
+	const _ = HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart);
 	TransferHandler.append(HorizontalBarPosition.WindowBlockStart, 0, 'basic-menu');
 </script>
 
