@@ -1,207 +1,153 @@
-import type { Transaction } from 'prosemirror-state';
-
-import { PROSEMIRROR_PAGE_CLASS } from '../prosemirror/view/constants';
-import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.svelte';
-import PageLayout from './page-layout.svelte';
 import type { EditorView } from 'prosemirror-view';
+import {
+	PROSEMIRROR_PAGE_CLASS,
+	PAGINATION_TRANSACTION_META_KEY,
+} from '../prosemirror/view/constants';
+import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.svelte';
+import PageLayout, { PageLayoutMetaTransactionType } from './page-layout.svelte';
 
+/** Tracks changed intersection entries against a persistent set, not callback entry counts. */
 export class DocumentObserver {
-	private observer: IntersectionObserver | null = $state(null);
-	private unsub: () => void;
-
-	intersectionCallback: IntersectionObserverCallback = (entries) => {
-		const newPage =
-			entries.filter(
-				(entry) => entry.target.classList.contains(PROSEMIRROR_PAGE_CLASS) && entry.isIntersecting,
-			).length - 1;
-
-		this.cb(newPage);
-	};
+	private observer: IntersectionObserver;
+	private pages: Element[] = [];
+	private visible = new Set<Element>();
+	private observed = new Set<Element>();
 
 	constructor(
-		private readonly _id: string,
-		private readonly cb: (page: number) => void,
-		private el: HTMLElement,
-		private _docId: string,
-		options: Partial<IntersectionObserverInit> = {},
+		private content: HTMLElement,
+		viewport: HTMLElement,
+		private cb: (page: number) => void,
 	) {
-		options.root ??= el;
-		options.rootMargin ??= '800px';
-		options.threshold ??= 0;
-
-		this.observer = new IntersectionObserver(this.intersectionCallback, options);
-		this.unsub = proseMirrorEventBus.subscribe(({ id, event }) => {
-			if (event.type === ProseMirrorEventBusEventType.Paginate && id === this._docId) {
-				this.reset();
-			}
+		this.observer = new IntersectionObserver(this.intersectionCallback, {
+			root: viewport,
+			threshold: 0,
 		});
-
-		this.el
-			.querySelectorAll(`.${PROSEMIRROR_PAGE_CLASS}`)
-			.forEach((el) => this.observer?.observe(el));
+		this.sync();
 	}
 
-	get id() {
-		return this._id;
+	intersectionCallback: IntersectionObserverCallback = (entries) => {
+		for (const entry of entries) {
+			if (!this.observed.has(entry.target)) continue;
+			if (entry.isIntersecting) this.visible.add(entry.target);
+			else this.visible.delete(entry.target);
+		}
+		this.report();
+	};
+
+	private report() {
+		const indexes = this.pages.flatMap((page, index) => (this.visible.has(page) ? [index] : []));
+		// Keep the last target when the pane is hidden or between intersection notifications.
+		if (indexes.length) this.cb(Math.max(...indexes));
 	}
 
-	get docId() {
-		return this._docId;
-	}
-
-	disconnect() {
-		this.observer?.disconnect();
-	}
-
-	reset() {
-		this.disconnect();
-		this.el
-			.querySelectorAll(`.${PROSEMIRROR_PAGE_CLASS}`)
-			.forEach((el) => this.observer?.observe(el));
+	sync() {
+		const pages = Array.from(this.content.children).filter((el) =>
+			el.classList.contains(PROSEMIRROR_PAGE_CLASS),
+		);
+		const next = new Set(pages);
+		for (const page of this.pages) {
+			if (!next.has(page)) {
+				this.observer.unobserve(page);
+				this.visible.delete(page);
+			}
+		}
+		for (const page of pages) if (!this.observed.has(page)) this.observer.observe(page);
+		this.observed = next;
+		this.pages = pages;
+		this.report();
 	}
 
 	close() {
-		this.disconnect();
-		this.unsub();
+		this.observer.disconnect();
+		this.visible.clear();
+		this.observed.clear();
+		this.pages = [];
 	}
 }
 
 export type ObservedPage = {
+	viewId: string;
+	documentId: string;
+	view: EditorView;
 	viewedPage: number;
-	obsPage: Record<string, number>;
+	/** Exclusive end of the valid prefix. */
 	paginatedTo: number;
-	lastChangedPage: number | null;
-	observers: DocumentObserver[];
+	/** Changes only for external edits/layout changes, not pagination's own transactions. */
+	revision: number;
+	observer: DocumentObserver;
 };
 
-export type ToPaginateRange = [id: string, from: number, to: number];
-
-class PageObserverManager {
-	private _map: Record<string, ObservedPage> = $state({});
+export class PageObserverManager {
+	map = $state<Record<string, ObservedPage>>({});
 	private unsub: () => void;
-	public map = $derived(this._map);
-
-	public toPaginate = $derived(
-		Object.entries(this._map).reduce<ToPaginateRange[]>((acc, [id, data]) => {
-			if (data.paginatedTo < data.viewedPage) {
-				acc.push([id, data.paginatedTo, data.viewedPage + 1]);
-			} else if (data.lastChangedPage !== null && data.lastChangedPage < data.viewedPage) {
-				acc.push([id, data.lastChangedPage, data.viewedPage + 1]);
-			}
-			return acc;
-		}, []),
-	);
 
 	constructor() {
 		this.unsub = proseMirrorEventBus.subscribe(({ id, event }) => {
-			const data = this._map[id];
-			if (!data) {
-				return;
-			}
-
-			switch (event.type) {
-				case ProseMirrorEventBusEventType.Paginate:
-					data.paginatedTo = event.paginatedTo;
-					break;
-				case ProseMirrorEventBusEventType.PreUpdate:
-					this.updateLastUpdatedPage(data, event.view, event.tr);
-					break;
+			if (event.type === ProseMirrorEventBusEventType.PreUpdate) {
+				if (!event.tr.docChanged) return;
+				const meta = event.tr.getMeta(PAGINATION_TRANSACTION_META_KEY);
+				if (meta && meta.type !== PageLayoutMetaTransactionType.BreakPeering) return;
+				const [page] = PageLayout.getAffectedPageRangeFromTransaction(event.view, event.tr);
+				for (const data of Object.values(this.map)) {
+					if (data.documentId === id) this.invalidate(data.viewId, page);
+				}
+			} else if (event.type === ProseMirrorEventBusEventType.Update) {
+				for (const data of Object.values(this.map)) {
+					if (data.view === event.view) {
+						PageLayout.syncPageIndexes(data.view);
+						data.observer.sync();
+					}
+				}
 			}
 		});
 	}
 
-	updateLastUpdatedPage(data: ObservedPage, view: EditorView, tr: Transaction) {
-		const [firstPage] = PageLayout.getAffectedPageRangeFromTransaction(view, tr);
-		data.lastChangedPage = firstPage;
+	register(viewId: string, documentId: string, view: EditorView, viewport: HTMLElement) {
+		this.deregister(viewId);
+		PageLayout.syncPageIndexes(view);
+		const observer = new DocumentObserver(view.dom, viewport, (page) => {
+			const data = this.map[viewId];
+			if (data) data.viewedPage = page;
+		});
+		this.map[viewId] = {
+			viewId,
+			documentId,
+			view,
+			viewedPage: 0,
+			paginatedTo: 0,
+			revision: 0,
+			observer,
+		};
+		return () => {
+			if (this.map[viewId]?.observer === observer) this.deregister(viewId);
+		};
+	}
+
+	target(data: ObservedPage) {
+		return Math.min(data.viewedPage + 2, data.view.state.doc.childCount);
+	}
+
+	invalidate(viewId: string, page = 0) {
+		const data = this.map[viewId];
+		if (!data) return;
+		// A change at a page boundary can allow content to be pulled onto its predecessor.
+		data.paginatedTo = Math.min(data.paginatedTo, Math.max(0, page - 1));
+		data.revision++;
+	}
+
+	invalidateAll() {
+		for (const viewId of Object.keys(this.map)) this.invalidate(viewId);
+	}
+
+	deregister(viewId: string) {
+		this.map[viewId]?.observer.close();
+		delete this.map[viewId];
 	}
 
 	close() {
 		this.unsub();
-		Object.values(this._map).forEach((data) => data.observers.forEach((obs) => obs.close()));
-		this._map = {};
-	}
-
-	getMaxPage(data: ObservedPage): number {
-		return Math.max(...Object.values(data.obsPage));
-	}
-
-	register(
-		obsId: string,
-		el: HTMLElement,
-		docId: string,
-		viewedPage: number = 0,
-		paginatedTo: number = 0,
-	) {
-		const data = this._map[docId];
-		const obs = new DocumentObserver(obsId, (page) => this.scrollTo(obsId, docId, page), el, docId);
-
-		if (!data) {
-			const observedPage = {
-				viewedPage,
-				paginatedTo,
-				observers: [obs],
-				needsPagination: false,
-				obsPage: { [obsId]: viewedPage },
-				lastChangedPage: null,
-			};
-			this._map[docId] = observedPage;
-		} else {
-			data.obsPage[obsId] = viewedPage;
-			data.paginatedTo = this.getMaxPage(data);
-			data.observers.push(obs);
-		}
-
-		return () => this.deregister(obs.id, docId);
-	}
-
-	deregister(id: string, docId: string) {
-		const data = this.data(docId);
-
-		const obsIndex = data.observers.findIndex((o) => o.id === id);
-		if (obsIndex === -1) {
-			throw new Error(`Observer ${id} not found for document ${docId}`);
-		}
-		const observer = data.observers[obsIndex];
-		observer.close();
-
-		if (data.observers.length === 0) {
-			delete this._map[docId];
-		} else {
-			data.observers.splice(obsIndex, 1);
-		}
-	}
-
-	data(docId: string): ObservedPage {
-		const data = this._map[docId];
-		if (!data) {
-			throw new Error(`Document ${docId} is not being observed`);
-		}
-
-		return data;
-	}
-
-	scrollTo(obsId: string, docId: string, page: number) {
-		const data = this.data(docId);
-		data.obsPage[obsId] = page;
-		data.viewedPage = this.getMaxPage(data);
-	}
-
-	paginateTo(docId: string, page: number) {
-		const data = this.data(docId);
-		data.paginatedTo = page;
-		data.lastChangedPage = page;
-	}
-
-	stopPagination(docId: string, page: number) {
-		const data = this.data(docId);
-		data.paginatedTo = page;
-		data.lastChangedPage = null;
-		data.observers.forEach((obs) => obs.reset());
-	}
-
-	finishPagination(docId: string) {
-		const data = this.data(docId);
-		data.observers.forEach((obs) => obs.reset());
+		for (const id of Object.keys(this.map)) this.deregister(id);
 	}
 }
+
 export const PageObserver = new PageObserverManager();

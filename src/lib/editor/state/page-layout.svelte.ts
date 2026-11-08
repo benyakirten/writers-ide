@@ -296,7 +296,7 @@ export class PageLayoutManager {
 		for (const child of children) {
 			if (
 				!child.classList.contains(PROSEMIRROR_PARAGRAPH_CLASS) ||
-				child.textContent.trim().length !== 0
+				child.textContent?.trim().length !== 0
 			) {
 				return child;
 			}
@@ -661,7 +661,7 @@ export class PageLayoutManager {
 			to: page.pageOffset + page.pageNode.nodeSize,
 		});
 
-		view.dispatch(tr);
+		view.dispatch(tr.setMeta('addToHistory', false));
 		return 0;
 	}
 
@@ -683,7 +683,6 @@ export class PageLayoutManager {
 	 * 2. The page does not overflow and the next page does not exist.
 	 */
 	paginate(view: EditorView, pageNumber: number): number | null {
-		console.log(`Page ${pageNumber}/${this.pageCount(view)}`);
 		const pageDetails = this.getPage(view, pageNumber);
 		if (!pageDetails) {
 			// We've run out of pages. Since the doc can only contain pages,
@@ -721,7 +720,7 @@ export class PageLayoutManager {
 			type: PageLayoutMetaTransactionType.Paginate,
 			pageNumber,
 		});
-		view.dispatch(tr);
+		view.dispatch(tr.setMeta('addToHistory', false));
 
 		return delta;
 	}
@@ -780,7 +779,7 @@ export class PageLayoutManager {
 				from: page.pageOffset,
 				to: page.pageOffset + page.pageNode.nodeSize,
 			});
-			view.dispatch(tr);
+			view.dispatch(tr.setMeta('addToHistory', false));
 		}
 	}
 
@@ -801,18 +800,19 @@ export class PageLayoutManager {
 		view: EditorView,
 		from: number,
 		to?: number,
+		signal?: AbortSignal,
 	): Generator<number, number, void> {
 		let pageNumber = from;
 
-		// This makes it so if a paragraph is broken over two pages, we correctly identify text content
-		// and where to split for orphan/widow lines.
-		this.reunitePeerParagraphsInRange(view, from, to);
-
 		while (true) {
+			if (signal?.aborted) return pageNumber;
 			if (to !== undefined && pageNumber >= to) {
 				break;
 			}
 
+			// Reunite only this boundary so each generator step has bounded preparation.
+			this.reunitePeerParagraphsInRange(view, pageNumber, pageNumber + 1);
+			if (signal?.aborted) return pageNumber;
 			const toDelta = this.paginate(view, pageNumber);
 			if (toDelta === null) {
 				break;
@@ -825,12 +825,11 @@ export class PageLayoutManager {
 				pageNumber++;
 			}
 
-			if (to) {
-				to += toDelta;
-			}
+			if (signal?.aborted) return pageNumber;
 			yield pageNumber;
 		}
 
+		if (signal?.aborted) return pageNumber;
 		proseMirrorEventBus.update({
 			id,
 			event: { type: ProseMirrorEventBusEventType.Paginate, paginatedTo: pageNumber },
@@ -1272,8 +1271,62 @@ export class PageLayoutManager {
 	/**
 	 * Determine which pages are affected by a given transaction
 	 */
-	getAffectedPageRangeFromTransaction(_: EditorView, _2: Transaction): [number, number] {
-		return [0, 0];
+	getAffectedPageRangeFromTransaction(view: EditorView, tr: Transaction): [number, number] {
+		if (tr.steps.length === 0) return [0, 0];
+
+		const lastPage = Math.max(
+			0,
+			view.state.doc.childCount - 1,
+			tr.before.childCount - 1,
+			tr.doc.childCount - 1,
+			...tr.docs.map((doc) => doc.childCount - 1),
+		);
+		// Step positions belong to different intermediate documents. Until we remap all
+		// boundaries across those documents, invalidate the full range rather than miss an earlier page.
+		if (tr.steps.length > 1) return [0, lastPage];
+
+		let earliest = lastPage;
+		let latest = 0;
+		const include = (doc: ProseMirrorNode, pos: number) => {
+			const page = Math.min(
+				Math.max(0, doc.childCount - 1),
+				doc.resolve(clamp(pos, 0, doc.content.size)).index(0),
+			);
+			earliest = Math.min(earliest, page);
+			latest = Math.max(latest, page);
+		};
+		let hasRange = false;
+		tr.steps[0].getMap().forEach((oldStart, oldEnd, newStart, newEnd) => {
+			hasRange = true;
+			include(tr.before, oldStart);
+			include(tr.before, oldEnd);
+			include(tr.doc, newStart);
+			include(tr.doc, newEnd);
+		});
+		if (!hasRange) {
+			// Attribute and mark steps can have empty maps despite affecting layout.
+			const json = tr.steps[0].toJSON();
+			for (const key of ['from', 'to', 'pos']) {
+				const pos = json[key];
+				if (typeof pos === 'number' && Number.isFinite(pos)) {
+					hasRange = true;
+					include(tr.before, pos);
+					include(tr.doc, pos);
+				}
+			}
+		}
+		return hasRange ? [earliest, latest] : [0, lastPage];
+	}
+
+	/** Refresh presentation indexes, including pages not yet visited by pagination. */
+	syncPageIndexes(view: EditorView): void {
+		view.state.doc.forEach((node, offset, index) => {
+			if (node.type.name !== 'page') return;
+			const dom = view.nodeDOM(offset);
+			if (dom instanceof HTMLElement && dom.dataset.index !== String(index)) {
+				dom.dataset.index = String(index);
+			}
+		});
 	}
 }
 

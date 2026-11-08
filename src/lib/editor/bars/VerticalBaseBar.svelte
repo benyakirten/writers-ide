@@ -1,9 +1,9 @@
 <script lang="ts">
 	import ToastManager from '$lib/services/toaster.svelte';
-	import Editors from '../prosemirror/prose-mirror-editor.svelte';
+	import { PageObserver } from '../state/page-observer.svelte';
 	import TransferHandler, { type BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
-	import PageLayout from '../state/page-layout.svelte';
+
 	import tabState from '../state/tab-state.svelte';
 	import { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
 
@@ -41,17 +41,8 @@
 		return messages[Math.floor(Math.random() * messages.length)];
 	}
 
-	let gen: Generator<number, number, void> | null = null;
 	function paginate() {
-		if (!gen) {
-			const [id, data] = Object.entries(Editors.editors)[0];
-			gen = PageLayout.paginateRange(id, data.view, 0);
-		}
-		const t = performance.now();
-		[...gen];
-		const dt = performance.now() - t;
-		console.log(`Pagination took ${dt}ms`);
-		gen = null;
+		PageObserver.invalidateAll();
 	}
 </script>
 

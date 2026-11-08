@@ -26,6 +26,7 @@
 	import Pointer from '$lib/components/tooltip/Pointer.svelte';
 	import Toaster from '$lib/components/toaster/Toaster.svelte';
 	import PageLayout from './state/page-layout.svelte';
+	import Paginator from '$lib/components/pagination/Paginator.svelte';
 
 	function resize(e: MouseEvent) {
 		VerticalBarState.resize(e);
@@ -66,6 +67,7 @@
 	onDragStart={handleDragStart}
 	onDragOver={handleDragOver}
 >
+	<Paginator />
 	<Toaster />
 	<Pointer />
 	<div
@@ -145,12 +147,16 @@
 	}
 
 	.main-container {
+		min-height: 0;
+		min-width: 0;
 		flex: 1;
 		display: flex;
 		position: relative;
 	}
 
 	.main {
+		min-height: 0;
+		min-width: 0;
 		flex: 1;
 		position: relative;
 		display: flex;

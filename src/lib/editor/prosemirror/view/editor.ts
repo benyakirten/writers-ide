@@ -65,15 +65,18 @@ export function createView(
 	fileName: string,
 	initialState: ProseMirrorNode,
 	el: HTMLElement,
+	viewport: HTMLElement = el,
 ): () => void {
-	const state = createProseMirrorState(id, initialState);
+	let state = createProseMirrorState(id, initialState);
+	const indexed = indexPages(state.tr);
+	if (indexed.docChanged) state = state.apply(indexed);
 	const view = new EditorView(el, {
 		state,
 		dispatchTransaction: (transaction) => handleTransaction(id, view, transaction),
 	});
 
 	const obsId = crypto.randomUUID();
-	const deregister = Editors.register(id, fileName, view, obsId, el.querySelector('.ProseMirror')!);
+	const deregister = Editors.register(id, fileName, view, obsId, viewport);
 	return () => deregister();
 }
 
@@ -81,11 +84,22 @@ export const TransactionHandlerRegistry = new Registry<
 	(view: EditorView, tr: Transaction) => Transaction
 >();
 
+// Keep indexes in the model before rendering: mutating parsed data-index attributes
+// independently can feed back through ProseMirror's DOM observer.
+function indexPages(tr: Transaction): Transaction {
+	tr.doc.forEach((node, offset, index) => {
+		if (node.type.name === 'page' && node.attrs.index !== index)
+			tr.setNodeAttribute(offset, 'index', index);
+	});
+	return tr;
+}
+
 function handleTransaction(id: string, view: EditorView, transaction: Transaction) {
 	for (const handler of TransactionHandlerRegistry.values()) {
 		transaction = handler(view, transaction);
 	}
 
+	if (transaction.docChanged) indexPages(transaction);
 	proseMirrorEventBus.update({
 		id,
 		event: { type: ProseMirrorEventBusEventType.PreUpdate, view, tr: transaction },

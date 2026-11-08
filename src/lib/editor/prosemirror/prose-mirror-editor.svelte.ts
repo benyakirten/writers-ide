@@ -1,40 +1,54 @@
 import type { EditorView } from 'prosemirror-view';
 import { PageObserver } from '../state/page-observer.svelte';
+import { workQueue } from '../state/work-queue.svelte';
 
-type EditorDetails = {
+export type EditorDetails = {
 	name: string;
+	documentId: string;
+	viewId: string;
 	view: EditorView;
 };
 
 export class ProseMirrorEditors {
+	/** View identity is independent of document identity; shared editing is not implemented yet. */
 	editors = $state<Record<string, EditorDetails>>({});
 
 	register(
-		id: string,
-		fileName: string,
+		documentId: string,
+		name: string,
 		view: EditorView,
-		obsId: string,
-		el: HTMLElement,
+		viewId: string,
+		viewport: HTMLElement,
 	): () => void {
-		if (!this.editors[id]) {
-			this.editors[id] = { name: fileName, view };
-		}
+		this.deregister(viewId);
+		this.editors[viewId] = { name, documentId, viewId, view };
 
-		const obsDeregister = PageObserver.register(obsId, el, id);
+		PageObserver.register(viewId, documentId, view, viewport);
 
+		const registration = this.editors[viewId];
 		return () => {
-			this.deregister(id);
-			obsDeregister();
+			if (this.editors[viewId] === registration) this.deregister(viewId);
 		};
 	}
 
-	deregister(id: string): void {
-		this.editors[id]?.view.destroy();
-		delete this.editors[id];
+	deregister(viewId: string): void {
+		workQueue.cancelView(viewId);
+		PageObserver.deregister(viewId);
+		this.editors[viewId]?.view.destroy();
+		delete this.editors[viewId];
 	}
 
-	get(id: string): EditorDetails | null {
-		return this.editors[id] ?? null;
+	getView(viewId: string): EditorDetails | null {
+		return this.editors[viewId] ?? null;
+	}
+
+	getViews(documentId: string): EditorDetails[] {
+		return Object.values(this.editors).filter((editor) => editor.documentId === documentId);
+	}
+
+	/** Compatibility lookup for document-oriented menu callers. */
+	get(documentId: string): EditorDetails | null {
+		return this.getViews(documentId)[0] ?? null;
 	}
 }
 

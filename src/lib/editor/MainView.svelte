@@ -17,6 +17,8 @@
 
 <style>
 	.main-view {
+		min-height: 0;
+		min-width: 0;
 		display: flex;
 		flex: 1;
 	}
