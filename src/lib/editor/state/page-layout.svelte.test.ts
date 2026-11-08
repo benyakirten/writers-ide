@@ -45,7 +45,9 @@ function documentElement() {
 
 function pageOffset(view: EditorView, index: number) {
 	let offset = 0;
-	for (let i = 0; i < index; i++) offset += view.state.doc.child(i).nodeSize;
+	for (let i = 0; i < index; i++) {
+		offset += view.state.doc.child(i).nodeSize;
+	}
 	return offset;
 }
 
@@ -54,9 +56,53 @@ beforeEach(() => {
 	layout = new PageLayoutManager();
 });
 afterEach(() => {
-	for (const view of views.splice(0)) view.destroy();
+	for (const view of views.splice(0)) {
+		view.destroy();
+	}
 	document.body.replaceChildren();
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
+});
+
+describe('overflow detection', () => {
+	it.each([0, 0.25])('continues past a fitting block with %s px boundary excess', (excess) => {
+		const view = createView(
+			doc(schema.node('page', null, [paragraph('first'), paragraph('later')])),
+		);
+		const details = layout.getPage(view, 0)!;
+		const first = view.nodeDOM(1) as HTMLElement;
+		const later = view.nodeDOM(1 + view.state.doc.firstChild!.firstChild!.nodeSize) as HTMLElement;
+		vi.spyOn(first, 'getBoundingClientRect').mockReturnValue({ bottom: 100 + excess } as DOMRect);
+		vi.spyOn(later, 'getBoundingClientRect').mockReturnValue({ bottom: 700 } as DOMRect);
+		const info = layout.getPageOverflowInformation(view, 100, details);
+		expect(layout.pageIsOverflowing(info)).toBe(true);
+		if (layout.pageIsOverflowing(info)) {
+			expect(info.overflowingEl).toBe(later);
+		}
+	});
+
+	it('detects a partial overflowing line instead of accepting the whole page', () => {
+		const view = createView();
+		const details = layout.getPage(view, 0)!;
+		const first = view.nodeDOM(1) as HTMLElement;
+		vi.spyOn(first, 'getBoundingClientRect').mockReturnValue({ bottom: 104 } as DOMRect);
+		const info = layout.getPageOverflowInformation(view, 100, details);
+		expect(layout.pageIsOverflowing(info)).toBe(true);
+	});
+
+	it.each([1, 2])('uses CSS pixels rather than device pixels at DPR %s', (density) => {
+		vi.stubGlobal('devicePixelRatio', density);
+		expect(layout.convertMeasurementToPx(1, 'in')).toBe(96);
+		expect(layout.convertMeasurementToPx(25.4, 'mm')).toBeCloseTo(96);
+	});
+
+	it('uses rendered padding and borders for the content boundaries', () => {
+		const host = documentElement();
+		host.style.cssText = 'padding-top: 20px; padding-bottom: 30px; border: 2px solid black;';
+		vi.spyOn(host, 'getBoundingClientRect').mockReturnValue({ top: 100, bottom: 500 } as DOMRect);
+		expect(layout.calculatePageTop(host)).toBe(122);
+		expect(layout.calculatePageBottom(host)).toBe(468);
+	});
 });
 
 describe('affected page ranges', () => {

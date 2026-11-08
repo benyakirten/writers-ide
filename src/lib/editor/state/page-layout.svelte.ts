@@ -50,14 +50,8 @@ type NotPeerGroup = {
 	details: NodeDetails;
 };
 
-/**
- * Information about the content that either overflows a page
- * or cannot grow without causing overflow. The `doesNotOverflowPage`
- * flag indicates that the content goes until the possible line page
- * while otherwise this indicates that the content is indeed overflowing.
- */
+/** The first block whose rendered bottom extends beyond the page's content area. */
 type OverflowingDetails = {
-	doesNotOverflowPage: boolean;
 	overflowingNode: ProseMirrorNode;
 	overflowingNodeOffset: number;
 	overflowingEl: HTMLElement;
@@ -191,7 +185,8 @@ export class PageLayoutManager {
 	}
 
 	convertMeasurementToPx(measurement: number, units: Unit): number {
-		const pixelsPerInch = window.devicePixelRatio * PIXELS_PER_INCH;
+		// DOM rectangles use CSS pixels, not physical device pixels.
+		const pixelsPerInch = PIXELS_PER_INCH;
 		let factor: number;
 		switch (units) {
 			case 'cm':
@@ -210,16 +205,16 @@ export class PageLayoutManager {
 
 	calculatePageBottom(host: HTMLElement): number {
 		const { bottom } = host.getBoundingClientRect();
-		const bottomPadding = this.convertMeasurementToPx(this.pageYMargin, this.units);
-
-		return bottom - bottomPadding;
+		const style = getComputedStyle(host);
+		return (
+			bottom - (parseFloat(style.paddingBottom) || 0) - (parseFloat(style.borderBottomWidth) || 0)
+		);
 	}
 
 	calculatePageTop(host: HTMLElement): number {
 		const { top } = host.getBoundingClientRect();
-		const topPadding = this.convertMeasurementToPx(this.pageYMargin, this.units);
-
-		return top + topPadding;
+		const style = getComputedStyle(host);
+		return top + (parseFloat(style.paddingTop) || 0) + (parseFloat(style.borderTopWidth) || 0);
 	}
 
 	getPage(view: EditorView, page: number): PageDetails | null {
@@ -705,12 +700,7 @@ export class PageLayoutManager {
 		let delta: number;
 
 		if (this.pageIsOverflowing(overflowingDetails)) {
-			// If we are right at the limit of the page, we don't need to do anything at all.
-			if (overflowingDetails.doesNotOverflowPage) {
-				delta = 0;
-			} else {
-				delta = this.handlePageOverflow(tr, pageDetails, overflowingDetails, maxBottom, nextPage);
-			}
+			delta = this.handlePageOverflow(tr, pageDetails, overflowingDetails, maxBottom, nextPage);
 		} else {
 			delta = this.handlePageUnderflow(view, tr, pageDetails, overflowingDetails, nextPage);
 		}
@@ -805,14 +795,18 @@ export class PageLayoutManager {
 		let pageNumber = from;
 
 		while (true) {
-			if (signal?.aborted) return pageNumber;
+			if (signal?.aborted) {
+				return pageNumber;
+			}
 			if (to !== undefined && pageNumber >= to) {
 				break;
 			}
 
 			// Reunite only this boundary so each generator step has bounded preparation.
 			this.reunitePeerParagraphsInRange(view, pageNumber, pageNumber + 1);
-			if (signal?.aborted) return pageNumber;
+			if (signal?.aborted) {
+				return pageNumber;
+			}
 			const toDelta = this.paginate(view, pageNumber);
 			if (toDelta === null) {
 				break;
@@ -825,11 +819,15 @@ export class PageLayoutManager {
 				pageNumber++;
 			}
 
-			if (signal?.aborted) return pageNumber;
+			if (signal?.aborted) {
+				return pageNumber;
+			}
 			yield pageNumber;
 		}
 
-		if (signal?.aborted) return pageNumber;
+		if (signal?.aborted) {
+			return pageNumber;
+		}
 		proseMirrorEventBus.update({
 			id,
 			event: { type: ProseMirrorEventBusEventType.Paginate, paginatedTo: pageNumber },
@@ -878,10 +876,9 @@ export class PageLayoutManager {
 
 			const { bottom } = el.getBoundingClientRect();
 
-			if (bottom >= maxBottom) {
-				const lineHeight = getLineHeight(el);
+			// A fitting block cannot establish that its following siblings fit as well.
+			if (bottom > maxBottom + 0.5) {
 				return {
-					doesNotOverflowPage: bottom - maxBottom - lineHeight < 0,
 					overflowingNode: node,
 					overflowingNodeOffset: pos,
 					overflowingEl: el,
@@ -940,7 +937,11 @@ export class PageLayoutManager {
 		const textRect = range.getBoundingClientRect();
 
 		const totalLines = Math.round(textRect.height / lineHeight);
-		const overflowingLines = Math.floor((textRect.bottom - maxBottom) / lineHeight);
+		// A partial line crossing the boundary must move too; flooring can retain overflow.
+		const overflowingLines = Math.max(
+			0,
+			Math.ceil((textRect.bottom - maxBottom - 0.5) / lineHeight),
+		);
 
 		return this.calculateLineSplitAmount(totalLines - overflowingLines, overflowingLines);
 	}
@@ -1272,7 +1273,9 @@ export class PageLayoutManager {
 	 * Determine which pages are affected by a given transaction
 	 */
 	getAffectedPageRangeFromTransaction(view: EditorView, tr: Transaction): [number, number] {
-		if (tr.steps.length === 0) return [0, 0];
+		if (tr.steps.length === 0) {
+			return [0, 0];
+		}
 
 		const lastPage = Math.max(
 			0,
@@ -1283,7 +1286,9 @@ export class PageLayoutManager {
 		);
 		// Step positions belong to different intermediate documents. Until we remap all
 		// boundaries across those documents, invalidate the full range rather than miss an earlier page.
-		if (tr.steps.length > 1) return [0, lastPage];
+		if (tr.steps.length > 1) {
+			return [0, lastPage];
+		}
 
 		let earliest = lastPage;
 		let latest = 0;
@@ -1321,7 +1326,9 @@ export class PageLayoutManager {
 	/** Refresh presentation indexes, including pages not yet visited by pagination. */
 	syncPageIndexes(view: EditorView): void {
 		view.state.doc.forEach((node, offset, index) => {
-			if (node.type.name !== 'page') return;
+			if (node.type.name !== 'page') {
+				return;
+			}
 			const dom = view.nodeDOM(offset);
 			if (dom instanceof HTMLElement && dom.dataset.index !== String(index)) {
 				dom.dataset.index = String(index);

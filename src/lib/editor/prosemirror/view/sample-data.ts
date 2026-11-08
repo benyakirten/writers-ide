@@ -1,3 +1,4 @@
+import { Fragment } from 'prosemirror-model';
 import { schema } from './schema';
 
 export const mediumPage = schema.node('page', null, [
@@ -166,3 +167,66 @@ export const barelyTooLongPage = schema.node('page', null, [
 	]),
 	schema.node('pageEnd'),
 ]);
+
+const paginationCases = [
+	{
+		name: 'Underflow: three short source pages should merge',
+		pages: [shortPage, shortPage, shortPage],
+	},
+	{ name: 'Overflow: long content should span several pages', pages: [longPage] },
+	{ name: 'Near-boundary overflow and paragraph splitting', pages: [barelyTooLongPage] },
+	{ name: 'Explicit break with content after it', pages: [mediumPageInterrupted] },
+	{ name: 'Long content with an internal explicit break', pages: [longPageWithBreak] },
+	{
+		name: 'Empty source pages between content',
+		pages: [shortPage, emptyPage, emptyPage, mediumPage],
+	},
+	{
+		name: 'Consecutive explicit breaks should keep short pages separate',
+		pages: [shortPageInterrupted, shortPageInterrupted, shortPageInterrupted],
+	},
+	{
+		name: 'Mixed short, medium, and overflowing source pages',
+		pages: [shortPage, mediumPage, longPage, shortPage],
+	},
+	{ name: 'Leading and trailing empty source pages', pages: [emptyPage, mediumPage, emptyPage] },
+	{ name: 'Several overflowing source pages', pages: multiplePages },
+];
+
+/** Source-case numbers survive reflow; they are deliberately not physical page numbers. */
+export const paginationSampleDocument = schema.node(
+	'doc',
+	null,
+	Array.from({ length: 2 }, (_, round) =>
+		paginationCases.flatMap((sample, caseIndex) => {
+			const caseNumber = String(round * paginationCases.length + caseIndex + 1).padStart(2, '0');
+			let paragraphNumber = 0;
+			return sample.pages.map((page, pageIndex) => {
+				const blocks = Array.from(page.content.content).map((block) => {
+					if (block.type.name !== 'paragraph' || block.content.size === 0) {
+						return block;
+					}
+					paragraphNumber++;
+					const label = schema.text(`[${caseNumber}.${String(paragraphNumber).padStart(2, '0')}] `);
+					return block.copy(Fragment.from(label).append(block.content));
+				});
+				if (pageIndex === 0) {
+					blocks.unshift(
+						schema.node(
+							'paragraph',
+							null,
+							schema.text(
+								`CASE ${caseNumber} — ${sample.name}. Paragraph labels identify source order, not page numbers.`,
+							),
+						),
+					);
+				}
+				// Isolate cases, while allowing content to flow between source pages inside a case.
+				if (pageIndex === sample.pages.length - 1 && blocks.at(-1)?.type.name !== 'pageEnd') {
+					blocks.push(schema.node('pageEnd'));
+				}
+				return schema.node('page', null, blocks);
+			});
+		}),
+	).flat(),
+);

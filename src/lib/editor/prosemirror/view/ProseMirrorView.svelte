@@ -3,18 +3,7 @@
 	import 'prosemirror-view/style/prosemirror.css';
 
 	import type { TabComponentProps } from '$lib/editor/state/tab-state-registry.svelte';
-	import { schema } from './schema';
-	import {
-		barelyTooLongPage,
-		emptyPage,
-		longPage,
-		mediumPage,
-		mediumPageInterrupted,
-		multiplePages,
-		shortPage,
-		shortPageInterrupted,
-		shortPages,
-	} from './sample-data';
+	import { paginationSampleDocument } from './sample-data';
 	import { ProseMirrorEventBusEventType } from '@/editor/state/event-bus.svelte';
 	import { createView } from './editor';
 
@@ -22,28 +11,9 @@
 
 	let el: HTMLElement;
 	let viewport: HTMLElement;
-	let initialState = schema.node('doc', null, [
-		// emptyPage,
-		// barelyTooLongPage,
-		barelyTooLongPage,
-		// mediumPageInterrupted,
-		// shortPage,
-		// shortPage,
-		// emptyPage,
-		// mediumPage,
-		// shortPage,
-		// ...multiplePages,
-		// longPage,
-		// shortPage,
-		// emptyPage,
-		// shortPageInterrupted,
-		// ...shortPages,
-		// mediumPage,
-		// emptyPage,
-	]);
 
 	onMount(() => {
-		const deregister = createView(id, 'Test', initialState, el, viewport);
+		const deregister = createView(id, 'Pagination samples', paginationSampleDocument, el, viewport);
 		return () => deregister();
 	});
 
