@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Schema, type Node as ProseMirrorNode } from 'prosemirror-model';
 import { EditorState, TextSelection, type Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { PageLayoutManager } from './page-layout.svelte';
+import { PageLayoutManager, PeerSelection } from './page-layout.svelte';
 import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.svelte';
 
 const schema = new Schema({
@@ -62,6 +62,34 @@ afterEach(() => {
 	document.body.replaceChildren();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
+});
+
+describe('peer-group page boundaries', () => {
+	it('treats the last paragraph of the final page as unpeered without reading past the document', () => {
+		const view = createView(doc(page()));
+		expect(layout.identifyPeerGroup(view.state, 2)).toMatchObject({
+			type: PeerSelection.NotPeered,
+		});
+	});
+
+	it('handles a peer flag on the first page without looking up a negative page index', () => {
+		const view = createView(doc(schema.node('page', null, paragraph('hello', true))));
+		expect(layout.identifyPeerGroup(view.state, 2)).toMatchObject({
+			type: PeerSelection.NotPeered,
+		});
+	});
+
+	it('finds both halves of a peer group by document order even when page index attributes are stale', () => {
+		const view = createView(doc(page(), schema.node('page', null, paragraph('continued', true))));
+		const peerPosition = pageOffset(view, 1) + 1;
+		for (const position of [2, peerPosition + 1]) {
+			expect(layout.identifyPeerGroup(view.state, position)).toMatchObject({
+				type: PeerSelection.Peered,
+				head: { position: 1 },
+				peer: { position: peerPosition },
+			});
+		}
+	});
 });
 
 describe('overflow detection', () => {

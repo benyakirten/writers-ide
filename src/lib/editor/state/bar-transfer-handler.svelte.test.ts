@@ -4,6 +4,9 @@ import FloatingBarState from './floater-state.svelte';
 import HorizontalBarState, { HorizontalBarPosition } from './horizontal-bar-state.svelte';
 import VerticalBarState, { VerticalBarPosition } from './vertical-bar-state.svelte';
 import Registry from './bar-item-registry.svelte';
+import type { ModularComponent } from './shared.types';
+
+const MockComponent: ModularComponent = () => ({});
 
 describe('BarTransferHandler', () => {
 	let item1Key: string;
@@ -11,7 +14,7 @@ describe('BarTransferHandler', () => {
 	let item3Key: string;
 
 	afterEach(() => {
-		Registry.items.clear();
+		Registry.clear();
 	});
 
 	beforeEach(() => {
@@ -24,13 +27,11 @@ describe('BarTransferHandler', () => {
 		item1Key = Registry.register({
 			title: 'item1',
 			vertical: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: MockComponent,
 				size: 1,
 			},
 			horizontal: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: MockComponent,
 				size: 2,
 			},
 		})[0];
@@ -38,13 +39,11 @@ describe('BarTransferHandler', () => {
 		item2Key = Registry.register({
 			title: 'item2',
 			vertical: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: MockComponent,
 				size: 2,
 			},
 			horizontal: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: MockComponent,
 				size: 1,
 			},
 		})[0];
@@ -52,13 +51,11 @@ describe('BarTransferHandler', () => {
 		item3Key = Registry.register({
 			title: 'item3',
 			vertical: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: MockComponent,
 				size: 3,
 			},
 			horizontal: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: MockComponent,
 				size: 3,
 			},
 		})[0];
@@ -530,7 +527,7 @@ describe('BarTransferHandler', () => {
 				{
 					location: HorizontalBarPosition.WindowBlockStart,
 					barId: bar2.id,
-					itemId: item1Key,
+					itemId: item2Key,
 				},
 				1,
 			);
@@ -613,7 +610,7 @@ describe('BarTransferHandler', () => {
 
 			expect(result).toBe(true);
 			expect(bar2.data.ids).not.toContain(item2Key);
-			expect(bar.data.ids).toContain(item1Key);
+			expect(bar.data.ids).toEqual([item1Key, item2Key]);
 		});
 
 		it('should create a new bar in the positive direction after the current target if the item cannot fit', () => {

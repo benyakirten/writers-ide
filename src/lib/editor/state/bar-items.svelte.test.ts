@@ -1,6 +1,11 @@
 import { describe, it, expect, afterEach, beforeEach, test } from 'vitest';
 import { BarItems } from './bar-items.svelte';
 import Registry from './bar-item-registry.svelte';
+import * as m from '$lib/paraglide/messages';
+import type { ModularComponent } from './shared.types';
+
+const VerticalComponent: ModularComponent = () => ({});
+const HorizontalComponent: ModularComponent = () => ({});
 
 describe('BarItems', () => {
 	let barItems: BarItems;
@@ -12,13 +17,11 @@ describe('BarItems', () => {
 		item1Key = Registry.register({
 			title: 'item1',
 			vertical: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: VerticalComponent,
 				size: 1,
 			},
 			horizontal: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: HorizontalComponent,
 				size: 2,
 			},
 		})[0];
@@ -26,13 +29,11 @@ describe('BarItems', () => {
 		item2Key = Registry.register({
 			title: 'item2',
 			vertical: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: VerticalComponent,
 				size: 2,
 			},
 			horizontal: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: HorizontalComponent,
 				size: 1,
 			},
 		})[0];
@@ -40,20 +41,18 @@ describe('BarItems', () => {
 		item3Key = Registry.register({
 			title: 'item3',
 			vertical: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: VerticalComponent,
 				size: 3,
 			},
 			horizontal: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				Component: null as any,
+				Component: HorizontalComponent,
 				size: 3,
 			},
 		})[0];
 	});
 
 	afterEach(() => {
-		Registry.items.clear();
+		Registry.clear();
 	});
 
 	it('should initialize with default values', () => {
@@ -61,6 +60,38 @@ describe('BarItems', () => {
 		expect(barItems.isVertical).toBe(true);
 		expect(barItems.ids).toEqual([]);
 		expect(barItems.maxSize).toBe(3);
+	});
+
+	describe('items', () => {
+		it.each([true, false])(
+			'should resolve registered item data when isVertical is %s',
+			(isVertical) => {
+				barItems = new BarItems(isVertical, [item1Key]);
+
+				expect(barItems.items).toEqual([
+					{
+						id: item1Key,
+						title: 'item1',
+						Component: isVertical ? VerticalComponent : HorizontalComponent,
+						size: isVertical ? 1 : 2,
+					},
+				]);
+			},
+		);
+
+		it('should resolve fallback data after an item is deregistered', () => {
+			barItems = new BarItems(true, [item2Key]);
+			expect(barItems.items[0].title).toBe('item2');
+			expect(barItems.availableSpace).toBe(1);
+
+			Registry.deregister(item2Key);
+
+			expect(barItems.ids).toEqual([item2Key]);
+			expect(barItems.items).toEqual([
+				{ id: item2Key, title: m.unknown_menu_title(), Component: null, size: 1 },
+			]);
+			expect(barItems.availableSpace).toBe(2);
+		});
 	});
 
 	describe('has', () => {

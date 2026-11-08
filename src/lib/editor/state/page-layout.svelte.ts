@@ -1158,7 +1158,7 @@ export class PageLayoutManager {
 			const resolvedPosition = state.doc.resolve(pos);
 
 			const pageNode = resolvedPosition.node(PAGE_DEPTH);
-			const pageIndex = pageNode.attrs['index'];
+			const pageIndex = resolvedPosition.index(0);
 
 			const blockStart = resolvedPosition.start(BLOCK_DEPTH) - 1;
 			const blockNode = state.doc.nodeAt(blockStart);
@@ -1196,7 +1196,7 @@ export class PageLayoutManager {
 		};
 
 		if (blockNode.attrs['peer']) {
-			const previousPage = state.doc.child(pageIndex - 1);
+			const previousPage = state.doc.maybeChild(pageIndex - 1);
 			const headNode = previousPage?.lastChild;
 			if (headNode) {
 				const head: NodeDetails = {
@@ -1215,7 +1215,7 @@ export class PageLayoutManager {
 		if (pageNode.lastChild?.eq(blockNode)) {
 			// If the next page's first element is peered, return the peer group.
 			// Otherwise, return not peered
-			const nextPage = state.doc.child(pageIndex + 1);
+			const nextPage = state.doc.maybeChild(pageIndex + 1);
 			const peerNode = nextPage?.firstChild;
 			if (peerNode?.attrs['peer']) {
 				const peer: NodeDetails = {

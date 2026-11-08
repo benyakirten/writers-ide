@@ -64,12 +64,15 @@ export class TabState {
 	}
 
 	remove(id: string): void {
-		if (this.#active === id) {
-			this.#active = this.windows.length > 0 ? this.windows[0].id : null;
+		const index = this.windows.findIndex((item) => item.id === id);
+		if (index === -1) {
+			return;
 		}
 
-		const index = this.windows.findIndex((item) => item.id === id);
 		this.windows.splice(index, 1);
+		if (this.#active === id) {
+			this.#active = this.windows[0]?.id ?? null;
+		}
 	}
 
 	swap(id1: string, id2: string): boolean {
