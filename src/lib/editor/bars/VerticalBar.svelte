@@ -1,13 +1,11 @@
 <script lang="ts">
 	import * as m from '$lib/paraglide/messages';
-	import VerticalBarState from '../state/vertical-bar-state.svelte.js';
-	import { VerticalBarPosition, type VerticalBar } from '../state/vertical-bar-state.svelte.js';
+	import VerticalBarState from '../state/vertical-bar-state.svelte';
+	import { VerticalBarPosition, type VerticalBar } from '../state/vertical-bar-state.svelte';
 	import BarMenu from './BarMenu.svelte';
-	import type { BarItemData } from '../state/bar-items.svelte.js';
+	import type { BarItemData } from '../state/bar-items.svelte';
 	import VerticalItemRenderer from './VerticalItemRenderer.svelte';
-	import TransferHandler, {
-		type BarTransferLocation
-	} from '../state/bar-transfer-handler.svelte.js';
+	import TransferHandler, { type BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import type { MoveDetails } from './BarLocation.svelte';
 
 	let {
@@ -15,7 +13,7 @@
 		position,
 		index,
 		items,
-		canMoveForward
+		canMoveForward,
 	}: {
 		bar: VerticalBar;
 		position: VerticalBarPosition;
@@ -29,20 +27,20 @@
 	let resizeLabel = $derived.by(() =>
 		position === VerticalBarPosition.InlineStart
 			? m.resize_inline_start_bar({ num: index + 1 })
-			: m.resize_inline_end_bar({ num: index + 1 })
+			: m.resize_inline_end_bar({ num: index + 1 }),
 	);
 
 	function determineMoveDetails(
 		itemIndex: number,
 		numItems: number,
 		barIndex: number,
-		canMoveForward: boolean
+		canMoveForward: boolean,
 	): MoveDetails {
 		return {
 			up: itemIndex > 0,
 			down: itemIndex < numItems - 1,
 			left: barIndex > 0,
-			right: canMoveForward
+			right: canMoveForward,
 		};
 	}
 
@@ -51,34 +49,34 @@
 			{
 				location: position,
 				barId: index,
-				itemId
+				itemId,
 			},
-			to
+			to,
 		);
 	}
 
 	function handleItemMove(
 		direction: 'up' | 'down' | 'left' | 'right',
 		itemId: string,
-		itemIndex: number
+		itemIndex: number,
 	) {
 		if (direction === 'up' || direction === 'down') {
 			TransferHandler.swap(
 				{
 					location: position,
 					barId: index,
-					itemId
+					itemId,
 				},
-				direction === 'up' ? itemIndex - 1 : itemIndex + 1
+				direction === 'up' ? itemIndex - 1 : itemIndex + 1,
 			);
 		} else {
 			TransferHandler.nudge(
 				{
 					location: position,
 					barId: index,
-					itemId
+					itemId,
 				},
-				direction === 'left' ? -1 : 1
+				direction === 'left' ? -1 : 1,
 			);
 		}
 	}

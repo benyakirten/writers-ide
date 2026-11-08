@@ -1,14 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	import FloaterBarState, { type FloatingBar } from '$lib/editor/state/floater-state.svelte.js';
+	import FloaterBarState, { type FloatingBar } from '$lib/editor/state/floater-state.svelte';
 	import FloaterBarTitle from './FloaterBarTitle.svelte';
 	import BarMenu from './BarMenu.svelte';
-	import type { BarItemData } from '../state/bar-items.svelte.js';
+	import type { BarItemData } from '../state/bar-items.svelte';
 	import VerticalItemRenderer from './VerticalItemRenderer.svelte';
-	import TransferHandler, {
-		type BarTransferLocation
-	} from '../state/bar-transfer-handler.svelte.js';
+	import TransferHandler, { type BarTransferLocation } from '../state/bar-transfer-handler.svelte';
 	import type { MoveDetails } from './BarLocation.svelte';
 
 	let { bar, items, index }: { bar: FloatingBar; items: BarItemData[]; index: number } = $props();
@@ -65,16 +63,16 @@
 			{
 				location: 'floating',
 				barId: index,
-				itemId
+				itemId,
 			},
-			to
+			to,
 		);
 	}
 
 	function handleItemMove(
 		direction: 'up' | 'down' | 'left' | 'right',
 		itemId: string,
-		itemIndex: number
+		itemIndex: number,
 	) {
 		if (direction === 'left' || direction === 'right') {
 			return;
@@ -84,9 +82,9 @@
 			{
 				location: 'floating',
 				barId: index,
-				itemId
+				itemId,
 			},
-			direction === 'up' ? itemIndex - 1 : itemIndex + 1
+			direction === 'up' ? itemIndex - 1 : itemIndex + 1,
 		);
 	}
 
@@ -95,7 +93,7 @@
 			up: index > 0,
 			down: index < numItems - 1,
 			left: null,
-			right: null
+			right: null,
 		};
 	}
 </script>

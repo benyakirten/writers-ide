@@ -3,7 +3,7 @@
 	import { CheckCircle, X } from '@steeze-ui/phosphor-icons';
 	import { Icon } from '@steeze-ui/svelte-icon';
 
-	import FloaterBarState from '$lib/editor/state/floater-state.svelte.js';
+	import FloaterBarState from '$lib/editor/state/floater-state.svelte';
 
 	let { title, id }: { index: number; title: string; id: string } = $props();
 

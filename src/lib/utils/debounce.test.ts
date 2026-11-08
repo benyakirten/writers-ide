@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
-import { Debouncer } from './debounce.js';
+import { Debouncer } from './debounce';
 
 describe('Debouncer', () => {
 	beforeAll(() => {
@@ -59,7 +59,7 @@ describe('Debouncer', () => {
 		const callback = vi.fn();
 		const debouncer = new Debouncer(callback, {
 			delay: 100,
-			resetIfSameValue: true
+			resetIfSameValue: true,
 		});
 		debouncer.update('test');
 		await vi.advanceTimersByTimeAsync(50);
@@ -74,7 +74,7 @@ describe('Debouncer', () => {
 		const callback = vi.fn();
 		const debouncer = new Debouncer(callback, {
 			delay: 100,
-			resetIfSameValue: false
+			resetIfSameValue: false,
 		});
 		debouncer.update('test');
 		await vi.advanceTimersByTimeAsync(50);

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { DropdownMenu as DropdownMenuPrimitive } from 'bits-ui';
 	import Check from 'lucide-svelte/icons/check';
-	import { cn } from '$lib/utils.js';
+	import { cn } from '$lib/utils';
 
 	type $$Props = DropdownMenuPrimitive.CheckboxItemProps;
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -16,7 +16,7 @@
 	bind:checked
 	class={cn(
 		'relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[disabled]:pointer-events-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:opacity-50',
-		className
+		className,
 	)}
 	{...$$restProps}
 	on:click

@@ -9,7 +9,7 @@
 	const { transform, listeners, attributes, node } = useDraggable({ id, data });
 
 	const style = $derived(
-		transform.current ? `transform: ${CSS.Translate.toString(transform.current)};` : ''
+		transform.current ? `transform: ${CSS.Translate.toString(transform.current)};` : '',
 	);
 </script>
 

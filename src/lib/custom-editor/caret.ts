@@ -1,5 +1,5 @@
-import type { Blocks } from '$lib/types/block.js';
-import { nextAnimationFrame } from './utils.js';
+import type { Blocks } from '$lib/types/block';
+import { nextAnimationFrame } from './utils';
 
 export function getCaretPosition(): number {
 	return window.getSelection()?.getRangeAt(0).endOffset ?? 0;
@@ -99,7 +99,7 @@ export function getCaretHorizontalPosition(): number {
 export function traverseFromStartOfLine(
 	node: Node,
 	position: number,
-	startOffset: number
+	startOffset: number,
 ): Range | null {
 	const range = document.createRange();
 	let prevOffset = 0;
@@ -164,7 +164,7 @@ export function moveCaretToPositionFromLeft(
 	selection: Selection,
 	el: HTMLElement,
 	position: number,
-	startOffset: number
+	startOffset: number,
 ): void {
 	const range = traverseFromStartOfLine(el, position, startOffset);
 	if (!range) {
@@ -179,7 +179,7 @@ export function moveCaretToPositionFromRight(
 	selection: Selection,
 	el: HTMLElement,
 	position: number,
-	startOffset: number
+	startOffset: number,
 ): void {
 	const range = traverseFromEndOfLine(el, position, startOffset);
 	if (!range) {
@@ -194,7 +194,7 @@ export function moveCaretToPositionFromRight(
 export function traverseFromEndOfLine(
 	node: Node,
 	position: number,
-	startOffset: number
+	startOffset: number,
 ): Range | null {
 	if (node.nodeType === Node.TEXT_NODE) {
 		const range = document.createRange();

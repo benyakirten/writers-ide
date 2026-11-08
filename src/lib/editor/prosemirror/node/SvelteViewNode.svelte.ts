@@ -4,7 +4,7 @@ import type {
 	DecorationSource,
 	EditorView,
 	NodeView,
-	ViewMutationRecord
+	ViewMutationRecord,
 } from 'prosemirror-view';
 import { SvelteComponent, unmount } from 'svelte';
 
@@ -28,7 +28,7 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 		| ((
 				node: PMNode,
 				decorations: readonly Decoration[],
-				innerDecorations: DecorationSource
+				innerDecorations: DecorationSource,
 		  ) => boolean)
 		| undefined;
 	multiType?: boolean | undefined;

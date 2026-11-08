@@ -3,22 +3,27 @@ import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import type { Schema, Node } from 'prosemirror-model';
 
-import { schema } from './schema.js';
-import { ActionUtilities } from './actions.js';
-import { INDENT_MIN, INDENT_MAX } from './constants.js';
+import { schema } from './schema';
+import { ActionUtilities } from './actions';
+import { INDENT_MIN, INDENT_MAX } from './constants';
 
 function createEditorView(
 	nodes: Node[],
 	schema: Schema,
-	selection?: { start?: number; end?: number }
+	selection?: { start?: number; end?: number },
 ) {
 	const element = document.createElement('div');
 
-	const doc = schema.node('doc', null, nodes);
+	const doc = schema.node('doc', null, [schema.node('page', { index: 0 }, nodes)]);
+	doc.check();
 	const state = EditorState.create({
 		doc,
 		schema,
-		selection: TextSelection.create(doc, selection?.start ?? 0, selection?.end ?? doc.content.size)
+		selection: TextSelection.create(
+			doc,
+			selection?.start ?? 2,
+			selection?.end ?? doc.content.size - 2,
+		),
 	});
 	return new EditorView(element, { state });
 }
@@ -28,19 +33,19 @@ describe('toggleTextMark', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state);
 		expect(got).toBe(false);
 
-		const text1 = view.state.doc.content.content[0].content.content[0];
+		const text1 = view.state.doc.child(0).child(0).child(0);
 		expect(text1.marks.length).toBe(1);
 		expect(text1.marks[0].type.name).toBe('bold');
 
-		const text2 = view.state.doc.content.content[1].content.content[0];
+		const text2 = view.state.doc.child(0).child(1).child(0);
 		expect(text2.marks.length).toBe(1);
 		expect(text2.marks[0].type.name).toBe('italic');
 	});
@@ -49,23 +54,23 @@ describe('toggleTextMark', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])]),
 			],
 			schema,
 			{
-				start: 0,
-				end: 0
-			}
+				start: 2,
+				end: 2,
+			},
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
 		expect(got).toBe(false);
 
-		const text1 = view.state.doc.content.content[0].content.content[0];
+		const text1 = view.state.doc.child(0).child(0).child(0);
 		expect(text1.marks.length).toBe(1);
 		expect(text1.marks[0].type.name).toBe('bold');
 
-		const text2 = view.state.doc.content.content[1].content.content[0];
+		const text2 = view.state.doc.child(0).child(1).child(0);
 		expect(text2.marks.length).toBe(1);
 		expect(text2.marks[0].type.name).toBe('italic');
 	});
@@ -75,19 +80,19 @@ describe('toggleTextMark', () => {
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
 				schema.node('paragraph', null, [
-					schema.text('Second item', [schema.mark('bold'), schema.mark('italic')])
-				])
+					schema.text('Second item', [schema.mark('bold'), schema.mark('italic')]),
+				]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
 		expect(got).toBe(true);
 
-		const text1 = view.state.doc.content.content[0].content.content[0];
+		const text1 = view.state.doc.child(0).child(0).child(0);
 		expect(text1.marks.length).toBe(0);
 
-		const text2 = view.state.doc.content.content[1].content.content[0];
+		const text2 = view.state.doc.child(0).child(1).child(0);
 		expect(text2.marks.length).toBe(1);
 		expect(text2.marks[0].type.name).toBe('italic');
 	});
@@ -96,19 +101,19 @@ describe('toggleTextMark', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item')]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
 		expect(got).toBe(true);
 
-		const text1 = view.state.doc.content.content[0].content.content[0];
+		const text1 = view.state.doc.child(0).child(0).child(0);
 		expect(text1.marks.length).toBe(1);
 		expect(text1.marks[0].type.name).toBe('bold');
 
-		const text2 = view.state.doc.content.content[1].content.content[0];
+		const text2 = view.state.doc.child(0).child(1).child(0);
 		expect(text2.marks.length).toBe(2);
 		expect(text2.marks[0].type.name).toBe('italic');
 		expect(text2.marks[1].type.name).toBe('bold');
@@ -118,19 +123,19 @@ describe('toggleTextMark', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view);
 		expect(got).toBe(true);
 
-		const text1 = view.state.doc.content.content[0].content.content[0];
+		const text1 = view.state.doc.child(0).child(0).child(0);
 		expect(text1.marks.length).toBe(1);
 		expect(text1.marks[0].type.name).toBe('bold');
 
-		const text2 = view.state.doc.content.content[1].content.content[0];
+		const text2 = view.state.doc.child(0).child(1).child(0);
 		expect(text2.marks.length).toBe(2);
 		expect(text2.marks[0].type.name).toBe('italic');
 		expect(text2.marks[1].type.name).toBe('bold');
@@ -140,19 +145,19 @@ describe('toggleTextMark', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
-				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])])
+				schema.node('paragraph', null, [schema.text('Second item', [schema.mark('italic')])]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view, 'italic');
 		expect(got).toBe(true);
 
-		const text1 = view.state.doc.content.content[0].content.content[0];
+		const text1 = view.state.doc.child(0).child(0).child(0);
 		expect(text1.marks.length).toBe(1);
 		expect(text1.marks[0].type.name).toBe('bold');
 
-		const text2 = view.state.doc.content.content[1].content.content[0];
+		const text2 = view.state.doc.child(0).child(1).child(0);
 		expect(text2.marks.length).toBe(1);
 		expect(text2.marks[0].type.name).toBe('bold');
 	});
@@ -162,19 +167,19 @@ describe('toggleTextMark', () => {
 			[
 				schema.node('paragraph', null, [schema.text('First Item', [schema.mark('bold')])]),
 				schema.node('paragraph', null, [
-					schema.text('Second item', [schema.mark('bold'), schema.mark('italic')])
-				])
+					schema.text('Second item', [schema.mark('bold'), schema.mark('italic')]),
+				]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.toggleTextMark('bold', view.state, view.dispatch, view, 'italic');
 		expect(got).toBe(true);
 
-		const text1 = view.state.doc.content.content[0].content.content[0];
+		const text1 = view.state.doc.child(0).child(0).child(0);
 		expect(text1.marks.length).toBe(0);
 
-		const text2 = view.state.doc.content.content[1].content.content[0];
+		const text2 = view.state.doc.child(0).child(1).child(0);
 		expect(text2.marks.length).toBe(1);
 		expect(text2.marks[0].type.name).toBe('italic');
 	});
@@ -185,18 +190,18 @@ describe('dent', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { indent: 1 }, [schema.text('First Item')]),
-				schema.node('paragraph', { indent: 2 }, [schema.text('Second item')])
+				schema.node('paragraph', { indent: 2 }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.dent('indent', view.state);
 		expect(got).toBe(false);
 
-		const paragraph1 = view.state.doc.content.content[0];
+		const paragraph1 = view.state.doc.child(0).child(0);
 		expect(paragraph1.attrs.indent).toBe(1);
 
-		const paragraph2 = view.state.doc.content.content[1];
+		const paragraph2 = view.state.doc.child(0).child(1);
 		expect(paragraph2.attrs.indent).toBe(2);
 	});
 
@@ -204,18 +209,18 @@ describe('dent', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { indent: INDENT_MAX - 2 }, [schema.text('First Item')]),
-				schema.node('paragraph', { indent: INDENT_MAX - 1 }, [schema.text('Second item')])
+				schema.node('paragraph', { indent: INDENT_MAX - 1 }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.dent('indent', view.state, view.dispatch);
 		expect(got).toBe(true);
 
-		const paragraph1 = view.state.doc.content.content[0];
+		const paragraph1 = view.state.doc.child(0).child(0);
 		expect(paragraph1.attrs.indent).toBe(INDENT_MAX - 1);
 
-		const paragraph2 = view.state.doc.content.content[1];
+		const paragraph2 = view.state.doc.child(0).child(1);
 		expect(paragraph2.attrs.indent).toBe(INDENT_MAX);
 	});
 
@@ -223,18 +228,18 @@ describe('dent', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { indent: INDENT_MIN + 1 }, [schema.text('First Item')]),
-				schema.node('paragraph', { indent: INDENT_MIN + 2 }, [schema.text('Second item')])
+				schema.node('paragraph', { indent: INDENT_MIN + 2 }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.dent('dedent', view.state, view.dispatch);
 		expect(got).toBe(true);
 
-		const paragraph1 = view.state.doc.content.content[0];
+		const paragraph1 = view.state.doc.child(0).child(0);
 		expect(paragraph1.attrs.indent).toBe(INDENT_MIN);
 
-		const paragraph2 = view.state.doc.content.content[1];
+		const paragraph2 = view.state.doc.child(0).child(1);
 		expect(paragraph2.attrs.indent).toBe(INDENT_MIN + 1);
 	});
 
@@ -242,18 +247,18 @@ describe('dent', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { indent: INDENT_MIN }, [schema.text('First Item')]),
-				schema.node('paragraph', { indent: INDENT_MAX }, [schema.text('Second item')])
+				schema.node('paragraph', { indent: INDENT_MAX }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.dent('dedent', view.state, view.dispatch);
 		expect(got).toBe(true);
 
-		const paragraph1 = view.state.doc.content.content[0];
+		const paragraph1 = view.state.doc.child(0).child(0);
 		expect(paragraph1.attrs.indent).toBe(INDENT_MIN);
 
-		const paragraph2 = view.state.doc.content.content[1];
+		const paragraph2 = view.state.doc.child(0).child(1);
 		expect(paragraph2.attrs.indent).toBe(INDENT_MAX - 1);
 	});
 
@@ -261,18 +266,18 @@ describe('dent', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { indent: INDENT_MIN }, [schema.text('First Item')]),
-				schema.node('paragraph', { indent: INDENT_MAX }, [schema.text('Second item')])
+				schema.node('paragraph', { indent: INDENT_MAX }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.dent('indent', view.state, view.dispatch);
 		expect(got).toBe(true);
 
-		const paragraph1 = view.state.doc.content.content[0];
+		const paragraph1 = view.state.doc.child(0).child(0);
 		expect(paragraph1.attrs.indent).toBe(INDENT_MIN + 1);
 
-		const paragraph2 = view.state.doc.content.content[1];
+		const paragraph2 = view.state.doc.child(0).child(1);
 		expect(paragraph2.attrs.indent).toBe(INDENT_MAX);
 	});
 });
@@ -282,18 +287,18 @@ describe('setTextAlignment', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { align: 'left' }, [schema.text('First Item')]),
-				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')])
+				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.setTextAlignment('center', view.state);
 		expect(got).toBe(false);
 
-		const paragraph1 = view.state.doc.content.content[0];
+		const paragraph1 = view.state.doc.child(0).child(0);
 		expect(paragraph1.attrs.align).toBe('left');
 
-		const paragraph2 = view.state.doc.content.content[1];
+		const paragraph2 = view.state.doc.child(0).child(1);
 		expect(paragraph2.attrs.align).toBe('right');
 	});
 
@@ -301,38 +306,38 @@ describe('setTextAlignment', () => {
 		const view = createEditorView(
 			[
 				schema.node('paragraph', { align: 'left' }, [schema.text('First Item')]),
-				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')])
+				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')]),
 			],
-			schema
+			schema,
 		);
 
 		const got = ActionUtilities.setTextAlignment('center', view.state, view.dispatch);
 		expect(got).toBe(true);
 
-		const paragraph1 = view.state.doc.content.content[0];
+		const paragraph1 = view.state.doc.child(0).child(0);
 		expect(paragraph1.attrs.align).toBe('center');
 
-		const paragraph2 = view.state.doc.content.content[1];
+		const paragraph2 = view.state.doc.child(0).child(1);
 		expect(paragraph2.attrs.align).toBe('center');
 	});
 
 	it('should not change alignment if no paragraphs are in the selection', () => {
 		const view = createEditorView(
 			[
-				schema.node('heading', [schema.text('First Item')]),
-				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')])
+				schema.node('heading', null, [schema.text('First Item')]),
+				schema.node('paragraph', { align: 'right' }, [schema.text('Second item')]),
 			],
 			schema,
 			{
-				start: 0,
-				end: 2
-			}
+				start: 2,
+				end: 4,
+			},
 		);
 
 		const got = ActionUtilities.setTextAlignment('center', view.state, view.dispatch);
 		expect(got).toBe(true);
 
-		const paragraph = view.state.doc.content.content[1];
+		const paragraph = view.state.doc.child(0).child(1);
 		expect(paragraph.attrs.align).toBe('right');
 	});
 });

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import TooltipManager from '$lib/services/tooltip.svelte';
-	import { MAX_Z_INDEX } from '@/constants';
+	import { MAX_Z_INDEX } from '$lib/constants';
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') {

@@ -14,7 +14,7 @@ export function getCaretHorizontalPosition(): number {
 export function traverseFromStartOfLine(
 	node: Node,
 	position: number,
-	startOffset: number
+	startOffset: number,
 ): Range | null {
 	const range = document.createRange();
 	let prevOffset = 0;
@@ -77,7 +77,7 @@ export function moveCaretToPositionFromLeft(
 	selection: Selection,
 	el: HTMLElement,
 	position: number,
-	startOffset: number
+	startOffset: number,
 ): void {
 	const range = traverseFromStartOfLine(el, position, startOffset);
 	if (!range) {
