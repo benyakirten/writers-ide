@@ -1,0 +1,11 @@
+{
+	"extends": "./tsconfig.json",
+	"include": [
+		"src/**/*.d.ts",
+		"e2e/fixtures/**/*.ts",
+		"performance/**/*.ts",
+		"playwright.performance.config.ts",
+		".storybook/*.ts",
+		".storybook/performance/*.ts"
+	]
+}

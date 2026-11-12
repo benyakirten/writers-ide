@@ -13,6 +13,8 @@
 		"tauri": "tauri",
 		"test:all": "pnpm test:unit:ci && pnpm test:e2e",
 		"test:e2e": "playwright test",
+		"test:performance": "playwright test --config playwright.performance.config.ts",
+		"check:performance": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.performance.json",
 		"test:unit:ci": "vitest --run",
 		"test": "vitest",
 		"lint": "oxfmt --check . && oxlint .",
