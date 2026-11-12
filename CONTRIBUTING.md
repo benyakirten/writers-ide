@@ -59,20 +59,27 @@ for (const job of jobs) {
 
 ### Formatting and linting
 
-Use the repository's Prettier and ESLint configuration rather than introducing personal formatting rules. Prettier formats code; it does not replace semantic lint rules or the conventions above.
+Use the repository's Oxfmt (`.oxfmtrc.json`) and Oxlint (`.oxlintrc.json`) configuration rather than introducing personal formatting rules. Oxfmt formats code, including Svelte components and Tailwind CSS classes; it does not replace semantic lint rules or the conventions above.
 
 ```sh
 pnpm lint
+pnpm lint:fix
 ```
+
+`lint` checks formatting and lint rules. `lint:fix` applies safe lint fixes, then formats the result.
 
 For a focused change, check only the files you touched:
 
 ```sh
-pnpm exec prettier --check path/to/file.ts
-pnpm exec eslint path/to/file.ts
+pnpm exec oxfmt --check path/to/file.ts
+pnpm exec oxlint path/to/file.ts
 ```
 
-ESLint's `curly: ['error', 'all']` rule can enforce brace bodies, and `no-cond-assign: ['error', 'always']` can prohibit assignments in conditions. Restricting increment/decrement expressions specifically inside conditions requires an AST selector rule; do not replace that restriction with a blanket ban on `++` and `--`.
+Oxlint preserves the supported rules from the previous ESLint configuration, including the underscore-prefixed unused-variable exemptions. It lints Svelte `<script>` blocks, not templates, so it does not replace `eslint-plugin-svelte`'s template rules. Continue to run `pnpm check` for Svelte and TypeScript diagnostics.
+
+The brace and mutation conventions above still apply even where lint rules do not enforce them. Do not replace the condition-specific increment/decrement restriction with a blanket ban on `++` and `--`.
+
+Oxfmt and Oxlint require Node.js `^20.19.0 || >=22.12.0`.
 
 ## Validation
 
