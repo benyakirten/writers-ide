@@ -175,7 +175,7 @@ Unit tests cover much of bar state/transfers, shortcuts, toast/tooltip behavior,
 
 The browser matrix targets Tauri's Chromium-based WebView2 and WebKit engine families; Firefox/Gecko is not a supported Tauri runtime. Playwright Chromium is not an actual WebView2 host, and Playwright WebKit does not pin the native WKWebView/WebKitGTK version.
 
-The cross-engine smoke suite checks typing/selection/undo, dropdown keyboard/focus behavior, visible-page bounds/marker preservation, startup exceptions and locale fallback. Its selection assertion exposes a current reflow issue: after insertion, automatic pagination can move the selection to another paragraph. This is not skipped; it remains a regression gate. Playwright's bundled engines are proxies for native WebViews, not validation of the minimum macOS version, Tauri IPC, or packaged-app startup.
+The cross-engine smoke suite checks typing/selection/undo, dropdown keyboard/focus behavior, visible-page bounds/marker preservation, startup exceptions and locale fallback. Reflow uses structural ProseMirror split/join mappings instead of whole-page replacement and text delete/reinsert, preserving logical text/inline-atom selections and undo mappings; explicit stored marks survive reflow and dispatch index normalization. Dedicated model and real-browser regressions cover carets through new-page creation and forward/reversed ranges through formatting reflow/undo. The current model-mutating pagination architecture is unchanged. Playwright's bundled engines are proxies for native WebViews, not validation of the minimum macOS version, Tauri IPC, or packaged-app startup.
 
 This document describes source inspection, not a standing claim that these checks pass. Report actual validation results for each change.
 

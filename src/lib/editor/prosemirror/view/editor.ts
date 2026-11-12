@@ -87,10 +87,16 @@ export const TransactionHandlerRegistry = new Registry<
 // Keep indexes in the model before rendering: mutating parsed data-index attributes
 // independently can feed back through ProseMirror's DOM observer.
 function indexPages(tr: Transaction): Transaction {
+	const { storedMarks } = tr;
 	tr.doc.forEach((node, offset, index) => {
-		if (node.type.name === 'page' && node.attrs.index !== index)
+		if (node.type.name === 'page' && node.attrs.index !== index) {
 			tr.setNodeAttribute(offset, 'index', index);
+		}
 	});
+	// Index attribute steps must not discard the incoming transaction's typing marks.
+	if (storedMarks !== null) {
+		tr.setStoredMarks(storedMarks);
+	}
 	return tr;
 }
 

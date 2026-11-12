@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { selectWithKeyboard } from './fixtures/pagination-selection';
 import {
 	expectVisiblePagesToFit,
 	sampleMarkers,
@@ -23,10 +24,7 @@ test('starts an editable workspace and supports keyboard formatting and undo', a
 	await page.keyboard.insertText(text);
 	await expect(editor).toContainText(text);
 
-	for (let index = 0; index < text.length; index++) {
-		await page.keyboard.press('Shift+ArrowLeft');
-	}
-	await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe(text);
+	await selectWithKeyboard(page, text);
 
 	// The app explicitly registers meta-b/meta-z, even on non-Mac platforms.
 	await page.keyboard.press('Meta+b');
