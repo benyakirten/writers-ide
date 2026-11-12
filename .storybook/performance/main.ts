@@ -1,5 +1,5 @@
 import type { StorybookConfig } from '@storybook/sveltekit';
-import base from '../main.js';
+import base from '../main';
 
 /** Isolate repeatable fixtures from documentation stories and their global decorators. */
 const config: StorybookConfig = {
