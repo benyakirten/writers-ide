@@ -136,7 +136,7 @@ Run every significant architectural decision by the owner before implementation,
 
 ## Tests and validation
 
-Unit tests run under jsdom via [vite.config.js](../vite.config.js). They validate state, transactions and mocked geometry; jsdom cannot establish real layout correctness.
+Unit tests run under jsdom via [vite.config.ts](../vite.config.ts). They validate state, transactions and mocked geometry; jsdom cannot establish real layout correctness.
 
 | Tests                                                                                                                                            | Coverage                                                                                                                      |
 | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -147,6 +147,10 @@ Unit tests run under jsdom via [vite.config.js](../vite.config.js). They validat
 | [actions.test.ts](../src/lib/editor/prosemirror/view/actions.test.ts), [selection.test.ts](../src/lib/editor/prosemirror/view/selection.test.ts) | Formatting commands and selection utilities.                                                                                  |
 | [pagination.test.ts](../e2e/pagination.test.ts)                                                                                                  | Real page bounds at DPR 1/2, mount/edit/scroll indexes and marker order, independent pane scrolling.                          |
 
+[smoke.test.ts](../e2e/smoke.test.ts) exercises the built application in Chromium and WebKit: startup exceptions, typing/selection/formatting/undo, dropdown keyboard navigation/focus restoration, visible-page geometry and marker preservation, and browser-locale resolution. The existing pagination and stylesheet compatibility suites also run in both engines. These tests require valid layout in each engine, not identical physical page breaks. They do not execute native Tauri WebViews or establish compatibility with macOS 13.3's WKWebView.
+
+The editing smoke test currently exposes selection movement during reflow after inserting text; whole-page replacement in pagination is a suspected cause, not a proven diagnosis. Preserve the failing regression rather than skipping it. Selection preservation still needs a targeted fix and browser validation.
+
 The separate [browser performance suite](browser-performance.md) runs nine focused paragraph search scenarios in real Chromium, comparing sequential and hybrid searches against an independent old-loop baseline. Correctness and probe bounds gate changes; warmups and repeated, rotated samples produce timing attachments without wall-clock gates. It is not an end-to-end editor performance fixture and does not replace the existing geometry tests.
 
 [sample-data.ts](../src/lib/editor/prosemirror/view/sample-data.ts) supplies 20 labeled source cases for overflow, underflow, explicit breaks and empty pages. Source-case labels deliberately survive reflow; they are not physical page numbers.
@@ -156,7 +160,9 @@ Run from the repository root:
 ```sh
 pnpm test:unit:ci src/lib/editor/state/page-layout.svelte.test.ts src/lib/editor/state/page-observer.svelte.test.ts src/lib/editor/state/work-queue.svelte.test.ts src/lib/components/pagination/queue.svelte.test.ts
 pnpm test:unit:ci src/lib/editor/prosemirror/view
+pnpm test:smoke
 pnpm test:e2e e2e/pagination.test.ts
+pnpm test:smoke --project=webkit
 pnpm test:performance
 ```
 

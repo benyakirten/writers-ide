@@ -149,7 +149,7 @@ Paths below are relative to the repository root. These are discovery entry point
 | Localization            | `project.inlang/settings.json`, `messages/`, `src/lib/i18n.ts`, `src/lib/services/locale-manager.svelte.ts`, `src/lib/paraglide/`                                                  | Paraglide JS 3 Vite compilation, English/French catalogs; browser-preferred language with English fallback, no locale URL routing. French currently contains English text and some UI is hard-coded English. Injected `LocaleManager` still initializes to English independently; locale preference settings and plugin i18n strategy remain incomplete. |
 | UI foundations          | `src/lib/components/`, `src/app.css`, `components.json`                                                                                                                            | Tailwind 4 with v3 compatibility styles, Bits UI 2 dropdown wrappers, icons, toasts, tooltips, theme tokens. Not a finished theme/settings platform.                                                                                                                                                                                                     |
 | Package scaffolds       | `packages-js/components/`, `packages-js/layout/`, `pnpm-workspace.yaml`, `src/lib/index.ts`                                                                                        | Manifests/licenses but no extracted implementation; only root is currently included in workspace config. Not usable published SDK packages.                                                                                                                                                                                                              |
-| Test/dev infrastructure | `vite.config.ts`, `playwright.config.ts`, `playwright.performance.config.ts`, `src/**/*.test.ts`, `e2e/`, `performance/`, `.storybook/`, `src/stories/`, `.github/workflows/`      | jsdom unit tests, real-browser pagination geometry tests and a static-Storybook paragraph search benchmark. Separate CI workflows run lint/unit tests and browser performance tests, not the full validation set.                                                                                                                                        |
+| Test/dev infrastructure | `vite.config.ts`, `playwright.config.ts`, `playwright.performance.config.ts`, `src/**/*.test.ts`, `e2e/`, `performance/`, `.storybook/`, `src/stories/`, `.github/workflows/`      | jsdom unit tests; Chromium/WebKit app smoke, pagination geometry and stylesheet tests; static-Storybook paragraph search benchmark. CI runs lint/unit tests, browser performance, and smoke checks (Windows Chromium, macOS/Linux WebKit), not the full validation set or native Tauri runtime tests.                                                    |
 
 ### Current gaps that must not be described as completed
 
@@ -163,6 +163,7 @@ Run commands from the repository root. Use [CONTRIBUTING.md](../CONTRIBUTING.md)
 pnpm check
 pnpm lint
 pnpm test:unit:ci
+pnpm test:smoke
 pnpm test:e2e
 pnpm test:performance
 pnpm build
@@ -171,6 +172,10 @@ pnpm build
 The dependency/toolchain baseline and outstanding upstream security advisories are documented in [dependencies.md](dependencies.md). SvelteKit 3 configuration is passed to its Vite plugin; the static/client-only deployment and model-mutating pagination remain unchanged. `$lib` and `@/*` are retained as compatibility aliases rather than rewriting all application imports.
 
 Unit tests cover much of bar state/transfers, shortcuts, toast/tooltip behavior, editor actions, scheduling and pagination logic. jsdom cannot establish layout correctness. Use the browser tests and commands in [pagination.md](pagination.md) for actual pagination geometry. Shell DnD, complete workspace interactions, accessibility, and plugin isolation do not have equivalent established end-to-end coverage. Storybook includes focused paragraph search performance and harness argument fixtures, not a finished editor/plugin development host or end-to-end editor performance fixture. See [browser-performance.md](browser-performance.md) for the typed story catalog/visit API, generic benchmark lifecycle, fixture extension guide, artifacts and CI interpretation limits. Browser timings are diagnostic, not Tauri measurements or arbitrary cross-machine comparisons.
+
+The browser matrix targets Tauri's Chromium-based WebView2 and WebKit engine families; Firefox/Gecko is not a supported Tauri runtime. Playwright Chromium is not an actual WebView2 host, and Playwright WebKit does not pin the native WKWebView/WebKitGTK version.
+
+The cross-engine smoke suite checks typing/selection/undo, dropdown keyboard/focus behavior, visible-page bounds/marker preservation, startup exceptions and locale fallback. Its selection assertion exposes a current reflow issue: after insertion, automatic pagination can move the selection to another paragraph. This is not skipped; it remains a regression gate. Playwright's bundled engines are proxies for native WebViews, not validation of the minimum macOS version, Tauri IPC, or packaged-app startup.
 
 This document describes source inspection, not a standing claim that these checks pass. Report actual validation results for each change.
 

@@ -15,6 +15,7 @@ export default defineConfig(async () => ({
 			strategy: ['preferredLanguage', 'baseLocale'],
 			outputStructure: 'message-modules',
 		}),
+		// SvelteKit 3 accepts configuration here and rejects standalone svelte.config files.
 		sveltekit({
 			preprocess: vitePreprocess(),
 			// Tauri has no Node.js server; preserve the static, client-only build.

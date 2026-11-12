@@ -1,0 +1,46 @@
+name: Browser Smoke
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  browser-smoke:
+    name: ${{ matrix.browser }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            browser: chromium
+          - os: macos-14
+            browser: webkit
+          - os: ubuntu-24.04
+            browser: webkit
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install browser and system dependencies
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Smoke tests
+        run: pnpm test:smoke --project=${{ matrix.browser }}
+      - name: Upload browser report and failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-smoke-${{ matrix.os }}-${{ matrix.browser }}
+          path: |
+            browser-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7
