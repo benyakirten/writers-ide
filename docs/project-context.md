@@ -126,7 +126,7 @@ Determinism means the same content, profile, converter version, and relevant res
 - Use short cooperative steps for DOM-dependent work; cancellation/invalidation must account for intervening edits.
 - Prefer Web Workers for suitable frontend CPU work and explicit asynchronous request/result or event workflows for work handed to the Rust backend.
 - Promises do not themselves move CPU work off the main thread. Backend work also needs appropriate concurrency rather than blocking the UI through a synchronous call pattern.
-- Establish measurements and regression tests as features develop. No fixed startup/latency benchmark, maximum project size, or complete virtualization design has been chosen.
+- Establish measurements and regression tests as features develop. The current [browser performance suite](browser-performance.md) measures focused paragraph split search with correctness and probe-bound gates, not timing thresholds. There is no end-to-end editor performance fixture or verified startup/latency target, maximum project size, or complete virtualization design.
 
 ## Current implementation map
 
@@ -148,7 +148,7 @@ Paths below are relative to the repository root. These are discovery entry point
 | Localization            | `project.inlang/settings.json`, `messages/`, `src/lib/i18n.ts`, `src/lib/services/locale-manager.svelte.ts`, `src/lib/paraglide/`                                                  | Paraglide wiring, English/French catalogs; French currently contains English text and some UI is hard-coded English. Locale preference and plugin i18n strategy remain incomplete.                                                                                        |
 | UI foundations          | `src/lib/components/`, `src/app.css`, `components.json`                                                                                                                            | Tailwind, shadcn/bits-ui dropdowns, icons, toasts, tooltips, theme tokens. Not a finished theme/settings platform.                                                                                                                                                        |
 | Package scaffolds       | `packages-js/components/`, `packages-js/layout/`, `pnpm-workspace.yaml`, `src/lib/index.ts`                                                                                        | Manifests/licenses but no extracted implementation; only root is currently included in workspace config. Not usable published SDK packages.                                                                                                                               |
-| Test/dev infrastructure | `vite.config.js`, `playwright.config.ts`, `src/**/*.test.ts`, `e2e/`, `.storybook/`, `src/stories/`, `.github/workflows/unit_test.yml`                                             | jsdom unit tests, real-browser pagination tests, starter Storybook examples. CI workflow runs lint/unit tests, not the full validation set.                                                                                                                               |
+| Test/dev infrastructure | `vite.config.js`, `playwright.config.ts`, `playwright.performance.config.ts`, `src/**/*.test.ts`, `e2e/`, `performance/`, `.storybook/`, `src/stories/`, `.github/workflows/`      | jsdom unit tests, real-browser pagination geometry tests and a static-Storybook paragraph search benchmark. Separate CI workflows run lint/unit tests and browser performance tests, not the full validation set.                                                         |
 
 ### Current gaps that must not be described as completed
 
@@ -163,10 +163,11 @@ pnpm check
 pnpm lint
 pnpm test:unit:ci
 pnpm test:e2e
+pnpm test:performance
 pnpm build
 ```
 
-Unit tests cover much of bar state/transfers, shortcuts, toast/tooltip behavior, editor actions, scheduling and pagination logic. jsdom cannot establish layout correctness. Use the browser tests and commands in [pagination.md](pagination.md) for actual pagination geometry. Shell DnD, complete workspace interactions, accessibility, and plugin isolation do not have equivalent established end-to-end coverage. Storybook is currently starter content, not a finished editor/plugin development host.
+Unit tests cover much of bar state/transfers, shortcuts, toast/tooltip behavior, editor actions, scheduling and pagination logic. jsdom cannot establish layout correctness. Use the browser tests and commands in [pagination.md](pagination.md) for actual pagination geometry. Shell DnD, complete workspace interactions, accessibility, and plugin isolation do not have equivalent established end-to-end coverage. Storybook includes focused paragraph search performance and harness argument fixtures, not a finished editor/plugin development host or end-to-end editor performance fixture. See [browser-performance.md](browser-performance.md) for the typed story catalog/visit API, generic benchmark lifecycle, fixture extension guide, artifacts and CI interpretation limits. Browser timings are diagnostic, not Tauri measurements or arbitrary cross-machine comparisons.
 
 This document describes source inspection, not a standing claim that these checks pass. Report actual validation results for each change.
 

@@ -17,6 +17,7 @@ import {
 import { clamp } from '$lib/utils/numbers';
 import type { EditorState, Transaction } from 'prosemirror-state';
 import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.svelte';
+import { findTextSplitOffset } from './text-split-measurement';
 
 export enum PageLayoutMetaTransactionType {
 	Paginate = 'PAGE_LAYOUT_PAGINATE',
@@ -956,26 +957,7 @@ export class PageLayoutManager {
 		lineHeight: number,
 		linesToKeepOnPage: number,
 	): number {
-		const range = document.createRange();
-		let offset = 0;
-
-		// Go through the nodes and find out when we've achieved the correct number of lines.
-		outer: for (const node of nodes) {
-			const domText = node.textContent ?? '';
-			for (let i = 0; i < domText.length; i++) {
-				range.setStart(nodes[0], 0);
-				range.setEnd(node, i);
-
-				const rect = range.getBoundingClientRect();
-				const numLines = Math.round(rect.height / lineHeight);
-				if (numLines - 1 >= linesToKeepOnPage) {
-					break outer;
-				}
-				offset++;
-			}
-		}
-
-		return offset;
+		return findTextSplitOffset(nodes, lineHeight, linesToKeepOnPage);
 	}
 
 	private advanceForTextNode(

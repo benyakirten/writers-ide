@@ -1,0 +1,42 @@
+name: Browser Performance
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  browser-performance:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium and system dependencies
+        run: pnpm exec playwright install chromium --with-deps
+      - name: Typecheck performance harness
+        run: pnpm check:performance
+      - name: Browser performance tests
+        run: pnpm test:performance
+      - name: Upload performance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results
+          path: performance-results/
+          if-no-files-found: warn
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: performance-report/
+          if-no-files-found: warn

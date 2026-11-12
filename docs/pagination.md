@@ -31,6 +31,8 @@ Paths below are relative to this documentation file.
 | [Paginator.svelte](../src/lib/components/pagination/Paginator.svelte)                                                                                                                                                                        | Queue lifecycle, settings/font invalidation and catch-up dialog.                                                                |
 | [Editor.svelte](../src/lib/editor/Editor.svelte), [global.css](../src/routes/global.css)                                                                                                                                                     | Reactive page dimensions/padding through CSS variables and fixed page styling.                                                  |
 
+[split-search.ts](../src/lib/editor/state/split-search.ts) supplies sequential and hybrid search strategies; [text-split-measurement.ts](../src/lib/editor/state/text-split-measurement.ts) supplies the shared DOM range mapper used by production text splitting and the focused browser benchmark.
+
 [pagination.plugin.ts](../src/lib/editor/prosemirror/plugins/pagination.plugin.ts) is only an empty keyed plugin with aspirational comments. It is not the active pagination engine.
 
 ## Current transaction and layout flow
@@ -53,7 +55,7 @@ View identity is separate from document identity. View teardown cancels scoped w
 - Block overflow detection allows 0.5 CSS pixels of boundary excess and continues scanning later siblings after a fitting block.
 - Overflow moves content forward, creating a page if necessary. Underflow pulls fitting content backward and may delete the emptied next page.
 - Atomic `pageEnd` nodes represent explicit breaks. Content after a break is moved forward; free space before a break is not a reason to pull subsequent content across it.
-- Text splitting coordinates ProseMirror descendants with a DOM `TreeWalker` and `Range` measurements. Estimated line counts enforce widow/orphan settings, both initially 2.
+- Text splitting collects ordered DOM text nodes with a `TreeWalker` and uses a shared UTF-16 offset-to-`Range` mapper. The production hybrid search probes the first ten offsets linearly, narrows the remainder by binary search to a window of at most ten, then finishes linearly. It preserves the rounded line-count predicate and unmeasured exclusive end sentinel; the predicate must be monotonic. Estimated line counts enforce widow/orphan settings, both initially 2.
 - Fixed page sizes and margins come from the global `PageLayout` singleton. Its current initial preset is A5 in inches; the constructor labels this a testing default.
 
 ### Paragraph continuity, history and indexes
@@ -107,7 +109,7 @@ The owner's historical explanation above is separate from rationale explicitly r
 
 ## Known limitations
 
-- The scheduler is cooperative, not preemptive. Character-by-character `Range` measurement inside one text split can exceed the nominal frame budget.
+- The scheduler is cooperative, not preemptive. Hybrid text splitting bounds predicate probes rather than measuring every character, but DOM text-node collection, mapper construction, each `Range` measurement and browser layout costs remain synchronous and uninterruptible within a step. A bounded probe count does not guarantee the nominal frame budget.
 - Non-text splitting contains unfinished handling. Schema acceptance does not establish reliable pagination for images, inline atoms or complex nested blocks.
 - Peer identification returns adjacent head/peer pairs, not a general multi-page continuation group. Underflow code still contains a peer-handling TODO.
 - Line-count estimation assumes a usable line height. [css.ts](../src/lib/utils/css.ts) approximates `normal` as font size multiplied by 1.2, with a 16 px fallback. Mixed-size inline content needs browser evidence.
@@ -145,6 +147,8 @@ Unit tests run under jsdom via [vite.config.js](../vite.config.js). They validat
 | [actions.test.ts](../src/lib/editor/prosemirror/view/actions.test.ts), [selection.test.ts](../src/lib/editor/prosemirror/view/selection.test.ts) | Formatting commands and selection utilities.                                                                                  |
 | [pagination.test.ts](../e2e/pagination.test.ts)                                                                                                  | Real page bounds at DPR 1/2, mount/edit/scroll indexes and marker order, independent pane scrolling.                          |
 
+The separate [browser performance suite](browser-performance.md) runs nine focused paragraph search scenarios in real Chromium, comparing sequential and hybrid searches against an independent old-loop baseline. Correctness and probe bounds gate changes; warmups and repeated, rotated samples produce timing attachments without wall-clock gates. It is not an end-to-end editor performance fixture and does not replace the existing geometry tests.
+
 [sample-data.ts](../src/lib/editor/prosemirror/view/sample-data.ts) supplies 20 labeled source cases for overflow, underflow, explicit breaks and empty pages. Source-case labels deliberately survive reflow; they are not physical page numbers.
 
 Run from the repository root:
@@ -153,6 +157,7 @@ Run from the repository root:
 pnpm test:unit:ci src/lib/editor/state/page-layout.svelte.test.ts src/lib/editor/state/page-observer.svelte.test.ts src/lib/editor/state/work-queue.svelte.test.ts src/lib/components/pagination/queue.svelte.test.ts
 pnpm test:unit:ci src/lib/editor/prosemirror/view
 pnpm test:e2e e2e/pagination.test.ts
+pnpm test:performance
 ```
 
 [playwright.config.ts](../playwright.config.ts) builds and starts preview on port 4173. Use real-browser tests for pagination geometry. Broader checks from contributor guidance are `pnpm check`, `pnpm lint`, `pnpm test:unit:ci`, `pnpm test:e2e` and `pnpm build`.
