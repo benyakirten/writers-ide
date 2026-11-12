@@ -3,6 +3,12 @@
 Writer's IDE is an extensible word processor built with Svelte 5 and ProseMirror.
 Keep changes focused, follow existing project patterns, and add or update tests when behavior changes.
 
+## Toolchain
+
+Use pnpm 12.4.1 (pinned in `package.json`), Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`, and Rust 1.90 or newer. CI uses Node.js 24. Install frontend dependencies with `pnpm install --frozen-lockfile`; install the matching browser with `pnpm exec playwright install chromium` before browser tests. The Node.js minimum follows jsdom's supported releases.
+
+The frontend uses SvelteKit 3, Vite 8, and Tailwind CSS 4. SvelteKit configuration lives in `vite.config.ts`, not `svelte.config.js`. Tailwind 4 requires Safari 16.4+, Chrome 111+, or Firefox 128+; desktop WebViews must satisfy that baseline too. The macOS application requires macOS 13.3 Ventura or newer, as configured in `src-tauri/tauri.conf.json`. See [dependency maintenance](docs/dependencies.md) for update/audit commands and outstanding upstream advisories.
+
 ## Code style
 
 These conventions apply to JavaScript and TypeScript, including scripts in Svelte components.
@@ -79,7 +85,7 @@ Oxlint preserves the supported rules from the previous ESLint configuration, inc
 
 The brace and mutation conventions above still apply even where lint rules do not enforce them. Do not replace the condition-specific increment/decrement restriction with a blanket ban on `++` and `--`.
 
-Oxfmt and Oxlint require Node.js `^20.19.0 || >=22.12.0`.
+Oxfmt and Oxlint's own Node.js minimum is lower than the project's toolchain requirement above; use the project requirement when installing dependencies.
 
 ## Validation
 

@@ -8,16 +8,6 @@ import Editors from '$lib/editor/prosemirror/prose-mirror-editor.svelte';
 import { workQueue } from '$lib/editor/state/work-queue.svelte';
 import { PaginationQueue } from './queue.svelte';
 
-// Vitest resolves Svelte's server entry by default; these lifecycle tests need client tracking.
-vi.mock('svelte', async (importOriginal) => {
-	const original = await importOriginal<typeof import('svelte')>();
-	const client = await vi.importActual<{
-		flush: typeof original.flushSync;
-		untrack: typeof original.untrack;
-	}>('svelte/internal/client');
-	return { ...original, flushSync: client.flush, untrack: client.untrack };
-});
-
 vi.mock('$lib/editor/state/page-observer.svelte', () => {
 	class ObserverMock {
 		map = $state<Record<string, ObservedPage>>({});
@@ -40,7 +30,9 @@ describe('PaginationQueue', () => {
 	let nextFrame: number;
 	let now: number;
 	let releases: (() => void)[];
-	let closed: ReturnType<typeof vi.fn>;
+	let closed: ReturnType<
+		typeof vi.fn<(from: number | undefined, aborted: boolean | undefined) => void>
+	>;
 	let signals: AbortSignal[];
 
 	beforeEach(() => {

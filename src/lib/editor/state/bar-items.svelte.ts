@@ -28,7 +28,7 @@ export class BarItems {
 		this.#ids.map((id) => {
 			let Component: BarItemData['Component'] = null;
 			let size: BarItemData['size'] = 1;
-			let title = m.unknown_menu_title();
+			let title: BarItemData['title'] = m.unknown_menu_title();
 
 			const item = Registry.items[id];
 			if (item) {
