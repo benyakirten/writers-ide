@@ -13,7 +13,7 @@ pnpm check:performance
 pnpm test:performance
 ```
 
-[playwright.performance.config.ts](../playwright.performance.config.ts) builds static Storybook using the isolated [performance configuration](../.storybook/performance/main.js), then serves `storybook-static` with Vite preview at `http://127.0.0.1:6006`. The suite does not reuse an existing server; leave port 6006 free. It runs Chromium with one worker, no retries, a 1280 × 900 viewport and device scale factor 1. This is not the development Storybook server or the application preview on port 4173.
+[playwright.performance.config.ts](../playwright.performance.config.ts) builds static Storybook using the isolated [performance configuration](../.storybook/performance/main.js), then serves `storybook-static` with Vite preview at `http://127.0.0.1:6006`. Preview uses a [separate static-only Vite configuration](../.storybook/performance/vite.preview.config.js), not the application's `vite.config.js`, so it does not load SvelteKit plugins or require `.svelte-kit/output/server` from an earlier application build. The suite does not reuse an existing server; leave port 6006 free. It runs Chromium with one worker, no retries, a 1280 × 900 viewport and device scale factor 1. This is not the development Storybook server or the application preview on port 4173.
 
 Results go to `performance-results/`, with the HTML report in `performance-report/` and traces retained on failure. Open the report with:
 
