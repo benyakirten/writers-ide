@@ -1,0 +1,13 @@
+{
+	"eslint.enable": false,
+	"editor.codeActionsOnSave": {
+		"source.fixAll.oxc": "explicit"
+	},
+	"[javascript][typescript][svelte][json][jsonc][html][css][markdown][yaml]": {
+		"editor.defaultFormatter": "oxc.oxc-vscode",
+		"editor.formatOnSave": true
+	},
+	"debug.javascript.defaultRuntimeExecutable": {
+		"pwa-node": "/Users/benyakirhorowitz/.local/share/mise/shims/node"
+	}
+}
