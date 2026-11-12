@@ -12,4 +12,8 @@ vite.config.ts.timestamp-*
 test-results
 node_modules
 Thumbs.db
-.vscode
+.vscode/
+!/.vscode/
+/.vscode/*
+!/.vscode/settings.json
+!/.vscode/extensions.json

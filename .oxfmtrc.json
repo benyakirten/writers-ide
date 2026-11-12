@@ -1,0 +1,18 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"useTabs": true,
+	"singleQuote": true,
+	"trailingComma": "all",
+	"printWidth": 100,
+	"sortPackageJson": false,
+	"sortTailwindcss": {},
+	"svelte": {},
+	"ignorePatterns": [
+		"pnpm-lock.yaml",
+		"src/lib/paraglide/",
+		"src-tauri/",
+		".svelte-kit/",
+		"dist/",
+		"build/"
+	]
+}

@@ -8,7 +8,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before making changes. Its contributor a
 - Increment/decrement expressions are allowed outside conditions, including a `for` loop's update clause.
 - Always use braces for control-flow bodies, including single-statement `if`, `else`, and loop bodies. Ordinary `else if` chains are allowed.
 - Ordinary predicate calls are allowed, but do not hide mutations inside predicate helpers to bypass these conventions.
-- Follow the existing Prettier and ESLint configuration. Do not assume Prettier adds missing braces or removes side effects from conditions.
+- Follow the existing Oxfmt and Oxlint configuration. Do not assume Oxfmt adds missing braces or removes side effects from conditions.
 
 ## Working in this repository
 
