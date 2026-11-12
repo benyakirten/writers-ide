@@ -1,6 +1,23 @@
-# Tauri + SvelteKit + TypeScript
+# Writer's IDE
 
-This template should help get you started developing with Tauri, SvelteKit and TypeScript in Vite.
+A local-first, extensible word processor with an IDE-like workspace for writers, built with Tauri, Svelte 5, ProseMirror, and Rust. Fiction writing is the initial focus; the broader goal is a flexible environment for organizing, editing, and publishing many kinds of writing.
+
+The project is under development. The current app is an editor workbench with configurable bars and lazy pagination, not yet a complete writing application: durable project save/load, import/export, collaboration, and an isolated third-party plugin platform are still planned.
+
+## Cooperation and creativity
+
+The application and official features will always be free, with no paid tiers or official paid-plugin marketplace. Essential workflows are intended to work offline, without accounts, with projects stored locally. Future collaboration should favor peer-to-peer operation rather than dependence on a central authority.
+
+This project is about cooperation and creativity, not revenue. Forks, extensions, and redistribution remain welcome under the existing MIT licensing terms, including commercial reuse. We strongly encourage sharing improvements and contributing upstream; this is a community principle, not an additional license restriction.
+
+## Project context and development
+
+- [CONTRIBUTING.md](CONTRIBUTING.md): code conventions and validation commands.
+- [docs/project-context.md](docs/project-context.md): product direction, current architecture, decisions, planned features, and open questions.
+- [docs/pagination.md](docs/pagination.md): current pagination mechanics, constraints, tests, and future direction.
+- [GitHub issues](https://github.com/benyakirten/writers-ide/issues): feature discussions and requests, including unsupported layout/format examples. Use minimal, non-sensitive reproductions rather than publishing private manuscripts.
+
+Use `pnpm dev` for the browser frontend and `pnpm dev:tauri` for the desktop application. See `package.json` and the contributor guide for checks and other workflows.
 
 ## Cooperative editor work
 
@@ -18,7 +35,9 @@ const job = workQueue.enqueue({
 	create: function* ({ signal }) {
 		try {
 			for (let index = 0; index < blocks.length; index++) {
-				if (signal.aborted) return;
+				if (signal.aborted) {
+					return;
+				}
 				scanBlock(blocks[index]);
 				yield { completed: index + 1, total: blocks.length };
 			}
