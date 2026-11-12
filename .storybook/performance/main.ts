@@ -1,10 +1,8 @@
+import type { StorybookConfig } from '@storybook/sveltekit';
 import base from '../main.js';
 
-/**
- * Isolate repeatable fixtures from documentation stories and their global decorators.
- * @type {import('@storybook/sveltekit').StorybookConfig}
- */
-const config = {
+/** Isolate repeatable fixtures from documentation stories and their global decorators. */
+const config: StorybookConfig = {
 	...base,
 	stories: ['../../src/stories/performance/**/*.stories.ts'],
 	async viteFinal(config) {

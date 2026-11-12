@@ -17,7 +17,7 @@ export default defineConfig({
 	},
 	webServer: {
 		command:
-			'pnpm build-storybook --config-dir .storybook/performance --disable-telemetry && pnpm exec vite preview --config .storybook/performance/vite.preview.config.js --host 127.0.0.1 --port 6006 --strictPort',
+			'pnpm build-storybook --config-dir .storybook/performance --disable-telemetry && pnpm exec vite preview --config .storybook/performance/vite.preview.config.ts --host 127.0.0.1 --port 6006 --strictPort',
 		url: 'http://127.0.0.1:6006/index.json',
 		timeout: 180000,
 		reuseExistingServer: false,
