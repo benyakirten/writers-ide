@@ -22,7 +22,7 @@ export interface SvelteNodeViewProps<A extends Attrs> {
 // TODO: https://github.com/benyakirten/svelte-multimodal-editor/issues/18
 export class SvelteNodeView<A extends Attrs> implements NodeView {
 	component?: typeof SvelteComponent<SvelteNodeViewProps<A>>;
-	dom: Node = document.createElement('div');
+	dom: HTMLElement = document.createElement('div');
 	contentDOM?: HTMLElement | null | undefined;
 	update?:
 		| ((

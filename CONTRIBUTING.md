@@ -3,6 +3,12 @@
 Writer's IDE is an extensible word processor built with Svelte 5 and ProseMirror.
 Keep changes focused, follow existing project patterns, and add or update tests when behavior changes.
 
+## Toolchain
+
+Use pnpm 12.4.1 (pinned in `package.json`), Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`, and Rust 1.90 or newer. CI uses Node.js 24. Install frontend dependencies with `pnpm install --frozen-lockfile`; install the matching browsers with `pnpm exec playwright install chromium webkit` before browser tests (`--with-deps` also installs Linux system dependencies). The Node.js minimum follows jsdom's supported releases.
+
+The frontend uses SvelteKit 3, Vite 8, and Tailwind CSS 4. SvelteKit configuration lives in `vite.config.ts`, not `svelte.config.js`. Tailwind 4 requires Safari 16.4+, Chrome 111+, or Firefox 128+; desktop WebViews must satisfy that baseline too. The macOS application requires macOS 13.3 Ventura or newer, as configured in `src-tauri/tauri.conf.json`. See [dependency maintenance](docs/dependencies.md) for update/audit commands and outstanding upstream advisories.
+
 ## Code style
 
 These conventions apply to JavaScript and TypeScript, including scripts in Svelte components.
@@ -79,7 +85,7 @@ Oxlint preserves the supported rules from the previous ESLint configuration, inc
 
 The brace and mutation conventions above still apply even where lint rules do not enforce them. Do not replace the condition-specific increment/decrement restriction with a blanket ban on `++` and `--`.
 
-Oxfmt and Oxlint require Node.js `^20.19.0 || >=22.12.0`.
+Oxfmt and Oxlint's own Node.js minimum is lower than the project's toolchain requirement above; use the project requirement when installing dependencies.
 
 ## Validation
 
@@ -91,5 +97,18 @@ pnpm test:unit:ci
 pnpm test:e2e
 pnpm build
 ```
+
+### Cross-engine browser smoke tests
+
+```sh
+pnpm test:smoke
+pnpm test:smoke --project=webkit
+pnpm test:e2e
+pnpm exec playwright show-report browser-report
+```
+
+`test:smoke` runs the built app in Chromium and WebKit. It checks startup/runtime errors, font readiness, typing and selection, keyboard formatting/undo, dropdown keyboard navigation and focus restoration, visible-page geometry and marker preservation, and locale fallback. It replaces the obsolete starter `<h1>` test and includes the dedicated pagination-selection regressions for caret preservation through new-page creation and forward/reversed ranges through formatting reflow and undo. `test:e2e` also runs the existing pagination and stylesheet compatibility checks across both engines. Tests assert fitting content and preservation, not identical page breaks across engines.
+
+The Browser Smoke CI workflow runs Chromium on Windows and WebKit on macOS and Linux, matching Tauri's Chromium-based WebView2 and WebKit engine families. Firefox/Gecko is not a Tauri runtime and is outside this test matrix. Failures retain traces, screenshots, and an HTML report as artifacts. These are Playwright browser-engine checks against the static frontend, not tests of Tauri IPC, production asset protocols, the installed WebView2/WKWebView/WebKitGTK runtimes, or macOS 13.3 specifically. A packaged-app smoke test on each supported platform, including the oldest supported macOS, is still needed before a release.
 
 DOM layout and pagination geometry require real-browser tests; jsdom does not provide a layout engine. Report any checks you could not run or existing failures separately from failures introduced by your change.

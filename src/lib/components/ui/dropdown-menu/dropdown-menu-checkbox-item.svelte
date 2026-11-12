@@ -1,36 +1,59 @@
 <script lang="ts">
+	import { createEventForwarder } from './forward-events';
 	import { DropdownMenu as DropdownMenuPrimitive } from 'bits-ui';
-	import Check from 'lucide-svelte/icons/check';
+	import Check from '@lucide/svelte/icons/check';
 	import { cn } from '$lib/utils';
 
-	type $$Props = DropdownMenuPrimitive.CheckboxItemProps;
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	type $$Events = DropdownMenuPrimitive.CheckboxItemEvents;
+	type Props = DropdownMenuPrimitive.CheckboxItemProps;
 
-	let className: $$Props['class'] = undefined;
-	export let checked: $$Props['checked'] = undefined;
-	export { className as class };
+	let {
+		class: className,
+		checked = $bindable(false),
+		indeterminate = $bindable(false),
+		onclick,
+		onkeydown,
+		onfocusin,
+		onfocusout,
+		onpointerdown,
+		onpointerleave,
+		onpointermove,
+		children,
+		...restProps
+	}: Props = $props();
+
+	type $$Events = {
+		click: MouseEvent;
+		keydown: KeyboardEvent;
+		focusin: FocusEvent;
+		focusout: FocusEvent;
+		pointerdown: PointerEvent;
+		pointerleave: PointerEvent;
+		pointermove: PointerEvent;
+	};
+
+	const forward = createEventForwarder();
 </script>
 
 <DropdownMenuPrimitive.CheckboxItem
 	bind:checked
+	bind:indeterminate
 	class={cn(
-		'relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[disabled]:pointer-events-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:opacity-50',
+		'data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground relative flex cursor-default items-center rounded-sm py-1.5 pr-2 pl-8 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
 		className,
 	)}
-	{...$$restProps}
-	on:click
-	on:keydown
-	on:focusin
-	on:focusout
-	on:pointerdown
-	on:pointerleave
-	on:pointermove
+	{...restProps}
+	onclick={forward('click', onclick)}
+	onkeydown={forward('keydown', onkeydown)}
+	onfocusin={forward('focusin', onfocusin)}
+	onfocusout={forward('focusout', onfocusout)}
+	onpointerdown={forward('pointerdown', onpointerdown)}
+	onpointerleave={forward('pointerleave', onpointerleave)}
+	onpointermove={forward('pointermove', onpointermove)}
 >
 	<span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-		<DropdownMenuPrimitive.CheckboxIndicator>
+		{#if checked || indeterminate}
 			<Check class="h-4 w-4" />
-		</DropdownMenuPrimitive.CheckboxIndicator>
+		{/if}
 	</span>
-	<slot />
+	{@render children?.({ checked, indeterminate })}
 </DropdownMenuPrimitive.CheckboxItem>

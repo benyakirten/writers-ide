@@ -1,7 +1,7 @@
-import { sourceLanguageTag } from '$lib/paraglide/runtime';
+import { baseLocale, type Locale } from '$lib/paraglide/runtime';
 
 export class LocaleState {
-	locale = $state(sourceLanguageTag);
+	locale = $state<Locale>(baseLocale);
 	constructor() {
 		// TODO: Have locale be established by settings
 	}

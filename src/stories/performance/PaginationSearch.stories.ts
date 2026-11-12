@@ -5,9 +5,7 @@ import PaginationSearch, { type PaginationSearchArgs } from './PaginationSearch.
 const meta = {
 	title: 'Performance/Pagination search',
 	id: 'performance-pagination-search',
-	// Locked Storybook types still describe Svelte 4 classes; its Svelte 5 renderer
-	// requires the original function component, not an asClassComponent wrapper.
-	component: PaginationSearch as unknown as Meta<PaginationSearchArgs>['component'],
+	component: PaginationSearch,
 	parameters: { layout: 'padded' },
 	args: {
 		repetitions: 1000,

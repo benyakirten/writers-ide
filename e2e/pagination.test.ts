@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const url = 'http://localhost:4173/';
+const url = '/';
 
 for (const deviceScaleFactor of [1, 2]) {
 	test.describe(`page geometry at DPR ${deviceScaleFactor}`, () => {

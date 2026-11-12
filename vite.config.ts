@@ -1,27 +1,40 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { paraglide } from '@inlang/paraglide-sveltekit/vite';
+import { paraglideVitePlugin } from '@inlang/paraglide-js';
+import adapter from '@sveltejs/adapter-static';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
 	plugins: [
-		sveltekit(),
-		paraglide({
+		paraglideVitePlugin({
 			project: './project.inlang',
 			outdir: './src/lib/paraglide',
-			// TODO: What is the best internationalizaiton strategy?
-			// We could route things based on a user settings - but should it come from the OS or the app?
-			// Should the user be able to override OS settings?
-			// @ts-expect-error TODO: Fix paraglide
-			strategy: ['preferredLanguage'],
+			strategy: ['preferredLanguage', 'baseLocale'],
+			outputStructure: 'message-modules',
+		}),
+		// SvelteKit 3 accepts configuration here and rejects standalone svelte.config files.
+		sveltekit({
+			preprocess: vitePreprocess(),
+			// Tauri has no Node.js server; preserve the static, client-only build.
+			adapter: adapter(),
+			alias: {
+				'@/*': 'src/lib/*',
+				$lib: 'src/lib',
+			},
 		}),
 	],
 
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}'],
 		environment: 'jsdom',
+	},
+
+	// DOM tests must use Svelte's client runtime rather than its server entry.
+	resolve: {
+		conditions: process.env.VITEST ? ['browser'] : undefined,
 	},
 
 	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

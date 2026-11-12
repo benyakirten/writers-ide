@@ -1,31 +1,63 @@
 <script lang="ts">
+	import { createEventForwarder } from './forward-events';
 	import { DropdownMenu as DropdownMenuPrimitive } from 'bits-ui';
+	import type { TransitionConfig } from 'svelte/transition';
 	import { cn, flyAndScale } from '$lib/utils';
 
-	type $$Props = DropdownMenuPrimitive.SubContentProps;
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	type $$Events = DropdownMenuPrimitive.SubContentEvents;
-
-	let className: $$Props['class'] = undefined;
-	export let transition: $$Props['transition'] = flyAndScale;
-	export let transitionConfig: $$Props['transitionConfig'] = {
-		x: -10,
-		y: 0,
+	type Props = Omit<DropdownMenuPrimitive.SubContentProps, 'child'> & {
+		portal?: DropdownMenuPrimitive.PortalProps['to'] | false;
+		transition?: (node: Element, params?: Parameters<typeof flyAndScale>[1]) => TransitionConfig;
+		transitionConfig?: Parameters<typeof flyAndScale>[1];
 	};
-	export { className as class };
+
+	let {
+		class: className,
+		portal = undefined,
+		forceMount = false,
+		transition = flyAndScale,
+		transitionConfig = {
+			x: -10,
+			y: 0,
+		},
+		onkeydown,
+		onfocusout,
+		onpointermove,
+		children,
+		...restProps
+	}: Props = $props();
+
+	type $$Events = {
+		keydown: KeyboardEvent;
+		focusout: FocusEvent;
+		pointermove: PointerEvent;
+	};
+
+	const forward = createEventForwarder();
 </script>
 
-<DropdownMenuPrimitive.SubContent
-	{transition}
-	{transitionConfig}
-	class={cn(
-		'z-50 min-w-[8rem] rounded-md border bg-popover p-1 text-popover-foreground shadow-lg focus:outline-none',
-		className,
-	)}
-	{...$$restProps}
-	on:keydown
-	on:focusout
-	on:pointermove
+<DropdownMenuPrimitive.Portal
+	to={portal === false ? undefined : portal}
+	disabled={portal === false}
 >
-	<slot />
-</DropdownMenuPrimitive.SubContent>
+	<DropdownMenuPrimitive.SubContent
+		forceMount
+		class={cn(
+			'bg-popover text-popover-foreground z-50 min-w-[8rem] rounded-md border p-1 shadow-lg focus:outline-none',
+			className,
+		)}
+		{...restProps}
+		onkeydown={forward('keydown', onkeydown)}
+		onfocusout={forward('focusout', onfocusout)}
+		onpointermove={forward('pointermove', onpointermove)}
+	>
+		{#snippet child({ props, wrapperProps, open })}
+			<div {...wrapperProps}>
+				{#if open || forceMount}
+					<div {...props} transition:transition={transitionConfig}>
+						{@render children?.()}
+					</div>
+				{/if}
+			</div>
+		{/snippet}
+	</DropdownMenuPrimitive.SubContent>
+</DropdownMenuPrimitive.Portal>

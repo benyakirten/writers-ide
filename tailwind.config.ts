@@ -1,18 +1,9 @@
-import { fontFamily } from 'tailwindcss/defaultTheme';
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
-	darkMode: ['class'],
+	darkMode: 'class',
 	content: ['./src/**/*.{html,js,svelte,ts}'],
-	safelist: ['dark'],
 	theme: {
-		container: {
-			center: true,
-			padding: '2rem',
-			screens: {
-				'2xl': '1400px',
-			},
-		},
 		extend: {
 			colors: {
 				border: 'hsl(var(--border) / <alpha-value>)',
@@ -55,7 +46,16 @@ const config: Config = {
 				sm: 'calc(var(--radius) - 4px)',
 			},
 			fontFamily: {
-				sans: [...fontFamily.sans],
+				// Pin the v3 system stack instead of adopting changed framework defaults.
+				sans: [
+					'ui-sans-serif',
+					'system-ui',
+					'sans-serif',
+					'"Apple Color Emoji"',
+					'"Segoe UI Emoji"',
+					'"Segoe UI Symbol"',
+					'"Noto Color Emoji"',
+				],
 			},
 		},
 	},

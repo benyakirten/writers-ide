@@ -10,7 +10,8 @@ const config: StorybookConfig = {
 		// These isolated fixtures need Svelte compilation, but no SvelteKit routing.
 		return {
 			...config,
-			plugins: [...(config.plugins ?? []), svelte({ hot: false })],
+			// Storybook's docgen plugin must receive compiled JavaScript, not Svelte markup.
+			plugins: [svelte({ compilerOptions: { hmr: false } }), ...(config.plugins ?? [])],
 		};
 	},
 };

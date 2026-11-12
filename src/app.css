@@ -1,6 +1,30 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss/index.css';
+@config '../tailwind.config.ts';
+
+/* Keep v3 hover behavior on touch-capable WebViews as well as desktop. */
+@custom-variant hover (&:hover);
+
+/* v4 no longer reads theme.container from the compatibility config. */
+@utility container {
+	width: 100%;
+	margin-inline: auto;
+	padding-inline: 2rem;
+	max-width: none;
+
+	@media (min-width: 1400px) {
+		max-width: 1400px;
+	}
+}
+
+/* Override v4's built-in utility after generation, retaining forced-colors outlines. */
+@layer utilities {
+	.outline-none,
+	.focus\:outline-none:focus {
+		--tw-outline-style: solid;
+		outline: 2px solid transparent;
+		outline-offset: 2px;
+	}
+}
 
 @layer base {
 	:root {
@@ -72,6 +96,40 @@
 	* {
 		@apply border-border;
 	}
+
+	/* v3 applied the gray-200 fallback to pseudo-elements, not border-border. */
+	::before,
+	::after {
+		border-color: #e5e7eb;
+	}
+
+	/* Restore the v3 Preflight defaults changed by v4. */
+	input::placeholder,
+	textarea::placeholder {
+		color: #9ca3af;
+	}
+
+	button:not(:disabled),
+	[role='button']:not(:disabled) {
+		cursor: pointer;
+	}
+
+	dialog {
+		margin: auto;
+	}
+
+	/* v3 left native form-control backgrounds and rounding to the browser. */
+	input,
+	select,
+	textarea {
+		border-radius: revert;
+		background-color: revert;
+	}
+
+	input:where([type='button'], [type='reset'], [type='submit']) {
+		background-color: transparent;
+	}
+
 	body {
 		@apply bg-background text-foreground;
 	}

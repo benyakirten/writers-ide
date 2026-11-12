@@ -346,26 +346,35 @@ export class PageLayoutManager {
 		hasNextPage: boolean,
 		shouldDedent: boolean,
 	): number {
-		// NOTE: node.cut WILL KEEP THE OUTER ELEMENT so if we only want the content
-		// and not the page too, we need to get cutContent.content instead of cutContent.
-		const contentToKeep = pageNode.cut(0, pageSplitOffset);
-		const contentToMove = pageNode.cut(pageSplitOffset);
-
-		tr.replaceWith(pageOffset, pageOffset + pageNode.nodeSize, contentToKeep);
-		// Create a new page with the content that was overflowing.
-		if (hasNextPage) {
-			// If there is a next page, we insert the content there
-			tr.insert(pageOffset + contentToKeep.nodeSize + 1, contentToMove.content);
-		} else {
-			// If there is no next page, we create it.
-			tr.insert(pageOffset + contentToKeep.nodeSize, contentToMove);
+		if (pageSplitOffset >= pageNode.content.size) {
+			return 0;
 		}
 
+		const nextPageOffset = pageOffset + pageNode.nodeSize;
+		const nextPage = hasNextPage ? tr.doc.nodeAt(nextPageOffset) : null;
+		if (nextPage) {
+			tr.join(nextPageOffset);
+		}
+
+		let splitPosition = pageOffset + 1 + pageSplitOffset;
+		if (pageSplitOffset === 0) {
+			// A production page requires block+ even when none of its content fits.
+			const filler = pageNode.type.schema.nodes.paragraph.create();
+			tr.insert(splitPosition, filler);
+			splitPosition += filler.nodeSize;
+		}
+
+		// Split through the enclosing blocks as well as the page when cutting text.
+		// Only wrapper tokens change, so selection and history maps retain the content.
+		const depth = tr.doc.resolve(splitPosition).depth;
+		tr.split(splitPosition, depth, [
+			{ type: pageNode.type, attrs: nextPage?.attrs ?? pageNode.attrs },
+		]);
 		if (shouldDedent) {
-			this.setPeer(tr, pageOffset + contentToKeep.nodeSize + 1);
+			this.setPeer(tr, splitPosition + depth + 1);
 		}
 
-		return hasNextPage ? 1 : 0;
+		return hasNextPage ? 0 : 1;
 	}
 
 	/**
@@ -375,28 +384,30 @@ export class PageLayoutManager {
 	 */
 	private paginateBackwardFromOffset(
 		tr: Transaction,
-		pageNode: ProseMirrorNode,
-		pageOffset: number,
 		nextPageNode: ProseMirrorNode,
 		nextPageOffset: number,
 		nextPageSplitOffset: number,
 		shouldDedent: boolean,
 		shouldDeleteNextPage: boolean,
 	): number {
-		const contentToMoveBackward = nextPageNode.cut(0, nextPageSplitOffset);
-		const contentToKeep = nextPageNode.cut(nextPageSplitOffset);
-
-		if (shouldDeleteNextPage) {
-			tr.delete(nextPageOffset, nextPageOffset + nextPageNode.nodeSize);
-		} else {
-			tr.replaceWith(nextPageOffset, nextPageOffset + nextPageNode.nodeSize, contentToKeep);
-			if (shouldDedent) {
-				this.setPeer(tr, nextPageOffset + 1);
-			}
+		if (nextPageSplitOffset === 0) {
+			return 0;
 		}
-		tr.insert(pageOffset + pageNode.nodeSize - 1, contentToMoveBackward.content);
 
-		return shouldDeleteNextPage ? -1 : 0;
+		tr.join(nextPageOffset);
+		if (shouldDeleteNextPage || nextPageSplitOffset >= nextPageNode.content.size) {
+			return -1;
+		}
+
+		// Joining the pages removed two boundary tokens before the split position.
+		const splitPosition = nextPageOffset + 1 + nextPageSplitOffset - 2;
+		const depth = tr.doc.resolve(splitPosition).depth;
+		tr.split(splitPosition, depth, [{ type: nextPageNode.type, attrs: nextPageNode.attrs }]);
+		if (shouldDedent) {
+			this.setPeer(tr, splitPosition + depth + 1);
+		}
+
+		return 0;
 	}
 
 	private setPeer(tr: Transaction, offset: number) {
@@ -473,7 +484,6 @@ export class PageLayoutManager {
 	 */
 	private handleNextPageUnderflow(
 		tr: Transaction,
-		pageDetails: PageDetails,
 		nextPageDetails: PageDetails,
 		nextPageUnderflowDetails: UnderflowingDetails,
 	): number {
@@ -490,8 +500,6 @@ export class PageLayoutManager {
 		// Returns -1 if we're removing a page or 0 in all other cases.
 		return this.paginateBackwardFromOffset(
 			tr,
-			pageDetails.pageNode,
-			pageDetails.pageOffset,
 			nextPageDetails.pageNode,
 			nextPageDetails.pageOffset,
 			splitOffset,
@@ -507,7 +515,6 @@ export class PageLayoutManager {
 	private handleNextPageOverflow(
 		tr: Transaction,
 		maxBottom: number,
-		pageDetails: PageDetails,
 		nextPageDetails: PageDetails,
 		nextPageOverflowingDetails: OverflowingDetails,
 	): number {
@@ -526,8 +533,6 @@ export class PageLayoutManager {
 
 		return this.paginateBackwardFromOffset(
 			tr,
-			pageDetails.pageNode,
-			pageDetails.pageOffset,
 			nextPageDetails.pageNode,
 			nextPageDetails.pageOffset,
 			absoluteSplitPoint,
@@ -629,18 +634,12 @@ export class PageLayoutManager {
 			return this.handleNextPageOverflow(
 				tr,
 				maxBottom,
-				pageDetails,
 				nextPageDetails,
 				nextPageOverflowingDetails,
 			);
 		} else {
 			// Situation #5. This method handles both the case of a `pageEnd` node and no `pageEnd` node.
-			return this.handleNextPageUnderflow(
-				tr,
-				pageDetails,
-				nextPageDetails,
-				nextPageOverflowingDetails,
-			);
+			return this.handleNextPageUnderflow(tr, nextPageDetails, nextPageOverflowingDetails);
 		}
 	}
 
@@ -649,7 +648,7 @@ export class PageLayoutManager {
 	}
 
 	deletePage(view: EditorView, page: PageDetails): number {
-		const { tr } = view.state;
+		const { tr, storedMarks } = view.state;
 		tr.delete(page.pageOffset, page.pageOffset + page.pageNode.nodeSize);
 		tr.setMeta(PAGINATION_TRANSACTION_META_KEY, {
 			type: PageLayoutMetaTransactionType.DeletePage,
@@ -657,7 +656,7 @@ export class PageLayoutManager {
 			to: page.pageOffset + page.pageNode.nodeSize,
 		});
 
-		view.dispatch(tr.setMeta('addToHistory', false));
+		view.dispatch(tr.setStoredMarks(storedMarks).setMeta('addToHistory', false));
 		return 0;
 	}
 
@@ -697,7 +696,7 @@ export class PageLayoutManager {
 		// Find out if the current page overflows or has available space.
 		const overflowingDetails = this.getPageOverflowInformation(view, maxBottom, pageDetails);
 
-		const { tr } = view.state;
+		const { tr, storedMarks } = view.state;
 		let delta: number;
 
 		if (this.pageIsOverflowing(overflowingDetails)) {
@@ -711,7 +710,9 @@ export class PageLayoutManager {
 			type: PageLayoutMetaTransactionType.Paginate,
 			pageNumber,
 		});
-		view.dispatch(tr.setMeta('addToHistory', false));
+		// Structural and attribute steps clear explicit typing marks, even though
+		// automatic reflow must not change the user's formatting choice.
+		view.dispatch(tr.setStoredMarks(storedMarks).setMeta('addToHistory', false));
 
 		return delta;
 	}
@@ -729,20 +730,30 @@ export class PageLayoutManager {
 		pageDetails: PageDetails,
 		nextPageDetails: PageDetails,
 	): void {
-		const lastChild = pageDetails.pageNode.lastChild;
-		if (lastChild?.type.name === 'paragraph' && nextPageDetails) {
-			const potentialPeer = nextPageDetails.pageNode.firstChild;
-			if (potentialPeer?.attrs['peer'] === true) {
-				const lastParagraphInsertPosition = nextPageDetails.pageOffset - 2;
-				const peerParagraphPosition = nextPageDetails.pageOffset + 1;
-
-				const lastParagraphInsertPositionMapped = tr.mapping.map(lastParagraphInsertPosition);
-
-				tr.deleteRange(peerParagraphPosition, peerParagraphPosition + potentialPeer.nodeSize);
-				tr.insert(lastParagraphInsertPositionMapped, potentialPeer.content);
-				tr.setMeta(PEERED_TRANSACTION_META_KEY, PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE);
-			}
+		const boundary = tr.mapping.map(nextPageDetails.pageOffset);
+		const nextPage = tr.doc.nodeAt(boundary);
+		const lastChild = tr.doc.nodeAt(tr.mapping.map(pageDetails.pageOffset))?.lastChild;
+		const potentialPeer = nextPage?.firstChild;
+		if (
+			lastChild?.type.name !== 'paragraph' ||
+			potentialPeer?.type.name !== 'paragraph' ||
+			potentialPeer.attrs.peer !== true ||
+			!nextPage
+		) {
+			return;
 		}
+
+		const afterPeer = boundary + 1 + potentialPeer.nodeSize;
+		if (nextPage.childCount === 1) {
+			// Keep the next page valid until the normal pagination step can remove it.
+			tr.insert(afterPeer, nextPage.type.schema.nodes.paragraph.create());
+		}
+
+		// Join across both paragraph and page boundaries, then restore the page
+		// boundary after the reunited paragraph without deleting any of its content.
+		tr.join(boundary, 2);
+		tr.split(afterPeer - 4, 1, [{ type: nextPage.type, attrs: nextPage.attrs }]);
+		tr.setMeta(PEERED_TRANSACTION_META_KEY, PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE);
 	}
 
 	/**
@@ -755,7 +766,7 @@ export class PageLayoutManager {
 			page != null;
 			i++, page = this.getPage(view, i)
 		) {
-			const { tr } = view.state;
+			const { tr, storedMarks } = view.state;
 			if (to !== undefined && i >= to) {
 				break;
 			}
@@ -770,7 +781,7 @@ export class PageLayoutManager {
 				from: page.pageOffset,
 				to: page.pageOffset + page.pageNode.nodeSize,
 			});
-			view.dispatch(tr.setMeta('addToHistory', false));
+			view.dispatch(tr.setStoredMarks(storedMarks).setMeta('addToHistory', false));
 		}
 	}
 
