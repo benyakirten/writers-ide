@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DockDraggable from '$lib/dnd/DockDraggable.svelte';
+	import DockTarget from '$lib/dnd/DockTarget.svelte';
 	import * as m from '$lib/paraglide/messages';
 	import VerticalBarState from '../state/vertical-bar-state.svelte';
 	import { VerticalBarPosition, type VerticalBar } from '../state/vertical-bar-state.svelte';
@@ -22,7 +24,7 @@
 		canMoveForward: boolean;
 	} = $props();
 
-	let shouldInvert = VerticalBarState.shouldInvert(position);
+	let shouldInvert = $derived(VerticalBarState.shouldInvert(position));
 	let width = $derived(VerticalBarState.width(bar));
 	let resizeLabel = $derived.by(() =>
 		position === VerticalBarPosition.InlineStart
@@ -91,42 +93,70 @@
 	></button>
 {/snippet}
 
-<div class="vertical-container">
-	{#if shouldInvert}
-		{@render resizeBar()}
-	{/if}
-	<div
-		class="vertical-slice"
-		style:width={`${width}px`}
-		style:overflow={width === 0 ? 'hidden' : 'auto'}
-	>
-		<BarMenu
-			onminimize={() => VerticalBarState.toggle(index, position)}
-			onclose={() => VerticalBarState.remove(index, position)}
-			draggable
-			{position}
-			{index}
-			{canMoveForward}
-		/>
-		<div>
-			{#each items as item, itemIndex (item.id)}
-				{@const moveDetails = determineMoveDetails(itemIndex, items.length, index, canMoveForward)}
-				<VerticalItemRenderer
-					{position}
-					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
-					{moveDetails}
-					onmove={(direction) => handleItemMove(direction, item.id, itemIndex)}
-					{...item}
-					onrelocate={(to) => handleItemRelocate(to, item.id)}
-					{...item}
-				/>
-			{/each}
+<DockDraggable
+	source={{ kind: 'bar', location: position, barId: bar.id }}
+	style="display: flex; height: 100%"
+>
+	{#snippet children(handle)}
+		<div class="vertical-container">
+			{#if shouldInvert}
+				{@render resizeBar()}
+			{/if}
+			<div
+				class="vertical-slice"
+				style:width={`${width}px`}
+				style:overflow={width === 0 ? 'hidden' : 'auto'}
+			>
+				<DockTarget
+					id={JSON.stringify(['bar-interior', position, bar.id])}
+					target={{ kind: 'bar', location: position, barId: bar.id, index: items.length }}
+					style="height: 100%; width: 100%"
+				>
+					<BarMenu
+						onminimize={() => VerticalBarState.toggle(index, position)}
+						onclose={() => VerticalBarState.remove(index, position)}
+						{handle}
+						{position}
+						{index}
+						{canMoveForward}
+					/>
+					<div>
+						{#each items as item, itemIndex (item.id)}
+							{@const moveDetails = determineMoveDetails(
+								itemIndex,
+								items.length,
+								index,
+								canMoveForward,
+							)}
+							<DockTarget
+								id={JSON.stringify(['bar-boundary', position, bar.id, itemIndex])}
+								target={{ kind: 'bar', location: position, barId: bar.id, index: itemIndex }}
+								style="height: 6px; width: 100%"
+							/>
+							<VerticalItemRenderer
+								barId={bar.id}
+								{position}
+								onremove={() => TransferHandler.remove(position, bar.id, item.id)}
+								{moveDetails}
+								onmove={(direction) => handleItemMove(direction, item.id, itemIndex)}
+								{...item}
+								onrelocate={(to) => handleItemRelocate(to, item.id)}
+							/>
+						{/each}
+						<DockTarget
+							id={JSON.stringify(['bar-boundary', position, bar.id, items.length])}
+							target={{ kind: 'bar', location: position, barId: bar.id, index: items.length }}
+							style="height: 6px; width: 100%"
+						/>
+					</div>
+				</DockTarget>
+			</div>
+			{#if !shouldInvert}
+				{@render resizeBar()}
+			{/if}
 		</div>
-	</div>
-	{#if !shouldInvert}
-		{@render resizeBar()}
-	{/if}
-</div>
+	{/snippet}
+</DockDraggable>
 
 <style>
 	.vertical-container {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DockDraggable from '$lib/dnd/DockDraggable.svelte';
 	import LocaleManager from '$lib/services/locale-manager.svelte';
 	import { schema } from '$lib/editor/prosemirror/view/schema';
 	import TabState from '$lib/editor/state/tab-state.svelte';
@@ -16,6 +17,8 @@
 	import Editors from '../prosemirror/prose-mirror-editor.svelte';
 
 	let {
+		id,
+		barId,
 		Component,
 		size,
 		title,
@@ -25,6 +28,8 @@
 		onrelocate,
 		onmove,
 	}: {
+		id: string;
+		barId: string;
 		Component: BarItemData['Component'];
 		size: BarItemData['size'];
 		title: string;
@@ -37,29 +42,45 @@
 </script>
 
 <div class="renderer" style:--size={size}>
-	<ItemRendererMenu {moveDetails} {position} {title} {onremove} {onrelocate} {onmove} />
-	<div class="component">
-		{#if Component}
-			<Component
-				proseMirror={{
-					actions: ActionUtilities,
-					selections: SelectionUtilities,
-					eventBus: ProseMirrorEventBus,
-					schema,
-					editors: Editors,
-				}}
-				bars={{
-					vertical: VerticalBarState,
-					horizontal: HorizontalBarState,
-					floater: FloaterBarState,
-				}}
-				tabs={TabState}
-				locale={LocaleManager.locale}
+	<DockDraggable
+		source={{ kind: 'item', location: position, barId, itemId: id }}
+		label={`Drag ${title}`}
+		style="height: 100%"
+	>
+		{#snippet children(handle)}
+			<ItemRendererMenu
+				{handle}
+				{moveDetails}
+				{position}
+				{title}
+				{onremove}
+				{onrelocate}
+				{onmove}
 			/>
-		{:else}
-			<ErrorComponent />
-		{/if}
-	</div>
+			<div class="component">
+				{#if Component}
+					<Component
+						proseMirror={{
+							actions: ActionUtilities,
+							selections: SelectionUtilities,
+							eventBus: ProseMirrorEventBus,
+							schema,
+							editors: Editors,
+						}}
+						bars={{
+							vertical: VerticalBarState,
+							horizontal: HorizontalBarState,
+							floater: FloaterBarState,
+						}}
+						tabs={TabState}
+						locale={LocaleManager.locale}
+					/>
+				{:else}
+					<ErrorComponent />
+				{/if}
+			</div>
+		{/snippet}
+	</DockDraggable>
 </div>
 
 <style>

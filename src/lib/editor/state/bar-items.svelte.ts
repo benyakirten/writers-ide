@@ -10,12 +10,26 @@ export type BarItemData = {
 	size: BarItemSection['size'];
 	title: string;
 };
+// Retained on the same bar object while it moves between docked and floating layouts.
+export type BarMetadata = {
+	height?: number;
+	width?: number;
+	visible?: boolean;
+	position?: { top: number; left: number; width: number; height: number };
+	z?: number;
+	title?: string;
+	minimized?: boolean;
+};
+
 export class BarItems {
+	isVertical = $state(false);
+
 	constructor(
-		public isVertical: boolean,
+		isVertical: boolean,
 		items: string[] = [],
 		public readonly maxSize = 3,
 	) {
+		this.isVertical = isVertical;
 		items.forEach((id) => this.append(id));
 	}
 
@@ -112,6 +126,21 @@ export class BarItems {
 		}
 
 		this.#ids.splice(index, 1);
+		return true;
+	}
+
+	canOrient(vertical: boolean): boolean {
+		return (
+			this.#ids.reduce((total, id) => total + Registry.size(id, vertical), 0) <=
+			Math.min(3, this.maxSize)
+		);
+	}
+
+	setOrientation(vertical: boolean): boolean {
+		if (!this.canOrient(vertical)) {
+			return false;
+		}
+		this.isVertical = vertical;
 		return true;
 	}
 
