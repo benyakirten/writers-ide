@@ -1,16 +1,16 @@
-# Merged PR changelog
+# Documentation index
 
-This document records completed pull requests after they have been merged, in chronological order. It is not an implementation diary or a record of intermediate decisions within a PR.
+Start with [project context](docs/project-context.md) for the general overview, accepted direction, implementation map, and topic index. Read [CONTRIBUTING.md](CONTRIBUTING.md) for code style and validation, and [AGENTS.md](AGENTS.md) for the agent reading/update workflow.
 
-Each entry should include:
+## Topic documentation
 
-- The merge date and PR number/link.
-- A concise summary of what shipped.
-- The final decisions and their rationale, where useful for future work.
-- Important behavior changes, limitations, and follow-up work.
+| Topic                                                        | Current context / guide                        | Confirmed merged PR history                                |
+| ------------------------------------------------------------ | ---------------------------------------------- | ---------------------------------------------------------- |
+| Bars, docking, drag-and-drop                                 | [Context](docs/dnd/context.md)                 | [Change log](docs/dnd/change-log.md)                       |
+| Pagination, footnotes, page geometry, cooperative scheduling | [Context](docs/pagination/context.md)          | [Change log](docs/pagination/change-log.md)                |
+| Browser performance testing                                  | [Context](docs/browser-performance/context.md) | [Change log](docs/browser-performance/change-log.md)       |
+| Dependency maintenance                                       | [Guide](docs/dependencies.md)                  | General maintenance reference, kept as a standalone guide. |
 
-Add one consolidated entry per merged PR. Do not add entries for in-progress work, individual agent sessions, intermediate fixes, or repeated validation runs. Do not describe a PR as merged without confirming its merge status.
+New substantive topics use `docs/<topic>/context.md` for current philosophy, contracts, rationale, source/tests, and limitations, plus `docs/<topic>/change-log.md` for completed, confirmed merged PRs. Existing standalone guides remain valid and can migrate incrementally when relevant.
 
-Current architecture and accepted design constraints belong in [project context](docs/project-context.md), not in a running session log.
-
-No merged PR entries have been recorded yet.
+Changelogs use chronological merge-date order and one consolidated entry per PR per affected topic. Record what shipped, final decisions and why, and important outcomes/follow-ups. Do not record in-PR progress, agent-session histories, provisional dates, or unverified merges. This index does not duplicate component histories.
