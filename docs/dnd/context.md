@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This describes the **current working-branch implementation and owner-approved direction**, not a claim that the docking PR has merged. The inspected branch is `bh/41-drag-n-drop-implementation`; feature-branch commits alone do not establish merge status. Confirmed merged outcomes belong in [change-log.md](change-log.md).
+Core docking shipped in [#78](https://github.com/benyakirten/writers-ide/pull/78), confirmed merged on 2026-11-13. This document describes that implementation and owner-approved direction plus the **current working-branch refinements in #79** (`bh/fix-dnd-main-area`), including the unhighlighted main floating surface. See [change-log.md](change-log.md) for the consolidated in-progress PR entry and confirmed merged history. Working-branch behavior must not be represented as already merged.
 
 This topic owns feature bars, item grouping, edge docking, floating overlays, and their drag interactions. Central tabs and split views are separate concerns. These are trusted in-process Svelte components, not an isolated third-party plugin platform.
 
