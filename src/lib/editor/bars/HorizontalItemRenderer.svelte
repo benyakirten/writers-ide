@@ -87,7 +87,8 @@
 	.renderer {
 		--mr: 9px;
 		margin-right: var(--mr);
-		width: calc(var(--size) * 33% - var(--mr));
+		width: calc((100% - var(--insertion-space, 0px)) * var(--size) / 3 - var(--mr));
+		flex-shrink: 0;
 		height: 100%;
 
 		position: relative;

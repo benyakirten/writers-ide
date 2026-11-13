@@ -133,15 +133,19 @@
 						{index}
 					/>
 				</div>
-				<div class="items" class:horizontal={!bar.data.isVertical}>
+				<div
+					class="items"
+					class:horizontal={!bar.data.isVertical}
+					style:--insertion-space={`${(items.length + 1) * 16}px`}
+				>
 					{#each items as item, itemIndex (item.id)}
 						{@const moveDetails = determineMoveDetails(itemIndex, items.length)}
 						<DockTarget
 							id={JSON.stringify(['bar-boundary', 'floating', bar.id, itemIndex])}
 							target={{ kind: 'bar', location: 'floating', barId: bar.id, index: itemIndex }}
 							style={bar.data.isVertical
-								? 'height: 6px; width: 100%'
-								: 'width: 6px; min-width: 6px; height: 100%'}
+								? 'height: 16px; width: 100%'
+								: 'width: 16px; min-width: 16px; height: 100%'}
 						/>
 						{@const Renderer = bar.data.isVertical ? VerticalItemRenderer : HorizontalItemRenderer}
 						<Renderer
@@ -158,8 +162,8 @@
 						id={JSON.stringify(['bar-boundary', 'floating', bar.id, items.length])}
 						target={{ kind: 'bar', location: 'floating', barId: bar.id, index: items.length }}
 						style={bar.data.isVertical
-							? 'height: 6px; width: 100%'
-							: 'width: 6px; min-width: 6px; height: 100%'}
+							? 'height: 16px; width: 100%'
+							: 'width: 16px; min-width: 16px; height: 100%'}
 					/>
 				</div>
 			</DockTarget>

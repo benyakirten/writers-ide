@@ -14,6 +14,7 @@
 		type DragStartEvent,
 		type MouseSensorOptions,
 		type TouchSensorOptions,
+		type Modifier,
 	} from '@dnd-kit-svelte/core';
 	import DockTarget from '$lib/dnd/DockTarget.svelte';
 	import TransferHandler, {
@@ -54,6 +55,36 @@
 		}),
 		useSensor(KeyboardSensor),
 	);
+
+	// Anchor the compact preview to the activator, not the source bar's potentially huge rect.
+	const pointerPreview: Modifier = ({ transform, activatorEvent, activeNodeRect }) => {
+		if (!activeNodeRect) {
+			return transform;
+		}
+		let x = transform.x + 18;
+		let y = transform.y + 20;
+		if (activatorEvent instanceof MouseEvent) {
+			x += activatorEvent.clientX - activeNodeRect.left;
+			y += activatorEvent.clientY - activeNodeRect.top;
+		} else if (
+			typeof TouchEvent !== 'undefined' &&
+			activatorEvent instanceof TouchEvent &&
+			activatorEvent.touches[0]
+		) {
+			x += activatorEvent.touches[0].clientX - activeNodeRect.left;
+			y += activatorEvent.touches[0].clientY - activeNodeRect.top;
+		}
+		const width = Math.min(280, window.innerWidth - 16);
+		return {
+			...transform,
+			x:
+				Math.max(8, Math.min(activeNodeRect.left + x, window.innerWidth - width - 8)) -
+				activeNodeRect.left,
+			y:
+				Math.max(8, Math.min(activeNodeRect.top + y, window.innerHeight - 120)) -
+				activeNodeRect.top,
+		};
+	};
 
 	// Prefer specific insertion/interior targets over the encompassing floating surface.
 	const collisionDetection: CollisionDetection = (args) => {
@@ -118,7 +149,7 @@
 			previewLabel =
 				active.kind === 'item'
 					? (bar?.data.items.find((item) => item.id === active?.itemId)?.title ?? 'Bar item')
-					: 'Toolbar';
+					: bar?.title || bar?.data.items.map((item) => item.title).join(' · ') || 'Empty toolbar';
 			announcement = '';
 			VerticalBarState.resizedSection = null;
 			HorizontalBarState.resizedSection = null;
@@ -189,7 +220,7 @@
 				id={`gap-${position}-${index}`}
 				target={{ kind: 'dock', location: position, index }}
 				class="dock-gap"
-				style="height: 10px; width: 100%;"
+				style="height: 28px; width: 100%;"
 			/>
 			<HorizontalBar
 				{bar}
@@ -203,7 +234,7 @@
 			id={`gap-${position}-${bars.length}`}
 			target={{ kind: 'dock', location: position, index: bars.length }}
 			class="dock-gap"
-			style="height: 10px; width: 100%;"
+			style="height: 28px; width: 100%;"
 		/>
 	</div>
 {/snippet}
@@ -216,7 +247,7 @@
 				id={`gap-${position}-${index}`}
 				target={{ kind: 'dock', location: position, index }}
 				class="dock-gap"
-				style="width: 12px; height: 100%; flex-shrink: 0;"
+				style="width: 28px; height: 100%; flex-shrink: 0;"
 			/>
 			<VerticalBar
 				{bar}
@@ -230,12 +261,14 @@
 			id={`gap-${position}-${bars.length}`}
 			target={{ kind: 'dock', location: position, index: bars.length }}
 			class="dock-gap"
-			style="width: 12px; height: 100%; flex-shrink: 0;"
+			style="width: 28px; height: 100%; flex-shrink: 0;"
 		/>
 	</div>
 {/snippet}
 
+<!-- Docking targets belong to the fixed workbench; scrolling source toolbars moves their handles. -->
 <DndContext
+	autoScroll={false}
 	{sensors}
 	{collisionDetection}
 	onDragStart={handleDragStart}
@@ -275,14 +308,25 @@
 			{@render horizontalDock(HorizontalBarPosition.WindowBlockEnd)}
 		</div>
 	</DockTarget>
-	<DragOverlay dropAnimation={null}>
-		{#if active}<div class="drag-preview">{previewLabel}</div>{/if}
+	<DragOverlay dropAnimation={null} modifiers={[pointerPreview]} zIndex={10000}>
+		{#if active}
+			<div class="drag-preview" aria-hidden="true">
+				<div class="preview-heading">
+					<span class="preview-grip">⠿</span><span
+						>{active.kind === 'bar' ? 'Move toolbar' : 'Move item'}</span
+					>
+				</div>
+				<strong>{previewLabel}</strong>
+				<small>Drop on a highlighted target · Esc to cancel</small>
+			</div>
+		{/if}
 	</DragOverlay>
 </DndContext>
 <div class="sr-only" role="status" aria-live="polite">{announcement}</div>
 
 <style>
 	.overlay {
+		overflow: clip;
 		width: 100%;
 		height: 100%;
 		display: flex;
@@ -311,15 +355,50 @@
 	.horizontal-dock {
 		flex-shrink: 0;
 	}
-	.drag-active :global(.dock-gap) {
-		background: color-mix(in srgb, Highlight 15%, transparent);
-	}
 	.drag-preview {
-		padding: 8px 16px;
+		box-sizing: border-box;
+		width: min(280px, calc(100vw - 16px));
+		padding: 12px 16px;
 		background: Canvas;
 		color: CanvasText;
-		border: 2px solid Highlight;
-		border-radius: 4px;
-		width: max-content;
+		border: 3px solid Highlight;
+		outline: 2px solid Canvas;
+		border-radius: 10px;
+		box-shadow:
+			0 10px 30px color-mix(in srgb, CanvasText 35%, transparent),
+			0 0 0 4px color-mix(in srgb, Highlight 30%, transparent);
+		pointer-events: none;
+	}
+	.preview-heading {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		color: Highlight;
+		font-size: 12px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+	.preview-grip {
+		font-size: 20px;
+		line-height: 1;
+	}
+	.drag-preview strong {
+		display: block;
+		margin-top: 4px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.drag-preview small {
+		display: block;
+		margin-top: 8px;
+		font-size: 11px;
+		line-height: 1.4;
+	}
+	@media (forced-colors: active) {
+		.drag-preview {
+			outline: 2px solid CanvasText;
+		}
 	}
 </style>

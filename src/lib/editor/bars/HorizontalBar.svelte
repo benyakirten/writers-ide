@@ -120,7 +120,7 @@
 							{canMoveForward}
 						/>
 					</div>
-					<div class="items">
+					<div class="items" style:--insertion-space={`${(items.length + 1) * 16}px`}>
 						{#each items as item, itemIndex (item.id)}
 							{@const moveDetails = determineMoveDetails(
 								itemIndex,
@@ -131,7 +131,7 @@
 							<DockTarget
 								id={JSON.stringify(['bar-boundary', position, bar.id, itemIndex])}
 								target={{ kind: 'bar', location: position, barId: bar.id, index: itemIndex }}
-								style="width: 6px; min-width: 6px; height: 100%"
+								style="width: 16px; min-width: 16px; height: 100%"
 							/>
 							<HorizontalItemRenderer
 								barId={bar.id}
@@ -146,7 +146,7 @@
 						<DockTarget
 							id={JSON.stringify(['bar-boundary', position, bar.id, items.length])}
 							target={{ kind: 'bar', location: position, barId: bar.id, index: items.length }}
-							style="width: 6px; min-width: 6px; height: 100%"
+							style="width: 16px; min-width: 16px; height: 100%"
 						/>
 					</div>
 				</DockTarget>

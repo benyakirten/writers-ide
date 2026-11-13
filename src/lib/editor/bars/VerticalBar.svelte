@@ -131,7 +131,7 @@
 							<DockTarget
 								id={JSON.stringify(['bar-boundary', position, bar.id, itemIndex])}
 								target={{ kind: 'bar', location: position, barId: bar.id, index: itemIndex }}
-								style="height: 6px; width: 100%"
+								style="height: 16px; width: 100%"
 							/>
 							<VerticalItemRenderer
 								barId={bar.id}
@@ -146,7 +146,7 @@
 						<DockTarget
 							id={JSON.stringify(['bar-boundary', position, bar.id, items.length])}
 							target={{ kind: 'bar', location: position, barId: bar.id, index: items.length }}
-							style="height: 6px; width: 100%"
+							style="height: 16px; width: 100%"
 						/>
 					</div>
 				</DockTarget>
