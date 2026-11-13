@@ -9,6 +9,27 @@ import {
 
 const prose = 'The patient writer follows the words across the turning page. ';
 
+test('waits for editor focus after a transient layout dialog before replacing the document', async ({
+	page,
+	app,
+}) => {
+	const dialog = page.locator('dialog[aria-labelledby="pagination-heading"]');
+	await dialog.evaluate((element: HTMLDialogElement) => {
+		element.showModal();
+		// Reproduce native focus blocking without depending on a slow CI pagination job.
+		window.setTimeout(() => element.close(), 300);
+	});
+	await replaceDocument(page, app.editor, 'Focus readiness regression.');
+	await expect(app.editor).toBeFocused();
+	await expect
+		.poll(() => selectionOffsets(app.editor))
+		.toEqual({
+			anchor: 'Focus readiness regression.'.length,
+			focus: 'Focus readiness regression.'.length,
+			collapsed: true,
+		});
+});
+
 test('keeps the typing caret at the logical insertion point when overflow creates pages', async ({
 	page,
 	app,
