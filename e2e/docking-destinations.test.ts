@@ -167,7 +167,7 @@ test('clicking a tooltip-bearing control does not replay its tooltip without a f
 	await freshTooltip(page, minimize, /Minimize bar/i);
 });
 
-test('colors side docks blue, horizontal docks yellow, and the whole floating destination red', async ({
+test('colors edge docks while leaving the main floating destination unhighlighted', async ({
 	page,
 }) => {
 	const floating = page.locator('[data-dock-target="floating"]');
@@ -189,22 +189,12 @@ test('colors side docks blue, horizontal docks yellow, and the whole floating de
 		expectHue(appearance.outline, hue);
 		outlines.push(appearance.outline);
 	}
-	await expect(floating).toHaveAttribute('data-dock-active', 'true');
-	await expect(floating).toHaveAttribute('data-dock-color', 'floating');
+	await expect(floating).not.toHaveAttribute('data-dock-active', 'true');
 	const appearance = await colors(floating);
-	expect(appearance.outlineStyle).not.toBe('none');
-	expect(appearance.outlineWidth).toBeGreaterThan(0);
-	expectHue(appearance.outline, 'red');
-	outlines.push(appearance.outline);
-	// The full-workbench tint must be visible but light, not an opaque red sheet.
-	const [red, green, blue, alpha] = appearance.background;
-	expect(alpha).toBeGreaterThan(0);
-	expect(red).toBeGreaterThan(green);
-	expect(red).toBeGreaterThan(blue);
-	expect(alpha / 255 < 0.16 || Math.min(green, blue) > 200).toBe(true);
+	expect(appearance.outlineStyle).toBe('none');
+	expect(appearance.background[3]).toBe(0);
 	expect(outlines[0]).not.toEqual(outlines[2]);
-	expect(outlines[0]).not.toEqual(appearance.outline);
-	expect(outlines[2]).not.toEqual(appearance.outline);
+	await expect(page.locator(description)).toContainText(/release to.*float/i);
 	await cancelDrag(page);
 	await expect(page.locator('[data-dock-active="true"]')).toHaveCount(0);
 });

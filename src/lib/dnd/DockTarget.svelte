@@ -35,7 +35,7 @@
 	const source = $derived(context.active?.data?.source as DockDragSource | undefined);
 	// Invalid item targets stay registered: rejecting a full bar must not float the item.
 	const inactive = $derived(disabled || (target.kind === 'bar' && source?.kind === 'bar'));
-	const active = $derived(!!source && !inactive);
+	const active = $derived(!!source && !inactive && target.kind !== 'floating');
 	const insertion = $derived(!children && target.kind !== 'floating');
 	const vertical = $derived(
 		target.kind === 'dock'
@@ -124,8 +124,8 @@
 			class="dock-hit"
 			class:dock-active={active}
 			class:dock-near={near}
-			class:dock-valid={hovered && valid}
-			class:dock-invalid={hovered && !valid}
+			class:dock-valid={active && hovered && valid}
+			class:dock-invalid={active && hovered && !valid}
 		>
 			{#if active}<span class="dock-cue" aria-hidden="true"
 					>{target.kind === 'dock' ? label : '+'}</span
@@ -136,10 +136,9 @@
 	<div
 		bind:this={droppable.node.current}
 		class={`dock-target ${className}`}
-		class:dock-floating={target.kind === 'floating'}
 		class:dock-active={active}
-		class:dock-valid={hovered && valid}
-		class:dock-invalid={hovered && !valid}
+		class:dock-valid={active && hovered && valid}
+		class:dock-invalid={active && hovered && !valid}
 		{style}
 		data-dock-target={target.kind}
 		data-dock-active={active || undefined}
@@ -206,12 +205,7 @@
 		cursor: not-allowed;
 		background-color: color-mix(in srgb, var(--color-destructive, #b91c1c) 15%, Canvas);
 	}
-	.dock-floating.dock-active {
-		background-color: color-mix(in srgb, var(--dock-accent) 4%, transparent);
-	}
-	.dock-floating.dock-valid {
-		background-color: color-mix(in srgb, var(--dock-accent) 7%, transparent);
-	}
+
 	@media (forced-colors: active) {
 		.dock-active {
 			outline-color: Highlight;

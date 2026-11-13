@@ -73,6 +73,14 @@ test('floats the whole toolbar on the workbench and redocks it', async ({ page }
 	await expect(page.locator(topDock).getByRole('button', wholeBar)).toHaveCount(0);
 	await expect(page.locator('.floater').getByRole('button', basicItem)).toHaveCount(1);
 
+	const floater = page.locator('.floater');
+	const before = (await floater.boundingBox())!;
+	const grip = await center(floater.getByRole('button', wholeBar));
+	await startDrag(page, floater.getByRole('button', wholeBar));
+	await page.mouse.move(grip.x, grip.y - 60, { steps: 20 });
+	await page.mouse.up();
+	await expect.poll(async () => (await floater.boundingBox())!.y).toBeLessThan(before.y);
+
 	await dropOn(
 		page,
 		page.locator('.floater').getByRole('button', wholeBar),
