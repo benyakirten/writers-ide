@@ -136,6 +136,144 @@ describe('TooltipSTate', () => {
 		});
 	});
 
+	describe('suppress', () => {
+		it('immediately dismisses an open tooltip and removes its accessibility association', () => {
+			state.set('Open tooltip', 'vertical', mockTarget);
+			vi.advanceTimersByTime(state.TIMEOUT_DURATION);
+			expect(state.open).toBe(true);
+			expect(mockTarget.getAttribute('aria-describedby')).toBe(state.TOOLTIP_ID);
+
+			const release = state.suppress();
+
+			expect(state.suppressed).toBe(true);
+			expect(state.open).toBe(false);
+			expect(state.tooltip).toBeNull();
+			expect(mockTarget.hasAttribute('aria-describedby')).toBe(false);
+
+			release();
+			vi.runAllTimers();
+			expect(state.open).toBe(false);
+			expect(state.tooltip).toBeNull();
+		});
+
+		it.each([false, true])(
+			'cancels a pending show without replay when released before the deadline: %s',
+			(releaseBeforeDeadline) => {
+				state.set('Pending tooltip', 'vertical', mockTarget);
+				vi.advanceTimersByTime(state.TIMEOUT_DURATION / 2);
+
+				const release = state.suppress();
+				expect(state.tooltipDebouncer.value).toBeNull();
+				expect(vi.getTimerCount()).toBe(0);
+				if (releaseBeforeDeadline) {
+					release();
+				}
+
+				vi.runAllTimers();
+				expect(state.open).toBe(false);
+				expect(state.tooltip).toBeNull();
+				expect(mockTarget.hasAttribute('aria-describedby')).toBe(false);
+
+				release();
+				vi.runAllTimers();
+				expect(state.open).toBe(false);
+				expect(state.tooltip).toBeNull();
+			},
+		);
+
+		it('ignores new requests during suppression without scheduling or replaying them', () => {
+			const release = state.suppress();
+
+			state.set('Ignored tooltip', 'vertical', mockTarget);
+			state.show();
+			expect(vi.getTimerCount()).toBe(0);
+			expect(state.tooltip).toBeNull();
+			expect(state.open).toBe(false);
+			expect(mockTarget.hasAttribute('aria-describedby')).toBe(false);
+
+			release();
+			vi.runAllTimers();
+			expect(state.tooltip).toBeNull();
+			expect(state.open).toBe(false);
+		});
+
+		it('guards direct and delayed show calls even when tooltip data exists', () => {
+			const release = state.suppress();
+			state.tooltip = {
+				data: 'Tooltip data',
+				target: mockTarget,
+				calibrateFor: 'vertical',
+			};
+
+			state.show();
+			expect(state.open).toBe(false);
+			state.tooltipDebouncer.update(true);
+			vi.runAllTimers();
+			expect(state.open).toBe(false);
+			expect(mockTarget.hasAttribute('aria-describedby')).toBe(false);
+
+			state.dismiss();
+			release();
+		});
+
+		it.each([false, true])(
+			'keeps nested leases suppressed until all are released, with outer-first release: %s',
+			(outerFirst) => {
+				const releaseOuter = state.suppress();
+				const releaseInner = state.suppress();
+				const releaseFirst = outerFirst ? releaseOuter : releaseInner;
+				const releaseLast = outerFirst ? releaseInner : releaseOuter;
+
+				releaseFirst();
+				releaseFirst();
+				expect(state.suppressed).toBe(true);
+				state.set('Still suppressed', 'vertical', mockTarget);
+				vi.runAllTimers();
+				expect(state.tooltip).toBeNull();
+				expect(state.open).toBe(false);
+
+				releaseLast();
+				releaseLast();
+				expect(state.suppressed).toBe(false);
+
+				const releaseNext = state.suppress();
+				releaseFirst();
+				releaseLast();
+				expect(state.suppressed).toBe(true);
+				releaseNext();
+				expect(state.suppressed).toBe(false);
+			},
+		);
+
+		it.each([false, true])(
+			'allows a fresh delayed request for the same target after releasing an open tooltip: %s',
+			(wasOpen) => {
+				state.set('Previous tooltip', 'vertical', mockTarget);
+				if (wasOpen) {
+					vi.advanceTimersByTime(state.TIMEOUT_DURATION);
+				}
+
+				const release = state.suppress();
+				state.set('Ignored tooltip', 'horizontal', mockTarget);
+				release();
+				vi.runAllTimers();
+				expect(state.open).toBe(false);
+
+				state.set('Fresh tooltip', 'horizontal', mockTarget);
+				expect(state.tooltip).toEqual({
+					data: 'Fresh tooltip',
+					target: mockTarget,
+					calibrateFor: 'horizontal',
+				});
+				vi.advanceTimersByTime(state.TIMEOUT_DURATION - 1);
+				expect(state.open).toBe(false);
+				vi.advanceTimersByTime(1);
+				expect(state.open).toBe(true);
+				expect(mockTarget.getAttribute('aria-describedby')).toBe(state.TOOLTIP_ID);
+			},
+		);
+	});
+
 	describe('calibratePosition', () => {
 		it("should set the tooltip's position to be on the left if the calibrateFor is horizontal and it does not go offscreen", () => {
 			const hostLeft = 200;

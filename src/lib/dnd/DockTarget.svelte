@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import './dock-colors.css';
+	import { getDockColor } from './dock-feedback';
 	import {
 		useDndContext,
 		useDndMonitor,
@@ -33,7 +35,7 @@
 	const source = $derived(context.active?.data?.source as DockDragSource | undefined);
 	// Invalid item targets stay registered: rejecting a full bar must not float the item.
 	const inactive = $derived(disabled || (target.kind === 'bar' && source?.kind === 'bar'));
-	const active = $derived(!!source && !inactive && target.kind !== 'floating');
+	const active = $derived(!!source && !inactive);
 	const insertion = $derived(!children && target.kind !== 'floating');
 	const vertical = $derived(
 		target.kind === 'dock'
@@ -114,6 +116,7 @@
 		data-dock-target={target.kind}
 		data-dock-active={active || undefined}
 		data-dock-near={near || undefined}
+		data-dock-color={getDockColor(target)}
 		data-dock-valid={hovered ? valid : undefined}
 	>
 		<div
@@ -133,12 +136,14 @@
 	<div
 		bind:this={droppable.node.current}
 		class={`dock-target ${className}`}
+		class:dock-floating={target.kind === 'floating'}
 		class:dock-active={active}
 		class:dock-valid={hovered && valid}
 		class:dock-invalid={hovered && !valid}
 		{style}
 		data-dock-target={target.kind}
 		data-dock-active={active || undefined}
+		data-dock-color={getDockColor(target)}
 		data-dock-valid={hovered ? valid : undefined}
 	>
 		{@render children?.()}
@@ -156,17 +161,17 @@
 		border-radius: 4px;
 	}
 	.dock-active {
-		outline: 2px dashed Highlight;
+		outline: 2px dashed var(--dock-accent);
 		outline-offset: -2px;
-		background-color: color-mix(in srgb, Highlight 12%, transparent);
+		background-color: color-mix(in srgb, var(--dock-accent) 12%, transparent);
 	}
 	.dock-hit.dock-active {
 		z-index: 20;
-		background-color: color-mix(in srgb, Highlight 22%, Canvas);
+		background-color: color-mix(in srgb, var(--dock-accent) 22%, Canvas);
 	}
 	.dock-hit.dock-near {
 		inset-block: calc(-1 * var(--dock-growth));
-		background-color: color-mix(in srgb, Highlight 38%, Canvas);
+		background-color: color-mix(in srgb, var(--dock-accent) 38%, Canvas);
 		box-shadow:
 			0 0 0 2px Canvas,
 			0 3px 12px color-mix(in srgb, CanvasText 25%, transparent);
@@ -191,15 +196,21 @@
 		writing-mode: vertical-rl;
 	}
 	.dock-valid {
-		outline: 3px solid Highlight;
+		outline: 3px solid var(--dock-accent);
 		outline-offset: -3px;
-		background-color: color-mix(in srgb, Highlight 30%, Canvas);
+		background-color: color-mix(in srgb, var(--dock-accent) 30%, Canvas);
 	}
 	.dock-invalid {
 		outline: 3px solid var(--color-destructive, #b91c1c);
 		outline-offset: -3px;
 		cursor: not-allowed;
 		background-color: color-mix(in srgb, var(--color-destructive, #b91c1c) 15%, Canvas);
+	}
+	.dock-floating.dock-active {
+		background-color: color-mix(in srgb, var(--dock-accent) 4%, transparent);
+	}
+	.dock-floating.dock-valid {
+		background-color: color-mix(in srgb, var(--dock-accent) 7%, transparent);
 	}
 	@media (forced-colors: active) {
 		.dock-active {

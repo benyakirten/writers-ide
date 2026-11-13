@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
 	import {
 		DndContext,
 		DragOverlay,
@@ -12,11 +12,14 @@
 		type CollisionDetection,
 		type DragEndEvent,
 		type DragStartEvent,
+		type DragOverEvent,
 		type MouseSensorOptions,
 		type TouchSensorOptions,
 		type Modifier,
 	} from '@dnd-kit-svelte/core';
 	import DockTarget from '$lib/dnd/DockTarget.svelte';
+	import { describeDrop, getDockColor } from '$lib/dnd/dock-feedback';
+	import TooltipManager from '$lib/services/tooltip.svelte';
 	import TransferHandler, {
 		type DockDragSource,
 		type DockDropTarget,
@@ -39,6 +42,20 @@
 	let active = $state<DockDragSource | null>(null);
 	let announcement = $state('');
 	let previewLabel = $state('');
+	let destination = $state<DockDropTarget | null>(null);
+	let rtl = $state(false);
+	let releaseTooltipSuppression: (() => void) | undefined;
+	const dropDescription = $derived(active ? describeDrop(active, destination, rtl) : '');
+	const dropColor = $derived(
+		active && destination && !TransferHandler.canDrop(active, destination)
+			? 'invalid'
+			: getDockColor(destination),
+	);
+	function restoreTooltips() {
+		releaseTooltipSuppression?.();
+		releaseTooltipSuppression = undefined;
+	}
+	onDestroy(restoreTooltips);
 	onMount(() => {
 		const root = FloaterBarState.root;
 		if (!root) {
@@ -81,7 +98,7 @@
 				Math.max(8, Math.min(activeNodeRect.left + x, window.innerWidth - width - 8)) -
 				activeNodeRect.left,
 			y:
-				Math.max(8, Math.min(activeNodeRect.top + y, window.innerHeight - 120)) -
+				Math.max(8, Math.min(activeNodeRect.top + y, window.innerHeight - 180)) -
 				activeNodeRect.top,
 		};
 	};
@@ -143,8 +160,12 @@
 		HorizontalBarState.endResize();
 	}
 	function handleDragStart(event: DragStartEvent) {
+		restoreTooltips();
+		destination = null;
 		active = event.active.data?.source ?? null;
 		if (active) {
+			releaseTooltipSuppression = TooltipManager.suppress();
+			rtl = getComputedStyle(FloaterBarState.root ?? document.body).direction === 'rtl';
 			const bar = TransferHandler.getBar(active.location, active.barId);
 			previewLabel =
 				active.kind === 'item'
@@ -155,7 +176,12 @@
 			HorizontalBarState.resizedSection = null;
 		}
 	}
+	function handleDragOver(event: DragOverEvent) {
+		destination = event.over?.data?.target ?? null;
+	}
 	function cancelDrag() {
+		restoreTooltips();
+		destination = null;
 		active = null;
 		announcement = 'Move cancelled.';
 	}
@@ -189,6 +215,8 @@
 			? 'Toolbar layout updated.'
 			: 'Move cancelled: the destination is unavailable or has insufficient capacity.';
 		active = null;
+		destination = null;
+		restoreTooltips();
 		if (moved && source && target && location && event.activatorEvent instanceof KeyboardEvent) {
 			const barId =
 				source.kind === 'bar'
@@ -272,6 +300,7 @@
 	{sensors}
 	{collisionDetection}
 	onDragStart={handleDragStart}
+	onDragOver={handleDragOver}
 	onDragEnd={handleDragEnd}
 	onDragCancel={cancelDrag}
 >
@@ -310,19 +339,22 @@
 	</DockTarget>
 	<DragOverlay dropAnimation={null} modifiers={[pointerPreview]} zIndex={10000}>
 		{#if active}
-			<div class="drag-preview" aria-hidden="true">
+			<div class="drag-preview" data-dock-color={dropColor}>
 				<div class="preview-heading">
 					<span class="preview-grip">⠿</span><span
 						>{active.kind === 'bar' ? 'Move toolbar' : 'Move item'}</span
 					>
 				</div>
 				<strong>{previewLabel}</strong>
-				<small>Drop on a highlighted target · Esc to cancel</small>
+				<p class="drop-description">{dropDescription}</p>
+				<small>Esc to cancel</small>
 			</div>
 		{/if}
 	</DragOverlay>
 </DndContext>
-<div class="sr-only" role="status" aria-live="polite">{announcement}</div>
+<div class="sr-only" role="status" aria-live="polite">
+	{active ? dropDescription : announcement}
+</div>
 
 <style>
 	.overlay {
@@ -361,19 +393,19 @@
 		padding: 12px 16px;
 		background: Canvas;
 		color: CanvasText;
-		border: 3px solid Highlight;
+		border: 3px solid var(--dock-accent);
 		outline: 2px solid Canvas;
 		border-radius: 10px;
 		box-shadow:
 			0 10px 30px color-mix(in srgb, CanvasText 35%, transparent),
-			0 0 0 4px color-mix(in srgb, Highlight 30%, transparent);
+			0 0 0 4px color-mix(in srgb, var(--dock-accent) 30%, transparent);
 		pointer-events: none;
 	}
 	.preview-heading {
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		color: Highlight;
+		color: CanvasText;
 		font-size: 12px;
 		font-weight: 700;
 		text-transform: uppercase;
@@ -389,6 +421,11 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.drop-description {
+		margin-top: 8px;
+		font-size: 12px;
+		line-height: 1.4;
 	}
 	.drag-preview small {
 		display: block;

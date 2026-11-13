@@ -38,9 +38,10 @@ Relocation menus use the same validated transfer API. Their existing convenience
 The installed `@dnd-kit-svelte` packages own drag gestures, including floating movement. Authoritative layout stays unchanged during hover; only a lightweight overlay moves. This avoids duplicate feature component trees/subscriptions and repeated workbench resizing/pagination while dragging.
 
 - Mouse activation: six pixels; touch: 200 ms hold with eight pixels tolerance; keyboard sensor plus existing relocation menus.
-- Persistent insertion slots reserve 28 px for docks and 16 px for items. During dragging, eligible destinations remain highlighted and hovered invalid destinations show a red outline.
+- Persistent insertion slots reserve 28 px for docks and 16 px for items. During dragging, eligible destinations remain highlighted. Destination colors are blue for vertical/side docks, yellow for horizontal/top-bottom docks, and red for floating areas (including the lightly tinted workbench floating surface). Color follows the destination location, not the shape of an insertion strip; text and outlines preserve meaning without relying on color alone. Hovered invalid destinations retain an explicit rejection outline and cancellation message. Forced-colors mode uses system highlight colors.
 - Within 64 px, actual insertion hit areas grow proportionally up to 12 px per side along their narrow axis. Growth is absolute within stationary slots to avoid reflow and feedback jitter. Horizontal item sizing reserves insertion space before distributing capacity units.
-- A high-contrast source-labelled preview follows the activator beside the pointer, stays viewport-bounded, and includes an Escape hint. It is not a second live plugin component.
+- A high-contrast source-labelled preview follows the activator beside the pointer, stays viewport-bounded, and includes an Escape hint. Its accent matches the current destination. Live release text distinguishes whole-bar placement, item insertion/reordering, new-bar creation, floating/repositioning, unchanged order, and invalid/outside cancellation, including dock side and insertion position where applicable. Text uses the same `canDrop()` validation as commit and is also exposed in the polite live region for keyboard use. It is not a second live plugin component.
+- Ordinary application tooltips are suppressed throughout an active bar/item drag. The tooltip service provides reference-counted suppression leases: activation immediately dismisses open/pending tooltips and discards requests while suppressed; drop, cancellation, and editor teardown release the lease. Suppressed requests are not replayed afterward—fresh hover/focus resumes normal tooltips. This prevents hovered controls obscuring the release description.
 - Pointer collisions resolve the visible surface before choosing specific insertion/interior targets, preventing drops into hidden overlapping floaters. Invalid visible targets never fall through to another destination.
 - Docking auto-scroll is disabled: edge acquisition must not scroll the source toolbar and clip its handle. The workbench clips target growth at viewport edges.
 - Successful keyboard moves restore focus to the destination handle. Floating geometry is reclamped after size/workbench changes; guarded writes avoid observer churn.
@@ -51,13 +52,15 @@ Paths below are repository-relative:
 
 - `src/lib/editor/Editor.svelte`: workbench composition, dock gaps, sensors, collisions, overlay, commit/cancel, and keyboard focus.
 - `src/lib/dnd/DockDraggable.svelte`, `DockTarget.svelte`: handle activation, typed metadata, target registration, validity and proximity feedback. Older generic wrappers remain unused experiments.
+- `src/lib/dnd/dock-feedback.ts`, `dock-colors.css`: shared destination classification, capacity-aware release descriptions, logical-to-physical side labels, and forced-colors-aware palette. `src/lib/services/tooltip.svelte.ts` owns tooltip suppression leases.
 - `src/lib/editor/bars/`: docked/floating rendering, item boundaries, relocation menus, orientation control, and resizing.
 - `src/lib/editor/state/bar-transfer-handler.svelte.ts`: `DockDragSource`, `DockDropTarget`, `getBar()`, `isVertical()`, `canDrop()`, `drop()`, and menu transfers.
 - `src/lib/editor/state/bar-items.svelte.ts`, `bar-item-registry.svelte.ts`: item IDs, orientation-specific costs/components, capacity and fallback rendering.
 - `src/lib/editor/state/horizontal-bar-state.svelte.ts`, `vertical-bar-state.svelte.ts`, `floater-state.svelte.ts`: geometry, collections, stacking, orientation, and bounds.
 - `src/lib/editor/prosemirror/menu/basic/`: example horizontal/vertical presentations sharing feature controls.
 - `src/lib/editor/state/dock-transfer.svelte.test.ts` and the bar/item/registry/floater state test files: transfer invariants, preservation, capacity, ordering, and bounds.
-- `e2e/docking.test.ts`, `e2e/docking-feedback.test.ts`: Chromium/WebKit geometry and gesture regressions, cancellation, focus, overlap, target visibility, proximity hit acquisition, and layout stability.
+- `e2e/docking.test.ts`, `e2e/docking-feedback.test.ts`, `e2e/docking-destinations.test.ts`: Chromium/WebKit geometry and gesture regressions, cancellation, focus, overlap, target visibility, proximity hit acquisition, layout stability, destination colors/descriptions, and tooltip suppression/resumption.
+- `src/lib/dnd/dock-feedback.test.ts`, `src/lib/services/tooltip.svelte.test.ts`: classification/descriptions (including RTL, insertion boundaries and invalid moves), suppression lifetime, pending timers, nested leases, and fresh tooltip requests.
 
 Use [CONTRIBUTING.md](../../CONTRIBUTING.md) for validation commands. Start with focused unit/browser tests; real browser tests are necessary for hit geometry. Test results recorded elsewhere are historical evidence, not a guarantee that a new checkout passes.
 
