@@ -4,7 +4,6 @@ import {
 	replaceDocument,
 	selectionOffsets,
 	selectTextRange,
-	selectWithKeyboard,
 } from './fixtures/pagination-selection';
 
 const prose = 'The patient writer follows the words across the turning page. ';
@@ -49,7 +48,7 @@ test('keeps the typing caret at the logical insertion point when overflow create
 	await page.keyboard.type(suffix);
 	await expect.poll(() => editor.textContent()).toBe(text + suffix);
 	await expectVisiblePagesToFit(viewport);
-	await selectWithKeyboard(page, suffix);
+	await selectTextRange(editor, text.length + suffix.length, text.length);
 	await page.keyboard.press('Meta+b');
 	await expect(editor.locator('strong')).toHaveText(suffix);
 	await expect.poll(() => editor.textContent()).toBe(text + suffix);

@@ -23,12 +23,41 @@ export class TooltipState {
 	open = $state(false);
 	tooltip = $state<TooltipData | null>(null);
 	tooltipEl = $state<HTMLElement | null>(null);
+	#suppressionCount = $state(0);
+
+	get suppressed() {
+		return this.#suppressionCount > 0;
+	}
+
+	/** Suppress tooltips until every lease is released; discarded requests are not replayed. */
+	suppress(): () => void {
+		this.#suppressionCount++;
+		if (this.#suppressionCount === 1) {
+			this.tooltipDebouncer.cancel();
+			// cancel() retains the value, which would otherwise skip the next fresh request.
+			this.tooltipDebouncer.value = null;
+			this.dismiss();
+		}
+
+		let released = false;
+		return () => {
+			if (released) {
+				return;
+			}
+			released = true;
+			this.#suppressionCount--;
+		};
+	}
 
 	set(
 		tooltip: TooltipData['data'],
 		calibrateFor: TooltipData['calibrateFor'],
 		target: HTMLElement,
 	) {
+		if (this.suppressed) {
+			return;
+		}
+
 		this.tooltipDebouncer.update(true);
 		if (this.tooltip?.target === target) {
 			return;
@@ -39,7 +68,7 @@ export class TooltipState {
 	}
 
 	show() {
-		if (!this.tooltip) {
+		if (this.suppressed || !this.tooltip) {
 			return;
 		}
 

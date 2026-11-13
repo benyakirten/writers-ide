@@ -1,6 +1,7 @@
 import { swap } from '$lib/utils/arrays';
 import { clamp } from '$lib/utils/numbers';
-import type { BarItems } from './bar-items.svelte';
+import { BarItems } from './bar-items.svelte';
+import Registry from './bar-item-registry.svelte';
 import FloatingBarState, { type FloatingBar } from './floater-state.svelte';
 import HorizontalBarState, {
 	HorizontalBarPosition,
@@ -13,7 +14,20 @@ import VerticalBarState, {
 
 export type PossibleSlot = 0 | 1 | 2;
 export type BarTransferLocation = HorizontalBarPosition | VerticalBarPosition | 'floating';
-export type Bars = HorizontalBar[] | VerticalBar[] | FloatingBar[];
+export type Bar = HorizontalBar | VerticalBar | FloatingBar;
+export type Bars = Bar[];
+
+export type DockDragSource = {
+	kind: 'bar' | 'item';
+	location: BarTransferLocation;
+	barId: string;
+	itemId?: string;
+};
+
+export type DockDropTarget =
+	| { kind: 'bar'; location: BarTransferLocation; barId: string; index: number }
+	| { kind: 'dock'; location: BarTransferLocation; index: number }
+	| { kind: 'floating'; left: number; top: number };
 export type BarTransfer = {
 	location: BarTransferLocation;
 	barId: string | number;
@@ -60,23 +74,182 @@ export class BarTransferHandler {
 		}
 	}
 
-	#createEmptyBar(location: BarTransferLocation): string {
-		switch (location) {
-			case 'floating':
-				return FloatingBarState.add().id;
-			case HorizontalBarPosition.WindowBlockEnd:
-			case HorizontalBarPosition.WindowBlockStart:
-				return HorizontalBarState.add({}, location).id;
+	getBar(location: BarTransferLocation, id: string | number): Bar | undefined {
+		const bars = this.#bars(location);
+		return typeof id === 'string' ? bars.find((bar) => bar.id === id) : bars.at(id);
+	}
 
-			default:
-				return VerticalBarState.add({}, location).id;
+	isVertical(location: BarTransferLocation, barId?: string): boolean {
+		if (location === 'floating') {
+			return (barId ? this.getBar(location, barId)?.data.isVertical : undefined) ?? true;
+		}
+		return (
+			location === VerticalBarPosition.InlineStart || location === VerticalBarPosition.InlineEnd
+		);
+	}
+
+	#boundary(index: number, length: number): boolean {
+		return Number.isInteger(index) && index >= 0 && index <= length;
+	}
+
+	canDrop(source: DockDragSource, target: DockDropTarget): boolean {
+		if (!this.isBarLocation(source.location)) {
+			return false;
+		}
+		const bar = this.getBar(source.location, source.barId);
+		if (!bar || (source.kind !== 'bar' && source.kind !== 'item')) {
+			return false;
+		}
+		if (source.kind === 'item' && (!source.itemId || !bar.data.has(source.itemId))) {
+			return false;
+		}
+		if (target.kind === 'floating') {
+			if (
+				source.kind === 'bar' &&
+				source.location !== 'floating' &&
+				this.getBar('floating', source.barId)
+			) {
+				return false;
+			}
+			return (
+				Number.isFinite(target.left) &&
+				Number.isFinite(target.top) &&
+				(source.kind === 'item' || bar.data.canOrient(bar.data.isVertical))
+			);
+		}
+		if (!this.isBarLocation(target.location)) {
+			return false;
+		}
+		if (target.kind === 'bar') {
+			const destination = this.getBar(target.location, target.barId);
+			if (
+				source.kind !== 'item' ||
+				!destination ||
+				!this.#boundary(target.index, destination.data.ids.length)
+			) {
+				return false;
+			}
+			if (bar === destination) {
+				return bar.data.canOrient(this.isVertical(target.location, target.barId));
+			}
+			const vertical = this.isVertical(target.location, target.barId);
+			const ids = [...destination.data.ids, source.itemId!];
+			return (
+				!destination.data.has(source.itemId!) &&
+				ids.reduce((total, id) => total + Registry.size(id, vertical), 0) <=
+					Math.min(3, destination.data.maxSize)
+			);
+		}
+		if (
+			target.kind !== 'dock' ||
+			!this.#boundary(target.index, this.#bars(target.location).length)
+		) {
+			return false;
+		}
+		if (
+			source.location !== target.location &&
+			this.getBar(target.location, source.barId) &&
+			source.kind === 'bar'
+		) {
+			return false;
+		}
+		const vertical =
+			target.location === 'floating' ? bar.data.isVertical : this.isVertical(target.location);
+		return source.kind === 'item'
+			? Registry.size(source.itemId!, vertical) <= 3
+			: bar.data.canOrient(vertical);
+	}
+
+	#prepareBar(bar: Bar, location: BarTransferLocation): void {
+		if (location === 'floating') {
+			bar.position ??= {
+				...FloatingBarState.determineStartingCoordinates({}),
+				...FloatingBarState.determineStartingMeasurements(),
+			};
+			bar.z ??= FloatingBarState.determineStartingZ();
+			bar.title ??= 'New Bar';
+			bar.minimized = false;
+		} else if (this.isVertical(location)) {
+			bar.width ??= VerticalBarState.minSize;
+			bar.visible ??= true;
+		} else {
+			bar.height ??= HorizontalBarState.minSize(location as HorizontalBarPosition);
+			bar.visible ??= true;
 		}
 	}
 
+	/** Boundaries are measured before removal, including same-bar/same-dock moves. */
+	drop(source: DockDragSource, target: DockDropTarget): boolean {
+		if (!this.canDrop(source, target)) {
+			return false;
+		}
+		const sourceBar = this.getBar(source.location, source.barId)!;
+		const sourceBars = this.#bars(source.location);
+		const sourceIndex = sourceBars.indexOf(sourceBar);
+		if (target.kind === 'bar') {
+			const destination = this.getBar(target.location, target.barId)!;
+			const itemIndex = sourceBar.data.index(source.itemId!);
+			const index = target.index - (sourceBar === destination && itemIndex < target.index ? 1 : 0);
+			sourceBar.data.remove(source.itemId!);
+			destination.data.insert(source.itemId!, index);
+			if (sourceBar !== destination && sourceBar.data.ids.length === 0) {
+				sourceBars.splice(sourceIndex, 1);
+			}
+			if (target.location === 'floating') {
+				FloatingBarState.focus(destination.id);
+			}
+			return true;
+		}
+
+		const location = target.kind === 'floating' ? 'floating' : target.location;
+		const destinationBars = this.#bars(location);
+		let index = target.kind === 'dock' ? target.index : destinationBars.length;
+		let bar: Bar;
+		if (source.kind === 'bar') {
+			bar = sourceBar;
+			if (sourceBars === destinationBars && sourceIndex < index) {
+				index--;
+			}
+			sourceBars.splice(sourceIndex, 1);
+			if (location !== 'floating') {
+				bar.data.setOrientation(this.isVertical(location));
+			}
+		} else {
+			const vertical =
+				location === 'floating' ? sourceBar.data.isVertical : this.isVertical(location);
+			// Use existing state factories for a fresh bar ID, then insert at the requested gap.
+			if (location === 'floating') {
+				bar = FloatingBarState.add({ isVertical: vertical });
+			} else if (vertical) {
+				bar = VerticalBarState.add({}, location as VerticalBarPosition);
+			} else {
+				bar = HorizontalBarState.add({}, location as HorizontalBarPosition);
+			}
+			destinationBars.pop();
+			bar.data.append(source.itemId!);
+			sourceBar.data.remove(source.itemId!);
+			if (sourceBar.data.ids.length === 0) {
+				if (sourceBars === destinationBars && sourceIndex < index) {
+					index--;
+				}
+				sourceBars.splice(sourceIndex, 1);
+			}
+		}
+		this.#prepareBar(bar, location);
+		destinationBars.splice(index, 0, bar);
+		if (location === 'floating') {
+			if (target.kind === 'floating') {
+				FloatingBarState.setPosition(bar.id, target.left, target.top);
+			} else {
+				FloatingBarState.setPosition(bar.id, bar.position!.left, bar.position!.top);
+			}
+			FloatingBarState.focus(bar.id);
+		}
+		return true;
+	}
+
 	#items(location: BarTransferLocation, id: string | number): BarItems | undefined {
-		const bars = this.#bars(location);
-		const bar = typeof id === 'string' ? bars.find((bar) => bar.id === id) : bars.at(id);
-		return bar?.data;
+		return this.getBar(location, id)?.data;
 	}
 
 	/**
@@ -91,22 +264,30 @@ export class BarTransferHandler {
 		if (from.location === to) {
 			return false;
 		}
+		const bar = this.getBar(from.location, from.barId);
+		if (!bar) {
+			return false;
+		}
+		const source: DockDragSource = {
+			kind: 'item',
+			location: from.location,
+			barId: bar.id,
+			itemId: from.itemId,
+		};
 		const toBars = this.#bars(to);
-
-		// Put on the last bar
-		const lastBar = toBars.at(toBars.length - 1);
-		if (!lastBar || !lastBar.data.canFit(from.itemId)) {
-			this.#createEmptyBar(to);
+		const lastBar = toBars.at(-1);
+		if (lastBar) {
+			const target: DockDropTarget = {
+				kind: 'bar',
+				location: to,
+				barId: lastBar.id,
+				index: lastBar.data.ids.length,
+			};
+			if (this.canDrop(source, target)) {
+				return this.drop(source, target);
+			}
 		}
-
-		this.remove(from.location, from.barId, from.itemId);
-		this.append(to, toBars.length - 1, from.itemId);
-
-		if (to === 'floating') {
-			FloatingBarState.focus(toBars.length - 1);
-		}
-
-		return true;
+		return this.drop(source, { kind: 'dock', location: to, index: toBars.length });
 	}
 
 	/**
@@ -226,40 +407,14 @@ export class BarTransferHandler {
 			return false;
 		}
 
-		const fromItems = this.#items(from, id)?.ids;
-		if (!fromItems) {
+		const bar = this.getBar(from, id);
+		if (!bar) {
 			return false;
 		}
-
-		if (from === 'floating') {
-			if (!FloatingBarState.remove(id)) {
-				return false;
-			}
-		} else if (
-			from === HorizontalBarPosition.WindowBlockStart ||
-			from === HorizontalBarPosition.WindowBlockEnd
-		) {
-			if (!HorizontalBarState.remove(id, from)) {
-				return false;
-			}
-		} else {
-			if (!VerticalBarState.remove(id, from)) {
-				return false;
-			}
-		}
-
-		if (to === 'floating') {
-			FloatingBarState.add({ data: fromItems });
-		} else if (
-			to === HorizontalBarPosition.WindowBlockStart ||
-			to === HorizontalBarPosition.WindowBlockEnd
-		) {
-			HorizontalBarState.add({ data: fromItems }, to);
-		} else {
-			VerticalBarState.add({ data: fromItems }, to);
-		}
-
-		return true;
+		return this.drop(
+			{ kind: 'bar', location: from, barId: bar.id },
+			{ kind: 'dock', location: to, index: this.#bars(to).length },
+		);
 	}
 
 	/**
@@ -283,7 +438,6 @@ export class BarTransferHandler {
 			return false;
 		}
 
-		// @ts-expect-error: The type of array doesn't matter.
 		swap(bars, fromIndex, toIndex);
 		return true;
 	}

@@ -1,13 +1,14 @@
 <script lang="ts">
 	import IconButton from '$lib/components/IconButton.svelte';
-	import { DotsSix, DotsSixVertical, X } from '@steeze-ui/phosphor-icons';
+	import { X } from '@steeze-ui/phosphor-icons';
+	import type { Snippet } from 'svelte';
 	import { Icon } from '@steeze-ui/svelte-icon';
 	import BarLocation, { type MoveDetails } from './BarLocation.svelte';
 	import type { BarTransferLocation } from '../state/bar-transfer-handler.svelte';
-	import { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 
 	let {
 		title,
+		handle,
 		position,
 		moveDetails,
 		onremove,
@@ -15,6 +16,7 @@
 		onmove,
 	}: {
 		title: string;
+		handle?: Snippet;
 		position: BarTransferLocation;
 		moveDetails: MoveDetails;
 		onremove: () => void;
@@ -27,13 +29,7 @@
 	<p>{title}</p>
 	<div class="buttons">
 		<BarLocation {moveDetails} {position} {onrelocate} {onmove} />
-		<div style:cursor={'grab'} class="drag-icon">
-			{#if position === HorizontalBarPosition.WindowBlockEnd || position === HorizontalBarPosition.WindowBlockStart}
-				<Icon src={DotsSix} size="18px" />
-			{:else}
-				<Icon src={DotsSixVertical} size="20px" />
-			{/if}
-		</div>
+		{@render handle?.()}
 		<IconButton tooltipDirection="vertical" onclick={onremove} label="Remove item">
 			{#snippet icon()}
 				<Icon src={X} size="14px" />
@@ -72,11 +68,5 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
-	}
-
-	.drag-icon {
-		height: 100%;
-		display: flex;
-		align-items: center;
 	}
 </style>

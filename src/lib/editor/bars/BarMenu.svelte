@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Icon } from '@steeze-ui/svelte-icon';
-	import { X, Minus, DotsSix, DotsSixVertical } from '@steeze-ui/phosphor-icons';
+	import { X, Minus } from '@steeze-ui/phosphor-icons';
+	import type { Snippet } from 'svelte';
 
 	import * as m from '$lib/paraglide/messages';
 	import IconButton from '$lib/components/IconButton.svelte';
@@ -11,14 +12,16 @@
 
 	let {
 		canMoveForward,
-		draggable,
+		draggable = false,
+		handle,
 		index,
 		position,
 		onminimize,
 		onclose,
 	}: {
 		canMoveForward: boolean;
-		draggable: boolean;
+		draggable?: boolean;
+		handle?: Snippet;
 		index: number;
 		position: BarTransferLocation;
 		onminimize: () => void;
@@ -53,14 +56,8 @@
 </script>
 
 <div class="menu">
-	{#if draggable}
-		<div style:cursor="grab" class="drag-icon">
-			{#if position === VerticalBarPosition.InlineStart || position === VerticalBarPosition.InlineEnd || position === 'floating'}
-				<Icon src={DotsSix} size="18px" />
-			{:else}
-				<Icon src={DotsSixVertical} size="20px" />
-			{/if}
-		</div>
+	{#if draggable || handle}
+		{@render handle?.()}
 	{/if}
 	<BarLocation
 		{moveDetails}
@@ -95,12 +92,5 @@
 		display: flex;
 		justify-content: flex-end;
 		align-items: center;
-	}
-
-	.drag-icon {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding-inline: 4px;
 	}
 </style>

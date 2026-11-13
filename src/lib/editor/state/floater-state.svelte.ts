@@ -1,6 +1,6 @@
 import { clamp } from '$lib/utils/numbers';
 import { IdGenerator } from '$lib/services/ids';
-import { BarItems } from './bar-items.svelte';
+import { BarItems, type BarMetadata } from './bar-items.svelte';
 
 export type FloatingPosition = {
 	top: number;
@@ -9,7 +9,7 @@ export type FloatingPosition = {
 	height: number;
 };
 
-export type FloatingBar = {
+export type FloatingBar = BarMetadata & {
 	position: FloatingPosition;
 	data: BarItems;
 	z: number;
@@ -114,11 +114,11 @@ export class FloaterBarState {
 		// If they only have a top, find the next open left position and use that
 		// If they only have a left, use that and an automatically generated top
 		// If they have neither, find the next open position
-		if (top && left) {
+		if (top !== undefined && left !== undefined) {
 			return { top, left };
 		}
 
-		if (left) {
+		if (left !== undefined) {
 			const nearbyBar = this.bars.find(
 				(bar) =>
 					bar.position.left - this.TOLERANCE < left && bar.position.left + this.TOLERANCE > left,
@@ -187,6 +187,7 @@ export class FloaterBarState {
 			height?: number;
 			z?: number;
 			data?: string[];
+			isVertical?: boolean;
 			id?: string;
 			minimized?: boolean;
 			title?: string;
@@ -203,7 +204,7 @@ export class FloaterBarState {
 			startingInformation.height,
 		);
 
-		const barData = new BarItems(true, startingInformation.data);
+		const barData = new BarItems(startingInformation.isVertical ?? true, startingInformation.data);
 		const bar: FloatingBar = {
 			position: {
 				...position,
@@ -219,6 +220,38 @@ export class FloaterBarState {
 
 		this.bars.push(bar);
 		return bar;
+	}
+
+	setOrientation(id: string | number, vertical: boolean): boolean {
+		return this.bar(id)?.data.setOrientation(vertical) ?? false;
+	}
+
+	setPosition(id: string | number, left: number, top: number): boolean {
+		const bar = this.bar(id);
+		if (!bar || !Number.isFinite(left) || !Number.isFinite(top)) {
+			return false;
+		}
+		const maxLeft = this.root
+			? Math.max(0, this.root.clientWidth - bar.position.width - this.EDGE_BUFFER_PX)
+			: Number.MAX_SAFE_INTEGER;
+		const maxTop = this.root
+			? Math.max(0, this.root.clientHeight - bar.position.height - this.EDGE_BUFFER_PX)
+			: Number.MAX_SAFE_INTEGER;
+		const nextLeft = clamp(left, 0, maxLeft);
+		const nextTop = clamp(top, 0, maxTop);
+		if (bar.position.left !== nextLeft) {
+			bar.position.left = nextLeft;
+		}
+		if (bar.position.top !== nextTop) {
+			bar.position.top = nextTop;
+		}
+		return true;
+	}
+
+	fitToRoot(): void {
+		for (const bar of this.bars) {
+			this.setPosition(bar.id, bar.position.left, bar.position.top);
+		}
 	}
 
 	focus(id: string | number): FloatingBar | null {
@@ -255,23 +288,22 @@ export class FloaterBarState {
 			return null;
 		}
 
-		if (bar.position.width === width && bar.position.height === height) {
-			return null;
+		const nextWidth = clamp(width, this.MIN_WIDTH_PX, this.MAX_WIDTH_PX);
+		const maxHeight = this.root
+			? Math.max(this.MIN_HEIGHT_PX, (this.MAX_HEIGHT_PERCENT * this.root.clientHeight) / 100)
+			: Infinity;
+		const nextHeight = clamp(height, this.MIN_HEIGHT_PX, maxHeight);
+		const changed = bar.position.width !== nextWidth || bar.position.height !== nextHeight;
+		if (bar.position.width !== nextWidth) {
+			bar.position.width = nextWidth;
 		}
+		if (bar.position.height !== nextHeight) {
+			bar.position.height = nextHeight;
+		}
+		// A root resize can invalidate coordinates even when the measured size is unchanged.
+		this.setPosition(bar.id, bar.position.left, bar.position.top);
 
-		bar.position.width = clamp(width, this.MIN_WIDTH_PX, this.MAX_WIDTH_PX);
-
-		const newHeight =
-			this.root && this.MAX_HEIGHT_PERCENT * this.root.clientHeight > this.MIN_HEIGHT_PX
-				? clamp(
-						height,
-						this.MIN_HEIGHT_PX,
-						(this.MAX_HEIGHT_PERCENT * this.root.clientHeight) / 100,
-					)
-				: Math.max(height, this.MIN_HEIGHT_PX);
-		bar.position.height = newHeight;
-
-		return bar;
+		return changed ? bar : null;
 	}
 
 	startDragging(id: string | number, e: MouseEvent): boolean {
@@ -307,12 +339,11 @@ export class FloaterBarState {
 		const deltaX = clientX - this.dragging.x;
 		const deltaY = clientY - this.dragging.y;
 
-		const { width, height, left, top } = bar.position;
+		const { left, top } = bar.position;
 		const x = left + deltaX;
 		const y = top + deltaY;
 
-		bar.position.left = clamp(x, 0, this.root.clientWidth - width - this.EDGE_BUFFER_PX);
-		bar.position.top = clamp(y, 0, this.root.clientHeight - height - this.EDGE_BUFFER_PX);
+		this.setPosition(bar.id, x, y);
 
 		this.dragging.x = clientX;
 		this.dragging.y = clientY;
@@ -341,10 +372,18 @@ export class FloaterBarState {
 				bar.position.left = Math.max(left - delta, 0);
 				break;
 			case 'down':
-				bar.position.top = Math.min(top + delta, clientHeight - height - this.EDGE_BUFFER_PX);
+				bar.position.top = clamp(
+					top + delta,
+					0,
+					Math.max(0, clientHeight - height - this.EDGE_BUFFER_PX),
+				);
 				break;
 			case 'right':
-				bar.position.left = Math.min(left + delta, clientWidth - width - this.EDGE_BUFFER_PX);
+				bar.position.left = clamp(
+					left + delta,
+					0,
+					Math.max(0, clientWidth - width - this.EDGE_BUFFER_PX),
+				);
 				break;
 		}
 

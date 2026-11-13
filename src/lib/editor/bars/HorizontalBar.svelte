@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DockDraggable from '$lib/dnd/DockDraggable.svelte';
+	import DockTarget from '$lib/dnd/DockTarget.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	import { HorizontalBarPosition, type HorizontalBar } from '../state/horizontal-bar-state.svelte';
@@ -23,7 +25,7 @@
 		canMoveForward: boolean;
 	} = $props();
 
-	let shouldInvert = HorizontalBarState.shouldInvert(position);
+	let shouldInvert = $derived(HorizontalBarState.shouldInvert(position));
 	let height = $derived(HorizontalBarState.height(bar, position));
 	let resizeLabel = $derived.by(() =>
 		position === HorizontalBarPosition.WindowBlockStart
@@ -92,43 +94,69 @@
 	></button>
 {/snippet}
 
-<div class="horizontal-container">
-	{#if shouldInvert}
-		{@render resizeBar()}
-	{/if}
-	<div
-		class="horizontal-slice"
-		style:height={`${height}px`}
-		style:overflow={height === 0 ? 'hidden' : 'auto'}
-	>
-		<div class="bar-title">
-			<BarMenu
-				onminimize={() => HorizontalBarState.toggle(index, position)}
-				onclose={() => HorizontalBarState.remove(index, position)}
-				draggable
-				{position}
-				{index}
-				{canMoveForward}
-			/>
+<DockDraggable source={{ kind: 'bar', location: position, barId: bar.id }} style="width: 100%">
+	{#snippet children(handle)}
+		<div class="horizontal-container">
+			{#if shouldInvert}
+				{@render resizeBar()}
+			{/if}
+			<div
+				class="horizontal-slice"
+				style:height={`${height}px`}
+				style:overflow={height === 0 ? 'hidden' : 'auto'}
+			>
+				<DockTarget
+					id={JSON.stringify(['bar-interior', position, bar.id])}
+					target={{ kind: 'bar', location: position, barId: bar.id, index: items.length }}
+					style="height: 100%; width: 100%"
+				>
+					<div class="bar-title">
+						<BarMenu
+							onminimize={() => HorizontalBarState.toggle(index, position)}
+							onclose={() => HorizontalBarState.remove(index, position)}
+							{handle}
+							{position}
+							{index}
+							{canMoveForward}
+						/>
+					</div>
+					<div class="items" style:--insertion-space={`${(items.length + 1) * 16}px`}>
+						{#each items as item, itemIndex (item.id)}
+							{@const moveDetails = determineMoveDetails(
+								itemIndex,
+								items.length,
+								index,
+								canMoveForward,
+							)}
+							<DockTarget
+								id={JSON.stringify(['bar-boundary', position, bar.id, itemIndex])}
+								target={{ kind: 'bar', location: position, barId: bar.id, index: itemIndex }}
+								style="width: 16px; min-width: 16px; height: 100%"
+							/>
+							<HorizontalItemRenderer
+								barId={bar.id}
+								{position}
+								onremove={() => TransferHandler.remove(position, bar.id, item.id)}
+								{moveDetails}
+								onrelocate={(to) => handleItemRelocate(to, item.id)}
+								onmove={(direction) => handleItemMove(direction, item.id, itemIndex)}
+								{...item}
+							/>
+						{/each}
+						<DockTarget
+							id={JSON.stringify(['bar-boundary', position, bar.id, items.length])}
+							target={{ kind: 'bar', location: position, barId: bar.id, index: items.length }}
+							style="width: 16px; min-width: 16px; height: 100%"
+						/>
+					</div>
+				</DockTarget>
+			</div>
+			{#if !shouldInvert}
+				{@render resizeBar()}
+			{/if}
 		</div>
-		<div class="items">
-			{#each items as item, itemIndex (item.id)}
-				{@const moveDetails = determineMoveDetails(itemIndex, items.length, index, canMoveForward)}
-				<HorizontalItemRenderer
-					{position}
-					onremove={() => TransferHandler.remove(position, bar.id, item.id)}
-					{moveDetails}
-					onrelocate={(to) => handleItemRelocate(to, item.id)}
-					onmove={(direction) => handleItemMove(direction, item.id, itemIndex)}
-					{...item}
-				/>
-			{/each}
-		</div>
-	</div>
-	{#if !shouldInvert}
-		{@render resizeBar()}
-	{/if}
-</div>
+	{/snippet}
+</DockDraggable>
 
 <style>
 	.horizontal-container {

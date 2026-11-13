@@ -1,12 +1,12 @@
 import { IdGenerator } from '$lib/services/ids';
-import { BarItems } from './bar-items.svelte';
+import { BarItems, type BarMetadata } from './bar-items.svelte';
 
 export enum HorizontalBarPosition {
 	WindowBlockStart = 'WINDOW_BLOCK_START',
 	WindowBlockEnd = 'WINDOW_BLOCK_END',
 }
 
-export type HorizontalBar = {
+export type HorizontalBar = BarMetadata & {
 	height: number;
 	visible: boolean;
 	id: string;
@@ -35,6 +35,7 @@ export class HorizontalBarState {
 			id = IdGenerator.generate(),
 			visible = true,
 			data,
+			...metadata
 		}: Partial<Omit<HorizontalBar, 'data'>> & { data?: string[] },
 		position: HorizontalBarPosition,
 		index: number = -1,
@@ -48,7 +49,7 @@ export class HorizontalBarState {
 		height = height ?? this.minSize(position);
 
 		const barData = new BarItems(false, data);
-		const bar = { height, id, visible, data: barData };
+		const bar = { ...metadata, height, id, visible, data: barData };
 
 		if (index < 0 || index >= bars.length) {
 			bars.push(bar);

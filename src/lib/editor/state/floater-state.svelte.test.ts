@@ -1,5 +1,13 @@
-import { describe, it, expect, beforeEach, test } from 'vitest';
+import { describe, it, expect, beforeEach, test, vi } from 'vitest';
 import { FloaterBarState } from './floater-state.svelte';
+
+// Class instances keep the write-tracking proxy outside Svelte's deep proxying.
+class SettledPosition {
+	left = 97;
+	top = 197;
+	width = 400;
+	height = 100;
+}
 
 describe('FloaterBarState', () => {
 	let floaterState: FloaterBarState;
@@ -421,6 +429,106 @@ describe('FloaterBarState', () => {
 			const bar = floaterState.add({ width: 200, height: 300 });
 			const got = floaterState.updateMeasurements(bar.id, 300, 5000);
 			expect(got!.position.height).toBe(5000);
+		});
+	});
+
+	describe('position constraints after resizing', () => {
+		it('reclamps coordinates after dimensions grow near the bottom-right edge', () => {
+			floaterState.root = createRoot(1000, 800);
+			const bar = floaterState.add({ left: 797, top: 697, width: 200, height: 100 });
+
+			const updated = floaterState.updateMeasurements(bar.id, 400, 300);
+
+			expect(updated?.position).toEqual({ left: 597, top: 497, width: 400, height: 300 });
+		});
+
+		it('reclamps coordinates even when measurements are unchanged', () => {
+			floaterState.root = createRoot(1000, 800);
+			const bar = floaterState.add({ left: 797, top: 697, width: 200, height: 100 });
+			floaterState.root = createRoot(500, 300);
+
+			expect(floaterState.updateMeasurements(bar.id, 200, 100)).toBeNull();
+			expect(floaterState.bar(bar.id)?.position).toEqual({
+				left: 297,
+				top: 197,
+				width: 200,
+				height: 100,
+			});
+		});
+
+		it.each([0, 1, 50, 110])(
+			'keeps coordinates nonnegative and dimensions at their minimum on a %ipx root',
+			(size) => {
+				floaterState.root = createRoot(size, size);
+				const bar = floaterState.add({ left: 900, top: 900, width: 300, height: 300 });
+
+				floaterState.updateMeasurements(bar.id, 10, 10);
+
+				expect(floaterState.bar(bar.id)?.position).toEqual({
+					left: 0,
+					top: Math.max(0, size - floaterState.MIN_HEIGHT_PX - floaterState.EDGE_BUFFER_PX),
+					width: floaterState.MIN_WIDTH_PX,
+					height: floaterState.MIN_HEIGHT_PX,
+				});
+			},
+		);
+
+		it('fits all bars after root shrink, including minimized bars, without changing dimensions', () => {
+			floaterState.root = createRoot(1000, 800);
+			const visible = floaterState.add({ left: 700, top: 600, width: 200, height: 100 });
+			const minimized = floaterState.add({
+				left: 600,
+				top: 500,
+				width: 300,
+				height: 200,
+				minimized: true,
+			});
+			floaterState.root = createRoot(500, 300);
+
+			floaterState.fitToRoot();
+
+			expect(floaterState.bar(visible.id)?.position).toEqual({
+				left: 297,
+				top: 197,
+				width: 200,
+				height: 100,
+			});
+			expect(floaterState.bar(minimized.id)?.position).toEqual({
+				left: 197,
+				top: 97,
+				width: 300,
+				height: 200,
+			});
+			expect(floaterState.bar(minimized.id)?.minimized).toBe(true);
+			floaterState.root = createRoot(1, 1);
+			floaterState.fitToRoot();
+			for (const bar of floaterState.bars) {
+				expect(bar.position.left).toBe(0);
+				expect(bar.position.top).toBe(0);
+			}
+		});
+
+		it('does not write settled dimensions or coordinates on repeated observer callbacks', () => {
+			floaterState.root = createRoot(500, 300);
+			const bar = floaterState.add();
+			const write = vi.fn(Reflect.set);
+			bar.position = new Proxy<SettledPosition>(new SettledPosition(), { set: write });
+
+			for (let i = 0; i < 3; i++) {
+				expect(floaterState.updateMeasurements(bar.id, 900, 100)).toBeNull();
+				floaterState.fitToRoot();
+			}
+
+			expect(write).not.toHaveBeenCalled();
+		});
+
+		it('preserves valid coordinates on root expansion or when no root is attached', () => {
+			const bar = floaterState.add({ left: 20, top: 30, width: 200, height: 100 });
+			floaterState.fitToRoot();
+			expect(floaterState.bar(bar.id)?.position).toMatchObject({ left: 20, top: 30 });
+			floaterState.root = createRoot(1000, 800);
+			floaterState.fitToRoot();
+			expect(floaterState.bar(bar.id)?.position).toMatchObject({ left: 20, top: 30 });
 		});
 	});
 

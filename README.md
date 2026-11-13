@@ -14,7 +14,7 @@ This project is about cooperation and creativity, not revenue. Forks, extensions
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): code conventions and validation commands.
 - [docs/project-context.md](docs/project-context.md): product direction, current architecture, decisions, planned features, and open questions.
-- [docs/pagination.md](docs/pagination.md): current pagination mechanics, constraints, tests, and future direction.
+- [docs/pagination/context.md](docs/pagination/context.md): current pagination mechanics, constraints, tests, and future direction.
 - [GitHub issues](https://github.com/benyakirten/writers-ide/issues): feature discussions and requests, including unsupported layout/format examples. Use minimal, non-sensitive reproductions rather than publishing private manuscripts.
 
 Use `pnpm dev` for the browser frontend and `pnpm dev:tauri` for the desktop application. See `package.json` and the contributor guide for checks and other workflows.

@@ -1,7 +1,7 @@
 import { IdGenerator } from '$lib/services/ids';
-import { BarItems } from './bar-items.svelte';
+import { BarItems, type BarMetadata } from './bar-items.svelte';
 
-export type VerticalBar = {
+export type VerticalBar = BarMetadata & {
 	width: number;
 	visible: boolean;
 	id: string;
@@ -43,6 +43,7 @@ export class VerticalBarState {
 			id = IdGenerator.generate(),
 			visible = true,
 			data,
+			...metadata
 		}: Partial<Omit<VerticalBar, 'data'>> & { data?: string[] },
 		position: VerticalBarPosition,
 		index: number = -1,
@@ -54,7 +55,7 @@ export class VerticalBarState {
 		}
 
 		const barData = new BarItems(true, data);
-		const bar = { width, id, visible, data: barData };
+		const bar = { ...metadata, width, id, visible, data: barData };
 
 		if (index < 0 || index >= bars.length) {
 			bars.push(bar);
