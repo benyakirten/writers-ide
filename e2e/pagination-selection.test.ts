@@ -86,8 +86,13 @@ for (const direction of ['forward', 'reverse'] as const) {
 		const text = prose.repeat(70);
 		await replaceDocument(page, editor, text);
 		await expect.poll(() => pages.count()).toBeGreaterThan(1);
+		// Pagination is viewport-driven; an offscreen first page can still contain
+		// the whole replacement while an empty later page is visible and fitting.
+		await pages.first().evaluate((element) => element.scrollIntoView({ block: 'start' }));
 		await expectVisiblePagesToFit(viewport);
 		const initialBoundary = (await pages.first().textContent())!.length;
+		expect(initialBoundary).toBeGreaterThan(0);
+		expect(initialBoundary).toBeLessThan(text.length);
 		const from = 12;
 		const to = text.length - 12;
 		const anchor = direction === 'forward' ? from : to;
