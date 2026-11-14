@@ -1120,7 +1120,6 @@ export class PageLayoutManager {
 			pos = nodeDetails.position + nodeDetails.node.nodeSize + 1;
 		}
 
-		console.log(peerIdentifications);
 		return peerIdentifications;
 	}
 

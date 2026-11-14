@@ -6,7 +6,13 @@ After confirmed merge, move the completed entry into `Merged PRs` in chronologic
 
 ## In progress
 
-No in-progress pagination entries are currently recorded.
+### `bh/add-plugin-interface-js` — Quiet peer-group queries for formatting
+
+**Status: In progress / unmerged.** PR identity and merge date are not established.
+
+- Reuses existing peer-paragraph rules in the host formatting bridge to calculate command availability without speculative document edits. Removes the peer-group helper's unconditional document-node console log because the helper now runs during ordinary formatting-state refreshes.
+- Adds a formatting-service regression asserting that initial and updated large-selection snapshots do not log document nodes. Pagination geometry, model mutation, continuation semantics, and history behavior are unchanged.
+- See the [plugin PR entry](../plugins/change-log.md) for cumulative validation and the main implementation. The full unit suite and browser smoke/docking checks cover integration; this is not a new pagination geometry benchmark or native-runtime validation.
 
 ## Merged PRs
 

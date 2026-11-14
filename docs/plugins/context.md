@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This topic establishes the distinction between plugins, reusable libraries, and the application core, plus the owner-approved staged implementation plan below. The plan is accepted direction, not current implementation: no plugin runtime or library extraction has landed through this documentation work. Detailed public APIs, package boundaries beyond the agreed scope, isolation mechanisms, and storage designs remain open and require owner approval before implementation.
+This topic establishes the distinction between plugins, reusable libraries, and the application core, plus the owner-approved staged implementation plan below. Stage 1 is implemented on working branch `bh/add-plugin-interface-js` (unmerged); Stages 2 and 3 remain accepted direction, not current implementation. This does not establish a sandbox or a published SDK. Detailed public APIs, package boundaries beyond the agreed scope, isolation mechanisms, and storage designs remain open and require owner approval before implementation.
 
 Read [project context](../project-context.md) for accepted product direction and security requirements. See [change-log.md](change-log.md) for the current documentation change.
 
@@ -44,6 +44,8 @@ Libraries should not import Writer's IDE application singletons or assume access
 The owner approved the following sequence. Stages 1 and 2 support trusted, bundled plugins only; arbitrary third-party code must not be loaded before Stage 3 isolation and enforcement are implemented. These stages are not release dates or claims of completed work.
 
 ### Stage 1 — Contracts, host, and formatting plugin
+
+**Current working-branch implementation:** contracts, bundled lifecycle host, registry/rendering adapters, and the formatting toolbar migration are implemented; see the contracts below. No merge is claimed.
 
 - Create a private workspace package for plugin identity, API compatibility, lifecycle, contribution contracts for toolbar items, commands and central views, and narrow formatting-state/command interfaces.
 - Keep data and command contracts independent of Svelte and ProseMirror; place Svelte presentation types in a separate adapter entry point.
@@ -101,26 +103,40 @@ Plugin APIs should expose versioned data or scoped handles and validated request
 
 Schema-owning features require versioning and missing-plugin preservation contracts before extraction. Removing a toolbar is different from removing the implementation of saved content. Preserve plugin-owned data when a plugin is disabled or unavailable; basic preservation must not require executing it.
 
-## Current implementation and source entry points
+## Current Stage 1 contracts and limitations
 
-These paths are internal discovery points, not stable public APIs:
+- `@writers-ide/plugins` is a private, source-exported workspace package. Root contracts have no framework/editor imports; the `/svelte` entry describes trusted component presentations. API compatibility currently means exact `apiVersion: 1`, not a version-range negotiation scheme. See the [package reference](../../packages-js/plugins/README.md).
+- The synchronous bundled host explicitly registers, activates, deactivates, and reports metadata/errors for plugins. It checks manifest/capability declarations and contribution IDs, rolls back failed activation, aborts/revokes a context before reverse-order cleanup, and continues cleanup after disposer failures. Contributions, formatting subscriptions, and `own()` resources are activation-owned; retained commands cannot act after deactivation or a later reactivation.
+- These checks govern host API use, not ambient JavaScript authority. Only trusted bundled plugins execute. There is no external loader, sandbox, user-grant UI, package discovery, persistent activation preference, or reactive plugin-manager subscription.
+- The application adapts toolbar/view contributions to existing registries and command contributions to host-owned command handles. The trusted Svelte adapter supplies only the scoped plugin context, not legacy workspace/editor props. Central-view instance metadata and contributed shortcut routing are not implemented. The built-in word processor still uses the legacy path; its extraction is intentionally deferred.
+- Formatting delivers immediate, copied, data-only snapshots: view ID, monotonic revision, mark/block ratios, and command availability. Requests specify view ID, revision, and command. The service validates live active view/state/editability, rejecting stale requests even before a reactive flush; tab document IDs are resolved to distinct registered view IDs. Existing caret mark no-ops, superscript/subscript exclusion, and continuation-aware paragraph commands are preserved. Unavailable/no-op controls are disabled.
+- Formatting subscriptions start the shared bridge lazily and release its bus/effect resources when unused. Availability queries inspect content without generating speculative transactions. Update-listener failures are reported without interrupting other subscribers or editor dispatch. No rich-text content or mutable editor reference crosses the formatting boundary.
+- Disabling a toolbar removes its presentation but retains placement IDs and declared orientation costs, avoiding overfill on re-enable. Missing-item placeholders remain, and reactivation restores the registered presentations. Registry `clear()` releases retained metadata. This is in-memory preservation, not durable layout or plugin-state storage.
+- Relocation remounts formatting presentations against the same scoped service and current snapshot. No general arbitrary component-local-state transfer, custom schema lifecycle, or durable project history is introduced.
 
-- `src/routes/+page.svelte`: manually registers the basic menu and ProseMirror view.
-- `src/lib/editor/prosemirror/menu/basic/`: current orientation-specific formatting presentations and shared snippets.
-- `src/lib/editor/state/bar-item-registry.svelte.ts` and `tab-state-registry.svelte.ts`: trusted in-process contribution registries.
-- `src/lib/editor/state/shared.types.ts`: broad injected component props, including mutable workspace/editor services; not a restricted capability contract.
-- `src/lib/editor/prosemirror/plugins.svelte.ts` and `view/editor.ts`: ProseMirror factory registration and editor construction, not an external plugin lifecycle.
-- `src/lib/editor/bars/`, `src/lib/dnd/`, and bar/floater/transfer state: current application-coupled docking implementation.
-- `src/lib/editor/state/work-queue.svelte.ts`: cooperative scheduling with progress, priorities, and cancellation.
-- `src/lib/components/` and `src/lib/services/`: UI components and shared services to evaluate for reuse.
-- `packages-js/components/` and `packages-js/layout/`: manifest/license scaffolds, not extracted implementations. `pnpm-workspace.yaml` currently includes only the root package.
+## Source and test entry points
+
+These are private, evolving contracts and internal discovery points, not a stable published SDK:
+
+- `packages-js/plugins/index.ts`, `svelte.ts`, and [README](../../packages-js/plugins/README.md): data/lifecycle contracts, trusted presentation descriptor, API reference.
+- `src/lib/plugins/plugin-host.ts`: generic lifecycle, ownership, revocation, and rollback; `plugin-host.test.ts` covers failure and lifecycle paths.
+- `src/lib/plugins/application-plugin-host.ts`, `PluginPresentation.svelte`: application registry adapters and restricted-prop rendering; `application-plugin-host.svelte.test.ts` covers collisions, rendering, ownership, disable/re-enable and capacity preservation.
+- `src/lib/plugins/formatting-service.svelte.ts`: scoped active-editor bridge; `formatting-service.svelte.test.ts` covers stale requests, separate tab/view IDs, summaries, availability, peer paragraphs, subscription cleanup, and quiet queries.
+- `src/routes/+page.svelte`: explicitly registers/activates the bundled formatting plugin and deactivates it on teardown; still directly registers the ProseMirror view.
+- `src/lib/editor/prosemirror/menu/basic/`: formatting plugin definition and snapshot/command-only presentations; `menu.test.ts` covers both orientations and command routing.
+- `src/lib/editor/state/bar-item-registry.svelte.ts`, `bar-items.svelte.ts`, and `tab-state-registry.svelte.ts`: existing registries with trusted plugin presentation adapters and retained disabled-toolbar sizes.
+- `src/lib/editor/state/shared.types.ts`: legacy broad injected props, no longer supplied to the formatting plugin.
+- `src/lib/editor/prosemirror/plugins.svelte.ts` and `view/editor.ts`: ProseMirror factory registration and editor construction, separate from the bundled application-plugin host.
+- `src/lib/editor/bars/`, `src/lib/dnd/`, and bar/floater/transfer state: application-coupled docking; `e2e/docking.test.ts` includes real formatting-button and docking regressions. `e2e/smoke.test.ts` covers app startup and editing across Chromium/WebKit.
+- `src/lib/editor/state/work-queue.svelte.ts`, `src/lib/components/`, and `src/lib/services/`: scheduling and UI/services remain in the application.
+- `packages-js/components/` and `packages-js/layout/`: manifest/license scaffolds pending Stage 2. The workspace currently includes the root application and `packages-js/plugins`.
 
 ## Open implementation decisions
 
 - Detailed package boundaries and names within the approved scope, dependency rules, and any later publication strategy. Initial packages are private workspace packages.
-- Plugin manifests, lifecycle, compatibility, contribution ownership, and capability grants.
+- Extensions beyond the initial synchronous lifecycle and API version 1, user-grant policy, reactive management notifications, and richer contribution/view-instance contracts.
 - Frontend isolation, messaging, and permission enforcement mechanisms.
 - Document/view ownership and command contracts, schema evolution, and content preservation.
 - History scope, granularity, branch/navigation semantics, collaboration, persistence, and retention.
 
-This document establishes vocabulary, responsibility boundaries, and the approved implementation sequence, not a complete API specification. The staged work is not yet implemented; candidate examples outside that scope do not authorize additional source migrations or imply runtime guarantees.
+This document establishes vocabulary, responsibility boundaries, and the approved implementation sequence, not a complete API specification. Only the Stage 1 working-branch behavior above is implemented; candidate examples outside the approved scope do not authorize additional source migrations or imply runtime guarantees.

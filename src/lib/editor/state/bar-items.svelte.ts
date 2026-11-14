@@ -41,13 +41,13 @@ export class BarItems {
 	items: BarItemData[] = $derived(
 		this.#ids.map((id) => {
 			let Component: BarItemData['Component'] = null;
-			let size: BarItemData['size'] = 1;
+			const size = Registry.size(id, this.isVertical);
 			let title: BarItemData['title'] = m.unknown_menu_title();
 
 			const item = Registry.items[id];
 			if (item) {
-				Component = this.isVertical ? item.vertical.Component : item.horizontal.Component;
-				size = this.isVertical ? item.vertical.size : item.horizontal.size;
+				Component = (this.isVertical ? item.vertical.Component : item.horizontal.Component) ?? null;
+
 				title = item.title;
 			}
 

@@ -4,6 +4,15 @@ For current behavior and rationale, read [context.md](context.md). Create one co
 
 ## In progress
 
+### `bh/add-plugin-interface-js` — Bundled plugin presentations and disabled capacity
+
+**Status: In progress / unmerged.** PR identity and merge date are not established.
+
+- Adds a trusted presentation branch to bar renderers, passing only the scoped plugin context rather than legacy editor/workspace props. Formatting now registers through the bundled plugin host; drag gestures, transfers, ordering, capacity rules, and geometry remain unchanged.
+- Keeps disabled toolbar placement IDs and declared horizontal/vertical costs. Placeholders reserve that space so inserting items while disabled cannot overfill the bar on re-enable. Default legacy deregistration and registry clearing still release retained metadata.
+- Tests cover presentation routing/cleanup, collisions and replacement ownership, repeated disable/re-enable across bars, and destination-orientation capacity. See the [plugin PR entry](../plugins/change-log.md) for the complete implementation and validation summary.
+- Validation: registry/bar/transfer/application-adapter tests passed (88 cases in the focused run); the final cross-engine browser rerun and full-suite results are recorded in the linked plugin entry. No layout persistence or general feature-state transfer lifecycle is introduced.
+
 ### [#79: Remove highlighting in main area for dnd](https://github.com/benyakirten/writers-ide/pull/79)
 
 **Status: In progress / unmerged.** Branch: `bh/fix-dnd-main-area`. No merge date is assigned.

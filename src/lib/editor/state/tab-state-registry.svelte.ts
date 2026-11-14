@@ -1,3 +1,4 @@
+import type { SveltePresentation } from '@writers-ide/plugins/svelte';
 import type { Component } from 'svelte';
 import ErrorTab from '../prosemirror/ErrorTab.svelte';
 import type { ModularComponentProps } from './shared.types';
@@ -8,7 +9,8 @@ export type TabComponentProps = ModularComponentProps & {
 };
 export type TabComponent = Component<TabComponentProps>;
 export type TabItem = {
-	component: TabComponent;
+	component?: TabComponent;
+	plugin?: SveltePresentation;
 };
 
 export class TabStateRegistry {

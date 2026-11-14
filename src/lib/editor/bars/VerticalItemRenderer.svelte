@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Registry from '$lib/editor/state/bar-item-registry.svelte';
+	import PluginPresentation from '$lib/plugins/PluginPresentation.svelte';
 	import DockDraggable from '$lib/dnd/DockDraggable.svelte';
 	import LocaleManager from '$lib/services/locale-manager.svelte';
 	import TabState from '$lib/editor/state/tab-state.svelte';
@@ -39,6 +41,8 @@
 		onrelocate: (to: BarTransferLocation) => void;
 		onmove: (direction: 'up' | 'down' | 'left' | 'right') => void;
 	} = $props();
+
+	const plugin = $derived(Registry.items[id]?.vertical.plugin);
 </script>
 
 <div class="renderer" style:--size={size}>
@@ -58,7 +62,9 @@
 				{onrelocate}
 			/>
 			<div class="component">
-				{#if Component}
+				{#if plugin}
+					<PluginPresentation presentation={plugin} />
+				{:else if Component}
 					<Component
 						proseMirror={{
 							actions: ActionUtilities,
