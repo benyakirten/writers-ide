@@ -1,0 +1,11 @@
+export * from './src/bar-item-registry.svelte';
+export * from './src/bar-items.svelte';
+export * from './src/bar-transfer-handler.svelte';
+export * from './src/horizontal-bar-state.svelte';
+export * from './src/vertical-bar-state.svelte';
+export * from './src/floater-state.svelte';
+export * from './src/services';
+export * from './src/workbench.svelte';
+export { default as DockDraggable } from './src/DockDraggable.svelte';
+export { default as DockTarget } from './src/DockTarget.svelte';
+export { getDockColor, type DockColor, type DockController } from './src/dock-feedback';

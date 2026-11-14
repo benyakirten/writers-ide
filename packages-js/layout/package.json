@@ -1,13 +1,20 @@
 {
-	"name": "layout",
-	"version": "1.0.0",
-	"description": "",
-	"main": "index.js",
-	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1"
+	"name": "@writers-ide/layout",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Reusable Svelte 5 workbench docking state and drag primitives",
+	"license": "MIT",
+	"exports": {
+		".": {
+			"types": "./index.ts",
+			"svelte": "./index.ts",
+			"default": "./index.ts"
+		},
+		"./dock-colors.css": "./src/dock-colors.css"
 	},
-	"keywords": [],
-	"author": "",
-	"license": "ISC",
-	"packageManager": "pnpm@10.6.1"
+	"peerDependencies": {
+		"svelte": "^5.57.3",
+		"@dnd-kit-svelte/core": "^0.0.11"
+	}
 }

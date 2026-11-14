@@ -9,18 +9,7 @@ import Horizontal, {
 } from '$lib/editor/state/horizontal-bar-state.svelte';
 import Vertical, { VerticalBarPosition as V } from '$lib/editor/state/vertical-bar-state.svelte';
 
-export type DockColor = 'vertical' | 'horizontal' | 'floating' | 'invalid' | 'none';
-
-/** Destination category only; callers can override it with invalid after canDrop(). */
-export function getDockColor(target: DockDropTarget | null | undefined): DockColor {
-	if (!target) {
-		return 'none';
-	}
-	if (target.kind === 'floating' || target.location === 'floating') {
-		return 'floating';
-	}
-	return Handler.isVertical(target.location) ? 'vertical' : 'horizontal';
-}
+export { getDockColor, type DockColor } from '@writers-ide/layout';
 
 function barsAt(location: BarTransferLocation) {
 	if (location === 'floating') {

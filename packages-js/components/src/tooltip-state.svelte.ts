@@ -1,0 +1,179 @@
+import { TooltipDebouncer } from './tooltip-debouncer';
+import { type Snippet } from 'svelte';
+
+export type TooltipData = {
+	data: string | Snippet;
+	target: HTMLElement;
+	calibrateFor: 'vertical' | 'horizontal';
+};
+export class TooltipState {
+	readonly TOOLTIP_ID: string;
+	#calibrationFrame: number | null = null;
+
+	constructor(id = `tooltip-${crypto.randomUUID()}`) {
+		this.TOOLTIP_ID = id;
+	}
+	readonly TIMEOUT_DURATION = 200;
+	readonly tooltipDebouncer = new TooltipDebouncer((val) => {
+		if (val) {
+			this.show();
+		} else {
+			this.dismiss();
+		}
+	}, this.TIMEOUT_DURATION);
+
+	open = $state(false);
+	tooltip = $state<TooltipData | null>(null);
+	tooltipEl = $state<HTMLElement | null>(null);
+	#suppressionCount = $state(0);
+
+	get suppressed() {
+		return this.#suppressionCount > 0;
+	}
+
+	/** Suppress tooltips until every lease is released; discarded requests are not replayed. */
+	suppress(): () => void {
+		this.#suppressionCount++;
+		if (this.#suppressionCount === 1) {
+			this.tooltipDebouncer.cancel();
+			// cancel() retains the value, which would otherwise skip the next fresh request.
+			this.tooltipDebouncer.value = null;
+			this.dismiss();
+		}
+
+		let released = false;
+		return () => {
+			if (released) {
+				return;
+			}
+			released = true;
+			this.#suppressionCount--;
+		};
+	}
+
+	set(
+		tooltip: TooltipData['data'],
+		calibrateFor: TooltipData['calibrateFor'],
+		target: HTMLElement,
+	) {
+		if (this.suppressed) {
+			return;
+		}
+
+		this.tooltipDebouncer.update(true);
+		if (this.tooltip?.target === target) {
+			return;
+		}
+
+		this.dismiss();
+		this.tooltip = { data: tooltip, target, calibrateFor };
+	}
+
+	show() {
+		if (this.suppressed || !this.tooltip) {
+			return;
+		}
+
+		this.open = true;
+		this.tooltip.target.setAttribute('aria-describedby', this.TOOLTIP_ID);
+		this.attemptCalibration();
+	}
+
+	/** Cancel pending work as well as the current tooltip; safe to reuse afterward. */
+	clear() {
+		this.tooltipDebouncer.cancel();
+		this.tooltipDebouncer.value = null;
+		this.dismiss();
+	}
+
+	dismiss() {
+		if (this.#calibrationFrame !== null) {
+			cancelAnimationFrame(this.#calibrationFrame);
+			this.#calibrationFrame = null;
+		}
+		this.tooltip?.target.removeAttribute('aria-describedby');
+		this.open = false;
+		this.tooltip = null;
+	}
+
+	MAX_RETRIES = 10;
+	attemptCalibration(attempts = 0) {
+		if (this.#calibrationFrame !== null) {
+			cancelAnimationFrame(this.#calibrationFrame);
+		}
+		this.#calibrationFrame = requestAnimationFrame(() => {
+			this.#calibrationFrame = null;
+			if (!this.open || !this.tooltip) {
+				return;
+			}
+			if (!this.tooltipEl) {
+				if (attempts > this.MAX_RETRIES) {
+					return;
+				}
+				return this.attemptCalibration(attempts + 1);
+			}
+			this.calibratePosition(this.tooltip.calibrateFor, this.tooltip.target, this.tooltipEl);
+		});
+	}
+
+	calibratePosition(
+		calibrateFor: TooltipData['calibrateFor'],
+		hostEl: HTMLElement,
+		tooltipEl: HTMLElement,
+	) {
+		if (calibrateFor === 'vertical') {
+			this.#calibrateVerticalPosition(hostEl, tooltipEl);
+		} else {
+			this.#calibrateHorizontalPosition(hostEl, tooltipEl);
+		}
+
+		tooltipEl.style.visibility = 'visible';
+	}
+
+	MARGIN = 15;
+	#calibrateHorizontalPosition(hostEl: HTMLElement, tooltipEl: HTMLElement) {
+		const hostRect = hostEl.getBoundingClientRect();
+		let tooltipRect = tooltipEl.getBoundingClientRect();
+
+		const tooltipArrow = tooltipEl.querySelector('.arrow') as HTMLElement;
+		tooltipArrow.style.top = '50%';
+
+		tooltipEl.style.left = `${hostRect.left - tooltipRect.width - this.MARGIN}px`;
+		tooltipEl.style.top = `${hostRect.top + hostRect.height / 2}px`;
+
+		tooltipRect = tooltipEl.getBoundingClientRect();
+		if (tooltipRect.left <= this.MARGIN * 2) {
+			tooltipEl.style.left = `${hostRect.right + this.MARGIN}px`;
+			tooltipArrow.style.transform = 'translateY(-50%) rotate(-90deg)';
+			tooltipArrow.style.right = 'calc(100% + 2px)';
+		} else {
+			tooltipArrow.style.transform = 'translateY(-50%) rotate(90deg)';
+			tooltipArrow.style.left = 'calc(100% + 2px)';
+		}
+
+		tooltipEl.style.transform = 'translateY(-50%)';
+	}
+
+	#calibrateVerticalPosition(hostEl: HTMLElement, tooltipEl: HTMLElement) {
+		const hostRect = hostEl.getBoundingClientRect();
+		const tooltipArrow = tooltipEl.querySelector('.arrow') as HTMLElement;
+		let tooltipRect = tooltipEl.getBoundingClientRect();
+
+		tooltipEl.style.top = `${hostRect.top - tooltipRect.height - this.MARGIN}px`;
+		tooltipEl.style.left = `${hostRect.left + hostRect.width / 2}px`;
+
+		tooltipArrow.style.left = '50%';
+
+		tooltipRect = tooltipEl.getBoundingClientRect();
+		if (tooltipRect.top <= this.MARGIN * 2) {
+			tooltipEl.style.top = `${hostRect.bottom + this.MARGIN}px`;
+			tooltipArrow.style.transform = 'translateX(-50%) rotate(0deg)';
+			tooltipArrow.style.bottom = 'calc(100% + 2px)';
+		} else {
+			tooltipArrow.style.transform = 'translateX(-50%) rotate(180deg)';
+			tooltipArrow.style.top = 'calc(100% + 2px)';
+		}
+
+		tooltipEl.style.transform = 'translateX(-50%)';
+	}
+}

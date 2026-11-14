@@ -12,7 +12,7 @@ import { TabStateRegistry } from '$lib/editor/state/tab-state-registry.svelte';
 import BasicMenuHorizontal from '$lib/editor/prosemirror/menu/basic/BasicMenuHorizontal.svelte';
 import BasicMenuVertical from '$lib/editor/prosemirror/menu/basic/BasicMenuVertical.svelte';
 import { formattingPlugin } from '$lib/editor/prosemirror/menu/basic/menu';
-import PluginPresentation from './PluginPresentation.svelte';
+import PluginPresentationFixture from '$lib/testing/PluginPresentationFixture.svelte';
 import { createApplicationPluginHost, PluginCommands } from './application-plugin-host';
 
 const components = new Set<ReturnType<typeof mount>>();
@@ -127,7 +127,7 @@ function contributeToolbar(context: SveltePluginContext, id = 'tools') {
 function render(presentation: SveltePresentation) {
 	const target = document.createElement('div');
 	document.body.append(target);
-	const component = mount(PluginPresentation, { target, props: { presentation } });
+	const component = mount(PluginPresentationFixture, { target, props: { presentation } });
 	components.add(component);
 	flushSync();
 	return { target, component };

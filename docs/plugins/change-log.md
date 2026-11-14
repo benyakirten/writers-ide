@@ -4,9 +4,24 @@ For current concepts, boundaries, source entry points, and open decisions, read 
 
 ## In progress
 
-### [#80 — Stage 1 bundled plugins and formatting boundary](https://github.com/benyakirten/writers-ide/pull/80)
+### `main` working tree — Stage 2 libraries and plugin management
 
-**Status: In progress / unmerged.** Branch: `bh/add-plugin-interface-js`. GitHub confirms the PR is open; no merge date is assigned.
+**Status: In progress / unmerged.** Working tree on `main`; no new branch or PR exists, and no merge date is assigned.
+
+- Extracts private `@writers-ide/layout` registry/capacity/transfer/floater mechanics and drag primitives with explicit dependencies and independent workbenches. App state facades, custom bar rendering, and `Editor` DnD composition remain adapters; this is not a wholesale workbench or word-processor migration. See the [docking entry](../dnd/change-log.md).
+- Extracts private `@writers-ide/components` tooltip state/provider, icon button, tooltip, and pointer without an app singleton. Legacy wrappers retain the shared app manager; the route provides it to `Editor` with `renderPointer={false}`, preserving the existing pointer and drag-suppression integration.
+- Adds public `PluginManagementService` list/subscribe/activate/deactivate with reactive frozen snapshots. The host-owned manager accepts `management` and optional `requiredPluginIds`; the route owns its native dialog, launched by Plugins in `HorizontalBaseBar` through `Editor`'s `onplugins` callback. Lists metadata, status, capabilities, active contributions and errors, with enable/disable/retry and an explicit trusted-bundled warning.
+- Adds local Svelte boundaries/fallbacks for presentation and shared tooltip-snippet rendering/effect failures so the manager remains available for recovery. These do not catch arbitrary JavaScript failures or establish a security sandbox. Disabled toolbar placement/cost preservation remains intact. The dialog explicitly restores launcher focus, including WebKit pointer activation.
+- Does not add installation/external loading, persistent activation preferences, a new i18n contract, arbitrary component-state transfer, pagination redesign, or Stage 3 isolation. Scheduling, shortcuts, editing helpers, and broader UI extraction remain deferred.
+- Tests cover independent library instances, legacy compatibility, transfers/capacity, shared tooltip lifetime/suppression, rendering-failure containment/recovery, management metadata notifications, activation errors, and enable/disable actions. `e2e/plugin-manager.test.ts` exercises keyboard/pointer closing, focus restoration, repeated disable/re-enable, placement/content preservation, and formatting afterward; it is included in the CI smoke command.
+- Validation: `pnpm lint` passed; all 843 unit tests in 38 files passed. `CI=true pnpm test:e2e` passed all 114 Chromium/WebKit cases, including production build, pagination-selection, docking, styles, and manager tests. Manager tests additionally passed three repetitions per engine (12 cases). After making the first-page undo baseline wait for visible pagination, the expanded smoke suite passed three repetitions across Chromium/WebKit (60 cases); the production pagination engine and test assertions remain unchanged. Markdown-link and whitespace checks passed. Frozen offline workspace install passed. `pnpm check` remains blocked by the pre-existing `Modal.svelte` `$props` type-argument error and five warnings in old generic DnD wrappers; no errors were reported in changed files. A WebKit keyboard-selection helper timeout occurred in an earlier combined run but did not recur in the full passing suite or repeated smoke checks; it was not suppressed or changed. The separate offscreen-baseline race and readiness fix are documented in the [pagination entry](../pagination/change-log.md).
+- Remaining limits: management is trusted-bundled and in-memory only; new manager/fallback copy is currently English, and richer plugin i18n remains open. Svelte boundaries do not contain arbitrary event-handler/async/native execution. No external loading/isolation, settings persistence, broader extraction, or native WebView/real-touch verification is claimed. PR and merge metadata remain to be finalized once available.
+
+## Merged PRs
+
+### 2026-11-14 — [#80 — Stage 1 bundled plugins and formatting boundary](https://github.com/benyakirten/writers-ide/pull/80)
+
+**Status: Merged 2026-11-14.** Branch: `bh/add-plugin-interface-js`.
 
 - Establishes plugins/core responsibilities and library reuse as separate architectural axes. Defines plugin packages, contributions, capabilities, and the distinction from ProseMirror plugins.
 - Documents core hosting responsibilities and library boundaries using formatting, docking, and a future undo-tree view to explain feature UI, shared infrastructure, and reusable implementation.
@@ -23,6 +38,4 @@ For current concepts, boundaries, source entry points, and open decisions, read 
 - Validation: all 759 unit tests in 34 files passed. `CI=true pnpm test:smoke` passed all 16 Chromium/WebKit cases; three additional full repeats passed 48 cases, with successful production builds. An earlier 52-case smoke/docking run passed but omitted the pagination-selection tests included by CI; the exact CI smoke command reproduced peer-group exceptions before the boundary fix. A separate one-off Chromium caret-range assertion failed during verification, then passed five focused repeats and the three full-suite repeats without helper changes; this is not proof that all selection timing issues are eliminated. `pnpm lint`, local Markdown links and `git diff --check` passed. `pnpm check` remains blocked by the existing invalid `$props` type-argument syntax in `Modal.svelte` and five older DnD warnings. Local macOS browser results are not verification of the Windows/Linux jobs, packaged Tauri, or third-party isolation.
 - Follow-up: Stage 2 library extraction and the host-owned plugin manager; Stage 3 isolation/enforcement before external loading. Management snapshots are synchronous (no reactive manager subscription yet), activation preferences are not persisted, and in-process JavaScript is not sandboxed. The undo-tree/history storage model is not implemented. Finalize PR/merge metadata only when verified.
 
-## Merged PRs
-
-No merged entries recorded for this topic.
+Merge evidence: [GitHub PR metadata](https://api.github.com/repos/benyakirten/writers-ide/pulls/80), verified by the parent agent: `merged: true`, `merged_at: 2026-11-14T19:08:58Z`, merge commit `4b39895c5218498fd1c0e79c99b1ea8012f1b67a` (matches current `main` HEAD).

@@ -4,7 +4,7 @@ A plugin adds a feature to Writer's IDE without taking over the workbench or rea
 
 For example, the built-in formatting plugin contributes a toolbar. It receives information such as “half the selected text is bold” and can request “toggle bold.” It does not need to receive the selected text, a ProseMirror editor, or the application's workspace state.
 
-**Current scope:** this private workspace package supports trusted, bundled plugins. There is no external installation, sandbox, or plugin-management UI yet. The APIs are evolving, not a stable published SDK. Capability checks restrict calls through the host, but do not contain in-process JavaScript.
+**Current scope:** this private workspace package supports trusted, bundled plugins. There is no external installation or sandbox. A host-owned management panel is available for the application to mount. The APIs are evolving, not a stable published SDK. Capability checks restrict calls through the host, but do not contain in-process JavaScript.
 
 ## What can a plugin do today?
 
@@ -158,9 +158,17 @@ This is host integration work, not something the plugin performs itself. The app
 
 [`createApplicationPluginHost()`](../../src/lib/plugins/application-plugin-host.ts) supplies the workbench registries and formatting service to [`PluginHost`](../../src/lib/plugins/plugin-host.ts). Host code calls `register(plugin)`, then `activate(plugin.manifest.id)`, and calls `deactivate(id)` during teardown or disabling. See the [application bootstrap](../../src/routes/+page.svelte) for the working integration.
 
-Host management uses `get(id)` or `list()` to inspect copied metadata, contribution IDs, status, and errors. Check the result of activation: activation/cleanup failures are recorded in `errors`, while invalid registrations and lifecycle calls throw. Re-enabling or retrying uses `activate(id)` again. There is no reactive management subscription or persisted enable/disable preference yet.
+Host management uses `get(id)` or `list()` to inspect copied metadata, contribution IDs, status, and errors. Check the result of activation: activation/cleanup failures are recorded in `errors`, while invalid registrations and lifecycle calls throw. Re-enabling or retrying uses `activate(id)` again. Management subscriptions deliver immediate and subsequent frozen metadata snapshots. There is no persisted enable/disable preference yet.
 
 For another host integration, implement `ContributionRegistry.register(ownerId, contribution)` adapters that return removal handles, and supply a `FormattingService`. Adapter registration and subscription setup must undo partial work if they throw; the generic host cannot repair an external service that fails before returning a cleanup handle.
+
+## Managing bundled plugins
+
+The application can mount the host-owned `PluginManager.svelte` panel with a `management` prop implementing `PluginManagementService` (the generic `PluginHost` already does). It shows capabilities, current contributions, lifecycle errors, and enable/disable/retry controls. An optional `requiredPluginIds: readonly string[]` prop prevents disabling host-required features in the panel; it is a UI policy, not a new manifest permission or host enforcement rule.
+
+The parent owns the launcher and any dialog wrapper. The panel is not a plugin contribution, so disabling a feature cannot remove the management shell. The service provides `list()`, immediate `subscribe(listener)` with an idempotent unsubscribe handle, and `activate(id)` / `deactivate(id)`. Observer failures cannot interrupt lifecycle cleanup; registration/lifecycle changes inside notification callbacks throw and must be deferred until the callback returns. Only metadata crosses this management boundary, not executable contributions or plugin contexts.
+
+This manages explicitly registered, trusted bundled code only: no file/URL installation, uninstall, sandbox, or saved activation preferences.
 
 ## Read next
 

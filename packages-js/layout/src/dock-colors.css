@@ -1,0 +1,21 @@
+/* Colors identify the destination, independently of the insertion strip's orientation. */
+[data-dock-color] {
+	--dock-accent: Highlight;
+}
+[data-dock-color='vertical'] {
+	--dock-accent: #2563eb;
+}
+[data-dock-color='horizontal'] {
+	--dock-accent: #ca8a04;
+}
+[data-dock-color='floating'] {
+	--dock-accent: #dc2626;
+}
+[data-dock-color='invalid'] {
+	--dock-accent: #9f1239;
+}
+@media (forced-colors: active) {
+	[data-dock-color] {
+		--dock-accent: Highlight;
+	}
+}

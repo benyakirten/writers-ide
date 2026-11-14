@@ -118,6 +118,18 @@ export interface PluginError {
 	readonly message: string;
 }
 
+/** Host-owned management, never supplied as a plugin capability.
+ * Snapshots contain only frozen metadata. Subscribe delivers immediately; listener
+ * failures are isolated. Registration/lifecycle calls during notification throw:
+ * schedule follow-up actions after the callback returns instead.
+ */
+export interface PluginManagementService {
+	list(): readonly PluginInfo[];
+	subscribe(listener: (plugins: readonly PluginInfo[]) => void): Dispose;
+	activate(id: string): PluginInfo;
+	deactivate(id: string): PluginInfo;
+}
+
 export interface PluginInfo {
 	readonly manifest: PluginManifest;
 	readonly status: PluginStatus;

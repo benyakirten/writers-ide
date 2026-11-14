@@ -1,6 +1,8 @@
 packages:
   - '.'
   - 'packages-js/plugins'
+  - 'packages-js/layout'
+  - 'packages-js/components'
 
 allowBuilds:
   esbuild: true

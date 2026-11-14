@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This topic establishes the distinction between plugins, reusable libraries, and the application core, plus the owner-approved staged implementation plan below. Stage 1 is implemented on working branch `bh/add-plugin-interface-js` (unmerged); Stages 2 and 3 remain accepted direction, not current implementation. This does not establish a sandbox or a published SDK. Detailed public APIs, package boundaries beyond the agreed scope, isolation mechanisms, and storage designs remain open and require owner approval before implementation.
+This topic distinguishes plugins, reusable libraries, and the application core. **Stage 1 merged in [#80](https://github.com/benyakirten/writers-ide/pull/80) on 2026-11-14. Stage 2 is implemented in the `main` working tree (unmerged; no new branch or PR). Stage 3 remains planned.** Stage 2 adds private layout/component libraries and a host-owned plugin manager, not a sandbox or published SDK. Public API stabilization, broader extraction, isolation mechanisms, and storage designs remain open and require owner approval.
 
 Read [project context](../project-context.md) for accepted product direction and security requirements. See [change-log.md](change-log.md) for the current documentation change.
 
@@ -35,7 +35,7 @@ For example, a formatting toolbar contributes horizontal and vertical presentati
 
 ### Libraries underneath these boundaries
 
-A reusable docking library could implement layout and transfer mechanics without knowing about manuscripts or formatting commands. Writer's IDE would integrate it into the core and supply feature content and application policies. The same library could support another application's toolbars.
+The Stage 2 `@writers-ide/layout` library implements registry, capacity, transfer, floater, and drag primitives without manuscript, ProseMirror, or application-singleton dependencies. Explicit dependency injection supports independent workbenches. Writer's IDE retains compatibility state facades, feature rendering, and `Editor.svelte` DnD composition as application adapters.
 
 Libraries should not import Writer's IDE application singletons or assume access to its project state. Framework-specific libraries are valid: a Svelte library need not acquire a framework-independent abstraction without a real use case. Extract cohesive functionality rather than creating a package for every utility or thin dependency wrapper.
 
@@ -45,7 +45,7 @@ The owner approved the following sequence. Stages 1 and 2 support trusted, bundl
 
 ### Stage 1 — Contracts, host, and formatting plugin
 
-**Current working-branch implementation:** contracts, bundled lifecycle host, registry/rendering adapters, and the formatting toolbar migration are implemented; see the contracts below. No merge is claimed.
+**Merged in #80:** contracts, bundled lifecycle host, registry/rendering adapters, and the formatting toolbar migration; see the contracts below.
 
 - Create a private workspace package for plugin identity, API compatibility, lifecycle, contribution contracts for toolbar items, commands and central views, and narrow formatting-state/command interfaces.
 - Keep data and command contracts independent of Svelte and ProseMirror; place Svelte presentation types in a separate adapter entry point.
@@ -55,6 +55,8 @@ The owner approved the following sequence. Stages 1 and 2 support trusted, bundl
 - Test lifecycle/cleanup and existing formatting behavior.
 
 ### Stage 2 — Reusable libraries and plugin management UI
+
+**Current `main` working tree / unmerged:** the scoped libraries and manager below are connected in source. Validation results and known limits are recorded in the current changelog entry. No new PR exists yet.
 
 - Extract cohesive docking/workbench infrastructure into `packages-js/layout`, removing ProseMirror and application-singleton dependencies from the reusable layer.
 - Extract the UI components and service pieces needed by the formatting plugin into `packages-js/components`, with explicit dependencies. Keep packages private to the workspace initially; publication and stable public-package APIs are not part of this stage.
@@ -82,8 +84,8 @@ The table illustrates responsibility boundaries. The staged plan above approves 
 | ---------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Formatting toolbar     | Feature plugin contributing bar presentations and invoking formatting commands.                  | Optional shared UI components; toolbar need not own editing semantics.                                                                                                             |
 | Word-processing view   | Feature plugin hosted in a central-view container.                                               | ProseMirror editing helpers where schema assumptions are explicit. Current editor assembly remains coupled.                                                                        |
-| Workbench docking      | Core workspace service used by plugin contributions.                                             | Strong candidate for a reusable Svelte docking/workbench library, separated from application state. See [DnD context](../dnd/context.md).                                          |
-| UI foundations         | Shared presentation services and optional plugin-facing components.                              | Candidate component library with explicit styling and service dependencies; do not duplicate upstream libraries without added value.                                               |
+| Workbench docking      | Core workspace service used by plugin contributions.                                             | Implemented as private `@writers-ide/layout` in Stage 2, with application-specific rendering/composition remaining in the host. See [DnD context](../dnd/context.md).              |
+| UI foundations         | Shared presentation services and optional plugin-facing components.                              | Stage 2 extracts tooltip/icon-button primitives into private `@writers-ide/components`; broader components remain in the application.                                              |
 | Cooperative scheduling | Shared execution infrastructure, not a feature plugin.                                           | Candidate library; currently Svelte-reactive. Cooperative steps must remain short and do not offload CPU work or isolate malicious code.                                           |
 | Shortcut handling      | Shared routing; feature commands and default bindings are contributions.                         | Potential reusable normalization/routing module; focus scopes and conflict policies still need design.                                                                             |
 | Pagination             | Currently a coupled word-processing subsystem, not an independently replaceable external plugin. | Possible later specialized library. Preserve current model-mutating behavior; extraction does not authorize a layout redesign. See [pagination context](../pagination/context.md). |
@@ -103,11 +105,14 @@ Plugin APIs should expose versioned data or scoped handles and validated request
 
 Schema-owning features require versioning and missing-plugin preservation contracts before extraction. Removing a toolbar is different from removing the implementation of saved content. Preserve plugin-owned data when a plugin is disabled or unavailable; basic preservation must not require executing it.
 
-## Current Stage 1 contracts and limitations
+## Current contracts and limitations
 
 - `@writers-ide/plugins` is a private, source-exported workspace package. Root contracts have no framework/editor imports; the `/svelte` entry describes trusted component presentations. API compatibility currently means exact `apiVersion: 1`, not a version-range negotiation scheme. See the [package reference](../../packages-js/plugins/README.md).
 - The synchronous bundled host explicitly registers, activates, deactivates, and reports metadata/errors for plugins. It checks manifest/capability declarations and contribution IDs, rolls back failed activation, aborts/revokes a context before reverse-order cleanup, and continues cleanup after disposer failures. Contributions, formatting subscriptions, and `own()` resources are activation-owned; retained commands cannot act after deactivation or a later reactivation.
-- These checks govern host API use, not ambient JavaScript authority. Only trusted bundled plugins execute. There is no external loader, sandbox, user-grant UI, package discovery, persistent activation preference, or reactive plugin-manager subscription.
+- These checks govern host API use, not ambient JavaScript authority. Only trusted bundled plugins execute. There is no external loader, sandbox, user-grant UI, package discovery, or persistent activation preference.
+- Stage 2 exposes `PluginManagementService` (`list`, `subscribe`, `activate`, `deactivate`) with reactive frozen snapshots. The host-owned `PluginManager.svelte` accepts `management` and optional `requiredPluginIds`; it lists metadata, lifecycle status, declared capabilities, active contributions, and activation/cleanup errors, with enable/disable/retry actions and a bundled-trusted warning. The route owns its native `<dialog>` and passes `onplugins` through `Editor` to the Plugins button in `HorizontalBaseBar`, explicitly restoring launcher focus on close for keyboard and pointer use. This adds no installation workflow or new plugin i18n contract.
+- Trusted presentations have a local Svelte boundary with a fallback for rendering/effect failures, leaving the host-owned manager available for disable/re-enable. Shared tooltip snippets have their own local boundary because they render outside the plugin view; replacing the descriptor/content or dismissing the tooltip allows recovery. This is presentation-error containment, not protection from arbitrary JavaScript errors, event-handler failures, malicious code, or ambient host access.
+- Stage 2 `@writers-ide/components` exports `TooltipState`, `TooltipProvider`, `IconButton`, `Tooltip`, and `Pointer` with explicit state/context dependencies and no application singleton. Legacy app wrappers share the application tooltip manager; the route wraps `Editor` with that manager and `renderPointer={false}` because the app still renders its pointer. Drag suppression uses the same manager.
 - The application adapts toolbar/view contributions to existing registries and command contributions to host-owned command handles. The trusted Svelte adapter supplies only the scoped plugin context, not legacy workspace/editor props. Central-view instance metadata and contributed shortcut routing are not implemented. The built-in word processor still uses the legacy path; its extraction is intentionally deferred.
 - Formatting delivers immediate, copied, data-only snapshots: view ID, monotonic revision, mark/block ratios, and command availability. Requests specify view ID, revision, and command. The service validates live active view/state/editability, rejecting stale requests even before a reactive flush; tab document IDs are resolved to distinct registered view IDs. Existing caret mark no-ops, superscript/subscript exclusion, and continuation-aware paragraph commands are preserved. Unavailable/no-op controls are disabled.
 - Formatting subscriptions start the shared bridge lazily and release its bus/effect resources when unused. Availability queries inspect content without generating speculative transactions. Peer grouping must safely traverse page boundaries, final leaf blocks and document-end selections; errors in this query can otherwise escape a ProseMirror update before subscriber notification. Update-listener failures are reported without interrupting other subscribers or editor dispatch. No rich-text content or mutable editor reference crosses the formatting boundary.
@@ -119,7 +124,8 @@ Schema-owning features require versioning and missing-plugin preservation contra
 These are private, evolving contracts and internal discovery points, not a stable published SDK:
 
 - `packages-js/plugins/index.ts`, `svelte.ts`, and [README](../../packages-js/plugins/README.md): data/lifecycle contracts, trusted presentation descriptor, API reference.
-- `src/lib/plugins/plugin-host.ts`: generic lifecycle, ownership, revocation, and rollback; `plugin-host.test.ts` covers failure and lifecycle paths.
+- `src/lib/plugins/plugin-host.ts`: lifecycle, ownership, revocation, rollback, and reactive management; `plugin-host.test.ts` covers those contracts.
+- `src/lib/plugins/PluginManager.svelte`, `PluginManager.svelte.test.ts`: host-owned management panel and service/action failures. `PluginPresentation.svelte` and `plugin-presentation.svelte.test.ts`: local presentation-failure fallback and recovery.
 - `src/lib/plugins/application-plugin-host.ts`, `PluginPresentation.svelte`: application registry adapters and restricted-prop rendering; `application-plugin-host.svelte.test.ts` covers collisions, rendering, ownership, disable/re-enable and capacity preservation.
 - `src/lib/plugins/formatting-service.svelte.ts`: scoped active-editor bridge; `formatting-service.svelte.test.ts` covers stale requests, separate tab/view IDs, summaries, availability, peer paragraphs, subscription cleanup, and quiet queries.
 - `src/routes/+page.svelte`: explicitly registers/activates the bundled formatting plugin and deactivates it on teardown; still directly registers the ProseMirror view.
@@ -127,16 +133,17 @@ These are private, evolving contracts and internal discovery points, not a stabl
 - `src/lib/editor/state/bar-item-registry.svelte.ts`, `bar-items.svelte.ts`, and `tab-state-registry.svelte.ts`: existing registries with trusted plugin presentation adapters and retained disabled-toolbar sizes.
 - `src/lib/editor/state/shared.types.ts`: legacy broad injected props, no longer supplied to the formatting plugin.
 - `src/lib/editor/prosemirror/plugins.svelte.ts` and `view/editor.ts`: ProseMirror factory registration and editor construction, separate from the bundled application-plugin host.
-- `src/lib/editor/bars/`, `src/lib/dnd/`, and bar/floater/transfer state: application-coupled docking; `e2e/docking.test.ts` includes real formatting-button and docking regressions. The CI smoke command includes both `e2e/smoke.test.ts` and `e2e/pagination-selection.test.ts`; validating only smoke plus docking misses the multi-page selection/reflow/undo regressions.
-- `src/lib/editor/state/work-queue.svelte.ts`, `src/lib/components/`, and `src/lib/services/`: scheduling and UI/services remain in the application.
-- `packages-js/components/` and `packages-js/layout/`: manifest/license scaffolds pending Stage 2. The workspace currently includes the root application and `packages-js/plugins`.
+- `src/lib/editor/bars/`, `src/lib/dnd/`, and bar/floater/transfer state: application rendering/composition and compatibility adapters over the layout library; `e2e/docking.test.ts` includes real formatting-button and docking regressions. The CI smoke command includes `e2e/smoke.test.ts`, `e2e/pagination-selection.test.ts`, and `e2e/plugin-manager.test.ts`; validating only smoke plus docking misses the multi-page selection/reflow/undo and management regressions.
+- `packages-js/layout/index.ts`, `src/`: injected workbench engine and drag primitives; `src/lib/editor/state/workbench.svelte.ts` composes the app compatibility instance. See [DnD context](../dnd/context.md).
+- `packages-js/components/index.ts`, `src/`: explicit tooltip state/provider and shared controls. `src/lib/testing/layout-library.svelte.test.ts` and `components-library.svelte.test.ts` cover library integration and instance independence.
+- The root and all three private packages are workspace members in Stage 2. Scheduling, shortcuts, broader UI/services, and editing helpers remain application code; no bulk extraction is implied.
 
 ## Open implementation decisions
 
 - Detailed package boundaries and names within the approved scope, dependency rules, and any later publication strategy. Initial packages are private workspace packages.
-- Extensions beyond the initial synchronous lifecycle and API version 1, user-grant policy, reactive management notifications, and richer contribution/view-instance contracts.
+- Extensions beyond the synchronous lifecycle and API version 1, user-grant policy, persistent activation preferences, and richer contribution/view-instance contracts.
 - Frontend isolation, messaging, and permission enforcement mechanisms.
 - Document/view ownership and command contracts, schema evolution, and content preservation.
 - History scope, granularity, branch/navigation semantics, collaboration, persistence, and retention.
 
-This document establishes vocabulary, responsibility boundaries, and the approved implementation sequence, not a complete API specification. Only the Stage 1 working-branch behavior above is implemented; candidate examples outside the approved scope do not authorize additional source migrations or imply runtime guarantees.
+This document establishes vocabulary, responsibility boundaries, and the approved implementation sequence, not a complete API specification. Stage 1 is merged and the described Stage 2 behavior is working-tree implementation; candidate examples outside the approved scope do not authorize additional source migrations or imply runtime guarantees.

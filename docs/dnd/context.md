@@ -2,9 +2,9 @@
 
 ## Status and scope
 
-Core docking shipped in [#78](https://github.com/benyakirten/writers-ide/pull/78), confirmed merged on 2026-11-13. This document describes that implementation and owner-approved direction plus the **current working-branch refinements in #79** (`bh/fix-dnd-main-area`), including the unhighlighted main floating surface. See [change-log.md](change-log.md) for the consolidated in-progress PR entry and confirmed merged history. Working-branch behavior must not be represented as already merged.
+Core docking shipped in [#78](https://github.com/benyakirten/writers-ide/pull/78); [#79](https://github.com/benyakirten/writers-ide/pull/79) merged on 2026-11-13 with the unhighlighted main floating surface. [#80](https://github.com/benyakirten/writers-ide/pull/80) merged on 2026-11-14 with bundled plugin presentations and retained disabled capacity. **Stage 2 library extraction is current `main` working-tree behavior, unmerged with no new branch or PR.** See [change-log.md](change-log.md) for separate working-tree and confirmed merged entries.
 
-This topic owns feature bars, item grouping, edge docking, floating overlays, and their drag interactions. Central tabs and split views are separate concerns. These are trusted in-process Svelte components, not an isolated third-party plugin platform. On working branch `bh/add-plugin-interface-js`, the bundled formatting plugin now contributes through the [Stage 1 host](../plugins/context.md); docking mechanics are unchanged.
+This topic owns feature bars, item grouping, edge docking, floating overlays, and their drag interactions. Central tabs and split views are separate concerns. These are trusted in-process Svelte components, not an isolated third-party plugin platform. The bundled formatting plugin contributes through the merged [Stage 1 host](../plugins/context.md). Stage 2 moves reusable mechanics into private `@writers-ide/layout` while the application retains rendering and workbench composition.
 
 ## Philosophy and approved behavior
 
@@ -29,7 +29,7 @@ The transfer handler is the state mutation boundary. DnD supplies a typed source
 
 Capacity uses the **destination orientation**. Reject a whole-bar move or floating orientation switch if the resulting total exceeds three units; never silently omit items. Insertion indices refer to boundaries before source removal; same-container movement adjusts them after removal and excludes the moving item from capacity accounting.
 
-Whole-bar transfers retain bar and `BarItems` identity, item order, title, and remembered docked/floating geometry. Moving the final item out removes the empty source bar. Registry IDs can repeat across different bars, but not within one bar. On the plugin-interface working branch, disabling a contributed toolbar removes its presentation while preserving placement IDs and declared orientation costs. Missing-item placeholders reserve those costs, so disable/re-enable cannot create spare capacity that later overfills a bar. Registry `clear()` releases retained metadata; this is not durable layout persistence. Meaningful feature state should live outside presentation instances: stable IDs do not preserve arbitrary component-local state across Svelte remounts.
+Whole-bar transfers retain bar and `BarItems` identity, item order, title, and remembered docked/floating geometry. Moving the final item out removes the empty source bar. Registry IDs can repeat across different bars, but not within one bar. Disabling a contributed toolbar removes its presentation while preserving placement IDs and declared orientation costs. Missing-item placeholders reserve those costs, so disable/re-enable cannot create spare capacity that later overfills a bar. Registry `clear()` releases retained metadata; this is not durable layout persistence. Meaningful feature state should live outside presentation instances: stable IDs do not preserve arbitrary component-local state across Svelte remounts.
 
 Relocation menus use the same validated transfer API. Their existing convenience behavior may choose a fitting final bar or create a new one; pointer drops instead require an explicit gap to create a bar. Legacy directional item nudges remain separate operations.
 
@@ -51,13 +51,16 @@ The installed `@dnd-kit-svelte` packages own drag gestures, including floating m
 Paths below are repository-relative:
 
 - `src/lib/editor/Editor.svelte`: workbench composition, dock gaps, sensors, collisions, overlay, commit/cancel, and keyboard focus.
-- `src/lib/dnd/DockDraggable.svelte`, `DockTarget.svelte`: handle activation, typed metadata, target registration, validity and proximity feedback. Older generic wrappers remain unused experiments.
-- `src/lib/dnd/dock-feedback.ts`, `dock-colors.css`: shared destination classification, capacity-aware release descriptions, logical-to-physical side labels, and forced-colors-aware palette. `src/lib/services/tooltip.svelte.ts` owns tooltip suppression leases.
+- `packages-js/layout/index.ts`, `src/`: reusable injected registry/capacity, item/bar state, transfers, floaters, feedback/palette, and `DockDraggable.svelte` / `DockTarget.svelte` primitives. `createWorkbench` accepts explicit registry, ID, title, and item-factory dependencies; independent instances do not share app state.
+- `src/lib/editor/state/workbench.svelte.ts`: app compatibility instance; existing bar/floater/registry/transfer state paths are app facades/adapters. Custom feature rendering and `Editor.svelte` DnD composition remain app-owned rather than moving wholesale into the package.
+- `src/lib/dnd/DockDraggable.svelte`, `DockTarget.svelte`: application wrappers around package primitives, binding the app transfer controller. Older generic wrappers remain unused experiments.
+- `src/lib/dnd/dock-feedback.ts`, `dock-colors.css`: app-facing adapters to package feedback/palette. `@writers-ide/components` owns reusable tooltip state/provider and suppression leases; `src/lib/services/tooltip.svelte.ts` supplies the shared app manager. The route provides it around `Editor` with `renderPointer={false}`; the app retains its pointer.
 - `src/lib/editor/bars/`: docked/floating rendering, item boundaries, relocation menus, orientation control, and resizing.
 - `src/lib/editor/state/bar-transfer-handler.svelte.ts`: `DockDragSource`, `DockDropTarget`, `getBar()`, `isVertical()`, `canDrop()`, `drop()`, and menu transfers.
 - `src/lib/editor/state/bar-items.svelte.ts`, `bar-item-registry.svelte.ts`: item IDs, orientation-specific costs/components, capacity and fallback rendering.
 - `src/lib/editor/state/horizontal-bar-state.svelte.ts`, `vertical-bar-state.svelte.ts`, `floater-state.svelte.ts`: geometry, collections, stacking, orientation, and bounds.
-- `src/lib/editor/prosemirror/menu/basic/`: example horizontal/vertical presentations sharing feature controls.
+- `src/lib/editor/prosemirror/menu/basic/`: bundled formatting plugin with horizontal/vertical snapshot-driven presentations using shared controls.
+- `src/lib/testing/layout-library.svelte.test.ts`, `components-library.svelte.test.ts`: injected library integration, independent state, and explicit tooltip-provider behavior.
 - `src/lib/editor/state/dock-transfer.svelte.test.ts` and the bar/item/registry/floater state test files: transfer invariants, preservation, capacity, ordering, and bounds.
 - `e2e/docking.test.ts`, `e2e/docking-feedback.test.ts`, `e2e/docking-destinations.test.ts`: Chromium/WebKit geometry and gesture regressions, cancellation, focus, overlap, target visibility, proximity hit acquisition, layout stability, destination colors/descriptions, and tooltip suppression/resumption.
 - `src/lib/dnd/dock-feedback.test.ts`, `src/lib/services/tooltip.svelte.test.ts`: classification/descriptions (including RTL, insertion boundaries and invalid moves), suppression lifetime, pending timers, nested leases, and fresh tooltip requests.
@@ -70,4 +73,4 @@ Use [CONTRIBUTING.md](../../CONTRIBUTING.md) for validation commands. Start with
 - Minimized floaters still lack a completed restore UI.
 - Component-local state transfer has no general plugin lifecycle contract. Logical capacity does not guarantee visual fit under resizing, translations, or larger text.
 - Native out-of-window event loss, packaged Tauri WebViews, real touch hardware, and comprehensive screen-reader behavior need separate validation; Playwright engine tests are not substitutes.
-- Development/base controls are fixed scaffolding, not draggable feature bars: `HorizontalBaseBar.svelte` creates bars/initial menu; `VerticalBaseBar.svelte` contains test controls.
+- Development/base controls are fixed scaffolding, not draggable feature bars: `HorizontalBaseBar.svelte` creates bars/initial menu and forwards `onplugins` to launch the route-owned manager dialog; `VerticalBaseBar.svelte` contains test controls.

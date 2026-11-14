@@ -10,6 +10,7 @@ import type {
 	PluginError,
 	PluginInfo,
 	PluginManifest,
+	PluginManagementService,
 	PluginRegistries,
 	PluginStatus,
 	ToolbarContribution,
@@ -44,9 +45,12 @@ export interface PluginHostOptions<Presentation> {
 }
 
 /** Synchronous lifecycle for explicitly supplied, trusted bundled plugins; not a sandbox. */
-export class PluginHost<Presentation> {
+export class PluginHost<Presentation> implements PluginManagementService {
 	readonly #entries = new Map<string, Entry<Presentation>>();
 	readonly #contributionIds = new Set<string>();
+	readonly #listeners = new Set<(plugins: readonly PluginInfo[]) => void>();
+	#notifying = false;
+	#notificationPending = false;
 	readonly #formatting: FormattingService;
 	readonly #registries: PluginRegistries<Presentation>;
 
@@ -56,6 +60,7 @@ export class PluginHost<Presentation> {
 	}
 
 	register(plugin: BundledPlugin<Presentation>): PluginInfo {
+		this.#assertNotNotifying();
 		const manifest = this.#validateManifest(plugin.manifest);
 		if (this.#entries.has(manifest.id)) {
 			throw new Error(`Plugin already registered: ${manifest.id}`);
@@ -69,6 +74,7 @@ export class PluginHost<Presentation> {
 			errors: [],
 		};
 		this.#entries.set(manifest.id, entry);
+		this.#notify();
 		return this.#info(entry);
 	}
 
@@ -79,6 +85,66 @@ export class PluginHost<Presentation> {
 
 	list(): readonly PluginInfo[] {
 		return Object.freeze([...this.#entries.values()].map((entry) => this.#info(entry)));
+	}
+
+	subscribe(listener: (plugins: readonly PluginInfo[]) => void): Dispose {
+		// Separate subscriptions remain independent even for the same callback.
+		const subscription = (plugins: readonly PluginInfo[]) => listener(plugins);
+		this.#listeners.add(subscription);
+		const notifying = this.#notifying;
+		this.#notifying = true;
+		try {
+			this.#deliver(subscription, this.list());
+		} finally {
+			this.#notifying = notifying;
+		}
+		if (!notifying && this.#notificationPending) {
+			this.#notify();
+		}
+		return () => {
+			this.#listeners.delete(subscription);
+		};
+	}
+
+	#deliver(
+		listener: (plugins: readonly PluginInfo[]) => void,
+		plugins: readonly PluginInfo[],
+	): void {
+		try {
+			listener(plugins);
+		} catch {
+			// Observers must not change lifecycle outcomes or interrupt rollback.
+		}
+	}
+
+	#notify(): void {
+		if (this.#listeners.size === 0) {
+			return;
+		}
+		this.#notificationPending = true;
+		if (this.#notifying) {
+			return;
+		}
+		this.#notifying = true;
+		try {
+			while (this.#notificationPending) {
+				this.#notificationPending = false;
+				const plugins = this.list();
+				for (const listener of [...this.#listeners]) {
+					if (this.#listeners.has(listener)) {
+						this.#deliver(listener, plugins);
+					}
+				}
+			}
+		} finally {
+			this.#notifying = false;
+		}
+	}
+
+	#assertNotNotifying(): void {
+		if (this.#notifying) {
+			throw new Error('Plugin management is busy notifying subscribers; defer lifecycle changes');
+		}
 	}
 
 	/** Lifecycle failures are recorded in PluginInfo; invalid IDs/transitions throw. */
@@ -97,6 +163,7 @@ export class PluginHost<Presentation> {
 			contributions: new Map(),
 		};
 		entry.activation = activation;
+		this.#notify();
 		try {
 			const dispose = entry.plugin.activate(this.#context(entry, activation));
 			if (dispose !== undefined) {
@@ -111,6 +178,7 @@ export class PluginHost<Presentation> {
 			this.#stop(entry, activation);
 			entry.status = 'failed';
 		}
+		this.#notify();
 		return this.#info(entry);
 	}
 
@@ -121,8 +189,10 @@ export class PluginHost<Presentation> {
 			return this.#info(entry);
 		}
 		entry.status = 'deactivating';
+		this.#notify();
 		this.#stop(entry, entry.activation);
 		entry.status = entry.errors.length > 0 ? 'failed' : 'disabled';
+		this.#notify();
 		return this.#info(entry);
 	}
 
@@ -269,7 +339,11 @@ export class PluginHost<Presentation> {
 		const release = this.#own(entry, activation, () => {
 			this.#contributionIds.delete(key);
 			activation.contributions.delete(key);
-			dispose?.();
+			try {
+				dispose?.();
+			} finally {
+				this.#notify();
+			}
 		});
 		try {
 			dispose = registry.register(entry.plugin.manifest.id, Object.freeze({ ...contribution }));
@@ -284,6 +358,7 @@ export class PluginHost<Presentation> {
 			release();
 			throw error;
 		}
+		this.#notify();
 		return release;
 	}
 
@@ -331,6 +406,7 @@ export class PluginHost<Presentation> {
 	}
 
 	#assertIdle(entry: Entry<Presentation>): void {
+		this.#assertNotNotifying();
 		if (entry.status === 'activating' || entry.status === 'deactivating') {
 			throw new Error(`Plugin lifecycle is busy: ${entry.plugin.manifest.id}`);
 		}
@@ -340,6 +416,7 @@ export class PluginHost<Presentation> {
 		entry.errors.push(
 			Object.freeze({ phase, message: error instanceof Error ? error.message : String(error) }),
 		);
+		this.#notify();
 	}
 
 	#info(entry: Entry<Presentation>): PluginInfo {
@@ -368,7 +445,14 @@ export class PluginHost<Presentation> {
 			}
 			declared.add(capability);
 		}
-		return Object.freeze({ ...manifest, capabilities: Object.freeze([...declared]) });
+		return Object.freeze({
+			id: manifest.id,
+			name: manifest.name,
+			description: manifest.description,
+			version: manifest.version,
+			apiVersion: manifest.apiVersion,
+			capabilities: Object.freeze([...declared]),
+		});
 	}
 
 	#nonempty(value: string, label: string): void {

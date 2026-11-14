@@ -21,11 +21,10 @@
 		TextAlignJustify,
 	} from '@steeze-ui/phosphor-icons';
 
-	import IconButton from '$lib/components/IconButton.svelte';
+	import { IconButton, type TooltipData } from '@writers-ide/components';
 	import type { Internationalizator } from '$lib/editor/types';
 	import { capitalize } from '$lib/utils/strings';
 	import { TextOverline } from '$lib/icons';
-	import type { TooltipData } from '$lib/services/tooltip.svelte';
 
 	type TextMenuIcon = {
 		iconSrc: IconSource;

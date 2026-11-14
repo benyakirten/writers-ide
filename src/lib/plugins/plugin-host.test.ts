@@ -11,6 +11,8 @@ import type {
 	PluginCapability,
 	PluginContext,
 	PluginManifest,
+	PluginInfo,
+	PluginManagementService,
 	ToolbarContribution,
 	ViewContribution,
 } from '@writers-ide/plugins';
@@ -108,6 +110,158 @@ function sveltePlugin(component: SveltePresentation['component']): SveltePlugin 
 void sveltePlugin;
 
 describe('PluginHost', () => {
+	it('publishes registration, transitions, contribution changes and cleanup errors', () => {
+		const { host } = setup();
+		const management: PluginManagementService = host;
+		const snapshots: (readonly PluginInfo[])[] = [];
+		const unsubscribe = management.subscribe((plugins) => snapshots.push(plugins));
+		expect(snapshots).toEqual([[]]);
+		let context!: PluginContext<string>;
+		host.register(
+			plugin('one', (value) => {
+				context = value;
+			}),
+		);
+		expect(snapshots.at(-1)?.[0].status).toBe('disabled');
+		host.activate('one');
+		expect(snapshots.map((snapshot) => snapshot[0]?.status)).toEqual([
+			undefined,
+			'disabled',
+			'activating',
+			'active',
+		]);
+		const release = context.contributions.toolbar(toolbarContribution);
+		expect(snapshots.at(-1)?.[0].contributions).toEqual([{ kind: 'toolbar', id: 'tools' }]);
+		release();
+		expect(snapshots.at(-1)?.[0].contributions).toEqual([]);
+		context.own(() => {
+			throw new Error('Cleanup needs attention');
+		})();
+		expect(snapshots.at(-1)?.[0].errors).toEqual([
+			{ phase: 'cleanup', message: 'Cleanup needs attention' },
+		]);
+		host.deactivate('one');
+		expect(snapshots.some((snapshot) => snapshot[0]?.status === 'deactivating')).toBe(true);
+		expect(snapshots.at(-1)?.[0].status).toBe('failed');
+		expect(Object.isFrozen(snapshots.at(-1))).toBe(true);
+		expect(Object.isFrozen(snapshots.at(-1)?.[0].errors[0])).toBe(true);
+		unsubscribe();
+		unsubscribe();
+		const count = snapshots.length;
+		host.activate('one');
+		expect(snapshots).toHaveLength(count);
+	});
+
+	it('isolates throwing observers and rejects notification-driven lifecycle resurrection', () => {
+		const { host, registries } = setup();
+		host.subscribe(() => {
+			throw new Error('Broken manager');
+		});
+		const observed = vi.fn();
+		host.subscribe(observed);
+		const attempts: (Error | undefined)[] = [];
+		host.subscribe((plugins) => {
+			if (plugins.length === 0) {
+				return;
+			}
+			for (const action of [
+				() => host.activate('one'),
+				() => host.deactivate('one'),
+				() => host.register(plugin('two')),
+			]) {
+				let failure: Error | undefined;
+				try {
+					action();
+				} catch (error) {
+					failure = error as Error;
+				}
+				attempts.push(failure);
+			}
+		});
+		host.register(
+			plugin('one', (context) => {
+				context.contributions.toolbar(toolbarContribution);
+				throw new Error('Activation failed');
+			}),
+		);
+		expect(host.activate('one').status).toBe('failed');
+		expect(host.get('one')?.contributions).toEqual([]);
+		expect(registries.toolbar.items.size).toBe(0);
+		expect(host.list()).toHaveLength(1);
+		expect(attempts.length).toBeGreaterThan(0);
+		for (const failure of attempts) {
+			expect(failure?.message).toContain('busy notifying');
+		}
+		expect(observed.mock.calls.at(-1)?.[0][0].errors).toEqual([
+			{ phase: 'activation', message: 'Activation failed' },
+		]);
+	});
+
+	it('cannot be resurrected by observers during successful deactivation', () => {
+		const { host } = setup();
+		let context!: PluginContext<string>;
+		const dispose = vi.fn();
+		host.register(
+			plugin('one', (value) => {
+				context = value;
+				value.contributions.toolbar(toolbarContribution);
+				return dispose;
+			}),
+		);
+		host.activate('one');
+		const attempted: string[] = [];
+		host.subscribe((plugins) => {
+			if (plugins[0].status === 'deactivating' || plugins[0].status === 'disabled') {
+				attempted.push(plugins[0].status);
+				host.activate('one');
+			}
+		});
+		expect(host.deactivate('one').status).toBe('disabled');
+		expect(host.get('one')?.contributions).toEqual([]);
+		expect(context.signal.aborted).toBe(true);
+		expect(dispose).toHaveBeenCalledOnce();
+		expect(attempted).toContain('deactivating');
+		expect(attempted).toContain('disabled');
+	});
+
+	it('keeps identical callbacks independently subscribed and honors removal during delivery', () => {
+		const { host } = setup();
+		const listener = vi.fn();
+		const first = host.subscribe(listener);
+		const second = host.subscribe(listener);
+		expect(listener).toHaveBeenCalledTimes(2);
+		first();
+		first();
+		host.register(plugin('one'));
+		expect(listener).toHaveBeenCalledTimes(3);
+		second();
+		let remove = () => {};
+		host.subscribe((plugins) => {
+			if (plugins[0]?.status === 'activating') {
+				remove();
+			}
+		});
+		remove = host.subscribe(listener);
+		listener.mockClear();
+		host.activate('one');
+		expect(listener).not.toHaveBeenCalled();
+	});
+
+	it('projects manifest metadata without carrying extra execution references', () => {
+		const { host } = setup();
+		const definition = plugin('one');
+		const manifest = { ...definition.manifest, execute: () => true, context: {} };
+		host.register({ ...definition, manifest });
+		expect(Object.keys(host.list()[0].manifest).sort()).toEqual([
+			'apiVersion',
+			'capabilities',
+			'description',
+			'id',
+			'name',
+			'version',
+		]);
+	});
+
 	it('registers explicitly without activating and returns immutable management snapshots', () => {
 		const { host } = setup();
 		const activate = vi.fn();

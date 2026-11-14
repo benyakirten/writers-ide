@@ -5,6 +5,7 @@ import type { SveltePluginContext } from '@writers-ide/plugins/svelte';
 import BasicMenuHorizontal from './BasicMenuHorizontal.svelte';
 import BasicMenuVertical from './BasicMenuVertical.svelte';
 import { formattingPlugin } from './menu';
+import PluginPresentationFixture from '$lib/testing/PluginPresentationFixture.svelte';
 
 const components: ReturnType<typeof mount>[] = [];
 
@@ -94,7 +95,10 @@ function setup() {
 function render(Component: typeof BasicMenuHorizontal, context: SveltePluginContext) {
 	const target = document.createElement('div');
 	document.body.append(target);
-	const component = mount(Component, { target, props: { context } });
+	const component = mount(PluginPresentationFixture, {
+		target,
+		props: { presentation: { component: Component, context } },
+	});
 	components.push(component);
 	flushSync();
 	return [...target.querySelectorAll('button')];
