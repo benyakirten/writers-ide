@@ -1,8 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Schema, type Node as ProseMirrorNode } from 'prosemirror-model';
-import { EditorState, TextSelection, type Transaction } from 'prosemirror-state';
+import {
+	AllSelection,
+	EditorState,
+	NodeSelection,
+	Selection,
+	TextSelection,
+	type Transaction,
+} from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { PageLayoutManager, PeerSelection } from './page-layout.svelte';
+import { schema as editorSchema } from '../prosemirror/view/schema';
 import proseMirrorEventBus, { ProseMirrorEventBusEventType } from './event-bus.svelte';
 
 const schema = new Schema({
@@ -89,6 +97,142 @@ describe('peer-group page boundaries', () => {
 				peer: { position: peerPosition },
 			});
 		}
+	});
+});
+
+describe('peer-group selection traversal with the editor schema', () => {
+	function fixture() {
+		const head = editorSchema.node('paragraph', null, editorSchema.text('head'));
+		const peer = editorSchema.node('paragraph', { peer: true }, editorSchema.text('continued'));
+		const middle = editorSchema.node('paragraph', null, editorSchema.text('middle'));
+		const final = editorSchema.node('paragraph', null, editorSchema.text('final'));
+		const pageEnd = editorSchema.node('pageEnd');
+		const firstPage = editorSchema.node('page', null, head);
+		const secondPage = editorSchema.node('page', null, [peer, middle]);
+		const document = editorSchema.node('doc', null, [
+			firstPage,
+			secondPage,
+			editorSchema.node('page', null, [final, pageEnd]),
+		]);
+		const peerPosition = firstPage.nodeSize + 1;
+		const finalPosition = firstPage.nodeSize + secondPage.nodeSize + 1;
+		const groups = [
+			{
+				type: PeerSelection.Peered,
+				head: { node: head, position: 1 },
+				peer: { node: peer, position: peerPosition },
+			},
+			{
+				type: PeerSelection.NotPeered,
+				details: { node: middle, position: peerPosition + peer.nodeSize },
+			},
+			{
+				type: PeerSelection.NotPeered,
+				details: { node: final, position: finalPosition },
+			},
+		];
+		const endGroup = {
+			type: PeerSelection.NotPeered,
+			details: { node: pageEnd, position: finalPosition + final.nodeSize },
+		};
+		return { document, groups, endGroup, finalPosition, final };
+	}
+
+	it.each([false, true])(
+		'walks a multi-page text range through the final paragraph (reversed: %s)',
+		(reversed) => {
+			const { document, groups, finalPosition, final } = fixture();
+			const end = finalPosition + final.nodeSize - 1;
+			const state = EditorState.create({
+				doc: document,
+				selection: TextSelection.create(document, reversed ? end : 2, reversed ? 2 : end),
+			});
+			expect(layout.groupPeerParagraphs(state)).toEqual(groups);
+		},
+	);
+
+	it('walks AllSelection through a final pageEnd without treating page or doc ends as blocks', () => {
+		const { document, groups, endGroup } = fixture();
+		const state = EditorState.create({ doc: document, selection: new AllSelection(document) });
+		expect(layout.groupPeerParagraphs(state)).toEqual([...groups, endGroup]);
+		expect(layout.identifyPeerGroup(state, document.content.size - 1)).toBeNull();
+		expect(layout.identifyPeerGroup(state, document.content.size)).toBeNull();
+	});
+
+	it('selects the final paragraph without including the following pageEnd', () => {
+		const { document, groups, finalPosition } = fixture();
+		const state = EditorState.create({
+			doc: document,
+			selection: NodeSelection.create(document, finalPosition),
+		});
+		expect(layout.groupPeerParagraphs(state)).toEqual([groups[2]]);
+	});
+
+	it('identifies a NodeSelection on the final leaf pageEnd at page depth', () => {
+		const { document, endGroup } = fixture();
+		const state = EditorState.create({
+			doc: document,
+			selection: NodeSelection.create(document, endGroup.details.position),
+		});
+		expect(layout.groupPeerParagraphs(state)).toEqual([endGroup]);
+	});
+
+	it('finds the final text caret from document end past an unselectable pageEnd', () => {
+		const { document, groups } = fixture();
+		const state = EditorState.create({
+			doc: document,
+			selection: Selection.near(document.resolve(document.content.size), -1),
+		});
+		expect(state.selection).toBeInstanceOf(TextSelection);
+		expect(layout.groupPeerParagraphs(state)).toEqual([groups[2]]);
+	});
+
+	it('identifies the final text caret without a sentinel or a following page', () => {
+		const final = editorSchema.node('paragraph', null, editorSchema.text('final'));
+		const document = editorSchema.node('doc', null, editorSchema.node('page', null, final));
+		const state = EditorState.create({
+			doc: document,
+			selection: Selection.atEnd(document),
+		});
+		expect(state.selection).toBeInstanceOf(TextSelection);
+		expect(layout.groupPeerParagraphs(state)).toEqual([
+			{ type: PeerSelection.NotPeered, details: { node: final, position: 1 } },
+		]);
+	});
+
+	it.each(['all', 'node'] as const)(
+		'ends a %s selection at the final paragraph without a sentinel',
+		(selectionType) => {
+			const final = editorSchema.node('paragraph', null, editorSchema.text('final'));
+			const document = editorSchema.node('doc', null, editorSchema.node('page', null, final));
+			const state = EditorState.create({
+				doc: document,
+				selection:
+					selectionType === 'all' ? new AllSelection(document) : NodeSelection.create(document, 1),
+			});
+			expect(layout.groupPeerParagraphs(state)).toEqual([
+				{ type: PeerSelection.NotPeered, details: { node: final, position: 1 } },
+			]);
+		},
+	);
+
+	it('uses structural block order rather than equality to identify a page-ending head', () => {
+		const repeated = editorSchema.node('paragraph', null, editorSchema.text('same'));
+		const peer = editorSchema.node('paragraph', { peer: true }, editorSchema.text('peer'));
+		const firstPage = editorSchema.node('page', null, [repeated, repeated]);
+		const document = editorSchema.node('doc', null, [
+			firstPage,
+			editorSchema.node('page', null, peer),
+		]);
+		const state = EditorState.create({ doc: document, selection: new AllSelection(document) });
+		expect(layout.groupPeerParagraphs(state)).toEqual([
+			{ type: PeerSelection.NotPeered, details: { node: repeated, position: 1 } },
+			{
+				type: PeerSelection.Peered,
+				head: { node: repeated, position: 1 + repeated.nodeSize },
+				peer: { node: peer, position: firstPage.nodeSize + 1 },
+			},
+		]);
 	});
 });
 

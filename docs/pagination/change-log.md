@@ -6,13 +6,14 @@ After confirmed merge, move the completed entry into `Merged PRs` in chronologic
 
 ## In progress
 
-### `bh/add-plugin-interface-js` — Quiet peer-group queries for formatting
+### [#80 — Safe peer-group queries for formatting](https://github.com/benyakirten/writers-ide/pull/80)
 
-**Status: In progress / unmerged.** PR identity and merge date are not established.
+**Status: In progress / unmerged.** Branch: `bh/add-plugin-interface-js`. GitHub confirms the PR is open; no merge date is assigned.
 
 - Reuses existing peer-paragraph rules in the host formatting bridge to calculate command availability without speculative document edits. Removes the peer-group helper's unconditional document-node console log because the helper now runs during ordinary formatting-state refreshes.
-- Adds a formatting-service regression asserting that initial and updated large-selection snapshots do not log document nodes. Pagination geometry, model mutation, continuation semantics, and history behavior are unchanged.
-- See the [plugin PR entry](../plugins/change-log.md) for cumulative validation and the main implementation. The full unit suite and browser smoke/docking checks cover integration; this is not a new pagination geometry benchmark or native-runtime validation.
+- Fixes structural peer lookup during ordinary selection updates: traverse adjacent blocks and page wrappers explicitly, resolve blocks using actual depth, and exclude a nonempty selection's end boundary. Document-end and leaf `pageEnd` positions must not be treated as textblock interiors. Identifies a page's last block by index, not equality with another identical node. The previous fixed traversal offset could cause `Index … out of range` exceptions from formatting snapshots and interrupt reflow/undo updates.
+- Adds production-schema model and service regressions for multi-page forward/reversed ranges, peer pairs, final paragraphs, full-document selection, final `pageEnd`, document-end lookup, and identical blocks. Large-selection snapshots also assert no document-node logging. The model-mutating pagination architecture, geometry rules, and history policy are unchanged.
+- Validation: 759 unit tests passed. The exact `CI=true pnpm test:smoke` command passed all 16 cases, plus three full repeats passed across Chromium/WebKit (48 cases), including pagination-selection reflow/undo regressions and production builds. A one-off Chromium caret-range assertion did not recur in five focused and three full repeats; the selection helper remains unchanged. See the [plugin PR entry](../plugins/change-log.md) for cumulative validation and remaining limits. This is not a new pagination geometry benchmark or native-runtime validation.
 
 ## Merged PRs
 

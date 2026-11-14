@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { Schema, type Node as ProseMirrorNode } from 'prosemirror-model';
-import { EditorState, TextSelection } from 'prosemirror-state';
+import { AllSelection, EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import type { FormattingCommand, FormattingSnapshot } from '@writers-ide/plugins';
 
@@ -9,6 +9,7 @@ import { FormattingService, type FormattingSources } from './formatting-service.
 import { INDENT_MAX } from '$lib/editor/prosemirror/view/constants';
 import PageLayout from '$lib/editor/state/page-layout.svelte';
 import { ActionUtilities } from '$lib/editor/prosemirror/view/actions';
+import { schema as productionSchema } from '$lib/editor/prosemirror/view/schema';
 import TabState from '$lib/editor/state/tab-state.svelte';
 import Editors from '$lib/editor/prosemirror/prose-mirror-editor.svelte';
 
@@ -127,6 +128,45 @@ afterEach(() => {
 	}
 	document.body.replaceChildren();
 	vi.restoreAllMocks();
+});
+
+describe('production document boundaries', () => {
+	it.each(['forward', 'reverse', 'all'] as const)(
+		'publishes and executes formatting for a %s selection across pages ending in pageEnd',
+		(direction) => {
+			const doc = productionSchema.node('doc', null, [
+				productionSchema.node('page', null, [
+					productionSchema.node('paragraph', null, productionSchema.text('First paragraph.')),
+				]),
+				productionSchema.node('page', null, [
+					productionSchema.node('paragraph', null, productionSchema.text('Second paragraph.')),
+				]),
+				productionSchema.node('page', null, [
+					productionSchema.node('paragraph', null, productionSchema.text('Final paragraph.')),
+					productionSchema.node('pageEnd'),
+				]),
+			]);
+			const from = 2;
+			const to = doc.content.size - 3;
+			const selection =
+				direction === 'all'
+					? new AllSelection(doc)
+					: TextSelection.create(
+							doc,
+							direction === 'forward' ? from : to,
+							direction === 'forward' ? to : from,
+						);
+			const view = createView();
+			view.updateState(EditorState.create({ doc, selection }));
+			const f = fixture(view);
+			expect(() => f.listen()).not.toThrow();
+			expect(f.latest.enabled['align-center']).toBe(true);
+			expect(f.service.execute(f.request('align-center'))).toBe(true);
+			view.state.doc.forEach((page) => {
+				expect(page.firstChild!.attrs.align).toBe('center');
+			});
+		},
+	);
 });
 
 describe('default application sources', () => {
