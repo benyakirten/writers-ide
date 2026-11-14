@@ -9,6 +9,7 @@ Start with [project context](docs/project-context.md) for the general overview, 
 | Bars, docking, drag-and-drop                                 | [Context](docs/dnd/context.md)                 | [Change log](docs/dnd/change-log.md)                       |
 | Pagination, footnotes, page geometry, cooperative scheduling | [Context](docs/pagination/context.md)          | [Change log](docs/pagination/change-log.md)                |
 | Browser performance testing                                  | [Context](docs/browser-performance/context.md) | [Change log](docs/browser-performance/change-log.md)       |
+| Plugins, reusable libraries, core boundaries                 | [Context](docs/plugins/context.md)             | [Change log](docs/plugins/change-log.md)                   |
 | Dependency maintenance                                       | [Guide](docs/dependencies.md)                  | General maintenance reference, kept as a standalone guide. |
 
 New substantive topics use `docs/<topic>/context.md` for current philosophy, contracts, rationale, source/tests, and limitations, plus `docs/<topic>/change-log.md` for consolidated PR entries maintained throughout development and retained as merged history. Existing standalone guides remain valid and can migrate incrementally when relevant.

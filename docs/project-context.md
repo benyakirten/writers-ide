@@ -19,13 +19,14 @@ Keep context focused on lasting behavior, constraints, decisions, rationale, and
 
 ## Topic index
 
-| Area                                                              | Read next                                                                                                                                                                 |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bars, docking, drag-and-drop                                      | [Current context](dnd/context.md), then relevant [PR change log](dnd/change-log.md). Core docking shipped in #78; the neutral main-area feedback is being refined in #79. |
-| Pagination, footnotes, page geometry, cooperative scheduling      | [Current context](pagination/context.md), then relevant [PR change log](pagination/change-log.md).                                                                        |
-| Browser performance tests and benchmark fixtures                  | [Current context](browser-performance/context.md), then relevant [PR change log](browser-performance/change-log.md).                                                      |
-| Dependency/toolchain maintenance                                  | [Dependency guide](dependencies.md).                                                                                                                                      |
-| Central views, plugins, persistence, collaboration, import/export | Relevant sections and implementation entry points below; separate topic documents have not yet been established.                                                          |
+| Area                                                         | Read next                                                                                                                                                                 |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bars, docking, drag-and-drop                                 | [Current context](dnd/context.md), then relevant [PR change log](dnd/change-log.md). Core docking shipped in #78; the neutral main-area feedback is being refined in #79. |
+| Pagination, footnotes, page geometry, cooperative scheduling | [Current context](pagination/context.md), then relevant [PR change log](pagination/change-log.md).                                                                        |
+| Browser performance tests and benchmark fixtures             | [Current context](browser-performance/context.md), then relevant [PR change log](browser-performance/change-log.md).                                                      |
+| Dependency/toolchain maintenance                             | [Dependency guide](dependencies.md).                                                                                                                                      |
+| Plugins, reusable libraries, core boundaries                 | [Current context](plugins/context.md), then relevant [PR change log](plugins/change-log.md). Conceptual boundaries; no extraction or runtime implementation yet.          |
+| Central views, persistence, collaboration, import/export     | Relevant sections and implementation entry points below; separate topic documents have not yet been established.                                                          |
 
 Existing standalone guides remain valid; migrate them incrementally when working on that topic. New substantive topics get the `context.md` / `change-log.md` pair and an index entry. See [AGENTS.md](../AGENTS.md) for the required maintenance and merge-verification workflow.
 
@@ -93,6 +94,8 @@ Project writes should participate in recoverable history. The intended damage bo
 - Offer enabling/installing a trusted plugin, inspection, or converting a copy to a supported representation.
 - Make destructive removal an explicit, separate action.
 - Plugins may supply migrations/fallback exporters through the restricted execution model. Basic preservation must not depend on executing an unavailable plugin.
+
+For the distinction between plugin features, reusable libraries, and core responsibilities, read [plugin and library context](plugins/context.md). It records current extension seams and candidate boundaries without treating package extraction or public API designs as approved.
 
 ## Plugin developer experience
 
