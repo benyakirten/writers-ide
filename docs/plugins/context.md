@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This topic establishes the conceptual distinction between plugins, reusable libraries, and the application core. It does not implement a plugin runtime or approve package extractions. Concrete package boundaries, public APIs, isolation mechanisms, and storage designs remain open and require owner approval before implementation.
+This topic establishes the distinction between plugins, reusable libraries, and the application core, plus the owner-approved staged implementation plan below. The plan is accepted direction, not current implementation: no plugin runtime or library extraction has landed through this documentation work. Detailed public APIs, package boundaries beyond the agreed scope, isolation mechanisms, and storage designs remain open and require owner approval before implementation.
 
 Read [project context](../project-context.md) for accepted product direction and security requirements. See [change-log.md](change-log.md) for the current documentation change.
 
@@ -39,9 +39,42 @@ A reusable docking library could implement layout and transfer mechanics without
 
 Libraries should not import Writer's IDE application singletons or assume access to its project state. Framework-specific libraries are valid: a Svelte library need not acquire a framework-independent abstraction without a real use case. Extract cohesive functionality rather than creating a package for every utility or thin dependency wrapper.
 
+## Accepted implementation stages
+
+The owner approved the following sequence. Stages 1 and 2 support trusted, bundled plugins only; arbitrary third-party code must not be loaded before Stage 3 isolation and enforcement are implemented. These stages are not release dates or claims of completed work.
+
+### Stage 1 — Contracts, host, and formatting plugin
+
+- Create a private workspace package for plugin identity, API compatibility, lifecycle, contribution contracts for toolbar items, commands and central views, and narrow formatting-state/command interfaces.
+- Keep data and command contracts independent of Svelte and ProseMirror; place Svelte presentation types in a separate adapter entry point.
+- Implement explicit bundled-plugin registration, contribution ownership, duplicate-ID validation, activation-failure rollback, and deactivation cleanup of contributions and subscriptions.
+- Migrate the basic formatting toolbar to formatting summaries and validated commands instead of raw editor views, selections, documents, or mutable workspace references. Preserve horizontal/vertical presentations, capacity rules, formatting behavior, and docking behavior.
+- Keep the existing ProseMirror editor behind the formatting service initially. Do not simultaneously extract the whole word processor or redesign pagination.
+- Test lifecycle/cleanup and existing formatting behavior.
+
+### Stage 2 — Reusable libraries and plugin management UI
+
+- Extract cohesive docking/workbench infrastructure into `packages-js/layout`, removing ProseMirror and application-singleton dependencies from the reusable layer.
+- Extract the UI components and service pieces needed by the formatting plugin into `packages-js/components`, with explicit dependencies. Keep packages private to the workspace initially; publication and stable public-package APIs are not part of this stage.
+- Leave scheduling, shortcut handling, and editing-helper extraction until a demonstrated consumer justifies it.
+- Add a user-facing plugin-management view backed by the host's public management API. Distinguish this UI from the developer-facing plugin API.
+- List bundled plugins with descriptions, versions, enabled/disabled/failed states, declared capabilities and contributions, and actionable activation errors. Allow enabling/disabling optional plugins.
+- Clearly identify bundled plugins as trusted. Capability declarations and narrow interfaces do not sandbox in-process JavaScript. Do not offer installation from files or URLs yet.
+- Disabling a plugin removes its active contributions, not its saved data. Keep the management shell host-owned so a failing plugin cannot prevent users from disabling it.
+
+### Stage 3 — Isolated third-party plugins
+
+- Approve and implement frontend isolation, messaging, runtime validation, permission enforcement, and isolated UI contributions before enabling external installation/loading.
+- Define external-package validation and compatibility checks. Add permission review, revocation, and failure handling to the plugin manager.
+- Test that plugins cannot bypass granted access, including through dependencies or ambient browser/native facilities.
+
+Defer the implementation of isolation, not its architectural constraints. From Stage 1, use transferable data, scoped IDs, and explicit requests at the data/command boundary. Direct Svelte component registration is a trusted rendering adapter, not the universal external-plugin interface. The eventual built-in and third-party feature APIs must converge on the accepted shared extension contracts; trusted adapters must not establish feature-only privileged shortcuts.
+
+The undo-tree plugin remains a future consumer once host history plumbing exists. These stages do not select a history/storage model or implement durable branching history.
+
 ## Examples and candidate boundaries
 
-These examples guide discussion; they are not approved extraction tasks or a publication roadmap.
+The table illustrates responsibility boundaries. The staged plan above approves formatting-plugin migration and scoped layout/component extraction; the remaining examples are candidates, not additional extraction tasks or a publication roadmap.
 
 | Area                   | Likely responsibility                                                                            | Possible library reuse / constraint                                                                                                                                                |
 | ---------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -84,10 +117,10 @@ These paths are internal discovery points, not stable public APIs:
 
 ## Open implementation decisions
 
-- Exact package boundaries, names, publication strategy, and dependency rules.
+- Detailed package boundaries and names within the approved scope, dependency rules, and any later publication strategy. Initial packages are private workspace packages.
 - Plugin manifests, lifecycle, compatibility, contribution ownership, and capability grants.
 - Frontend isolation, messaging, and permission enforcement mechanisms.
 - Document/view ownership and command contracts, schema evolution, and content preservation.
 - History scope, granularity, branch/navigation semantics, collaboration, persistence, and retention.
 
-This document establishes vocabulary and responsibility boundaries, not a complete API specification. No source migration or runtime guarantee follows from documenting a candidate.
+This document establishes vocabulary, responsibility boundaries, and the approved implementation sequence, not a complete API specification. The staged work is not yet implemented; candidate examples outside that scope do not authorize additional source migrations or imply runtime guarantees.
