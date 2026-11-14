@@ -1,9 +1,11 @@
 <script lang="ts" module>
-	import { EditorView } from 'prosemirror-view';
-	import type { Selection } from 'prosemirror-state';
-	import type { Node } from 'prosemirror-model';
-	import { Icon } from '@steeze-ui/svelte-icon';
-	import { type IconSource } from '@steeze-ui/svelte-icon';
+	import type {
+		FormattingBlockCommand,
+		FormattingCommand,
+		FormattingMark,
+		FormattingSnapshot,
+	} from '@writers-ide/plugins';
+	import { Icon, type IconSource } from '@steeze-ui/svelte-icon';
 	import {
 		TextB,
 		TextItalic,
@@ -20,222 +22,91 @@
 	} from '@steeze-ui/phosphor-icons';
 
 	import IconButton from '$lib/components/IconButton.svelte';
-	import { type Internationalizator } from '$lib/editor/types';
-	import { type SelectionUtilities, type TextMarkPresence } from '../../view/selection';
-	import { type ActionUtilities } from '../../view/actions';
+	import type { Internationalizator } from '$lib/editor/types';
 	import { capitalize } from '$lib/utils/strings';
-
-	import type { UseableMarkName } from '$lib/editor/prosemirror/view/actions';
 	import { TextOverline } from '$lib/icons';
-	import { type TooltipData } from '$lib/services/tooltip.svelte';
+	import type { TooltipData } from '$lib/services/tooltip.svelte';
 
 	type TextMenuIcon = {
 		iconSrc: IconSource;
-		onclick: (view: EditorView | null, utils: typeof ActionUtilities) => void;
-		markName: UseableMarkName;
+		markName: FormattingMark;
 		translateMark: (t: Internationalizator) => string;
 	};
 
 	const textMarks: TextMenuIcon[] = [
 		{
 			iconSrc: TextB,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-
-				const { state, dispatch } = view;
-				utils.toggleTextMark('bold', state, dispatch, view);
-				view.focus();
-			},
 			markName: 'bold',
 			translateMark: (m) => m.bold(),
 		},
 		{
 			iconSrc: TextItalic,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('italic', view.state, view.dispatch, view);
-				view.focus();
-			},
 			markName: 'italic',
 			translateMark: (m) => m.italic(),
 		},
 		{
 			iconSrc: TextSuperscript,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('superscript', view.state, view.dispatch, view, 'subscript');
-				view.focus();
-			},
 			markName: 'superscript',
 			translateMark: (m) => m.superscript(),
 		},
 		{
 			iconSrc: TextSubscript,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('subscript', view.state, view.dispatch, view, 'superscript');
-				view.focus();
-			},
 			markName: 'subscript',
 			translateMark: (m) => m.subscript(),
 		},
 		{
 			iconSrc: TextUnderline,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('underline', view.state, view.dispatch, view);
-				view.focus();
-			},
 			markName: 'underline',
 			translateMark: (m) => m.underline(),
 		},
 		{
 			iconSrc: TextOverline,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('overline', view.state, view.dispatch, view);
-				view.focus();
-			},
 			markName: 'overline',
 			translateMark: (m) => m.overline(),
 		},
 		{
 			iconSrc: TextStrikethrough,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.toggleTextMark('strikethrough', view.state, view.dispatch, view);
-				view.focus();
-			},
 			markName: 'strikethrough',
 			translateMark: (m) => m.strikethrough(),
 		},
-	] as const;
+	];
 
 	type BlockMenuIcon = {
-		id: string;
+		command: FormattingBlockCommand;
 		generateLabel: (t: Internationalizator) => string;
 		iconSrc: IconSource;
-		onclick: (view: EditorView | null, utils: typeof ActionUtilities) => void;
-		determineInversion: (
-			selection: Selection,
-			doc: Node,
-			utils: typeof SelectionUtilities,
-		) => number;
 	};
 
 	const blockMarks: BlockMenuIcon[] = [
 		{
-			id: 'indent_more',
+			command: 'indent',
 			generateLabel: (m) => m.indent_text_more() + '.',
 			iconSrc: TextIndent,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.dent('indent', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc, utils) => {
-				const ratio = utils.getIndentRatio(selection, doc);
-				return ratio ?? 0;
-			},
 		},
 		{
-			id: 'indent_less',
+			command: 'dedent',
 			generateLabel: (m) => m.indent_text_less() + '.',
 			iconSrc: TextOutdent,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.dent('dedent', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc, utils) => {
-				const ratio = utils.getIndentRatio(selection, doc);
-				return ratio === null ? 0 : 1 - ratio;
-			},
 		},
 		{
-			id: 'align_left',
+			command: 'align-left',
 			generateLabel: (m) => m.align_text_left() + '.',
 			iconSrc: TextAlignLeft,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.setTextAlignment('left', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc, utils) =>
-				utils.getBlockAttributeRatio(
-					selection,
-					doc,
-					'align',
-					// TODO: Add method to detect default alignment value
-					(value) => value === 'left' || value === 'start',
-				),
 		},
 		{
-			id: 'align_center',
+			command: 'align-center',
 			generateLabel: (m) => m.align_text_center() + '.',
 			iconSrc: TextAlignCenter,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.setTextAlignment('center', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc, utils) =>
-				utils.getBlockAttributeRatio(selection, doc, 'align', 'center'),
 		},
 		{
-			id: 'align_right',
+			command: 'align-right',
 			generateLabel: (m) => m.align_text_right() + '.',
 			iconSrc: TextAlignRight,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.setTextAlignment('right', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc, utils) =>
-				utils.getBlockAttributeRatio(
-					selection,
-					doc,
-					'align',
-					(value) => value === 'right' || value === 'end',
-				),
 		},
 		{
-			id: 'align_justify',
+			command: 'align-justify',
 			generateLabel: (m) => m.align_text_justify() + '.',
 			iconSrc: TextAlignJustify,
-			onclick: (view, utils) => {
-				if (!view) {
-					return;
-				}
-				utils.setTextAlignment('justify', view.state, view.dispatch);
-				view.focus();
-			},
-			determineInversion: (selection, doc, utils) =>
-				utils.getBlockAttributeRatio(selection, doc, 'align', 'justify'),
 		},
 	];
 
@@ -243,14 +114,13 @@
 </script>
 
 {#snippet textMarkButtons(
-	activeCodeMarks: TextMarkPresence | null,
+	snapshot: FormattingSnapshot | null,
 	m: Internationalizator,
-	editorView: EditorView | null,
-	actionUtils: typeof ActionUtilities,
+	execute: (command: FormattingCommand) => void,
 	tooltipDirection: TooltipData['calibrateFor'],
 )}
-	{#each textMarks as { iconSrc, onclick, markName, translateMark } (markName)}
-		{@const inversion = activeCodeMarks?.get(markName) ?? 0}
+	{#each textMarks as { iconSrc, markName, translateMark } (markName)}
+		{@const inversion = snapshot?.marks[markName] ?? 0}
 		{@const translatedMark = translateMark(m)}
 		{@const label =
 			inversion === 1
@@ -260,7 +130,8 @@
 			{tooltipDirection}
 			{inversion}
 			label="{capitalize(label)}."
-			onclick={() => onclick(editorView, actionUtils)}
+			disabled={!snapshot?.enabled[markName]}
+			onclick={() => execute(markName)}
 		>
 			{#snippet icon()}
 				<Icon src={iconSrc} title={label} size="16px" />
@@ -270,24 +141,20 @@
 {/snippet}
 
 {#snippet blockMarkButtons(
-	editorView: EditorView | null,
-	selection: Selection | null,
+	snapshot: FormattingSnapshot | null,
 	m: Internationalizator,
-	actionUtils: typeof ActionUtilities,
-	selectionUtils: typeof SelectionUtilities,
+	execute: (command: FormattingCommand) => void,
 	tooltipDirection: TooltipData['calibrateFor'],
 )}
-	{#each blockMarks as { id, generateLabel, iconSrc, onclick, determineInversion } (id)}
-		{@const inversion =
-			editorView && selection
-				? determineInversion(selection, editorView.state.doc, selectionUtils)
-				: 0}
+	{#each blockMarks as { command, generateLabel, iconSrc } (command)}
+		{@const inversion = snapshot?.blocks[command] ?? 0}
 		{@const label = generateLabel(m)}
 		<IconButton
 			{tooltipDirection}
 			{inversion}
 			{label}
-			onclick={() => onclick(editorView, actionUtils)}
+			disabled={!snapshot?.enabled[command]}
+			onclick={() => execute(command)}
 		>
 			{#snippet icon()}
 				<Icon src={iconSrc} title={label} size="16px" />

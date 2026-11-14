@@ -4,7 +4,7 @@
 
 Core docking shipped in [#78](https://github.com/benyakirten/writers-ide/pull/78), confirmed merged on 2026-11-13. This document describes that implementation and owner-approved direction plus the **current working-branch refinements in #79** (`bh/fix-dnd-main-area`), including the unhighlighted main floating surface. See [change-log.md](change-log.md) for the consolidated in-progress PR entry and confirmed merged history. Working-branch behavior must not be represented as already merged.
 
-This topic owns feature bars, item grouping, edge docking, floating overlays, and their drag interactions. Central tabs and split views are separate concerns. These are trusted in-process Svelte components, not an isolated third-party plugin platform.
+This topic owns feature bars, item grouping, edge docking, floating overlays, and their drag interactions. Central tabs and split views are separate concerns. These are trusted in-process Svelte components, not an isolated third-party plugin platform. On working branch `bh/add-plugin-interface-js`, the bundled formatting plugin now contributes through the [Stage 1 host](../plugins/context.md); docking mechanics are unchanged.
 
 ## Philosophy and approved behavior
 
@@ -29,7 +29,7 @@ The transfer handler is the state mutation boundary. DnD supplies a typed source
 
 Capacity uses the **destination orientation**. Reject a whole-bar move or floating orientation switch if the resulting total exceeds three units; never silently omit items. Insertion indices refer to boundaries before source removal; same-container movement adjusts them after removal and excludes the moving item from capacity accounting.
 
-Whole-bar transfers retain bar and `BarItems` identity, item order, title, and remembered docked/floating geometry. Moving the final item out removes the empty source bar. Registry IDs can repeat across different bars, but not within one bar. Meaningful feature state should live outside presentation instances: stable IDs do not preserve arbitrary component-local state across Svelte remounts.
+Whole-bar transfers retain bar and `BarItems` identity, item order, title, and remembered docked/floating geometry. Moving the final item out removes the empty source bar. Registry IDs can repeat across different bars, but not within one bar. On the plugin-interface working branch, disabling a contributed toolbar removes its presentation while preserving placement IDs and declared orientation costs. Missing-item placeholders reserve those costs, so disable/re-enable cannot create spare capacity that later overfills a bar. Registry `clear()` releases retained metadata; this is not durable layout persistence. Meaningful feature state should live outside presentation instances: stable IDs do not preserve arbitrary component-local state across Svelte remounts.
 
 Relocation menus use the same validated transfer API. Their existing convenience behavior may choose a fitting final bar or create a new one; pointer drops instead require an explicit gap to create a bar. Legacy directional item nudges remain separate operations.
 

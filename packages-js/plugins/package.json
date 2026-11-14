@@ -1,0 +1,25 @@
+{
+	"name": "@writers-ide/plugins",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"license": "MIT",
+	"exports": {
+		".": {
+			"types": "./index.ts",
+			"default": "./index.ts"
+		},
+		"./svelte": {
+			"types": "./svelte.ts",
+			"default": "./svelte.ts"
+		}
+	},
+	"peerDependencies": {
+		"svelte": "^5.0.0"
+	},
+	"peerDependenciesMeta": {
+		"svelte": {
+			"optional": true
+		}
+	}
+}

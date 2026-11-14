@@ -1,4 +1,7 @@
 <script lang="ts">
+	import type { SveltePresentation } from '@writers-ide/plugins/svelte';
+	import PluginPresentation from '$lib/plugins/PluginPresentation.svelte';
+	import Editors from './prosemirror/prose-mirror-editor.svelte';
 	import LocaleManager from '$lib/services/locale-manager.svelte';
 	import TabState from './state/tab-state.svelte';
 	import ProseMirrorEventBus from './state/event-bus.svelte';
@@ -14,29 +17,41 @@
 		id,
 		data,
 		Component,
-	}: { index: number; id: string; data?: object; Component: TabComponent } = $props();
+		plugin,
+	}: {
+		index: number;
+		id: string;
+		data?: object;
+		Component: TabComponent;
+		plugin?: SveltePresentation;
+	} = $props();
 </script>
 
 <div class="tab">
 	<!-- Tab Menu -->
 	<!-- Component should be zoomable -->
-	<Component
-		{id}
-		{data}
-		proseMirror={{
-			actions: ActionUtilities,
-			selections: SelectionUtilities,
-			eventBus: ProseMirrorEventBus,
-			schema,
-		}}
-		bars={{
-			vertical: VerticalBarState,
-			horizontal: HorizontalBarState,
-			floater: FloaterBarState,
-		}}
-		tabs={TabState}
-		locale={LocaleManager.locale}
-	/>
+	{#if plugin}
+		<PluginPresentation presentation={plugin} />
+	{:else}
+		<Component
+			{id}
+			{data}
+			proseMirror={{
+				actions: ActionUtilities,
+				selections: SelectionUtilities,
+				eventBus: ProseMirrorEventBus,
+				schema,
+				editors: Editors,
+			}}
+			bars={{
+				vertical: VerticalBarState,
+				horizontal: HorizontalBarState,
+				floater: FloaterBarState,
+			}}
+			tabs={TabState}
+			locale={LocaleManager.locale}
+		/>
+	{/if}
 </div>
 
 <style>

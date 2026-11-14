@@ -1108,7 +1108,7 @@ export class PageLayoutManager {
 
 		const { from, to } = state.selection;
 		let pos = from;
-		while (pos <= to) {
+		while (pos < to || pos === from) {
 			const identification = this.identifyPeerGroup(state, pos);
 			if (!identification) {
 				break;
@@ -1117,51 +1117,57 @@ export class PageLayoutManager {
 			peerIdentifications.push(identification);
 			const nodeDetails =
 				identification.type === PeerSelection.Peered ? identification.peer : identification.details;
-			pos = nodeDetails.position + nodeDetails.node.nodeSize + 1;
+			pos = nodeDetails.position + nodeDetails.node.nodeSize;
+			const resolvedEnd = state.doc.resolve(pos);
+			if (
+				resolvedEnd.depth === PAGE_DEPTH &&
+				resolvedEnd.index(PAGE_DEPTH) === resolvedEnd.parent.childCount
+			) {
+				pos = resolvedEnd.after(PAGE_DEPTH);
+			}
 		}
 
-		console.log(peerIdentifications);
 		return peerIdentifications;
 	}
 
-	/**
-	 * If the user selects before the first block node, it's because they selected all and did the action.
-	 * We can't use the typical selection methods to figure it out so we have a special way of handling it.
-	 *
-	 * This feels incredibly hacky, and I may revise it in the future.
-	 */
+	/** Resolve a page's direct block, including selections on leaf blocks and page boundaries. */
 	private getPeerGroupDetails(state: EditorState, pos: number) {
-		if (pos < 2) {
-			const pageIndex = 0;
-			const pageNode = state.doc.firstChild;
-			if (!pageNode) {
+		const resolvedPosition = state.doc.resolve(pos);
+		const pageIndex = resolvedPosition.index(0);
+		if (resolvedPosition.depth < PAGE_DEPTH) {
+			// AllSelection and traversal across pages start before a page; doc end has no next page.
+			const pageNode = state.doc.maybeChild(pageIndex);
+			const blockNode = pageNode?.firstChild;
+			if (!pageNode || !blockNode) {
 				return null;
 			}
-
-			const blockStart = 1;
-			const blockNode = state.doc.nodeAt(blockStart);
-			if (!blockNode) {
-				return null;
-			}
-
-			const position = blockStart + blockNode.nodeSize + 1;
-
-			return { pageNode, pageIndex, blockStart, blockNode, position };
-		} else {
-			const resolvedPosition = state.doc.resolve(pos);
-
-			const pageNode = resolvedPosition.node(PAGE_DEPTH);
-			const pageIndex = resolvedPosition.index(0);
-
-			const blockStart = resolvedPosition.start(BLOCK_DEPTH) - 1;
-			const blockNode = state.doc.nodeAt(blockStart);
-			if (!blockNode) {
-				return null;
-			}
-			const position = blockStart + blockNode.nodeSize;
-
-			return { pageNode, pageIndex, blockStart, blockNode, position };
+			const blockStart = pos + 1;
+			return {
+				pageNode,
+				pageIndex,
+				blockStart,
+				blockNode,
+				blockIndex: 0,
+				position: blockStart + blockNode.nodeSize,
+			};
 		}
+
+		const pageNode = resolvedPosition.node(PAGE_DEPTH);
+		const blockIndex = resolvedPosition.index(PAGE_DEPTH);
+		const blockNode = pageNode.maybeChild(blockIndex);
+		if (!blockNode) {
+			return null;
+		}
+		const blockStart =
+			resolvedPosition.depth >= BLOCK_DEPTH ? resolvedPosition.before(BLOCK_DEPTH) : pos;
+		return {
+			pageNode,
+			pageIndex,
+			blockStart,
+			blockNode,
+			blockIndex,
+			position: blockStart + blockNode.nodeSize,
+		};
 	}
 
 	/**
@@ -1181,7 +1187,7 @@ export class PageLayoutManager {
 			return null;
 		}
 
-		const { pageNode, pageIndex, blockStart, blockNode, position } = groupDetails;
+		const { pageNode, pageIndex, blockStart, blockNode, blockIndex, position } = groupDetails;
 
 		const blockDetails: NodeDetails = {
 			node: blockNode,
@@ -1205,7 +1211,7 @@ export class PageLayoutManager {
 			}
 		}
 
-		if (pageNode.lastChild?.eq(blockNode)) {
+		if (blockIndex === pageNode.childCount - 1) {
 			// If the next page's first element is peered, return the peer group.
 			// Otherwise, return not peered
 			const nextPage = state.doc.maybeChild(pageIndex + 1);
