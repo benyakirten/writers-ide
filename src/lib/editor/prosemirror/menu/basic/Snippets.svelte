@@ -4,7 +4,7 @@
 		FormattingCommand,
 		FormattingMark,
 		FormattingSnapshot,
-	} from '@writers-ide/plugins';
+	} from './contracts';
 	import { Icon, type IconSource } from '@steeze-ui/svelte-icon';
 	import {
 		TextB,

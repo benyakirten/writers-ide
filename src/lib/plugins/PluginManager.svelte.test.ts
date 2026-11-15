@@ -16,7 +16,6 @@ afterEach(async () => {
 function setup(activate: BundledPlugin<string>['activate'] = () => {}) {
 	const register = () => () => {};
 	const host = new PluginHost<string>({
-		formatting: { subscribe: () => () => {}, execute: () => false },
 		registries: { toolbar: { register }, view: { register }, command: { register } },
 	});
 	host.register({
@@ -26,13 +25,7 @@ function setup(activate: BundledPlugin<string>['activate'] = () => {}) {
 			description: 'Tools for your writing.',
 			version: '1.2.3',
 			apiVersion: 1,
-			capabilities: [
-				'formatting.observe',
-				'formatting.execute',
-				'contributions.toolbar',
-				'contributions.view',
-				'contributions.command',
-			],
+			capabilities: ['contributions.toolbar', 'contributions.view', 'contributions.command'],
 		},
 		activate,
 	});
@@ -81,7 +74,9 @@ describe('host-owned PluginManager panel', () => {
 		for (const capability of host.list()[0].manifest.capabilities) {
 			expect(target.textContent).toContain(capability);
 		}
-		expect(target.textContent).toContain('Observe active-editor formatting summaries');
+		expect(target.textContent).toContain('Provide toolbar controls in the workbench.');
+		expect(target.textContent).toContain('Provide a central workspace view.');
+		expect(target.textContent).toContain('Provide actions the host can invoke.');
 		expect(button(target).type).toBe('button');
 		button(target).focus();
 		expect(document.activeElement).toBe(button(target));

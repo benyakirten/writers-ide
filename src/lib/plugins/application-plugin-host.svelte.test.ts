@@ -1,17 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushSync, mount, unmount } from 'svelte';
-import type { FormattingService, FormattingSnapshot } from '@writers-ide/plugins';
 import type {
-	SveltePlugin,
-	SveltePluginContext,
-	SveltePresentation,
+	FormattingService,
+	FormattingSnapshot,
+} from '$lib/editor/prosemirror/menu/basic/contracts';
+import {
+	defineSveltePresentation,
+	type SveltePlugin,
+	type SveltePluginContext,
+	type SveltePresentation,
 } from '@writers-ide/plugins/svelte';
 import Registry, { BarItemRegistry } from '$lib/editor/state/bar-item-registry.svelte';
 import { BarItems } from '$lib/editor/state/bar-items.svelte';
 import { TabStateRegistry } from '$lib/editor/state/tab-state-registry.svelte';
 import BasicMenuHorizontal from '$lib/editor/prosemirror/menu/basic/BasicMenuHorizontal.svelte';
 import BasicMenuVertical from '$lib/editor/prosemirror/menu/basic/BasicMenuVertical.svelte';
-import { formattingPlugin } from '$lib/editor/prosemirror/menu/basic/menu';
+import { createFormattingPlugin } from '$lib/editor/prosemirror/menu/basic/menu';
+import { scopeFormattingService } from '$lib/editor/prosemirror/menu/basic/scope-formatting-service';
 import PluginPresentationFixture from '$lib/testing/PluginPresentationFixture.svelte';
 import { createApplicationPluginHost, PluginCommands } from './application-plugin-host';
 
@@ -71,7 +76,8 @@ function setup(bars = new BarItemRegistry()) {
 		}),
 		execute: vi.fn<FormattingService['execute']>(() => true),
 	};
-	const host = createApplicationPluginHost({ bars, views, commands, formatting });
+	const host = createApplicationPluginHost({ bars, views, commands });
+	const formattingPlugin = createFormattingPlugin(formatting);
 	cleanups.push(() => {
 		for (const plugin of host.list()) {
 			host.deactivate(plugin.manifest.id);
@@ -79,6 +85,7 @@ function setup(bars = new BarItemRegistry()) {
 	});
 	return {
 		host,
+		formattingPlugin,
 		bars,
 		views,
 		commands,
@@ -103,24 +110,28 @@ function plugin(activate: SveltePlugin['activate']): SveltePlugin {
 			description: 'Exercises application contribution adapters.',
 			version: '0.1.0',
 			apiVersion: 1,
-			capabilities: [
-				'formatting.observe',
-				'formatting.execute',
-				'contributions.toolbar',
-				'contributions.view',
-				'contributions.command',
-			],
+			capabilities: ['contributions.toolbar', 'contributions.view', 'contributions.command'],
 		},
 		activate,
 	};
 }
 
-function contributeToolbar(context: SveltePluginContext, id = 'tools') {
+function contributeToolbar(
+	context: SveltePluginContext,
+	formatting: FormattingService,
+	id = 'tools',
+) {
 	return context.contributions.toolbar({
 		id,
 		name: 'Tools',
-		horizontal: { size: 2, presentation: { component: BasicMenuHorizontal, context } },
-		vertical: { size: 1, presentation: { component: BasicMenuVertical, context } },
+		horizontal: {
+			size: 2,
+			presentation: defineSveltePresentation(BasicMenuHorizontal, { formatting }),
+		},
+		vertical: {
+			size: 1,
+			presentation: defineSveltePresentation(BasicMenuVertical, { formatting }),
+		},
 	});
 }
 
@@ -157,35 +168,63 @@ afterEach(async () => {
 });
 
 describe('application plugin adapters', () => {
+	it('provides only feature-agnostic lifecycle and contribution APIs', () => {
+		const f = setup();
+		let retained: SveltePluginContext | undefined;
+		f.host.register(
+			plugin((context) => {
+				retained = context;
+				expect(Object.keys(context).sort()).toEqual(['contributions', 'own', 'signal']);
+				expect(Object.keys(context.contributions).sort()).toEqual(['command', 'toolbar', 'view']);
+				expect(context.signal.aborted).toBe(false);
+			}),
+		);
+		expect(f.host.activate('test.adapters').status).toBe('active');
+		f.host.deactivate('test.adapters');
+		expect(retained!.signal.aborted).toBe(true);
+		expect(f.formatting.subscribe).not.toHaveBeenCalled();
+	});
 	it('registers the real formatting plugin with orientation sizes and only scoped presentation data', () => {
 		const f = setup();
-		f.host.register(formattingPlugin);
-		expect(f.host.activate(formattingPlugin.manifest.id)).toMatchObject({
+		f.host.register(f.formattingPlugin);
+		expect(f.host.activate(f.formattingPlugin.manifest.id)).toMatchObject({
 			status: 'active',
 			contributions: [{ kind: 'toolbar', id: 'basic-menu' }],
 		});
 		const item = f.bars.items['basic-menu'];
-		const context = item.horizontal.plugin!.context;
+		const props = item.horizontal.plugin!.props;
 		expect(f.bars.items).toEqual({
 			'basic-menu': {
 				title: 'Basic Menu',
-				horizontal: { size: 2, plugin: { component: BasicMenuHorizontal, context } },
-				vertical: { size: 1, plugin: { component: BasicMenuVertical, context } },
+				horizontal: { size: 2, plugin: { component: BasicMenuHorizontal, props } },
+				vertical: { size: 1, plugin: { component: BasicMenuVertical, props } },
 			},
 		});
 		expect(f.bars.size('basic-menu', false)).toBe(2);
 		expect(f.bars.size('basic-menu', true)).toBe(1);
-		expect(Object.keys(context).sort()).toEqual(['contributions', 'formatting', 'own', 'signal']);
-		expect(Object.keys(context.formatting).sort()).toEqual(['execute', 'subscribe']);
-		expect(Object.keys(context.contributions).sort()).toEqual(['command', 'toolbar', 'view']);
-		expect(item.vertical.plugin!.context.signal).toBe(context.signal);
-		expect(context.formatting).not.toBe(f.formatting);
+		expect(Object.keys(props)).toEqual(['formatting']);
+		expect(Object.keys(props.formatting as FormattingService).sort()).toEqual([
+			'execute',
+			'subscribe',
+		]);
+		const verticalFormatting = item.vertical.plugin!.props.formatting as FormattingService;
+		expect(verticalFormatting.subscribe).toBe((props.formatting as FormattingService).subscribe);
+		expect(verticalFormatting.execute).toBe((props.formatting as FormattingService).execute);
+		expect(props.formatting).not.toBe(f.formatting);
+		expect(item.horizontal.plugin).not.toHaveProperty('context');
 		expect(f.views.items).toEqual({});
 		expect(f.formatting.subscribe).not.toHaveBeenCalled();
-		f.host.deactivate(formattingPlugin.manifest.id);
+		f.host.deactivate(f.formattingPlugin.manifest.id);
 		expect(f.bars.items).toEqual({});
 		expect(f.bars.size('basic-menu', false)).toBe(2);
-		expect(context.signal.aborted).toBe(true);
+		expect(
+			(props.formatting as FormattingService).execute({
+				viewId: 'editor-one',
+				revision: 7,
+				command: 'bold',
+			}),
+		).toBe(false);
+		expect(f.formatting.execute).not.toHaveBeenCalled();
 	});
 
 	it('reserves disabled plugin capacity in every placement and orientation until metadata is cleared', () => {
@@ -195,8 +234,8 @@ describe('application plugin adapters', () => {
 		Registry.register({ title: 'One', horizontal: { size: 1 }, vertical: { size: 1 } }, 'one');
 		Registry.register({ title: 'Extra', horizontal: { size: 1 }, vertical: { size: 1 } }, 'extra');
 		Registry.register({ title: 'Two', horizontal: { size: 2 }, vertical: { size: 2 } }, 'two');
-		f.host.register(formattingPlugin);
-		expect(f.host.activate(formattingPlugin.manifest.id).status).toBe('active');
+		f.host.register(f.formattingPlugin);
+		expect(f.host.activate(f.formattingPlugin.manifest.id).status).toBe('active');
 		const first = new BarItems(false, ['basic-menu', 'one']);
 		const second = new BarItems(false, ['one', 'basic-menu']);
 		const vertical = new BarItems(true, ['basic-menu', 'two']);
@@ -207,7 +246,7 @@ describe('application plugin adapters', () => {
 			expect(bar.items.reduce((sum, item) => sum + item.size, 0)).toBe(3);
 		}
 		for (let cycle = 0; cycle < 2; cycle++) {
-			f.host.deactivate(formattingPlugin.manifest.id);
+			f.host.deactivate(f.formattingPlugin.manifest.id);
 			for (const bar of bars) {
 				expect(bar.availableSpace).toBe(0);
 				expect(bar.canFit('extra')).toBe(false);
@@ -225,13 +264,13 @@ describe('application plugin adapters', () => {
 			expect(first.availableSpace).toBe(1);
 			expect(first.setOrientation(false)).toBe(true);
 			expect(first.availableSpace).toBe(0);
-			expect(f.host.activate(formattingPlugin.manifest.id).status).toBe('active');
+			expect(f.host.activate(f.formattingPlugin.manifest.id).status).toBe('active');
 			expect(bars.map((bar) => [...bar.ids])).toEqual(placements);
 			for (const bar of bars) {
 				expect(bar.items.reduce((sum, item) => sum + item.size, 0)).toBeLessThanOrEqual(3);
 			}
 		}
-		f.host.deactivate(formattingPlugin.manifest.id);
+		f.host.deactivate(f.formattingPlugin.manifest.id);
 		Registry.clear();
 		expect(bars.map((bar) => [...bar.ids])).toEqual(placements);
 		for (const bar of bars) {
@@ -242,11 +281,11 @@ describe('application plugin adapters', () => {
 	});
 
 	it.each(['horizontal', 'vertical'] as const)(
-		'%s presentation subscribes through the host, routes real buttons to the latest target, and is revoked before unmount',
+		'%s presentation subscribes through the injected feature service, routes real buttons to the latest target, and is revoked before unmount',
 		async (orientation) => {
 			const f = setup();
-			f.host.register(formattingPlugin);
-			f.host.activate(formattingPlugin.manifest.id);
+			f.host.register(f.formattingPlugin);
+			f.host.activate(f.formattingPlugin.manifest.id);
 			const presentation = f.bars.items['basic-menu'][orientation].plugin!;
 			const { target, component } = render(presentation);
 			expect(f.formatting.subscribe).toHaveBeenCalledOnce();
@@ -264,7 +303,7 @@ describe('application plugin adapters', () => {
 				revision: 19,
 				command: 'bold',
 			});
-			f.host.deactivate(formattingPlugin.manifest.id);
+			f.host.deactivate(f.formattingPlugin.manifest.id);
 			expect(f.bars.items).toEqual({});
 			expect(f.listeners.size).toBe(0);
 			expect(f.unsubscribe).toHaveBeenCalledOnce();
@@ -279,8 +318,8 @@ describe('application plugin adapters', () => {
 
 	it('unmounting one orientation releases only its subscription, leaving the other presentation live', async () => {
 		const f = setup();
-		f.host.register(formattingPlugin);
-		f.host.activate(formattingPlugin.manifest.id);
+		f.host.register(f.formattingPlugin);
+		f.host.activate(f.formattingPlugin.manifest.id);
 		const item = f.bars.items['basic-menu'];
 		const horizontal = render(item.horizontal.plugin!);
 		const vertical = render(item.vertical.plugin!);
@@ -295,7 +334,7 @@ describe('application plugin adapters', () => {
 			revision: 23,
 			command: 'bold',
 		});
-		f.host.deactivate(formattingPlugin.manifest.id);
+		f.host.deactivate(f.formattingPlugin.manifest.id);
 		expect(f.listeners.size).toBe(0);
 		expect(f.unsubscribe).toHaveBeenCalledTimes(2);
 		await remove(vertical.component);
@@ -311,7 +350,9 @@ describe('application plugin adapters', () => {
 				context.contributions.view({
 					id: 'view',
 					name: 'View',
-					presentation: { component: BasicMenuHorizontal, context },
+					presentation: defineSveltePresentation(BasicMenuHorizontal, {
+						formatting: scopeFormattingService(f.formatting, context),
+					}),
 				});
 				context.contributions.command({ id: 'command', name: 'Command', execute });
 			}),
@@ -320,7 +361,7 @@ describe('application plugin adapters', () => {
 		expect(Object.keys(f.views.items)).toEqual(['view']);
 		const presentation = f.views.items.view.plugin!;
 		expect(f.views.items.view).toEqual({
-			plugin: { component: BasicMenuHorizontal, context: presentation.context },
+			plugin: { component: BasicMenuHorizontal, props: presentation.props },
 		});
 		const fallback = f.views.get('missing');
 		const { target, component } = render(presentation);
@@ -366,20 +407,24 @@ describe('application plugin adapters', () => {
 			const originalView = f.views.items.collision;
 			f.host.register(
 				plugin((context) => {
-					contributeToolbar(context);
+					contributeToolbar(context, f.formatting);
 					context.contributions.view({
 						id: 'view',
 						name: 'View',
-						presentation: { component: BasicMenuHorizontal, context },
+						presentation: defineSveltePresentation(BasicMenuHorizontal, {
+							formatting: scopeFormattingService(f.formatting, context),
+						}),
 					});
 					context.contributions.command({ id: 'command', name: 'Command', execute: () => true });
 					if (kind === 'toolbar') {
-						contributeToolbar(context, 'collision');
+						contributeToolbar(context, f.formatting, 'collision');
 					} else if (kind === 'view') {
 						context.contributions.view({
 							id: 'collision',
 							name: 'Collision',
-							presentation: { component: BasicMenuVertical, context },
+							presentation: defineSveltePresentation(BasicMenuVertical, {
+								formatting: f.formatting,
+							}),
 						});
 					} else {
 						context.contributions.command({
@@ -416,11 +461,13 @@ describe('application plugin adapters', () => {
 		const register = vi.spyOn(f.commands, 'register');
 		f.host.register(
 			plugin((context) => {
-				contributeToolbar(context);
+				contributeToolbar(context, f.formatting);
 				context.contributions.view({
 					id: 'view',
 					name: 'View',
-					presentation: { component: BasicMenuHorizontal, context },
+					presentation: defineSveltePresentation(BasicMenuHorizontal, {
+						formatting: scopeFormattingService(f.formatting, context),
+					}),
 				});
 				context.contributions.command({ id: 'command', name: 'Command', execute: () => true });
 			}),

@@ -3,7 +3,7 @@ import type {
 	FormattingRequest,
 	FormattingService as FormattingServiceContract,
 	FormattingSnapshot,
-} from '@writers-ide/plugins';
+} from './contracts';
 import type { EditorState, Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { untrack } from 'svelte';
@@ -19,7 +19,7 @@ import PageLayout, { PeerSelection } from '$lib/editor/state/page-layout.svelte'
 import { INDENT_MAX, INDENT_MIN } from '$lib/editor/prosemirror/view/constants';
 import { clamp } from '$lib/utils/numbers';
 
-/** Internal host sources, never passed to a plugin. Getters must track reactive registry changes. */
+/** Internal editor sources, not presentation props. Getters must track reactive registry changes. */
 export interface FormattingSources {
 	activeId(): string | null | undefined;
 	getView(id: string): { view: EditorView } | null;
@@ -182,7 +182,7 @@ function copy(value: FormattingSnapshot | null): FormattingSnapshot | null {
 	);
 }
 
-/** Lazy host-owned bridge. Only transferable summaries and validated requests cross its boundary. */
+/** Lazy feature bridge. Only transferable summaries and validated requests cross its boundary. */
 export class FormattingService implements FormattingServiceContract {
 	private listeners = new Set<(snapshot: FormattingSnapshot | null) => void>();
 	private cleanup: (() => void) | undefined;

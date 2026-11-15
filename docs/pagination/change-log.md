@@ -6,12 +6,13 @@ After confirmed merge, move the completed entry into `Merged PRs` in chronologic
 
 ## In progress
 
-### `main` working tree — Stage 2 browser baseline readiness
+### `bh/phase-2-plugin-transition` — Stage 2 browser baseline readiness and formatting boundary
 
-**Status: In progress / unmerged.** Working tree on `main`; no new branch or PR exists, and no merge date is assigned.
+**Status: In progress / unmerged.** Branch: `bh/phase-2-plugin-transition`. PR identity is not yet known; no merge date is assigned.
 
 - Makes the first page visible and waits for fitting content before capturing the initial split in formatting/reflow/undo range tests. A smoke trace showed an unpaginated offscreen first page with all 4,340 characters being recorded as the baseline, then compared with the correctly paginated 1,792-character split after undo. No assertions, selection helpers, or production pagination algorithms are weakened or changed.
-- Validation: the updated smoke suite passed three repeats across Chromium/WebKit (60 cases), including the new manager tests. See the [plugin entry](../plugins/change-log.md) for overall Stage 2 validation and remaining limits; library/manager implementation is tracked there and in [docking](../dnd/change-log.md).
+- Moves formatting contracts and the ProseMirror bridge into `src/lib/editor/prosemirror/menu/basic/`, with feature-local `scope-formatting-service.ts` owning cloned data/requests, subscriptions through `context.own`, and revocation through `context.signal`. The route injects the trusted singleton only into `createFormattingPlugin(service)`; the general plugin host no longer requires formatting. Stale active-view/revision checks, safe peer traversal, lazy bridge resources, cleanup/error isolation, and the full bridge regression suite are preserved at their new feature-local paths. This owner correction changes responsibility boundaries, not production pagination, geometry, history, selection helpers, or word-processor ownership. No generic service bus or external permission model is introduced.
+- Validation after the feature-boundary correction: all 856 unit tests in 40 files and all 20 smoke cases passed, including the caret and forward/reverse reflow/undo regressions across Chromium/WebKit. The earlier readiness fix also passed three repeated smoke runs (60 cases). No broader elimination of selection timing issues is claimed. See the [plugin entry](../plugins/change-log.md) for overall Stage 2 validation and remaining limits; library/manager implementation is tracked there and in [docking](../dnd/change-log.md).
 
 ## Merged PRs
 

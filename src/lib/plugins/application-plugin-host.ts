@@ -1,8 +1,8 @@
-import type { CommandContribution, FormattingService } from '@writers-ide/plugins';
+import type { CommandContribution } from '@writers-ide/plugins';
 import type { SveltePresentation } from '@writers-ide/plugins/svelte';
 import Registry, { type BarItemRegistry } from '$lib/editor/state/bar-item-registry.svelte';
 import TabRegistry, { type TabStateRegistry } from '$lib/editor/state/tab-state-registry.svelte';
-import Formatting from './formatting-service.svelte';
+
 import { PluginHost } from './plugin-host';
 
 /** Host-owned command handles; these are not keyboard bindings or editor internals. */
@@ -31,7 +31,6 @@ export const pluginCommands = new PluginCommands();
 
 export function createApplicationPluginHost(
 	options: {
-		formatting?: FormattingService;
 		bars?: BarItemRegistry;
 		views?: TabStateRegistry;
 		commands?: PluginCommands;
@@ -41,7 +40,6 @@ export function createApplicationPluginHost(
 	const views = options.views ?? TabRegistry;
 	const commands = options.commands ?? pluginCommands;
 	return new PluginHost<SveltePresentation>({
-		formatting: options.formatting ?? Formatting,
 		registries: {
 			toolbar: {
 				register(_ownerId, contribution) {

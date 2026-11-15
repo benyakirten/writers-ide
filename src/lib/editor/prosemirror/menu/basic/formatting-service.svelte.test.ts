@@ -3,7 +3,7 @@ import { flushSync } from 'svelte';
 import { Schema, type Node as ProseMirrorNode } from 'prosemirror-model';
 import { AllSelection, EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import type { FormattingCommand, FormattingSnapshot } from '@writers-ide/plugins';
+import type { FormattingCommand, FormattingSnapshot } from './contracts';
 
 import { FormattingService, type FormattingSources } from './formatting-service.svelte';
 import { INDENT_MAX } from '$lib/editor/prosemirror/view/constants';

@@ -11,8 +11,6 @@
 
 	const panelId = $props.id();
 	const explanations: Record<PluginCapability, string> = {
-		'formatting.observe': 'Observe active-editor formatting summaries, not manuscript text.',
-		'formatting.execute': 'Request supported formatting changes in the active editor.',
 		'contributions.toolbar': 'Provide toolbar controls in the workbench.',
 		'contributions.view': 'Provide a central workspace view.',
 		'contributions.command': 'Provide actions the host can invoke.',

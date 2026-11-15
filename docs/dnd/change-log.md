@@ -4,15 +4,16 @@ For current behavior and rationale, read [context.md](context.md). Create one co
 
 ## In progress
 
-### `main` working tree — Stage 2 reusable layout and tooltip integration
+### `bh/phase-2-plugin-transition` — Stage 2 reusable layout and tooltip integration
 
-**Status: In progress / unmerged.** Working tree on `main`; no new branch or PR exists, and no merge date is assigned.
+**Status: In progress / unmerged.** Branch: `bh/phase-2-plugin-transition`. PR identity is not yet known; no merge date is assigned.
 
 - Moves registry/capacity, item/bar state, validated transfers, floaters, feedback/palette, and drag/target primitives into private `@writers-ide/layout`. Explicit registry/ID/title/item-factory dependencies support independent workbenches without importing app singletons or ProseMirror.
 - Keeps the app compatibility instance in `src/lib/editor/state/workbench.svelte.ts`, existing state facades, custom bar/presentation rendering, and `Editor.svelte` sensors/collisions/overlay/commit composition. Existing three-unit, destination-orientation, cancellation, placement-identity, and disabled-cost contracts are preserved; no persistence or general component-local-state transfer is added.
 - Uses explicit tooltip state/provider from private `@writers-ide/components`; app wrappers retain the shared manager and suppression leases. The route provides that manager around `Editor` without a duplicate pointer. The base bar forwards the host-owned Plugins dialog action; feature contributions do not own management UI. See the [plugin entry](../plugins/change-log.md).
+- Updates trusted presentation routing for the owner's feature-neutral contract correction: `defineSveltePresentation(component, props)` carries typed explicit feature props, with no hardcoded context. Formatting gets its feature-scoped service from `createFormattingPlugin(service)`, not a general host formatting service. Common context is supplied only when needed. Docking identity, placement, orientation costs, cleanup, and disabled capacity stay unchanged; no generic service bus, permission model, component-state transfer, or word-processor migration is added. See the linked plugin entry for feature-local lifecycle/bridge coverage and rationale.
 - Adds library integration/independence coverage in `src/lib/testing/layout-library.svelte.test.ts` and `components-library.svelte.test.ts`, alongside existing state/transfer and browser docking regressions.
-- Validation: all 843 unit tests in 38 files passed; `CI=true pnpm test:e2e` passed all 114 Chromium/WebKit cases, including the complete docking/feedback/destination suite, pagination-selection and plugin-manager coverage, styles, and a production build. Lint and frozen offline workspace install passed. Type checking remains blocked by the pre-existing `Modal.svelte` typing error and five old generic DnD warnings. These browser results do not verify native WebViews, real touch hardware, or complete accessibility; see the linked plugin entry for limits and final smoke-command checks.
+- Validation after the contract correction: all 856 unit tests in 40 files passed; all 78 docking/feedback/destination cases and 20 smoke cases passed across Chromium/WebKit, including production builds. Lint passed. Type checking remains blocked by the pre-existing `Modal.svelte` typing error and five old generic DnD warnings. These results do not verify native WebViews, real touch hardware, or complete accessibility; see the linked plugin entry for cumulative outcomes and limits.
 
 ## Merged PRs
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushSync, mount, unmount } from 'svelte';
-import type { SveltePresentation } from '@writers-ide/plugins/svelte';
+import { defineSveltePresentation, type SveltePresentation } from '@writers-ide/plugins/svelte';
 import FailingPluginPresentation from '$lib/testing/FailingPluginPresentation.svelte';
 import { failures } from '$lib/testing/plugin-presentation-failures';
 import PluginBoundaryHostFixture from '$lib/testing/PluginBoundaryHostFixture.svelte';
@@ -22,7 +22,6 @@ function setup(failure: 'init' | 'effect') {
 	const subscribe = vi.fn(() => unsubscribe);
 	const register = () => () => {};
 	const host = new PluginHost<SveltePresentation>({
-		formatting: { subscribe, execute: () => false },
 		registries: {
 			toolbar: { register },
 			command: { register },
@@ -37,6 +36,7 @@ function setup(failure: 'init' | 'effect') {
 		},
 	});
 	let fail = true;
+	let signal: AbortSignal;
 	host.register({
 		manifest: {
 			id: 'test.boundary',
@@ -44,16 +44,20 @@ function setup(failure: 'init' | 'effect') {
 			description: 'Exercises presentation failures.',
 			version: '1.0.0',
 			apiVersion: 1,
-			capabilities: ['formatting.observe', 'contributions.view'],
+			capabilities: ['contributions.view'],
 		},
 		activate(context) {
+			signal = context.signal;
 			if (fail) {
 				failures.set(context.signal, failure);
 			}
 			context.contributions.view({
 				id: 'test.boundary/view',
 				name: 'Test view',
-				presentation: { component: FailingPluginPresentation, context },
+				presentation: defineSveltePresentation(FailingPluginPresentation, {
+					context,
+					events: { subscribe },
+				}),
 			});
 		},
 	});
@@ -80,7 +84,7 @@ function setup(failure: 'init' | 'effect') {
 		unsubscribe,
 		recover() {
 			fail = false;
-			failures.delete(props.presentation!.context.signal);
+			failures.delete(signal);
 		},
 	};
 }
@@ -144,14 +148,13 @@ describe('plugin presentation host boundary', () => {
 		expect(f.unsubscribe).toHaveBeenCalledTimes(2);
 	});
 
-	it('recovers on context replacement even when the descriptor is retained', () => {
+	it('recovers on props replacement even when the descriptor is retained', () => {
 		const f = setup('effect');
 		expect(f.target.querySelector('[role="alert"]')).not.toBeNull();
 		f.recover();
 		const descriptor = f.props.presentation!;
 
-		const context = descriptor.context;
-		Object.assign(descriptor, { context: { ...context } });
+		Object.assign(descriptor, { props: { ...descriptor.props } });
 		flushSync();
 		expect(f.target.querySelector('[role="alert"]')).toBeNull();
 		expect(f.target.textContent).toContain('Plugin interface ready');

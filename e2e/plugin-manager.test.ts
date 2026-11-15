@@ -19,8 +19,9 @@ test('opens the host plugin manager with the keyboard and restores focus on clos
 	await expect(manager).toContainText('0.1.0');
 	await expect(manager).toContainText('trusted bundled plugins');
 	await expect(manager).toContainText('not sandboxed');
-	await expect(manager).toContainText('formatting.observe');
-	await expect(manager).toContainText('formatting.execute');
+	await expect(manager).toContainText('contributions.toolbar');
+	await expect(manager).not.toContainText('formatting.observe');
+	await expect(manager).not.toContainText('formatting.execute');
 	await expect(manager).toContainText('toolbar:');
 	await expect(manager).toContainText('basic-menu');
 	await expect(manager.getByRole('status')).toHaveText('Enabled');

@@ -1,179 +1,115 @@
 # Building a Writer's IDE plugin
 
-A plugin adds a feature to Writer's IDE without taking over the workbench or reaching into editor internals. It can contribute an interface, observe the state it needs, and ask the host to perform supported actions.
+A plugin adds a feature without taking over the workbench. It contributes UI or actions through platform extension points; the workbench owns placement and rendering, and the host owns activation and cleanup. Feature-specific behavior and dependencies belong to the feature, not to a growing universal plugin context.
 
-For example, the built-in formatting plugin contributes a toolbar. It receives information such as “half the selected text is bold” and can request “toggle bold.” It does not need to receive the selected text, a ProseMirror editor, or the application's workspace state.
-
-**Current scope:** this private workspace package supports trusted, bundled plugins. There is no external installation or sandbox. A host-owned management panel is available for the application to mount. The APIs are evolving, not a stable published SDK. Capability checks restrict calls through the host, but do not contain in-process JavaScript.
+**Current scope:** this private workspace package supports explicitly registered, trusted bundled plugins. It is an evolving API, not a stable published SDK. There is no external installation or sandbox. Capability checks govern host API calls; they do not contain in-process JavaScript.
 
 ## What can a plugin do today?
 
-Plugins declare the capabilities they use in their manifest. Each capability has a corresponding API on the context supplied during activation.
+Declare the capabilities your plugin uses in its manifest:
 
-| I want to…                      | Declare this capability | Use this API                         | What it gives you                                                                                         |
-| ------------------------------- | ----------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| Add a movable toolbar item      | `contributions.toolbar` | `context.contributions.toolbar(...)` | Horizontal and vertical presentations; the workbench handles placement, dragging, and capacity.           |
-| Provide a central view          | `contributions.view`    | `context.contributions.view(...)`    | Registers a view type that the host can place in the central workspace.                                   |
-| Provide an action               | `contributions.command` | `context.contributions.command(...)` | Registers a named action that host code can invoke without depending on your implementation.              |
-| Follow active-editor formatting | `formatting.observe`    | `context.formatting.subscribe(...)`  | Immediate and subsequent formatting summaries, including mixed-selection ratios and command availability. |
-| Change active-editor formatting | `formatting.execute`    | `context.formatting.execute(...)`    | Requests a supported change against a particular view and state revision.                                 |
+| Goal                                 | Capability              | Context API                          |
+| ------------------------------------ | ----------------------- | ------------------------------------ |
+| Add a movable toolbar item           | `contributions.toolbar` | `context.contributions.toolbar(...)` |
+| Register a central view presentation | `contributions.view`    | `context.contributions.view(...)`    |
+| Register a named action              | `contributions.command` | `context.contributions.command(...)` |
 
-Contributions and data access are separate. Registering a toolbar does not grant formatting access, and observing formatting does not grant editing authority. Declare only what the feature uses. Missing observation/registration capabilities cause an error; unauthorized formatting execution returns `false`.
+These are the current `PluginCapability` values. Missing registration capabilities cause an error. Toolbar contributions provide horizontal and vertical presentations; view contributions register a view type, without instance metadata or a plugin-facing “open view” operation. Commands are host-invokable actions, not automatic keyboard bindings, menu items, or command-palette entries.
 
-The current view API registers a presentation, not a complete document-view integration: it has no instance metadata or plugin-facing “open view” operation yet. Command registration does not create a keyboard binding, menu item, or command palette entry automatically.
-
-There are no public plugin APIs yet for reading manuscript text, arbitrary document edits, project storage, history trees, assets, network requests, filesystem access, or native execution. An undo-tree plugin, for example, needs a future host history service; it cannot be built from the current formatting API.
+The activation context contains only `contributions`, `signal`, and `own(dispose)`. It is not a bag of every feature's services. There is no generic services registry or public plugin API for manuscript text, arbitrary document edits, storage, history, network, filesystem, or native execution.
 
 ## How the pieces fit together
 
-There are three layers:
+- **The plugin** owns its feature, manifest, presentations, and explicitly supplied dependencies.
+- **The generic host** owns capability checks, contribution registration, activation, rollback, and cleanup. Its options contain contribution registries only.
+- **Application adapters** connect those registries to the workbench. Trusted application composition separately supplies any feature-owned dependencies to the particular plugin that needs them.
 
-1. **Your plugin** describes a feature and uses the context it receives.
-2. **The plugin host** owns activation, capabilities, registrations, and cleanup.
-3. **Application adapters and services** connect those requests to the existing workbench and ProseMirror editor.
+Platform contributions answer “what does this feature add to the workspace?” Feature-owned dependencies answer “what does this feature need to do its job?” Do not turn the latter into generic host capabilities merely because one plugin needs them. Injecting an in-process dependency is trusted composition, not an external permission grant or an approved sandbox interface.
 
-```mermaid
-flowchart TD
-    Host[Plugin host] -->|Activates with scoped context| Plugin[Feature plugin]
-    Plugin -->|Registers toolbar, view, or command| Contributions[Contribution adapters]
-    Contributions --> Workbench[Workbench rendering and layout]
-    Plugin -->|Subscribes or requests formatting| Formatting[Host formatting service]
-    Formatting -->|Validates and applies commands| Editor[ProseMirror editor]
-    Formatting -->|Publishes copied summaries| Plugin
-```
+The package exposes two entry points:
 
-The workbench owns where a toolbar lives; the plugin owns what its controls do. The formatting service owns editor transactions, active-view resolution, and focus restoration; the plugin supplies a command request. This division keeps feature code smaller and gives the host one place to enforce shared rules.
+- [`@writers-ide/plugins`](index.ts): framework-independent lifecycle, manifest, contribution, registry, and management contracts, plus the `Dispose` cleanup type.
+- [`@writers-ide/plugins/svelte`](svelte.ts): trusted Svelte presentation descriptors and `defineSveltePresentation(Component, props)`.
 
-The package exports **contracts**, not the application host implementation:
-
-- `@writers-ide/plugins`: framework-independent data, capability, contribution, and lifecycle types.
-- `@writers-ide/plugins/svelte`: the current trusted Svelte presentation adapter types.
-
-A ProseMirror `Plugin` is a different concept: it extends an editor internally. It is not an application-plugin lifecycle or a security boundary.
+A ProseMirror `Plugin` extends an editor internally; it is not an application-plugin lifecycle or a security boundary.
 
 ## Add a toolbar
 
-A bundled plugin exports a manifest and a synchronous `activate(context)` function. The manifest identifies the feature, names its capabilities, and declares the host API version it expects. Currently, only `apiVersion: 1` is supported.
-
-Here is a small plugin definition, assuming `FormattingToolbar.svelte` is the component shown in the next section:
+A bundled definition has a manifest and synchronous `activate(context)` function. Only `apiVersion: 1` is currently supported. For example, pair this definition with a `CounterToolbar.svelte` component:
 
 ```ts
-import type { SveltePlugin } from '@writers-ide/plugins/svelte';
-import FormattingToolbar from './FormattingToolbar.svelte';
+import { defineSveltePresentation, type SveltePlugin } from '@writers-ide/plugins/svelte';
+import CounterToolbar from './CounterToolbar.svelte';
 
 export const plugin: SveltePlugin = {
 	manifest: {
-		id: 'example.formatting',
+		id: 'example.counter',
 		version: '0.1.0',
 		apiVersion: 1,
-		name: 'Formatting tools',
-		description: 'A toolbar for basic text formatting.',
-		capabilities: ['contributions.toolbar', 'formatting.observe', 'formatting.execute'],
+		name: 'Counter',
+		description: 'A small local counter toolbar.',
+		capabilities: ['contributions.toolbar'],
 	},
 	activate(context) {
-		const presentation = { component: FormattingToolbar, context };
+		const presentation = defineSveltePresentation(CounterToolbar, { label: 'Count' });
 		context.contributions.toolbar({
-			id: 'example.formatting/toolbar',
-			name: 'Formatting tools',
+			id: 'example.counter/toolbar',
+			name: 'Counter',
 			horizontal: { presentation, size: 1 },
 			vertical: { presentation, size: 1 },
 		});
+		const onReset = () => console.info('Counter plugin reset requested');
+		window.addEventListener('example-counter-reset', onReset);
+		context.own(() => window.removeEventListener('example-counter-reset', onReset));
 	},
 };
 ```
 
-Each orientation can use a different component and cost **1, 2, or 3 logical capacity units**. A bar holds at most three units; these are layout costs, not a pixel-size guarantee. This example shares one component between orientations; the built-in plugin provides separate presentations.
-
-Use stable, plugin-qualified contribution IDs. IDs must be unique within each contribution kind across active plugins; they are not automatically prefixed. Registering a toolbar makes it available to the workbench; it does not choose its initial placement.
-
-The descriptor `{ component, context }` tells the trusted adapter what to render and which activation's services it can use. Components receive a `context` prop, not the legacy editor/workspace props. Svelte is the current bundled rendering adapter, not a requirement selected for all future third-party interfaces.
-
-## Observe state, then request an action
-
-A formatting component subscribes to the latest summary and uses that summary when issuing a command:
-
 ```svelte
 <script lang="ts">
-	import type { FormattingSnapshot } from '@writers-ide/plugins';
-	import type { SveltePluginContext } from '@writers-ide/plugins/svelte';
-
-	let { context }: { context: SveltePluginContext } = $props();
-	let formatting = $state<FormattingSnapshot | null>(null);
-
-	$effect(() => {
-		return context.formatting.subscribe((snapshot) => {
-			formatting = snapshot;
-		});
-	});
-
-	function toggleBold() {
-		if (!formatting?.enabled.bold) {
-			return;
-		}
-		context.formatting.execute({
-			viewId: formatting.viewId,
-			revision: formatting.revision,
-			command: 'bold',
-		});
-	}
+	let { label }: { label: string } = $props();
+	let count = $state(0);
 </script>
 
-<button disabled={!formatting?.enabled.bold} onclick={toggleBold}>Toggle bold</button>
+<button onclick={() => count++}>{label}: {count}</button>
 ```
 
-`subscribe()` delivers a snapshot immediately, or `null` when no supported editor is active. Later notifications follow editor and active-view changes. Each subscriber receives its own data copy.
+The helper checks the component's typed props before producing a generic `{ component, props }` descriptor. The adapter renders those props; it does not automatically inject a `context` prop or legacy workspace/editor props. This example passes only `{ label }`. Its window listener illustrates `own()` cleanup in trusted bundled code, not a platform event API or permission guarantee.
 
-| Snapshot field | How to use it                                                                                                                                                                                         |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `viewId`       | Identifies the editor view the summary describes. Treat it as opaque; it is not a document ID.                                                                                                        |
-| `revision`     | An opaque, in-memory state token. Send it back with the command; it is not a saved document version.                                                                                                  |
-| `marks`        | Ratios for bold, italic, superscript, subscript, underline, overline, and strikethrough. `0` means absent, `1` means present throughout selected text, and intermediate values mean mixed formatting. |
-| `blocks`       | Paragraph-formatting indicators. Alignment values are coverage ratios; `indent` is indentation relative to the maximum, and `dedent` is its complement when paragraphs are available.                 |
-| `enabled`      | Whether each formatting command is currently available. Use it to disable controls rather than guessing from visual state.                                                                            |
+Each orientation can use a different component and costs **1, 2, or 3 logical capacity units**. A bar holds at most three units; this is not a pixel-size guarantee. Use stable, preferably plugin-qualified contribution IDs. IDs are unique within each contribution kind across active plugins and are not automatically prefixed. Registration makes a toolbar available; it does not choose its initial placement.
 
-Commands are the seven mark names above, `indent`, `dedent`, `align-left`, `align-center`, `align-right`, and `align-justify`.
-
-`execute()` returns `false` if the request is stale, the target is no longer active, the command is unavailable, or the plugin's authority has been revoked. **Do not retry a stale action against whichever editor happens to be active next.** Wait for a fresh snapshot and a new user action. This prevents delayed interactions from editing the wrong view or selection.
-
-The service retains existing editor behavior: mark toggles require a nonempty selection, superscript/subscript exclude each other, and paragraph operations account for pagination-created continuations. A plugin does not need to reproduce those rules.
+Svelte is the current trusted rendering adapter, not a requirement selected for all future third-party UI. For a real feature with an explicitly injected dependency, see the [built-in formatting plugin guide](../../src/lib/editor/prosemirror/menu/basic/README.md).
 
 ## Activation, cleanup, and moving UI
 
-Registration is not activation. The host calls `activate()` when enabling a plugin; it may return a cleanup function. Activation is synchronous in this phase.
+Registration is not activation. The host calls `activate()` when enabling the plugin; it may return a synchronous cleanup function.
 
-- Contribution registrations and formatting subscriptions return cleanup handles and are automatically owned by the activation.
-- For component subscriptions, also return the handle from a Svelte effect, as above. Moving a toolbar can unmount its presentation without disabling the plugin.
-- Use `context.own(dispose)` for additional resources, such as timers or event listeners. Its returned handle lets you release them early.
-- Use `context.signal` to cancel work when the activation ends. It does not move work off the main thread or make asynchronous activation supported.
+- Contribution registrations return activation-owned cleanup handles.
+- Use `context.own(dispose)` for other resources, such as timers and listeners. Its idempotent returned handle supports early release; late ownership disposes immediately.
+- Use `context.signal` to cancel work when activation ends. It does not offload CPU work or make asynchronous activation supported.
+- Feature dependencies must arrange their own activation scoping, using `own` and `signal` where needed. The generic host cannot automatically discover their subscriptions.
+- Component-bound subscriptions also need unmount cleanup, for example by returning the disposer from a Svelte effect. Moving a toolbar can unmount its presentation without disabling its plugin.
 
-Keep meaningful feature state outside component-local presentation state when it must survive relocation. The formatting example simply resubscribes to the current host summary after remounting. There is no general plugin-state persistence API yet.
+Keep meaningful state outside component-local presentation state if it must survive relocation. The counter deliberately resets on remount; there is no general plugin-state persistence API.
 
-On deactivation, the host first revokes the context and aborts its signal, then cleans up owned resources in reverse order. On activation failure, it rolls back registered resources. Cleanup handles are idempotent, and a failed disposer does not prevent other cleanup. Old command handles cannot regain authority when the plugin is enabled again.
+Deactivation revokes the context and aborts its signal before reverse-order cleanup. Activation failure rolls back owned resources. Cleanup handles are idempotent; a failing disposer does not stop other cleanup, and old command handles do not regain authority after reactivation. External registration adapters must undo partial work if they throw before returning a cleanup handle.
 
-Disabling a toolbar preserves its in-memory placement and capacity costs, but removes its presentation. It does not delete project data. The current host does not provide durable project recovery or layout storage.
+Disabling a toolbar removes its presentation while retaining in-memory placement and capacity costs. This does not provide durable layout storage or project recovery.
 
-## Connecting a plugin to the application
+## Connecting and managing plugins
 
-This is host integration work, not something the plugin performs itself. The application currently imports bundled definitions explicitly; nothing scans directories or executes project-supplied code.
+Application integration imports bundled definitions explicitly; nothing scans directories or executes project-supplied code. [`createApplicationPluginHost()`](../../src/lib/plugins/application-plugin-host.ts) supplies toolbar, view, and command registry adapters to [`PluginHost`](../../src/lib/plugins/plugin-host.ts), not feature services. A different integration supplies its own `ContributionRegistry.register(ownerId, contribution)` adapters and their removal handles.
 
-[`createApplicationPluginHost()`](../../src/lib/plugins/application-plugin-host.ts) supplies the workbench registries and formatting service to [`PluginHost`](../../src/lib/plugins/plugin-host.ts). Host code calls `register(plugin)`, then `activate(plugin.manifest.id)`, and calls `deactivate(id)` during teardown or disabling. See the [application bootstrap](../../src/routes/+page.svelte) for the working integration.
+Host code calls `register(plugin)`, then `activate(plugin.manifest.id)`, and `deactivate(id)` on teardown or disabling. Check activation results: lifecycle failures appear in `errors`, while invalid registrations and lifecycle calls throw. `get(id)` and `list()` expose copied metadata, status, contribution IDs, and errors; retry or re-enable with `activate(id)` again. The [application bootstrap](../../src/routes/+page.svelte) demonstrates explicit composition and teardown.
 
-Host management uses `get(id)` or `list()` to inspect copied metadata, contribution IDs, status, and errors. Check the result of activation: activation/cleanup failures are recorded in `errors`, while invalid registrations and lifecycle calls throw. Re-enabling or retrying uses `activate(id)` again. Management subscriptions deliver immediate and subsequent frozen metadata snapshots. There is no persisted enable/disable preference yet.
+The application can mount the host-owned [`PluginManager.svelte`](../../src/lib/plugins/PluginManager.svelte) with a `management` prop implementing `PluginManagementService`; `PluginHost` already implements it. The panel lists trusted bundled plugins and offers enable/disable/retry. Optional `requiredPluginIds` prevents disabling selected plugins in the panel only; it is not a manifest permission or host enforcement rule. The parent owns the launcher and dialog wrapper, so disabling a feature cannot remove the management shell.
 
-For another host integration, implement `ContributionRegistry.register(ownerId, contribution)` adapters that return removal handles, and supply a `FormattingService`. Adapter registration and subscription setup must undo partial work if they throw; the generic host cannot repair an external service that fails before returning a cleanup handle.
+Management subscriptions deliver immediate and subsequent frozen metadata snapshots, never executable contributions or contexts. Observer failures do not interrupt lifecycle cleanup. Registration/lifecycle calls inside notification callbacks throw; defer follow-up actions until the callback returns. Activation preferences are not persisted.
 
-## Managing bundled plugins
+## Boundaries and next steps
 
-The application can mount the host-owned `PluginManager.svelte` panel with a `management` prop implementing `PluginManagementService` (the generic `PluginHost` already does). It shows capabilities, current contributions, lifecycle errors, and enable/disable/retry controls. An optional `requiredPluginIds: readonly string[]` prop prevents disabling host-required features in the panel; it is a UI policy, not a new manifest permission or host enforcement rule.
+The current host manages trusted in-process code only. Typed props, narrow injected dependencies, capability declarations, and local presentation-error boundaries are not isolation. External loading requires separately approved and implemented isolation, messaging, validation, and permission enforcement; current dependency injection does not settle those contracts.
 
-The parent owns the launcher and any dialog wrapper. The panel is not a plugin contribution, so disabling a feature cannot remove the management shell. The service provides `list()`, immediate `subscribe(listener)` with an idempotent unsubscribe handle, and `activate(id)` / `deactivate(id)`. Observer failures cannot interrupt lifecycle cleanup; registration/lifecycle changes inside notification callbacks throw and must be deferred until the callback returns. Only metadata crosses this management boundary, not executable contributions or plugin contexts.
-
-This manages explicitly registered, trusted bundled code only: no file/URL installation, uninstall, sandbox, or saved activation preferences.
-
-## Read next
-
-- [Built-in formatting plugin](../../src/lib/editor/prosemirror/menu/basic/menu.ts): real registration and orientation-specific components.
-- [Type definitions](index.ts) and [Svelte adapter](svelte.ts): exact API signatures, rather than a second copy of the interfaces here.
-- [Plugin architecture and stages](../../docs/plugins/context.md): current boundaries, limitations, and the planned manager/library and isolation work.
-
-The long-term boundary is the same—features contribute through explicit APIs—but isolated third-party rendering, messaging, and permission grants still require Stage 3 implementation. A direct Svelte mount and a capability declaration are not a sandbox.
+- [Exact root contracts](index.ts) and [Svelte adapter](svelte.ts).
+- [Formatting feature guide](../../src/lib/editor/prosemirror/menu/basic/README.md): feature-local snapshots, commands, editor bridge, and lifecycle scoping.
+- [Plugin architecture and stages](../../docs/plugins/context.md): broader direction and remaining decisions; consult current source for working-tree API changes.

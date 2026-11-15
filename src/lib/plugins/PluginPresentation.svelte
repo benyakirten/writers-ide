@@ -3,12 +3,12 @@
 
 	let { presentation }: { presentation: SveltePresentation } = $props();
 	const Component = $derived(presentation.component);
-	const identity = $derived({ presentation, context: presentation.context });
+	const identity = $derived({ presentation, props: presentation.props });
 </script>
 
 {#key identity}
 	<svelte:boundary>
-		<Component context={presentation.context} />
+		<Component {...presentation.props} />
 		{#snippet failed()}
 			<p role="alert">
 				This plugin’s interface could not be displayed. Open Plugins to disable and re-enable the

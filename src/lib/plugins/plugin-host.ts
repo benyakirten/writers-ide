@@ -4,7 +4,6 @@ import type {
 	ContributionKind,
 	ContributionRegistry,
 	Dispose,
-	FormattingService,
 	PluginCapability,
 	PluginContext,
 	PluginError,
@@ -18,8 +17,6 @@ import type {
 } from '@writers-ide/plugins';
 
 const capabilities = new Set<PluginCapability>([
-	'formatting.observe',
-	'formatting.execute',
 	'contributions.toolbar',
 	'contributions.view',
 	'contributions.command',
@@ -40,7 +37,6 @@ interface Entry<Presentation> {
 }
 
 export interface PluginHostOptions<Presentation> {
-	readonly formatting: FormattingService;
 	readonly registries: PluginRegistries<Presentation>;
 }
 
@@ -51,11 +47,9 @@ export class PluginHost<Presentation> implements PluginManagementService {
 	readonly #listeners = new Set<(plugins: readonly PluginInfo[]) => void>();
 	#notifying = false;
 	#notificationPending = false;
-	readonly #formatting: FormattingService;
 	readonly #registries: PluginRegistries<Presentation>;
 
 	constructor(options: PluginHostOptions<Presentation>) {
-		this.#formatting = options.formatting;
 		this.#registries = Object.freeze({ ...options.registries });
 	}
 
@@ -208,67 +202,6 @@ export class PluginHost<Presentation> implements PluginManagementService {
 		return Object.freeze({
 			signal: activation.controller.signal,
 			own: (dispose: Dispose) => this.#own(entry, activation, dispose),
-			formatting: Object.freeze({
-				subscribe: (listener: Parameters<FormattingService['subscribe']>[0]) => {
-					requireCapability('formatting.observe');
-					let subscribed = true;
-					let subscribing = true;
-					let failure: { error: unknown } | undefined;
-					let unsubscribe: Dispose;
-					try {
-						unsubscribe = this.#formatting.subscribe((snapshot) => {
-							if (!activation.live || !subscribed) {
-								return;
-							}
-							try {
-								listener(
-									snapshot === null
-										? null
-										: {
-												...snapshot,
-												marks: { ...snapshot.marks },
-												blocks: { ...snapshot.blocks },
-												enabled: { ...snapshot.enabled },
-											},
-								);
-							} catch (error) {
-								if (!subscribing) {
-									throw error;
-								}
-								// Obtain the service's disposer before propagating an initial listener failure.
-								subscribed = false;
-								failure = { error };
-							}
-						});
-						if (typeof unsubscribe !== 'function') {
-							throw new Error('Formatting subscription must return a disposer');
-						}
-					} catch (error) {
-						subscribed = false;
-						throw error;
-					} finally {
-						subscribing = false;
-					}
-					const release = this.#own(entry, activation, () => {
-						subscribed = false;
-						unsubscribe();
-					});
-					if (failure) {
-						release();
-						throw failure.error;
-					}
-					return release;
-				},
-				execute: (request: Parameters<FormattingService['execute']>[0]) => {
-					if (
-						!activation.live ||
-						!entry.plugin.manifest.capabilities.includes('formatting.execute')
-					) {
-						return false;
-					}
-					return this.#formatting.execute({ ...request });
-				},
-			}),
 			contributions: Object.freeze({
 				toolbar: (contribution: ToolbarContribution<Presentation>) => {
 					requireCapability('contributions.toolbar');

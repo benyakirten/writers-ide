@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SveltePluginContext } from '@writers-ide/plugins/svelte';
-	import { failures } from './plugin-presentation-failures';
-	let { context }: { context: SveltePluginContext } = $props();
+	import { failures, type PresentationEvents } from './plugin-presentation-failures';
+	let { context, events }: { context: SveltePluginContext; events: PresentationEvents } = $props();
 
 	function initialize() {
 		if (failures.get(context.signal) === 'init') {
@@ -10,7 +10,7 @@
 	}
 	initialize();
 
-	$effect(() => context.formatting.subscribe(() => {}));
+	$effect(() => context.own(events.subscribe()));
 	$effect(() => {
 		if (failures.get(context.signal) === 'effect') {
 			throw new Error('Private plugin effect details');
