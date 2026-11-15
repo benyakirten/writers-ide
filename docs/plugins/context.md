@@ -4,7 +4,7 @@
 
 This topic distinguishes plugins, reusable libraries, and the application core. **Stage 1 merged in [#80](https://github.com/benyakirten/writers-ide/pull/80) on 2026-11-14. Stage 2 is implemented on `bh/phase-2-plugin-transition` (unmerged; no PR known). Stage 3 remains planned.** Stage 2 adds private layout/component libraries and a host-owned plugin manager, not a sandbox or published SDK. Public API stabilization, broader extraction, isolation mechanisms, and storage designs remain open and require owner approval.
 
-Read [project context](../project-context.md) for accepted product direction and security requirements. See [change-log.md](change-log.md) for the current documentation change.
+Read [project context](../project-context.md) for accepted product direction and security requirements. See [implementation-plan.md](implementation-plan.md) for the proposed four-part implementation roadmap and approval gates, and [change-log.md](change-log.md) for cumulative PR outcomes.
 
 ## The distinction
 
