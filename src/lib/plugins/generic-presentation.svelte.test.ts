@@ -24,6 +24,9 @@ const management: PluginManagementService = {
 	activate() {
 		throw new Error('No registered plugins');
 	},
+	planDeactivation() {
+		throw new Error('No registered plugins');
+	},
 	deactivate() {
 		throw new Error('No registered plugins');
 	},

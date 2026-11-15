@@ -507,7 +507,7 @@ describe('PluginHost', () => {
 		expect(registries.toolbar.register).not.toHaveBeenCalled();
 		expect(registries.view.register).not.toHaveBeenCalled();
 		expect(registries.command.register).not.toHaveBeenCalled();
-		expect(Object.keys(saved).sort()).toEqual(['contributions', 'own', 'signal', 'tasks']);
+		expect(Object.keys(saved).sort()).toEqual(['apis', 'contributions', 'own', 'signal', 'tasks']);
 	});
 
 	it('clears old errors on retry after activation or cleanup failure', () => {

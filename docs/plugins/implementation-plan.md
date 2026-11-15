@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**Part 1 is owner-authorized and implemented on `bh/phase-2-plugin-transition` (in progress / unmerged; no PR known). Parts 2–4 remain proposed for separate review and approval.** The frontend trust model and opt-in cooperation are accepted; Part 1 establishes private, evolving task contracts, not a published stable API. Provider/dependency policies, live ProseMirror callback access, schema lifecycle and native-enforcement designs are not authorized by this roadmap.
+**Parts 1–2 are owner-authorized and implemented on `bh/phase-2-plugin-transition` (in progress / unmerged; no PR known). Parts 3–4 remain proposed for separate review and approval.** The frontend trust model and opt-in cooperation are accepted; task/provider contracts remain private and evolving, not a published stable API. Part 2's provider/dependency policies are approved; live ProseMirror callback access, schema lifecycle and native-enforcement designs are not authorized by this roadmap.
 
 Read [context.md](context.md) for current implementation and accepted architectural direction, [change-log.md](change-log.md) for cumulative PR outcomes, and [project context](../project-context.md) for repository-wide constraints. Update this plan as scopes are approved or completed; do not treat it as evidence that a feature exists.
 
@@ -25,7 +25,7 @@ Read [context.md](context.md) for current implementation and accepted architectu
 | 3. Editor extensions | Replaceable formatting, ProseMirror wrappers, Svelte node views | Pagination redesign, unrestricted live schema toggling |
 | 4. External loading  | Installation, trust UX, verified native restrictions            | Frontend sandbox guarantees                            |
 
-Part 1 is implemented in the current working tree. The later parts remain a roadmap with separate design and approval gates, not one authorized migration.
+Parts 1–2 are implemented in the current working tree. Parts 3–4 remain a roadmap with separate design and approval gates, not one authorized migration.
 
 ## Part 1 — Shared scheduler and managed tasks
 
@@ -60,30 +60,25 @@ Iteration helpers manage checkpoints, not callback cost. Each unit must remain s
 
 **Goal:** plugins consume another plugin's public functionality without importing its private implementation.
 
-### Proposed initial policies
+### Implemented scope (owner-authorized / unmerged)
 
-| Concern              | Initial proposal                                              |
-| -------------------- | ------------------------------------------------------------- |
-| Provider identity    | Named contract with a declared version                        |
-| Compatibility        | Explicit API-major compatibility; manifest syntax to finalize |
-| Required dependency  | Must be available before consumer activation                  |
-| Optional dependency  | Consumer remains active without it                            |
-| Cycles               | Reject required dependency cycles with a useful error         |
-| Disabling a provider | Show affected required dependents before disabling them       |
-| Cleanup order        | Dependents stop before required providers                     |
-| Communication        | Public methods, subscriptions, and owned registrations        |
+- `definePluginApi<T>({ id, major })` defines a frozen nonempty ID and positive safe-integer major. Providers declare `provides: [{ id, major }]`; consumers pin `dependencies: [{ provider, api, major, optional? }]` to an exact provider ID/API ID/major, not a package-version range. Self/duplicate dependencies fail validation.
+- Providers publish each declared contract once through `context.apis.provide(contract, factory)` during synchronous activation only. `get`/`subscribe` require the consumer's matching declaration. Optional absence yields `null`; subscriptions deliver immediately and on provider arrival/removal/reactivation. Optional dependencies never auto-activate providers and consumers remain active on optional removal.
+- Required activation preflights the entire registered-only required graph before activators run, rejects missing/incompatible contracts and required cycles, and activates dependencies first. Optional edges allow cycles between distinct plugins and do not affect activation ordering. Graph mutations are serialized and notification callbacks must defer lifecycle changes. Newly enabled providers stay enabled after downstream failure; only the failed activation is rolled back.
+- Synchronous factories return plain method-only objects with own string-named methods, no data fields, getters/accessors, symbols, class/prototype methods, promises or `then`. Frozen top-level facades are cached per consumer activation/provider activation/contract and throw after either endpoint stops. Nested return values and method-returned promises/functions are not recursively revoked.
+- Connections expose `consumerId`, `signal`, `own`, and `guard`. Either endpoint stopping revokes/aborts the connection and releases owned resources in reverse order. Cleanup is idempotent, late ownership disposes immediately, and cleanup errors are provider-attributed. Providers must own registrations and guard callbacks or honor cancellation; `guard` suppresses late calls with `undefined`, honestly returning `Result | undefined`, without catching live callback failures or retracting returned results.
+- Frozen management snapshots include active provider identities and dependency availability: `missing`, `incompatible`, `inactive`, `available`. Availability does not guarantee successful factory construction. Errors distinguish `dependency` preflight/downstream failures, `provider` factory/connection-cleanup and subscription errors, and existing `task`, `activation`, `cleanup` phases. Provider/task errors do not disable active plugins or fail otherwise successful deactivation; activation/dependency/host-cleanup failures retain lifecycle consequences.
+- `planDeactivation` returns the transitive active-required-dependent-first plan. Disabling with affected dependents requires explicit `{ cascade: true }` consent; optional consumers receive removal instead. The manager shows impact, focuses Cancel, rechecks the plan before confirmation, requires renewed review on changes, protects `requiredPluginIds` throughout the plan and restores launcher focus on cancel/completion. This required-ID protection is UI policy, not an ambient authority boundary.
 
-The host resolves dependencies and exposes providers declared by the consumer. These are integration contracts, not a frontend security sandbox. Do not build a universal event bus or put every subsystem service on the common plugin context.
+The host resolves only declared integrations, not a universal event bus. These are trusted-code lifecycle contracts, not a frontend security sandbox, automatic installation or backend permission grants. Formatting still uses its feature-local injected service; no editor migration is included.
 
-### Completion criteria
+### Evidence and validation
 
-- A provider/consumer fixture exercises activation and cleanup.
-- Optional-provider arrival/removal has defined notifications.
-- Missing/incompatible dependencies produce actionable manager errors.
-- Retained handles reject calls after provider deactivation.
-- Dependency declarations do not automatically install code or grant permissions.
+- `src/lib/plugins/plugin-dependencies.test.ts` and manager tests cover dependency/facade lifecycle and consent behavior. The dependency suite includes 52 core cases and manager coverage includes five new consent/metadata cases; the full unit suite passes 966 tests in 45 files.
+- `e2e/plugin-dependencies.test.ts` and `e2e/fixtures/plugins/` provide a production-built provider/consumer and management fixture through `playwright.plugins.config.ts` / `pnpm test:plugins`, separate from app e2e. Browser Smoke CI runs it for the selected Chromium/WebKit engine. All 8 provider browser cases passed across Chromium/WebKit, as did 114 app e2e cases, 20 smoke cases and 8 task fixture cases, including production builds. Lint, local Markdown links and whitespace checks passed. `pnpm check` remains blocked only by the existing Modal type error and five DnD warnings.
+- No native-runtime enforcement, frontend isolation or performance guarantee is established. Parts 3–4 remain proposed.
 
-This precedes editor extraction because the word processor will provide APIs consumed by formatting and other plugins.
+This precedes proposed editor extraction because the word processor would provide APIs consumed by formatting and other plugins.
 
 ## Part 3 — Word-processing extension API
 
@@ -130,7 +125,7 @@ Before external loading:
 - Define package identity, entry points, compatibility, and dependency metadata.
 - Add installation/removal and persistent activation preferences.
 - Present clear frontend trust and document/network disclosures. Document access plus network access permits exfiltration; informational declarations are not enforced restrictions.
-- Extend the manager with dependency impact and task status where useful.
+- Build on the implemented dependency-impact manager and task error reporting; design any additional external-package/task-status UX separately.
 - Prevent project data from automatically installing or executing extensions.
 
 Frontend DOM isolation remains deferred. No iframe or ShadowRealm work is necessary for the preceding parts. If a claimed native restriction cannot be enforced, resolve that before external loading rather than hiding the gap behind a manifest checkbox.
@@ -148,9 +143,8 @@ For each part:
 
 ## Decisions needed before implementation
 
-Part 1's private package boundary and initial lifecycle/result contracts are authorized and implemented, not pending approval. Remaining gates:
+Parts 1–2's private package boundary, task lifecycle/results and provider compatibility/dependency-removal policies are authorized and implemented, not pending approval. Remaining gates:
 
-1. Before Part 2, approve provider compatibility and dependency-removal policies.
-2. Before Part 3, approve synchronous live ProseMirror access and concrete registration/reconfiguration contracts.
-3. Before custom content or external loading, approve schema-preservation and native-enforcement designs respectively.
-4. Require separate justification/approval for broader extraction or task features beyond Part 1; API publication/stability and performance targets are not established.
+1. Before Part 3, approve synchronous live ProseMirror access and concrete registration/reconfiguration contracts; Part 2 does not authorize editor migration.
+2. Before custom content or external loading, approve schema-preservation and native-enforcement designs respectively.
+3. Require separate justification/approval for broader extraction or task/provider features beyond Parts 1–2; API publication/stability and performance targets are not established.

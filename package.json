@@ -20,6 +20,7 @@
 		"test:smoke": "playwright test smoke.test.ts pagination-selection.test.ts plugin-manager.test.ts",
 		"test:performance": "playwright test --config playwright.performance.config.ts",
 		"test:tasks": "playwright test --config playwright.tasks.config.ts",
+		"test:plugins": "playwright test --config playwright.plugins.config.ts",
 		"check:performance": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.performance.json",
 		"test:unit:ci": "vitest --run",
 		"test": "vitest",

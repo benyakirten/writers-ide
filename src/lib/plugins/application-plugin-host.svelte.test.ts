@@ -174,7 +174,13 @@ describe('application plugin adapters', () => {
 		f.host.register(
 			plugin((context) => {
 				retained = context;
-				expect(Object.keys(context).sort()).toEqual(['contributions', 'own', 'signal', 'tasks']);
+				expect(Object.keys(context).sort()).toEqual([
+					'apis',
+					'contributions',
+					'own',
+					'signal',
+					'tasks',
+				]);
 				expect(Object.keys(context.contributions).sort()).toEqual(['command', 'toolbar', 'view']);
 				expect(context.signal.aborted).toBe(false);
 			}),

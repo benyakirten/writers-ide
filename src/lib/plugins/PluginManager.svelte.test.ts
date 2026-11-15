@@ -172,7 +172,8 @@ describe('host-owned PluginManager panel', () => {
 			activate: vi.fn(() => {
 				throw new Error('Host is busy');
 			}),
-			deactivate: (id) => host.deactivate(id),
+			planDeactivation: (id) => host.planDeactivation(id),
+			deactivate: (id, options) => host.deactivate(id, options),
 		};
 		const { target } = render(management);
 		for (const status of ['activating', 'deactivating'] as const) {
@@ -203,7 +204,8 @@ describe('host-owned PluginManager panel', () => {
 			list: () => host.list(),
 			subscribe,
 			activate: (id) => host.activate(id),
-			deactivate: (id) => host.deactivate(id),
+			planDeactivation: (id) => host.planDeactivation(id),
+			deactivate: (id, options) => host.deactivate(id, options),
 		};
 		const { component, props } = render(service);
 		expect(subscribe).toHaveBeenCalledOnce();
@@ -224,7 +226,8 @@ describe('host-owned PluginManager panel', () => {
 				throw new Error('Manager unavailable');
 			},
 			activate: (id) => host.activate(id),
-			deactivate: (id) => host.deactivate(id),
+			planDeactivation: (id) => host.planDeactivation(id),
+			deactivate: (id, options) => host.deactivate(id, options),
 		});
 		expect(target.querySelector('[role="alert"]')?.textContent).toContain('Manager unavailable');
 	});

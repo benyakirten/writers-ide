@@ -34,6 +34,8 @@ describe('plugin-owned tasks', () => {
 	let frames: Map<number, FrameRequestCallback>;
 	let id: number;
 	beforeEach(() => {
+		// Queue budget behavior has separate coverage; ownership tests should not depend on machine load.
+		vi.spyOn(performance, 'now').mockReturnValue(0);
 		frames = new Map();
 		id = 0;
 		vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {

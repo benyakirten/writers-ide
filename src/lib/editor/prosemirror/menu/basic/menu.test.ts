@@ -63,6 +63,7 @@ function setup() {
 	const controller = new AbortController();
 	const context: SveltePluginContext = {
 		signal: controller.signal,
+		apis: { provide: vi.fn(), get: vi.fn(() => null), subscribe: vi.fn(() => () => {}) },
 		tasks: createTaskService({
 			queue: new WorkQueue(),
 			ownerId: 'test.menu',

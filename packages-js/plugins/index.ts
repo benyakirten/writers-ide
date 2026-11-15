@@ -2,6 +2,58 @@ import type { TaskService } from '@writers-ide/tasks';
 
 export type Dispose = () => void;
 
+export interface PluginApiIdentity {
+	readonly id: string;
+	readonly major: number;
+}
+
+declare const apiType: unique symbol;
+
+/** Immutable contract identity; the phantom member preserves its facade type. */
+export interface PluginApi<T extends object> extends PluginApiIdentity {
+	readonly [apiType]?: (value: T) => T;
+}
+
+export function definePluginApi<T extends object>(identity: PluginApiIdentity): PluginApi<T> {
+	if (typeof identity.id !== 'string' || identity.id.trim().length === 0) {
+		throw new Error('Plugin API ID must be a nonempty string');
+	}
+	if (!Number.isSafeInteger(identity.major) || identity.major <= 0) {
+		throw new Error('Plugin API major must be a positive safe integer');
+	}
+	return Object.freeze({ id: identity.id, major: identity.major });
+}
+
+export interface PluginDependency {
+	readonly provider: string;
+	readonly api: string;
+	readonly major: number;
+	readonly optional?: boolean;
+}
+
+export interface PluginApiConnection {
+	readonly consumerId: string;
+	readonly signal: AbortSignal;
+	readonly own: (dispose: Dispose) => Dispose;
+	/** Late callbacks are ignored after either endpoint is revoked. */
+	guard<Args extends unknown[], Result>(
+		callback: (...args: Args) => Result,
+	): (...args: Args) => Result | undefined;
+}
+
+export interface PluginApis {
+	provide<T extends object>(
+		contract: PluginApi<T>,
+		factory: (connection: PluginApiConnection) => T,
+	): void;
+	get<T extends object>(providerId: string, contract: PluginApi<T>): T | null;
+	subscribe<T extends object>(
+		providerId: string,
+		contract: PluginApi<T>,
+		listener: (api: T | null) => void,
+	): Dispose;
+}
+
 export type PluginCapability =
 	| 'contributions.toolbar'
 	| 'contributions.view'
@@ -14,6 +66,8 @@ export interface PluginManifest {
 	readonly name: string;
 	readonly description: string;
 	readonly capabilities: readonly PluginCapability[];
+	readonly provides?: readonly PluginApiIdentity[];
+	readonly dependencies?: readonly PluginDependency[];
 }
 
 /** Presentation values are interpreted only by the trusted host's rendering adapter. */
@@ -50,6 +104,7 @@ export interface PluginContext<Presentation> {
 	readonly contributions: PluginContributions<Presentation>;
 	/** Activation-owned helpers; optional to use, not a sandbox or editor API. */
 	readonly tasks: TaskService;
+	readonly apis: PluginApis;
 }
 
 /** Trusted bundled code only. Activation and the optional returned disposer are synchronous. */
@@ -73,7 +128,7 @@ export type PluginStatus = 'disabled' | 'activating' | 'active' | 'deactivating'
 export type ContributionKind = 'toolbar' | 'view' | 'command';
 
 export interface PluginError {
-	readonly phase: 'activation' | 'cleanup' | 'task';
+	readonly phase: 'activation' | 'cleanup' | 'task' | 'dependency' | 'provider';
 	readonly message: string;
 }
 
@@ -86,13 +141,22 @@ export interface PluginManagementService {
 	list(): readonly PluginInfo[];
 	subscribe(listener: (plugins: readonly PluginInfo[]) => void): Dispose;
 	activate(id: string): PluginInfo;
-	deactivate(id: string): PluginInfo;
+	planDeactivation(id: string): readonly string[];
+	deactivate(id: string, options?: { cascade?: boolean }): PluginInfo;
 }
 
 export interface PluginInfo {
 	readonly manifest: PluginManifest;
 	readonly status: PluginStatus;
 	readonly errors: readonly PluginError[];
+	readonly providers: readonly PluginApiIdentity[];
+	readonly dependencies: readonly {
+		readonly provider: string;
+		readonly api: string;
+		readonly major: number;
+		readonly optional: boolean;
+		readonly status: 'available' | 'missing' | 'incompatible' | 'inactive';
+	}[];
 	readonly contributions: readonly {
 		readonly kind: ContributionKind;
 		readonly id: string;

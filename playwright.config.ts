@@ -2,8 +2,8 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
 	testDir: 'e2e',
-	// The bundled task fixture runs on its own server/configuration.
-	testIgnore: 'tasks.test.ts',
+	// Library/host fixtures run on their own servers/configurations.
+	testIgnore: ['tasks.test.ts', 'plugin-dependencies.test.ts'],
 	forbidOnly: Boolean(process.env.CI),
 	workers: process.env.CI ? 2 : undefined,
 	reporter: [['list'], ['html', { outputFolder: 'browser-report', open: 'never' }]],
