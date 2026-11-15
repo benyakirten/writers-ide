@@ -16,12 +16,12 @@ Declare the capabilities your plugin uses in its manifest:
 
 These are the current `PluginCapability` values. Missing registration capabilities cause an error. Toolbar contributions provide horizontal and vertical presentations; view contributions register a view type, without instance metadata or a plugin-facing “open view” operation. Commands are host-invokable actions, not automatic keyboard bindings, menu items, or command-palette entries.
 
-The activation context contains only `contributions`, `signal`, and `own(dispose)`. It is not a bag of every feature's services. There is no generic services registry or public plugin API for manuscript text, arbitrary document edits, storage, history, network, filesystem, or native execution.
+The activation context contains `contributions`, `signal`, `own(dispose)`, and activation-owned `tasks`. It is not a bag of every feature's services. There is no generic services registry or public plugin API for manuscript text, arbitrary document edits, storage, history, network, filesystem, or native execution.
 
 ## How the pieces fit together
 
 - **The plugin** owns its feature, manifest, presentations, and explicitly supplied dependencies.
-- **The generic host** owns capability checks, contribution registration, activation, rollback, and cleanup. Its options contain contribution registries only.
+- **The generic host** owns capability checks, contribution registration, activation, rollback, and cleanup. Its options contain contribution registries and an optional shared work queue.
 - **Application adapters** connect those registries to the workbench. Trusted application composition separately supplies any feature-owned dependencies to the particular plugin that needs them.
 
 Platform contributions answer “what does this feature add to the workspace?” Feature-owned dependencies answer “what does this feature need to do its job?” Do not turn the latter into generic host capabilities merely because one plugin needs them. Injecting an in-process dependency is trusted composition, not an external permission grant or an approved sandbox interface.
@@ -78,7 +78,13 @@ The helper checks the component's typed props before producing a generic `{ comp
 
 Each orientation can use a different component and costs **1, 2, or 3 logical capacity units**. A bar holds at most three units; this is not a pixel-size guarantee. Use stable, preferably plugin-qualified contribution IDs. IDs are unique within each contribution kind across active plugins and are not automatically prefixed. Registration makes a toolbar available; it does not choose its initial placement.
 
-Svelte is the current trusted rendering adapter, not a requirement selected for all future third-party UI. For a real feature with an explicitly injected dependency, see the [built-in formatting plugin guide](../../src/lib/editor/prosemirror/menu/basic/README.md).
+Ordinary Svelte is supported by the current trusted rendering adapter and is the accepted frontend direction. For a real feature with an explicitly injected dependency, see the [built-in formatting plugin guide](../../src/lib/editor/prosemirror/menu/basic/README.md).
+
+## Run managed work without managing a scheduler
+
+`context.tasks` provides convenient cooperative iteration (`forEach`), advanced generator work (`cooperative`), lifecycle-managed promises (`async`), and one-shot bundled workers (`worker`). Helpers supply cancellation, replacement by plugin-local key, reactive status/progress, and nonrejecting outcome promises. Task failures are attributed in management errors; a task failure does not disable its plugin. No new manifest capability is required, and short synchronous actions do not need a helper.
+
+The application shares one cooperative scheduler with pagination. Helpers manage leases and cancel on unload or activation rollback. They cannot interrupt an expensive synchronous callback; promises do not move CPU work off-thread. Use a worker for suitable computation and short cooperative units for DOM-dependent work. The [task-author guide](../tasks/README.md) includes ordinary iteration, advanced generators, cancellation, and a bundled worker example.
 
 ## Activation, cleanup, and moving UI
 
@@ -98,7 +104,7 @@ Disabling a toolbar removes its presentation while retaining in-memory placement
 
 ## Connecting and managing plugins
 
-Application integration imports bundled definitions explicitly; nothing scans directories or executes project-supplied code. [`createApplicationPluginHost()`](../../src/lib/plugins/application-plugin-host.ts) supplies toolbar, view, and command registry adapters to [`PluginHost`](../../src/lib/plugins/plugin-host.ts), not feature services. A different integration supplies its own `ContributionRegistry.register(ownerId, contribution)` adapters and their removal handles.
+Application integration imports bundled definitions explicitly; nothing scans directories or executes project-supplied code. [`createApplicationPluginHost()`](../../src/lib/plugins/application-plugin-host.ts) supplies the application's shared queue and toolbar, view, and command registry adapters to [`PluginHost`](../../src/lib/plugins/plugin-host.ts), not feature services. A different integration supplies its own `ContributionRegistry.register(ownerId, contribution)` adapters and their removal handles.
 
 Host code calls `register(plugin)`, then `activate(plugin.manifest.id)`, and `deactivate(id)` on teardown or disabling. Check activation results: lifecycle failures appear in `errors`, while invalid registrations and lifecycle calls throw. `get(id)` and `list()` expose copied metadata, status, contribution IDs, and errors; retry or re-enable with `activate(id)` again. The [application bootstrap](../../src/routes/+page.svelte) demonstrates explicit composition and teardown.
 
@@ -108,7 +114,7 @@ Management subscriptions deliver immediate and subsequent frozen metadata snapsh
 
 ## Boundaries and next steps
 
-The current host manages trusted in-process code only. Typed props, narrow injected dependencies, capability declarations, and local presentation-error boundaries are not isolation. External loading requires separately approved and implemented isolation, messaging, validation, and permission enforcement; current dependency injection does not settle those contracts.
+The current host manages trusted in-process code only. Typed props, narrow injected dependencies, capability declarations, and local presentation-error boundaries are not isolation. External loading requires separately approved package/trust UX, validation, and restrictive native enforcement. Frontend DOM isolation is deferred; document access plus network access permits exfiltration. Current dependency injection and task ownership do not establish a security sandbox.
 
 - [Exact root contracts](index.ts) and [Svelte adapter](svelte.ts).
 - [Formatting feature guide](../../src/lib/editor/prosemirror/menu/basic/README.md): feature-local snapshots, commands, editor bridge, and lifecycle scoping.

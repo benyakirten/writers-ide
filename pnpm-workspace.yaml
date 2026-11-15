@@ -3,6 +3,7 @@ packages:
   - 'packages-js/plugins'
   - 'packages-js/layout'
   - 'packages-js/components'
+  - 'packages-js/tasks'
 
 allowBuilds:
   esbuild: true

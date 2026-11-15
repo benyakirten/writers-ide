@@ -14,6 +14,9 @@
 			"default": "./svelte.ts"
 		}
 	},
+	"dependencies": {
+		"@writers-ide/tasks": "workspace:*"
+	},
 	"peerDependencies": {
 		"svelte": "^5.0.0"
 	},

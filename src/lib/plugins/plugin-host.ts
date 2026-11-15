@@ -16,6 +16,8 @@ import type {
 	ViewContribution,
 } from '@writers-ide/plugins';
 
+import { createTaskService, WorkQueue } from '@writers-ide/tasks';
+
 const capabilities = new Set<PluginCapability>([
 	'contributions.toolbar',
 	'contributions.view',
@@ -38,6 +40,8 @@ interface Entry<Presentation> {
 
 export interface PluginHostOptions<Presentation> {
 	readonly registries: PluginRegistries<Presentation>;
+	/** Supply the application's shared queue; standalone hosts get an independent queue. */
+	readonly workQueue?: WorkQueue;
 }
 
 /** Synchronous lifecycle for explicitly supplied, trusted bundled plugins; not a sandbox. */
@@ -48,9 +52,11 @@ export class PluginHost<Presentation> implements PluginManagementService {
 	#notifying = false;
 	#notificationPending = false;
 	readonly #registries: PluginRegistries<Presentation>;
+	readonly #workQueue: WorkQueue;
 
 	constructor(options: PluginHostOptions<Presentation>) {
 		this.#registries = Object.freeze({ ...options.registries });
+		this.#workQueue = options.workQueue ?? new WorkQueue();
 	}
 
 	register(plugin: BundledPlugin<Presentation>): PluginInfo {
@@ -185,12 +191,24 @@ export class PluginHost<Presentation> implements PluginManagementService {
 		entry.status = 'deactivating';
 		this.#notify();
 		this.#stop(entry, entry.activation);
-		entry.status = entry.errors.length > 0 ? 'failed' : 'disabled';
+		entry.status = entry.errors.some((error) => error.phase !== 'task') ? 'failed' : 'disabled';
 		this.#notify();
 		return this.#info(entry);
 	}
 
 	#context(entry: Entry<Presentation>, activation: Activation): PluginContext<Presentation> {
+		const tasks = createTaskService({
+			queue: this.#workQueue,
+			ownerId: entry.plugin.manifest.id,
+			signal: activation.controller.signal,
+			onError: ({ key, label, error }) => {
+				if (entry.activation === activation) {
+					const message = error instanceof Error ? error.message : String(error);
+					this.#error(entry, 'task', new Error(`${label} [${key}]: ${message}`));
+				}
+			},
+		});
+		this.#own(entry, activation, () => tasks.dispose());
 		const requireCapability = (capability: PluginCapability) => {
 			if (!activation.live) {
 				throw new Error(`Plugin context revoked: ${entry.plugin.manifest.id}`);
@@ -201,6 +219,7 @@ export class PluginHost<Presentation> implements PluginManagementService {
 		};
 		return Object.freeze({
 			signal: activation.controller.signal,
+			tasks,
 			own: (dispose: Dispose) => this.#own(entry, activation, dispose),
 			contributions: Object.freeze({
 				toolbar: (contribution: ToolbarContribution<Presentation>) => {

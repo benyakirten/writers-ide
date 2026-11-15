@@ -4,6 +4,7 @@ import Registry, { type BarItemRegistry } from '$lib/editor/state/bar-item-regis
 import TabRegistry, { type TabStateRegistry } from '$lib/editor/state/tab-state-registry.svelte';
 
 import { PluginHost } from './plugin-host';
+import { workQueue, type WorkQueue } from '$lib/editor/state/work-queue.svelte';
 
 /** Host-owned command handles; these are not keyboard bindings or editor internals. */
 export class PluginCommands {
@@ -34,12 +35,14 @@ export function createApplicationPluginHost(
 		bars?: BarItemRegistry;
 		views?: TabStateRegistry;
 		commands?: PluginCommands;
+		workQueue?: WorkQueue;
 	} = {},
 ): PluginHost<SveltePresentation> {
 	const bars = options.bars ?? Registry;
 	const views = options.views ?? TabRegistry;
 	const commands = options.commands ?? pluginCommands;
 	return new PluginHost<SveltePresentation>({
+		workQueue: options.workQueue ?? workQueue,
 		registries: {
 			toolbar: {
 				register(_ownerId, contribution) {

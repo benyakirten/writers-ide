@@ -1,3 +1,5 @@
+import type { TaskService } from '@writers-ide/tasks';
+
 export type Dispose = () => void;
 
 export type PluginCapability =
@@ -46,6 +48,8 @@ export interface PluginContext<Presentation> {
 	/** Returns an idempotent early-release handle; late ownership disposes immediately. */
 	readonly own: (dispose: Dispose) => Dispose;
 	readonly contributions: PluginContributions<Presentation>;
+	/** Activation-owned helpers; optional to use, not a sandbox or editor API. */
+	readonly tasks: TaskService;
 }
 
 /** Trusted bundled code only. Activation and the optional returned disposer are synchronous. */
@@ -69,7 +73,7 @@ export type PluginStatus = 'disabled' | 'activating' | 'active' | 'deactivating'
 export type ContributionKind = 'toolbar' | 'view' | 'command';
 
 export interface PluginError {
-	readonly phase: 'activation' | 'cleanup';
+	readonly phase: 'activation' | 'cleanup' | 'task';
 	readonly message: string;
 }
 

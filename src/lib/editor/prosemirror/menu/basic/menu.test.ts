@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createTaskService, WorkQueue } from '@writers-ide/tasks';
 import { flushSync, mount, unmount } from 'svelte';
 import type { FormattingService, FormattingSnapshot } from './contracts';
 import { defineSveltePresentation, type SveltePluginContext } from '@writers-ide/plugins/svelte';
@@ -59,8 +60,14 @@ function snapshot(): FormattingSnapshot {
 function setup() {
 	const listeners = new Set<(value: FormattingSnapshot | null) => void>();
 	const dispose = vi.fn();
+	const controller = new AbortController();
 	const context: SveltePluginContext = {
-		signal: new AbortController().signal,
+		signal: controller.signal,
+		tasks: createTaskService({
+			queue: new WorkQueue(),
+			ownerId: 'test.menu',
+			signal: controller.signal,
+		}),
 		own: (cleanup) => cleanup,
 
 		contributions: {

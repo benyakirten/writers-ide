@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**Proposed implementation plan, recorded for review.** This document does not authorize all four parts or finalize public API signatures. The owner has accepted the frontend trust model and opt-in cooperative execution direction; package names, dependency policies, live ProseMirror callback access, and the concrete implementation scopes below remain proposals until approved.
+**Part 1 is owner-authorized and implemented on `bh/phase-2-plugin-transition` (in progress / unmerged; no PR known). Parts 2–4 remain proposed for separate review and approval.** The frontend trust model and opt-in cooperation are accepted; Part 1 establishes private, evolving task contracts, not a published stable API. Provider/dependency policies, live ProseMirror callback access, schema lifecycle and native-enforcement designs are not authorized by this roadmap.
 
 Read [context.md](context.md) for current implementation and accepted architectural direction, [change-log.md](change-log.md) for cumulative PR outcomes, and [project context](../project-context.md) for repository-wide constraints. Update this plan as scopes are approved or completed; do not treat it as evidence that a feature exists.
 
@@ -25,32 +25,32 @@ Read [context.md](context.md) for current implementation and accepted architectu
 | 3. Editor extensions | Replaceable formatting, ProseMirror wrappers, Svelte node views | Pagination redesign, unrestricted live schema toggling |
 | 4. External loading  | Installation, trust UX, verified native restrictions            | Frontend sandbox guarantees                            |
 
-Part 1 is the recommended next implementation scope. The later parts are a roadmap with separate design and approval gates, not one large migration.
+Part 1 is implemented in the current working tree. The later parts remain a roadmap with separate design and approval gates, not one authorized migration.
 
 ## Part 1 — Shared scheduler and managed tasks
 
 **Goal:** plugins can use the existing cooperative scheduler easily, without writing generators for ordinary actions.
 
-### Implementation
+### Implemented scope (unmerged)
 
-- Extract the generic `WorkQueue` into a private reusable workspace package, tentatively `@writers-ide/tasks`.
-- Keep pagination-specific invalidation, revision tracking, and UI in the application.
-- Preserve one shared application queue and its current scheduling behavior. Do not allocate a separate frame budget per plugin.
-- Add a plugin-scoped task service that handles activation-owned cancellation and cleanup, task identity, namespaced replacement keys, progress/status, attributed errors, and optional caller cancellation.
-- Provide cooperative iteration over bounded units, advanced generator jobs, lifecycle-managed async tasks, and worker tasks using bundled worker modules with a small request/result protocol.
-- Keep short synchronous actions as ordinary functions. Do not require every command to declare an execution mode or pass through the scheduler.
+- Private `@writers-ide/tasks` exports the extracted `WorkQueue`, `createTaskService` and contracts; it has no singleton or editor/plugin-host dependency. Pagination invalidation, revision tracking and UI remain in the application.
+- `src/lib/editor/state/work-queue.svelte.ts` preserves compatibility exports and the same application singleton. `createApplicationPluginHost` passes it by default; generic `PluginHost` accepts optional `workQueue`, otherwise allocating an independent queue. Application plugins do not receive separate frame budgets.
+- The common context now exposes `signal`, `own`, `contributions`, and `tasks`. Toolbar/view/command capabilities are unchanged; tasks require no extra capability and do not introduce feature services or a generic service bus.
+- Per-activation services expose `forEach`, `cooperative`, `async`, and `worker`, with caller/owner cancellation, replacement keys isolated across activations, reactive status/progress/errors, and nonrejecting completed/cancelled/failed outcomes. Cooperative helpers own queue leases and expose pause/resume; async/worker work acquires no scheduler lease. Disposal cancels only owned work and revokes submissions.
+- Task errors appear in management with `phase: 'task'` and label/key attribution. They do not disable the plugin or make successful deactivation fail; activation and host cleanup failures still do.
+- Keep short synchronous actions as ordinary functions. No mandatory execution-mode declaration or scheduler path is introduced.
 
 The library owns execution mechanics; the plugin host supplies a scoped service. Editor concepts do not belong in the tasks package. Authors should not manage queue start leases or remember plugin-unload cleanup.
 
-Worker support should initially use dedicated one-shot workers, explicit inputs/outputs, and optional transfer lists. Pooling is deferred until justified by a consumer. Do not serialize arbitrary functions with `toString()`: imports/closures and messaging are not preserved that way.
+Worker support uses dedicated one-shot bundled modules, explicit inputs/outputs and optional transfer lists. `@writers-ide/tasks/worker` exports the independent `defineTaskWorker` protocol helper without Svelte or application/DOM runtime imports. The service handles result/error messages, transport/application failures, termination and late responses; synchronous `apply` runs at most once while active. Pooling, worker progress and timeouts are deferred. No arbitrary function serialization is supported: `toString()` does not preserve imports/closures or provide messaging.
 
-### Completion criteria
+### Completion evidence and remaining validation
 
-- Pagination still uses the shared queue and behaves unchanged.
-- Identical plugin-local task keys cannot collide across plugins.
-- Plugin unload cancels its tasks without affecting other plugins or pagination.
-- Tests cover replacement, cleanup, errors, cancellation, and late results.
-- An example demonstrates both convenient iteration and an advanced generator.
+- Queue budget/fairness and pagination behavior remain unchanged; compatibility exports retain the original queue regression suite.
+- Service and host tests cover isolated keys, cross-mode replacement, leases, cancellation/reentrancy, cleanup failures, rollback, reactivation and late results. Plugin unload leaves other owners and pagination intact.
+- The [task guide](../../packages-js/tasks/README.md) documents convenient iteration, advanced generators, async work, worker modules and exact outcome semantics; [contracts](../../packages-js/tasks/src/contracts.ts) are the type reference.
+- `e2e/tasks.test.ts` and `e2e/fixtures/tasks/` exercise real emitted workers, transfers, started-worker cancellation, errors/recovery and shared queue ownership through `playwright.tasks.config.ts` / `pnpm test:tasks`. Browser Smoke CI adds a task step for its selected engine, separate from app smoke/pagination.
+- Validation: 909 unit tests in 43 files, the exact `CI=true pnpm test:smoke` command, 16 pagination/stylesheet cases and 8 dedicated task cases passed across Chromium/WebKit with production builds. Lint, local Markdown target checks and whitespace checks passed. `pnpm check` reports only the existing Modal type error and five DnD warnings. See the [cumulative entry](change-log.md) for details; no native verification is claimed.
 
 ### Limits to communicate
 
@@ -148,8 +148,9 @@ For each part:
 
 ## Decisions needed before implementation
 
-1. Approve Part 1's scope and the tentative private `@writers-ide/tasks` boundary.
-2. Finalize task API shapes and lifecycle/result semantics while keeping cooperation opt-in.
-3. Before Part 2, approve provider compatibility and dependency-removal policies.
-4. Before Part 3, approve synchronous live ProseMirror access and concrete registration/reconfiguration contracts.
-5. Before custom content or external loading, approve schema-preservation and native-enforcement designs respectively.
+Part 1's private package boundary and initial lifecycle/result contracts are authorized and implemented, not pending approval. Remaining gates:
+
+1. Before Part 2, approve provider compatibility and dependency-removal policies.
+2. Before Part 3, approve synchronous live ProseMirror access and concrete registration/reconfiguration contracts.
+3. Before custom content or external loading, approve schema-preservation and native-enforcement designs respectively.
+4. Require separate justification/approval for broader extraction or task features beyond Part 1; API publication/stability and performance targets are not established.
