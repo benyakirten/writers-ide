@@ -16,7 +16,7 @@ Declare the capabilities your plugin uses in its manifest:
 
 These are the current `PluginCapability` values. Missing registration capabilities cause an error. Toolbar contributions provide horizontal and vertical presentations; view contributions register a view type, without instance metadata or a plugin-facing “open view” operation. Commands are host-invokable actions, not automatic keyboard bindings, menu items, or command-palette entries.
 
-The activation context contains `contributions`, `signal`, `own(dispose)`, activation-owned `tasks`, and declared provider access through `apis`. It is not a bag of every feature's services. Providers define their own domain contracts; the generic platform still has no manuscript-editing, storage, history, or native-execution API. Trusted frontend code can use browser APIs, including network requests; these interfaces are not a sandbox.
+The activation context contains `contributions`, `signal`, `own(dispose)`, activation-owned `tasks`, and declared provider access through `apis`. It is not a bag of every feature's services. Providers define their own domain contracts; the generic platform still has no built-in manuscript-editing, storage, history, or native-execution API. The separate [word-processing provider](../word-processing/README.md) now supplies editor access through a declared dependency. Trusted frontend code can use browser APIs, including network requests; these interfaces are not a sandbox.
 
 ## How the pieces fit together
 
@@ -163,6 +163,23 @@ The host wraps top-level methods. Retained methods reject after either endpoint 
 For a subscription method, wrap its callback with `connection.guard(listener)` and register its disposer with `connection.own(dispose)`. The guard suppresses late callbacks after revocation and returns `undefined` then; it does not catch listener exceptions or cancel already-running work. Ownership handles remain idempotently callable after revocation and automatically release when either endpoint stops. Register cleanup before delivering an initial event, releasing it if initial delivery throws. Factory failure also rolls back connection-owned resources. Cleanup failures are reported without preventing remaining cleanup.
 
 Factory/subscription/cleanup failure reporting is not a security boundary: arbitrary trusted frontend code can still import private code or modify shared objects outside these supported contracts.
+
+## Inspect and edit a document through the word-processing provider
+
+Declare a required dependency on `WORD_PROCESSING_PLUGIN_ID` and `wordProcessingApi`, exported by `@writers-ide/word-processing`, then resolve it with `context.apis.get`. Both the default formatting plugin and independent consumers use this same contract; there is no special formatting service on the common context.
+
+| Goal                                         | Word-processing API                             | Why it helps                                                                                                                                   |
+| -------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Observe editors and choose a view            | `snapshot`, `subscribe`                         | Data-only identities, editability and revisions, without serializing the manuscript.                                                           |
+| Read the current selection or inspect layout | `inspect`                                       | Live ProseMirror state/view inside a short synchronous callback.                                                                               |
+| Construct an edit                            | `edit`                                          | Checks the target and cancellation before dispatching your returned transaction through the normal editor pipeline.                            |
+| Use an upstream ProseMirror command          | `runCommand`                                    | Standard command signature, with synchronous captured dispatch and freshness checks.                                                           |
+| Publish an editor command                    | `registerCommand`, `commands`, `executeCommand` | Connection-owned registration and discoverable metadata, independent of the default toolbar.                                                   |
+| Apply asynchronous/worker results            | `applyResult`                                   | Revalidates the exact captured target before synchronous transaction construction; stale results are rejected rather than silently retargeted. |
+
+The [word-processing guide](../word-processing/README.md) explains signatures, failure results, lifecycle and limitations. The [Quick Format example](../../src/lib/editor/prosemirror/menu/quick-format/menu.ts) uses only this provider and an upstream command, without the default formatting plugin. It is an opt-in example, not registered or placed by the application route.
+
+Live callback objects are trusted access, not a sandbox. Do not retain mutable transactions across `await` or cooperative yields, or directly dispatch through a retained view. Arbitrary ProseMirror plugin registration, dynamic schemas and Svelte node-view APIs are still later work; this API does not reconfigure the editor or redesign pagination.
 
 ## Run managed work without managing a scheduler
 

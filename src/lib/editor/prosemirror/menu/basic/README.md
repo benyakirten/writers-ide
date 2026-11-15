@@ -4,11 +4,11 @@ This directory owns the formatting toolbar feature: its local contracts, editor 
 
 ## Composition and ownership
 
-[`menu.ts`](menu.ts) exports `createFormattingPlugin(formatting)`, an explicit factory accepting the local `FormattingService` contract. The [application route](../../../../../routes/+page.svelte) imports the `Formatting` singleton from this directory, calls `createFormattingPlugin(Formatting)`, then registers and activates the result. Only this plugin receives that dependency; it is not installed on every plugin context.
+[`menu.ts`](menu.ts) exports `createFormattingPlugin()` with no injection arguments. Its manifest declares a required dependency on `WORD_PROCESSING_PLUGIN_ID` and `wordProcessingApi` (major 1) from `@writers-ide/word-processing`. During each activation it resolves that API through `context.apis.get`, constructs a new feature-local `FormattingService(api)`, and wraps it in the existing activation scope. There is no formatting singleton, default service constructor, or special route-injected formatting dependency. The application must register the word-processing provider alongside the formatting plugin; the host activates required dependencies first.
 
-The manifest declares only `contributions.toolbar`. The feature contributes `basic-menu`, with a two-unit horizontal presentation and a one-unit vertical presentation. The workbench owns docking, capacity, placement, and rendering; the feature owns formatting controls and editor behavior.
+The manifest's only contribution capability is `contributions.toolbar`. The feature contributes `basic-menu`, with a two-unit horizontal presentation and a one-unit vertical presentation. The workbench owns docking, capacity, placement, and rendering; the feature owns formatting controls and editor behavior.
 
-There is no generic services registry and no `formatting.observe` or `formatting.execute` platform capability. Explicit injection here is trusted in-process composition, not an external permission grant or approval of a future sandbox API.
+The shared word-processing API is available to other declared consumers without enabling this toolbar. Formatting command names, summaries, availability, and policies stay in this feature rather than moving into the generic plugin host or word-processing provider. There is no `formatting.observe` or `formatting.execute` platform capability. Provider connections are trusted in-process integration and lifecycle contracts, not an external permission grant or sandbox.
 
 ## Local contracts and requests
 
@@ -38,15 +38,17 @@ Execution returns `false` for stale/incorrect tokens, an inactive or changed tar
 
 ## Editor integration versus the generic host
 
-[`formatting-service.svelte.ts`](formatting-service.svelte.ts) implements the ProseMirror bridge and exports `Formatting`. Its default sources resolve active tab document IDs to registered view IDs and listen for editor changes; injectable `FormattingSources` support focused tests. This editor-specific integration belongs here, not in `src/lib/plugins` or the reusable plugin package.
+[`formatting-service.svelte.ts`](formatting-service.svelte.ts) exports the `FormattingService` class, requiring a `WordProcessingApi` constructor argument. All live editor access goes through that API: `snapshot()` supplies active view/document identity and provider revision, `inspect()` synchronously derives summaries and availability, and `runCommand()` executes this feature's ProseMirror command with `{ requireActive: true, focus: true }`. Only copied metadata and formatting data are retained between callbacks, never live views, states, selections, or transactions.
 
-The bridge checks live view identity, editor state, editability, revision, and availability before dispatch, including changes before a reactive flush. It preserves existing semantics: caret mark toggles are disabled no-ops, superscript/subscript exclude each other, and paragraph operations account for pagination continuations. Successful commands restore editor focus. Availability queries are read-only and do not generate speculative transactions.
+The application provider adapter, not this feature, owns editor registry/event subscriptions and resolves active tab document IDs to registered view IDs. Tests inject `createWordProcessingService` with controlled `WordProcessingSources`; the application-source integration regression builds sources from `Editors`/`TabState` in test code only. `FormattingSources`, the `Formatting` singleton, and the default export have been removed. The presentation-facing `FormattingService`, `FormattingSnapshot`, and `FormattingRequest` contracts are unchanged.
 
-The first subscription starts the shared event/effect bridge; the last unsubscribe releases it. Revisions keep increasing across stop/start. Update-listener failures are reported without interrupting other subscribers or ProseMirror dispatch; failed initial delivery releases its subscription.
+The bridge checks the current active target and provider revision against the snapshot's captured target before requesting execution. The provider detects view replacement, document/state changes, and editability changes synchronously, even before a reactive flush, and revalidates before dispatch. It preserves existing semantics: caret mark toggles are disabled no-ops, superscript/subscript exclude each other, and paragraph operations account for pagination continuations. Successful commands restore editor focus. Availability queries are read-only and do not generate speculative transactions.
+
+The first formatting subscription subscribes to the provider; the last unsubscribe releases that subscription, allowing the provider to release its source event/effect resources when unused. Formatting revisions are local tokens distinct from provider revisions and keep increasing across lazy stop/start, so old requests cannot be replayed after resubscription. Update-listener failures are reported without interrupting other subscribers or ProseMirror dispatch; failed initial delivery releases its subscription.
 
 ## Activation scope and presentations
 
-[`scope-formatting-service.ts`](scope-formatting-service.ts) wraps the injected dependency using only the activation's `own` and `signal`. It owns subscription disposal, copies each snapshot's nested records and outgoing requests, suppresses callbacks after unsubscribe/revocation, and rejects new subscriptions after abort. Retained execution handles return `false` after deactivation and cannot revive when the plugin is enabled again.
+[`scope-formatting-service.ts`](scope-formatting-service.ts) wraps the per-activation feature service using only the activation's `own` and `signal`. It owns subscription disposal, copies each snapshot's nested records and outgoing requests, suppresses callbacks after unsubscribe/revocation, and rejects new subscriptions after abort. Retained execution handles return `false` after deactivation and cannot revive when the plugin is enabled again.
 
 If an immediate listener throws, the wrapper releases the returned source handle before propagating the error. A source that throws during subscription setup must undo its own partial registration; the wrapper cannot recover a handle it never received.
 
@@ -55,8 +57,8 @@ Both presentations receive typed props `{ formatting: FormattingService }`, pair
 ## Source and tests
 
 - [`menu.ts`](menu.ts), [`BasicMenuHorizontal.svelte`](BasicMenuHorizontal.svelte), [`BasicMenuVertical.svelte`](BasicMenuVertical.svelte), and [`Snippets.svelte`](Snippets.svelte): composition, orientations, controls, and request routing.
-- [`menu.test.ts`](menu.test.ts): both presentations and formatting interaction through local contracts.
-- [`scope-formatting-service.test.ts`](scope-formatting-service.test.ts): copy isolation, subscription cleanup, failure handling, and activation revocation.
+- [`menu.test.ts`](menu.test.ts): required provider declaration/resolution, both real rendered presentations, and formatting interaction through unchanged local props/contracts.
+- [`scope-formatting-service.test.ts`](scope-formatting-service.test.ts): copy isolation, subscription cleanup, failure handling, activation revocation, and real provider/fresh-service composition across reactivation.
 - [`formatting-service.svelte.test.ts`](formatting-service.svelte.test.ts): snapshots, revision/live-state validation, tab/view identity, lazy cleanup, quiet availability queries, and editing semantics.
 - [`generic-presentation.svelte.test.ts`](../../../../plugins/generic-presentation.svelte.test.ts): generic typed props without a formatting dependency; host tests remain under `src/lib/plugins`.
 - [Docking browser tests](../../../../../../e2e/docking.test.ts) and [plugin-manager browser tests](../../../../../../e2e/plugin-manager.test.ts): workbench integration. Pagination geometry requires real-browser tests, not jsdom.

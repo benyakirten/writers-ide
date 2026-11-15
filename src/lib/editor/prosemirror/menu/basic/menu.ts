@@ -1,10 +1,11 @@
 import { defineSveltePresentation, type SveltePlugin } from '@writers-ide/plugins/svelte';
-import type { FormattingService } from './contracts';
+import { WORD_PROCESSING_PLUGIN_ID, wordProcessingApi } from '@writers-ide/word-processing';
+import { FormattingService } from './formatting-service.svelte';
 import { scopeFormattingService } from './scope-formatting-service';
 import BasicMenuHorizontal from './BasicMenuHorizontal.svelte';
 import BasicMenuVertical from './BasicMenuVertical.svelte';
 
-export function createFormattingPlugin(formatting: FormattingService): SveltePlugin {
+export function createFormattingPlugin(): SveltePlugin {
 	return {
 		manifest: {
 			id: 'writers-ide.formatting',
@@ -13,9 +14,20 @@ export function createFormattingPlugin(formatting: FormattingService): SveltePlu
 			name: 'Basic Menu',
 			description: 'Basic text and block formatting toolbar.',
 			capabilities: ['contributions.toolbar'],
+			dependencies: [
+				{
+					provider: WORD_PROCESSING_PLUGIN_ID,
+					api: wordProcessingApi.id,
+					major: wordProcessingApi.major,
+				},
+			],
 		},
 		activate(context) {
-			const props = { formatting: scopeFormattingService(formatting, context) };
+			const api = context.apis.get(WORD_PROCESSING_PLUGIN_ID, wordProcessingApi);
+			if (!api) {
+				throw new Error('Required word-processing API unavailable');
+			}
+			const props = { formatting: scopeFormattingService(new FormattingService(api), context) };
 			context.contributions.toolbar({
 				id: 'basic-menu',
 				name: 'Basic Menu',

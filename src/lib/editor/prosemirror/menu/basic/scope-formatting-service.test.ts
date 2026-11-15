@@ -4,7 +4,16 @@ import type { SveltePresentation, SvelteToolbarContribution } from '@writers-ide
 import { PluginHost } from '$lib/plugins/plugin-host';
 import type { FormattingRequest, FormattingService, FormattingSnapshot } from './contracts';
 import { scopeFormattingService } from './scope-formatting-service';
+import { Schema } from 'prosemirror-model';
+import { EditorState, TextSelection } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
 import { createFormattingPlugin } from './menu';
+import {
+	createWordProcessingService,
+	createWordProcessingConnection,
+	WORD_PROCESSING_PLUGIN_ID,
+	wordProcessingApi,
+} from '@writers-ide/word-processing';
 
 function snapshot(): FormattingSnapshot {
 	return {
@@ -308,8 +317,40 @@ describe('feature-owned formatting activation scope', () => {
 });
 
 describe('formatting factory composition', () => {
-	it('supplies only a shared activation-scoped formatting prop and creates a fresh scope on reactivation', () => {
-		const s = source();
+	it('supplies only a shared activation-scoped formatting prop and creates a fresh scope on reactivation', ({
+		onTestFinished,
+	}) => {
+		const schema = new Schema({
+			nodes: {
+				doc: { content: 'page+' },
+				page: { content: 'paragraph+', toDOM: () => ['section', 0] },
+				paragraph: {
+					content: 'text*',
+					attrs: { indent: { default: 0 }, align: { default: 'start' } },
+					toDOM: () => ['p', 0],
+				},
+				text: {},
+			},
+			marks: { bold: { toDOM: () => ['strong', 0] } },
+		});
+		const doc = schema.node(
+			'doc',
+			null,
+			schema.node('page', null, schema.node('paragraph', null, schema.text('Selected text'))),
+		);
+		const view = new EditorView(document.createElement('div'), {
+			state: EditorState.create({ doc, selection: TextSelection.create(doc, 2, 8) }),
+		});
+		onTestFinished(() => {
+			api.dispose();
+			view.destroy();
+		});
+		const unsubscribe = vi.fn();
+		const api = createWordProcessingService({
+			listViews: () => [{ viewId: 'one', documentId: 'document-one', name: 'One', view }],
+			activeViewId: () => 'one',
+			subscribe: () => unsubscribe,
+		});
 		const toolbars: SvelteToolbarContribution[] = [];
 		const cleanup = vi.fn();
 		const host = new PluginHost<SveltePresentation>({
@@ -324,26 +365,51 @@ describe('formatting factory composition', () => {
 				command: { register: () => () => {} },
 			},
 		});
-		const plugin = createFormattingPlugin(s.service);
+		host.register({
+			manifest: {
+				id: WORD_PROCESSING_PLUGIN_ID,
+				name: 'Word processing',
+				description: 'Formatting test provider',
+				version: '0.1.0',
+				apiVersion: 1,
+				capabilities: [],
+				provides: [wordProcessingApi],
+			},
+			activate(context) {
+				context.apis.provide(wordProcessingApi, (connection) =>
+					createWordProcessingConnection(api, connection),
+				);
+			},
+		});
+		const plugin = createFormattingPlugin();
 		host.register(plugin);
 		host.activate(plugin.manifest.id);
 		const first = toolbars[0].horizontal.presentation.props;
 		expect(Object.keys(first)).toEqual(['formatting']);
 		expect(first).toBe(toolbars[0].vertical.presentation.props);
-		expect(first.formatting).not.toBe(s.service);
+		expect(first.formatting).not.toBe(api);
 		const formatting = first.formatting as FormattingService;
 		const listener = vi.fn();
 		const release: Dispose = formatting.subscribe(listener);
 		host.deactivate(plugin.manifest.id);
 		release();
 		expect(cleanup).toHaveBeenCalledOnce();
-		expect(s.unsubscribe).toHaveBeenCalledOnce();
+		expect(unsubscribe).toHaveBeenCalledOnce();
 		expect(formatting.execute(request)).toBe(false);
 		host.activate(plugin.manifest.id);
 		const next = toolbars[1].horizontal.presentation.props.formatting as FormattingService;
 		expect(next).not.toBe(formatting);
-		expect(next.execute(request)).toBe(true);
+		const nextListener = vi.fn();
+		const stopNext = next.subscribe(nextListener);
+		expect(nextListener).toHaveBeenCalledOnce();
+		const nextSnapshot = nextListener.mock.calls[0][0] as FormattingSnapshot;
+		expect(next.execute({ ...nextSnapshot, command: 'bold' })).toBe(true);
+		expect(view.state.doc.rangeHasMark(2, 8, schema.marks.bold)).toBe(true);
+		expect(() => formatting.subscribe(vi.fn())).toThrow('revoked');
+		stopNext();
 		expect(formatting.execute(request)).toBe(false);
 		host.deactivate(plugin.manifest.id);
+		host.deactivate(WORD_PROCESSING_PLUGIN_ID);
+		api.dispose();
 	});
 });

@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**Parts 1–2 are owner-authorized and implemented on `bh/phase-2-plugin-transition` (in progress / unmerged; no PR known). Parts 3–4 remain proposed for separate review and approval.** The frontend trust model and opt-in cooperation are accepted; task/provider contracts remain private and evolving, not a published stable API. Part 2's provider/dependency policies are approved; live ProseMirror callback access, schema lifecycle and native-enforcement designs are not authorized by this roadmap.
+**Parts 1–2 and Part 3A are owner-authorized and implemented on `bh/phase-2-plugin-transition` (in progress / unmerged; no PR known). Parts 3B/3C and 4 retain separate review/approval gates; 3A is not all of Part 3.** The owner explicitly approved live ProseMirror `EditorState`/`EditorView` access inside synchronous callbacks, with the provider owning edits. Contracts remain private and evolving, not a published stable API. Behavioral reconfiguration, schema lifecycle and native-enforcement designs are not authorized by this roadmap.
 
 Read [context.md](context.md) for current implementation and accepted architectural direction, [change-log.md](change-log.md) for cumulative PR outcomes, and [project context](../project-context.md) for repository-wide constraints. Update this plan as scopes are approved or completed; do not treat it as evidence that a feature exists.
 
@@ -25,7 +25,7 @@ Read [context.md](context.md) for current implementation and accepted architectu
 | 3. Editor extensions | Replaceable formatting, ProseMirror wrappers, Svelte node views | Pagination redesign, unrestricted live schema toggling |
 | 4. External loading  | Installation, trust UX, verified native restrictions            | Frontend sandbox guarantees                            |
 
-Parts 1–2 are implemented in the current working tree. Parts 3–4 remain a roadmap with separate design and approval gates, not one authorized migration.
+Parts 1–2 and 3A are implemented in the current working tree. Parts 3B/3C/4 remain a roadmap with separate design and approval gates, not one authorized migration.
 
 ## Part 1 — Shared scheduler and managed tasks
 
@@ -70,15 +70,15 @@ Iteration helpers manage checkpoints, not callback cost. Each unit must remain s
 - Frozen management snapshots include active provider identities and dependency availability: `missing`, `incompatible`, `inactive`, `available`. Availability does not guarantee successful factory construction. Errors distinguish `dependency` preflight/downstream failures, `provider` factory/connection-cleanup and subscription errors, and existing `task`, `activation`, `cleanup` phases. Provider/task errors do not disable active plugins or fail otherwise successful deactivation; activation/dependency/host-cleanup failures retain lifecycle consequences.
 - `planDeactivation` returns the transitive active-required-dependent-first plan. Disabling with affected dependents requires explicit `{ cascade: true }` consent; optional consumers receive removal instead. The manager shows impact, focuses Cancel, rechecks the plan before confirmation, requires renewed review on changes, protects `requiredPluginIds` throughout the plan and restores launcher focus on cancel/completion. This required-ID protection is UI policy, not an ambient authority boundary.
 
-The host resolves only declared integrations, not a universal event bus. These are trusted-code lifecycle contracts, not a frontend security sandbox, automatic installation or backend permission grants. Formatting still uses its feature-local injected service; no editor migration is included.
+The host resolves only declared integrations, not a universal event bus. These are trusted-code lifecycle contracts, not a frontend security sandbox, automatic installation or backend permission grants. Part 2 alone did not migrate the editor; the subsequently authorized Part 3A below migrates formatting to a word-processing provider.
 
 ### Evidence and validation
 
 - `src/lib/plugins/plugin-dependencies.test.ts` and manager tests cover dependency/facade lifecycle and consent behavior. The dependency suite includes 52 core cases and manager coverage includes five new consent/metadata cases; the full unit suite passes 966 tests in 45 files.
 - `e2e/plugin-dependencies.test.ts` and `e2e/fixtures/plugins/` provide a production-built provider/consumer and management fixture through `playwright.plugins.config.ts` / `pnpm test:plugins`, separate from app e2e. Browser Smoke CI runs it for the selected Chromium/WebKit engine. All 8 provider browser cases passed across Chromium/WebKit, as did 114 app e2e cases, 20 smoke cases and 8 task fixture cases, including production builds. Lint, local Markdown links and whitespace checks passed. `pnpm check` remains blocked only by the existing Modal type error and five DnD warnings.
-- No native-runtime enforcement, frontend isolation or performance guarantee is established. Parts 3–4 remain proposed.
+- These are Parts 1–2 validation results, not final validation of the current 3A working tree. No native-runtime enforcement, frontend isolation or performance guarantee is established.
 
-This precedes proposed editor extraction because the word processor would provide APIs consumed by formatting and other plugins.
+This dependency infrastructure now supports Part 3A's word-processing provider, consumed by formatting and the independent QuickFormat example.
 
 ## Part 3 — Word-processing extension API
 
@@ -86,17 +86,21 @@ This precedes proposed editor extraction because the word processor would provid
 
 ### 3A — Editor commands, observations, and result application
 
-Introduce a word-processing provider with document/view identity and lifecycle, observations/subscriptions, supported command registration/invocation, synchronous current-state editing callbacks, and a task-result application helper that checks cancellation and target lifetime.
+**Owner-approved and implemented / unmerged.** Live `EditorState`/`EditorView` callbacks are synchronous-only; the provider owns edits. This approval does not authorize 3B reconfiguration or 3C schema changes.
 
-**Proposal requiring approval:** expose live ProseMirror objects inside documented synchronous editor callbacks. This supports wrappers and sophisticated commands without inventing a weaker editing language. Do not retain mutable transactions across async/cooperative boundaries. Current state alone does not validate an old result: map and validate targets, discard stale results, or recompute as appropriate.
+- Private `@writers-ide/word-processing` supplies source contracts, `createWordProcessingService` and connection facades without app imports. The app adapter `createWordProcessingPlugin(sources = defaultWordProcessingSources)` supplies existing view/active-tab/update sources. The route registers provider and formatting, activates formatting through required-provider resolution, and cascades provider teardown. API cleanup does not destroy source-owned views.
+- Data-only snapshots/subscriptions and `inspect`, `edit`, `runCommand`, `registerCommand`, `executeCommand`, `commands`, `applyResult` support explicit targets and provider-owned dispatch. Command registrations belong to this service/connection, not the ProseMirror plugin registry or automatic shortcut routing.
+- Exact targets are `{ viewId, documentId, revision }`; module-wide monotonic tokens survive service/provider restarts. Even selection-only state changes invalidate targets. Caller/connection signals, target freshness, lifetime, editability and optional active-view requirements are rechecked around callbacks and dispatch. Async/worker/cooperative results are strictly discarded when stale, not mapped or retargeted; recomputation is explicit.
+- Do not retain live objects/transactions/dispatch callbacks or directly dispatch through the raw view. Thenable callbacks throw but cannot undo an async body already started or raw dispatch. `tr.before` verifies the current document, not transaction-origin state: a retained transaction from another state with the same document can pass with a fresh target and violates the contract.
+- Commands return a synchronous boolean, capture at most one transaction, and dispatch only after invocation/revalidation for `true`. Nested inspection is allowed; nested edits and editing during notifications return `busy`. Connections own command/subscription cleanup and guard late callbacks; lazy shared source/effect resources are released when unused or disposed.
+- `createFormattingPlugin()` has no injected argument: it resolves its required provider and builds `FormattingService(provider)` per activation. Feature policies stay in Basic Menu, including caret mark no-ops, exclusivity and continuation-aware commands. The app dispatch pipeline, history, schema and model-mutating pagination are unchanged; no editor reconfiguration is added.
+- **Independent proof:** `menu/quick-format/` consumes only the public provider API and upstream `toggleMark`, supporting production `bold` and conventional `strong`, caret stored marks, both orientations and a connection-owned command. It is registered only in the dedicated browser fixture, not the default app, and does not depend on Basic Menu.
 
-Migrate formatting to this provider. Keep formatting-specific command names, UI, and policies in the formatting feature, not the generic plugin architecture.
-
-**Proof case:** a small alternative formatting presentation uses the same provider without depending on the default toolbar.
+**Validation:** all 1,025 unit tests in 47 files passed, including 53 core service cases. All 12 Chromium/WebKit cases (six scenarios) passed via the dedicated `test:word-processing` configuration. Its production-built fixture uses the actual app provider adapter, generic host, real ProseMirror views/history and a bundled worker, with no Basic Menu import or registration. It covers selection/caret formatting, focus/remount/undo, stale/cancelled/closed-view results, same-document view isolation, cascade revocation and fresh reactivation. The full app suite passed 116 browser cases, including actual provider cascade/content/undo preservation; dedicated provider and task fixtures each passed 8 cases. Production builds, lint, local Markdown links and whitespace checks passed. `pnpm check` remains blocked only by the existing Modal type error and five DnD warnings. No native/runtime checks were run. See [context](context.md#word-processing-provider-part-3a-implemented--unmerged), the [author guide](../../packages-js/word-processing/README.md) and the [existing branch entry](change-log.md).
 
 ### 3B — Behavioral extensions
 
-Add lifecycle-owned registrations for a selected set of ProseMirror behaviors, validated by:
+**Proposed; separate owner approval required.** Add lifecycle-owned registrations for a selected set of ProseMirror behaviors, validated by:
 
 1. An input-rule wrapper.
 2. A decoration-based feature.
@@ -108,7 +112,7 @@ Define ordering and removal, especially for transaction hooks. Genuinely synchro
 
 ### 3C — Custom content and Svelte node views
 
-Prototype a small custom node rendered with ordinary Svelte. Cover mount/update/destroy, selection/events, editable content integration where needed, serialization, copy/paste, pagination interaction, and missing-plugin preservation.
+**Proposed; separate owner approval required.** Prototype a small custom node rendered with ordinary Svelte. Cover mount/update/destroy, selection/events, editable content integration where needed, serialization, copy/paste, pagination interaction, and missing-plugin preservation.
 
 **Approval gate:** schema lifecycle is a separate design. Before shipping arbitrary node/mark registration, decide when schemas are assembled, what provider changes mean for open documents, and how unsupported content survives. Removing content support is not equivalent to toggling a toolbar.
 
@@ -143,8 +147,8 @@ For each part:
 
 ## Decisions needed before implementation
 
-Parts 1–2's private package boundary, task lifecycle/results and provider compatibility/dependency-removal policies are authorized and implemented, not pending approval. Remaining gates:
+Parts 1–2's task/provider policies and Part 3A's synchronous live access, provider-owned edits and formatting migration are authorized and implemented, not pending approval. Remaining gates:
 
-1. Before Part 3, approve synchronous live ProseMirror access and concrete registration/reconfiguration contracts; Part 2 does not authorize editor migration.
-2. Before custom content or external loading, approve schema-preservation and native-enforcement designs respectively.
-3. Require separate justification/approval for broader extraction or task/provider features beyond Parts 1–2; API publication/stability and performance targets are not established.
+1. Before Part 3B, approve behavioral registration, ordering/removal and editor reconfiguration contracts; Part 3A does not authorize installing arbitrary ProseMirror plugins or recreating editors.
+2. Before Part 3C/custom content or Part 4/external loading, approve schema-preservation and native-enforcement designs respectively.
+3. Require separate justification/approval for broader extraction or task/provider features beyond Parts 1–2/3A; API publication/stability and performance targets are not established.

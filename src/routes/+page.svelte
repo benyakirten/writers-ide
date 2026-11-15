@@ -6,7 +6,7 @@
 	import { createApplicationPluginHost } from '$lib/plugins/application-plugin-host';
 	import Editor from '$lib/editor/Editor.svelte';
 	import { createFormattingPlugin } from '$lib/editor/prosemirror/menu/basic/menu';
-	import Formatting from '$lib/editor/prosemirror/menu/basic/formatting-service.svelte';
+	import { createWordProcessingPlugin } from '$lib/editor/prosemirror/word-processing.svelte';
 	import Shortcuts from '$lib/services/shortcuts.svelte';
 	import TabRegistry from '$lib/editor/state/tab-state-registry.svelte';
 	import ProseMirrorView from '$lib/editor/prosemirror/view/ProseMirrorView.svelte';
@@ -15,13 +15,15 @@
 
 	Shortcuts.add(builtInShortcuts);
 	const pluginHost = createApplicationPluginHost();
-	const formattingPlugin = createFormattingPlugin(Formatting);
+	const wordProcessingPlugin = createWordProcessingPlugin();
+	const formattingPlugin = createFormattingPlugin();
+	pluginHost.register(wordProcessingPlugin);
 	pluginHost.register(formattingPlugin);
 	const formatting = pluginHost.activate(formattingPlugin.manifest.id);
 	if (formatting.status === 'failed') {
 		console.error('Formatting plugin activation failed', formatting.errors);
 	}
-	onDestroy(() => pluginHost.deactivate(formattingPlugin.manifest.id));
+	onDestroy(() => pluginHost.deactivate(wordProcessingPlugin.manifest.id, { cascade: true }));
 	TabRegistry.register(
 		{
 			component: ProseMirrorView,

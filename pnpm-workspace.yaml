@@ -4,6 +4,7 @@ packages:
   - 'packages-js/layout'
   - 'packages-js/components'
   - 'packages-js/tasks'
+  - 'packages-js/word-processing'
 
 allowBuilds:
   esbuild: true

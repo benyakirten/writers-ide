@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushSync, mount, unmount } from 'svelte';
+import { Schema } from 'prosemirror-model';
+import { EditorState, TextSelection } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
+import type { WordProcessingSources } from '@writers-ide/word-processing';
+import { createWordProcessingPlugin } from '$lib/editor/prosemirror/word-processing.svelte';
 import type {
 	FormattingService,
 	FormattingSnapshot,
@@ -24,10 +29,20 @@ const components = new Set<ReturnType<typeof mount>>();
 const cleanups: (() => void)[] = [];
 
 // Exercise the application adapters without sharing the workbench's singleton registries.
-function setup(bars = new BarItemRegistry()) {
+function setupHost(bars = new BarItemRegistry()) {
 	const views = new TabStateRegistry();
 	const commands = new PluginCommands();
-	let current: FormattingSnapshot = {
+	const host = createApplicationPluginHost({ bars, views, commands });
+	cleanups.push(() => {
+		for (const plugin of host.list()) {
+			host.deactivate(plugin.manifest.id, { cascade: true });
+		}
+	});
+	return { host, bars, views, commands };
+}
+
+function setup() {
+	const current: FormattingSnapshot = {
 		viewId: 'editor-one',
 		revision: 7,
 		marks: {
@@ -76,28 +91,105 @@ function setup(bars = new BarItemRegistry()) {
 		}),
 		execute: vi.fn<FormattingService['execute']>(() => true),
 	};
-	const host = createApplicationPluginHost({ bars, views, commands });
-	const formattingPlugin = createFormattingPlugin(formatting);
+	return { ...setupHost(), formatting, listeners, unsubscribe };
+}
+
+function setupFormatting(bars = new BarItemRegistry()) {
+	const f = setupHost(bars);
+	const editorViews: EditorView[] = [];
+	let active = 'editor-one';
+	const listeners = new Set<() => void>();
+	const unsubscribe = vi.fn();
+	const sources: WordProcessingSources = {
+		listViews: () =>
+			editorViews.map((view, index) => ({
+				viewId: index === 0 ? 'editor-one' : 'editor-two',
+				documentId: `document-${index}`,
+				name: `Editor ${index}`,
+				view,
+			})),
+		activeViewId: () => active,
+		subscribe: vi.fn((listener) => {
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+				unsubscribe();
+			};
+		}),
+	};
+	function emit() {
+		for (const listener of listeners) {
+			listener();
+		}
+		flushSync();
+	}
+	f.host.register(createWordProcessingPlugin(sources));
+	const formattingPlugin = createFormattingPlugin();
 	cleanups.push(() => {
-		for (const plugin of host.list()) {
-			host.deactivate(plugin.manifest.id);
+		f.host.deactivate(formattingPlugin.manifest.id);
+		for (const view of editorViews) {
+			view.destroy();
 		}
 	});
 	return {
-		host,
+		...f,
 		formattingPlugin,
-		bars,
-		views,
-		commands,
-		formatting,
+		sources,
 		listeners,
 		unsubscribe,
-		emitTarget(viewId: string, revision: number) {
-			current = { ...current, viewId, revision };
-			for (const listener of listeners) {
-				listener(current);
-			}
-			flushSync();
+		createView() {
+			// Formatting actions resolve peer paragraphs at doc/page/block depth.
+			const schema = new Schema({
+				nodes: {
+					doc: { content: 'page+' },
+					page: {
+						content: 'paragraph+',
+						attrs: { index: { default: 0 } },
+						toDOM: () => ['section', 0],
+					},
+					paragraph: {
+						content: 'text*',
+						attrs: {
+							peer: { default: false },
+							indent: { default: 0 },
+							align: { default: 'start' },
+						},
+						toDOM: () => ['p', 0],
+					},
+					text: {},
+				},
+				marks: Object.fromEntries(
+					[
+						'bold',
+						'italic',
+						'superscript',
+						'subscript',
+						'underline',
+						'overline',
+						'strikethrough',
+					].map((name) => [name, { toDOM: () => ['span', 0] }]),
+				),
+			});
+			const doc = schema.node(
+				'doc',
+				null,
+				schema.node('page', null, schema.node('paragraph', null, schema.text('first second'))),
+			);
+			const target = document.createElement('div');
+			document.body.append(target);
+			const view = new EditorView(target, {
+				state: EditorState.create({ doc, selection: TextSelection.create(doc, 2, 7) }),
+				dispatchTransaction(transaction) {
+					view.updateState(view.state.apply(transaction));
+					emit();
+				},
+			});
+			editorViews.push(view);
+			return view;
+		},
+		activateView(viewId: string) {
+			active = viewId;
+			emit();
 		},
 	};
 }
@@ -191,7 +283,7 @@ describe('application plugin adapters', () => {
 		expect(f.formatting.subscribe).not.toHaveBeenCalled();
 	});
 	it('registers the real formatting plugin with orientation sizes and only scoped presentation data', () => {
-		const f = setup();
+		const f = setupFormatting();
 		f.host.register(f.formattingPlugin);
 		expect(f.host.activate(f.formattingPlugin.manifest.id)).toMatchObject({
 			status: 'active',
@@ -216,10 +308,10 @@ describe('application plugin adapters', () => {
 		const verticalFormatting = item.vertical.plugin!.props.formatting as FormattingService;
 		expect(verticalFormatting.subscribe).toBe((props.formatting as FormattingService).subscribe);
 		expect(verticalFormatting.execute).toBe((props.formatting as FormattingService).execute);
-		expect(props.formatting).not.toBe(f.formatting);
+
 		expect(item.horizontal.plugin).not.toHaveProperty('context');
 		expect(f.views.items).toEqual({});
-		expect(f.formatting.subscribe).not.toHaveBeenCalled();
+		expect(f.sources.subscribe).not.toHaveBeenCalled();
 		f.host.deactivate(f.formattingPlugin.manifest.id);
 		expect(f.bars.items).toEqual({});
 		expect(f.bars.size('basic-menu', false)).toBe(2);
@@ -230,12 +322,12 @@ describe('application plugin adapters', () => {
 				command: 'bold',
 			}),
 		).toBe(false);
-		expect(f.formatting.execute).not.toHaveBeenCalled();
+		expect(f.sources.subscribe).not.toHaveBeenCalled();
 	});
 
 	it('reserves disabled plugin capacity in every placement and orientation until metadata is cleared', () => {
 		Registry.clear();
-		const f = setup(Registry);
+		const f = setupFormatting(Registry);
 		cleanups.push(() => Registry.clear());
 		Registry.register({ title: 'One', horizontal: { size: 1 }, vertical: { size: 1 } }, 'one');
 		Registry.register({ title: 'Extra', horizontal: { size: 1 }, vertical: { size: 1 } }, 'extra');
@@ -287,64 +379,73 @@ describe('application plugin adapters', () => {
 	});
 
 	it.each(['horizontal', 'vertical'] as const)(
-		'%s presentation subscribes through the injected feature service, routes real buttons to the latest target, and is revoked before unmount',
+		'%s presentation subscribes lazily through the provider, formats the latest view and selection, and is revoked before unmount',
 		async (orientation) => {
-			const f = setup();
+			const f = setupFormatting();
+			const first = f.createView();
+			const second = f.createView();
 			f.host.register(f.formattingPlugin);
-			f.host.activate(f.formattingPlugin.manifest.id);
+			expect(f.host.activate(f.formattingPlugin.manifest.id).status).toBe('active');
+			expect(f.sources.subscribe).not.toHaveBeenCalled();
 			const presentation = f.bars.items['basic-menu'][orientation].plugin!;
 			const { target, component } = render(presentation);
-			expect(f.formatting.subscribe).toHaveBeenCalledOnce();
+			expect(f.sources.subscribe).toHaveBeenCalledOnce();
 			expect(f.listeners.size).toBe(1);
+			const untouchedSecond = second.state;
 			boldButton(target).click();
-			expect(f.formatting.execute).toHaveBeenLastCalledWith({
-				viewId: 'editor-one',
-				revision: 7,
-				command: 'bold',
-			});
-			f.emitTarget('editor-two', 19);
-			boldButton(target).click();
-			expect(f.formatting.execute).toHaveBeenLastCalledWith({
-				viewId: 'editor-two',
-				revision: 19,
-				command: 'bold',
-			});
+			expect(first.state.doc.rangeHasMark(2, 7, first.state.schema.marks.bold)).toBe(true);
+			expect(second.state).toBe(untouchedSecond);
+			const formattedFirst = first.state;
+			f.activateView('editor-two');
+			second.dispatch(second.state.tr.setSelection(TextSelection.create(second.state.doc, 8, 14)));
+			const retainedButton = boldButton(target);
+			retainedButton.click();
+			expect(second.state.doc.rangeHasMark(8, 14, second.state.schema.marks.bold)).toBe(true);
+			expect(second.state.doc.rangeHasMark(2, 7, second.state.schema.marks.bold)).toBe(false);
+			expect(second.state.selection.from).toBe(8);
+			expect(second.state.selection.to).toBe(14);
+			expect(first.state).toBe(formattedFirst);
+			const formattedSecond = second.state;
 			f.host.deactivate(f.formattingPlugin.manifest.id);
 			expect(f.bars.items).toEqual({});
 			expect(f.listeners.size).toBe(0);
 			expect(f.unsubscribe).toHaveBeenCalledOnce();
 			// A retained mounted presentation must not keep command authority after removal.
-			boldButton(target).click();
-			expect(f.formatting.execute).toHaveBeenCalledTimes(2);
+			retainedButton.click();
+			expect(first.state).toBe(formattedFirst);
+			expect(second.state).toBe(formattedSecond);
 			await remove(component);
 			expect(target.querySelector('button')).toBeNull();
 			expect(f.unsubscribe).toHaveBeenCalledOnce();
 		},
 	);
 
-	it('unmounting one orientation releases only its subscription, leaving the other presentation live', async () => {
-		const f = setup();
+	it('unmounting one orientation retains the shared provider subscription and leaves the other presentation live', async () => {
+		const f = setupFormatting();
+		const first = f.createView();
+		const second = f.createView();
 		f.host.register(f.formattingPlugin);
-		f.host.activate(f.formattingPlugin.manifest.id);
+		expect(f.host.activate(f.formattingPlugin.manifest.id).status).toBe('active');
+		expect(f.sources.subscribe).not.toHaveBeenCalled();
 		const item = f.bars.items['basic-menu'];
 		const horizontal = render(item.horizontal.plugin!);
 		const vertical = render(item.vertical.plugin!);
-		expect(f.listeners.size).toBe(2);
+		expect(f.listeners.size).toBe(1);
+		expect(f.sources.subscribe).toHaveBeenCalledOnce();
 		await remove(horizontal.component);
 		expect(f.listeners.size).toBe(1);
-		expect(f.unsubscribe).toHaveBeenCalledOnce();
-		f.emitTarget('remaining-editor', 23);
+		expect(f.unsubscribe).not.toHaveBeenCalled();
+		const untouchedFirst = first.state;
+		f.activateView('editor-two');
 		boldButton(vertical.target).click();
-		expect(f.formatting.execute).toHaveBeenCalledExactlyOnceWith({
-			viewId: 'remaining-editor',
-			revision: 23,
-			command: 'bold',
-		});
+		expect(second.state.doc.rangeHasMark(2, 7, second.state.schema.marks.bold)).toBe(true);
+		expect(first.state).toBe(untouchedFirst);
+		expect(f.sources.subscribe).toHaveBeenCalledOnce();
 		f.host.deactivate(f.formattingPlugin.manifest.id);
 		expect(f.listeners.size).toBe(0);
-		expect(f.unsubscribe).toHaveBeenCalledTimes(2);
+		expect(f.unsubscribe).toHaveBeenCalledOnce();
 		await remove(vertical.component);
-		expect(f.unsubscribe).toHaveBeenCalledTimes(2);
+		expect(f.unsubscribe).toHaveBeenCalledOnce();
 	});
 
 	it('registers and removes views and commands through scoped contexts, revoking retained command handles', async () => {

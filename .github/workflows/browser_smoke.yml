@@ -38,6 +38,8 @@ jobs:
         run: pnpm test:tasks --project=${{ matrix.browser }}
       - name: Plugin providers and dependency management tests
         run: pnpm test:plugins --project=${{ matrix.browser }}
+      - name: Word-processing provider and independent formatting tests
+        run: pnpm test:word-processing --project=${{ matrix.browser }}
       - name: Upload browser report and failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4

@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
 	testDir: 'e2e',
 	// Library/host fixtures run on their own servers/configurations.
-	testIgnore: ['tasks.test.ts', 'plugin-dependencies.test.ts'],
+	testIgnore: ['tasks.test.ts', 'plugin-dependencies.test.ts', 'word-processing.test.ts'],
 	forbidOnly: Boolean(process.env.CI),
 	workers: process.env.CI ? 2 : undefined,
 	reporter: [['list'], ['html', { outputFolder: 'browser-report', open: 'never' }]],

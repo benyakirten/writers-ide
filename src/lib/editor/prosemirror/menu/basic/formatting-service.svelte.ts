@@ -4,45 +4,19 @@ import type {
 	FormattingService as FormattingServiceContract,
 	FormattingSnapshot,
 } from './contracts';
-import type { EditorState, Transaction } from 'prosemirror-state';
-import type { EditorView } from 'prosemirror-view';
+import type { Command } from 'prosemirror-state';
+import type {
+	EditorContext,
+	EditorSnapshot,
+	WordProcessingApi,
+} from '@writers-ide/word-processing';
 import { untrack } from 'svelte';
 
-import Editors from '$lib/editor/prosemirror/prose-mirror-editor.svelte';
 import { ActionUtilities } from '$lib/editor/prosemirror/view/actions';
 import { SelectionUtilities } from '$lib/editor/prosemirror/view/selection';
-import proseMirrorEventBus, {
-	ProseMirrorEventBusEventType,
-} from '$lib/editor/state/event-bus.svelte';
-import TabState from '$lib/editor/state/tab-state.svelte';
 import PageLayout, { PeerSelection } from '$lib/editor/state/page-layout.svelte';
 import { INDENT_MAX, INDENT_MIN } from '$lib/editor/prosemirror/view/constants';
 import { clamp } from '$lib/utils/numbers';
-
-/** Internal editor sources, not presentation props. Getters must track reactive registry changes. */
-export interface FormattingSources {
-	activeId(): string | null | undefined;
-	getView(id: string): { view: EditorView } | null;
-	subscribe(listener: () => void): () => void;
-}
-
-const defaultSources: FormattingSources = {
-	activeId: () => {
-		const documentId = TabState.active;
-		return documentId ? Editors.get(documentId)?.viewId : undefined;
-	},
-	getView: (id) => Editors.getView(id),
-	subscribe: (listener) =>
-		proseMirrorEventBus.subscribe(({ event }) => {
-			if (
-				event.type === ProseMirrorEventBusEventType.Init ||
-				event.type === ProseMirrorEventBusEventType.Update ||
-				event.type === ProseMirrorEventBusEventType.SetActiveTab
-			) {
-				listener();
-			}
-		}),
-};
 
 const marks = [
 	'bold',
@@ -63,38 +37,37 @@ const blocks = [
 ] as const;
 const commands: readonly string[] = [...marks, ...blocks];
 
-type Current = { viewId: string; view: EditorView; state: EditorState; editable: boolean };
-
-function run(command: FormattingCommand, current: Current, dispatch: (tr: Transaction) => void) {
-	const { state, view } = current;
-	switch (command) {
-		case 'indent':
-		case 'dedent':
-			return ActionUtilities.dent(command, state, dispatch);
-		case 'align-left':
-			return ActionUtilities.setTextAlignment('left', state, dispatch);
-		case 'align-center':
-			return ActionUtilities.setTextAlignment('center', state, dispatch);
-		case 'align-right':
-			return ActionUtilities.setTextAlignment('right', state, dispatch);
-		case 'align-justify':
-			return ActionUtilities.setTextAlignment('justify', state, dispatch);
-		default: {
-			if (!state.schema.marks[command]) {
-				return false;
+function run(command: FormattingCommand): Command {
+	return (state, dispatch, view) => {
+		switch (command) {
+			case 'indent':
+			case 'dedent':
+				return ActionUtilities.dent(command, state, dispatch);
+			case 'align-left':
+				return ActionUtilities.setTextAlignment('left', state, dispatch);
+			case 'align-center':
+				return ActionUtilities.setTextAlignment('center', state, dispatch);
+			case 'align-right':
+				return ActionUtilities.setTextAlignment('right', state, dispatch);
+			case 'align-justify':
+				return ActionUtilities.setTextAlignment('justify', state, dispatch);
+			default: {
+				if (!state.schema.marks[command]) {
+					return false;
+				}
+				const exclusive =
+					command === 'superscript'
+						? 'subscript'
+						: command === 'subscript'
+							? 'superscript'
+							: undefined;
+				return ActionUtilities.toggleTextMark(command, state, dispatch, view, exclusive);
 			}
-			const exclusive =
-				command === 'superscript'
-					? 'subscript'
-					: command === 'subscript'
-						? 'superscript'
-						: undefined;
-			return ActionUtilities.toggleTextMark(command, state, dispatch, view, exclusive);
 		}
-	}
+	};
 }
 
-function availability(current: Current): FormattingSnapshot['enabled'] {
+function availability(current: EditorContext): FormattingSnapshot['enabled'] {
 	const result = Object.fromEntries(
 		commands.map((command) => [command, false]),
 	) as FormattingSnapshot['enabled'];
@@ -142,7 +115,7 @@ function availability(current: Current): FormattingSnapshot['enabled'] {
 	return result;
 }
 
-function snapshot(current: Current, revision: number): FormattingSnapshot {
+function snapshot(current: EditorContext, revision: number): FormattingSnapshot {
 	const { selection, doc } = current.state;
 	const presence = SelectionUtilities.findTextMarks(selection, doc);
 	const indent = SelectionUtilities.getIndentRatio(selection, doc);
@@ -186,33 +159,34 @@ function copy(value: FormattingSnapshot | null): FormattingSnapshot | null {
 export class FormattingService implements FormattingServiceContract {
 	private listeners = new Set<(snapshot: FormattingSnapshot | null) => void>();
 	private cleanup: (() => void) | undefined;
-	private current: Current | null = null;
+	private current: EditorSnapshot | null = null;
 	private value: FormattingSnapshot | null = null;
 	private revision = 0;
 
-	constructor(private readonly sources: FormattingSources = defaultSources) {}
+	constructor(private readonly api: WordProcessingApi) {}
 
-	private read(): Current | null {
-		const viewId = this.sources.activeId();
-		const view = viewId ? this.sources.getView(viewId)?.view : null;
-		return viewId && view && !view.isDestroyed
-			? { viewId, view, state: view.state, editable: view.editable }
-			: null;
+	private read(): EditorSnapshot | null {
+		const current = this.api.snapshot();
+		return current.views.find((view) => view.viewId === current.activeViewId) ?? null;
 	}
 
 	private refresh(): void {
 		const next = this.read();
 		if (
 			next?.viewId === this.current?.viewId &&
-			next?.view === this.current?.view &&
-			next?.state === this.current?.state &&
-			next?.editable === this.current?.editable
+			next?.documentId === this.current?.documentId &&
+			next?.revision === this.current?.revision
 		) {
 			return;
 		}
 		this.current = next;
 		this.revision++;
-		this.value = next ? snapshot(next, this.revision) : null;
+		const result = next
+			? this.api.inspect(next, (current) => snapshot(current, this.revision), {
+					requireActive: true,
+				})
+			: null;
+		this.value = result?.ok ? result.value : null;
 		for (const listener of [...this.listeners]) {
 			if (this.listeners.has(listener)) {
 				try {
@@ -227,17 +201,7 @@ export class FormattingService implements FormattingServiceContract {
 
 	subscribe(listener: (snapshot: FormattingSnapshot | null) => void): () => void {
 		if (!this.cleanup) {
-			this.cleanup = $effect.root(() => {
-				const unsubscribe = this.sources.subscribe(() => untrack(() => this.refresh()));
-				$effect(() => {
-					const id = this.sources.activeId();
-					if (id) {
-						this.sources.getView(id);
-					}
-					untrack(() => this.refresh());
-				});
-				return unsubscribe;
-			});
+			this.cleanup = this.api.subscribe(() => untrack(() => this.refresh()));
 		}
 		untrack(() => this.refresh());
 		// Each subscription has its own identity, even when the callback is reused.
@@ -276,21 +240,17 @@ export class FormattingService implements FormattingServiceContract {
 			request.viewId !== this.value.viewId ||
 			request.revision !== this.value.revision ||
 			live.viewId !== this.current.viewId ||
-			live.view !== this.current.view ||
-			live.state !== this.current.state ||
-			live.editable !== this.current.editable ||
+			live.documentId !== this.current.documentId ||
+			live.revision !== this.current.revision ||
 			!this.value.enabled[request.command]
 		) {
 			return false;
 		}
-		const result = run(request.command, live, (tr) => live.view.dispatch(tr));
-		if (result && !live.view.isDestroyed) {
-			live.view.focus();
-		}
+		const result = this.api.runCommand(live, run(request.command), {
+			requireActive: true,
+			focus: true,
+		});
 		this.refresh();
-		return result;
+		return result.ok && result.value;
 	}
 }
-
-export const Formatting = new FormattingService();
-export default Formatting;

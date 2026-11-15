@@ -6,6 +6,11 @@ import { defineSveltePresentation, type SveltePluginContext } from '@writers-ide
 import BasicMenuHorizontal from './BasicMenuHorizontal.svelte';
 import BasicMenuVertical from './BasicMenuVertical.svelte';
 import { createFormattingPlugin } from './menu';
+import {
+	createWordProcessingService,
+	WORD_PROCESSING_PLUGIN_ID,
+	wordProcessingApi,
+} from '@writers-ide/word-processing';
 import PluginPresentationFixture from '$lib/testing/PluginPresentationFixture.svelte';
 
 const components: ReturnType<typeof mount>[] = [];
@@ -116,15 +121,33 @@ function render(Component: typeof BasicMenuHorizontal, formatting: FormattingSer
 
 describe('formatting plugin', () => {
 	it('registers the stable toolbar identity and both scoped presentation descriptors', () => {
-		const { context, formatting } = setup();
-		const formattingPlugin = createFormattingPlugin(formatting);
+		const { context } = setup();
+		const api = createWordProcessingService({
+			listViews: () => [],
+			activeViewId: () => null,
+			subscribe: () => () => {},
+		});
+		vi.mocked(context.apis.get).mockReturnValue(api);
+		const formattingPlugin = createFormattingPlugin();
 		expect(formattingPlugin.manifest).toMatchObject({
 			id: 'writers-ide.formatting',
 			version: '0.1.0',
 			apiVersion: 1,
 			capabilities: ['contributions.toolbar'],
+			dependencies: [
+				{
+					provider: WORD_PROCESSING_PLUGIN_ID,
+					api: wordProcessingApi.id,
+					major: wordProcessingApi.major,
+				},
+			],
 		});
 		formattingPlugin.activate(context);
+		expect(context.apis.get).toHaveBeenCalledExactlyOnceWith(
+			WORD_PROCESSING_PLUGIN_ID,
+			wordProcessingApi,
+		);
+		api.dispose();
 		expect(context.contributions.toolbar).toHaveBeenCalledExactlyOnceWith({
 			id: 'basic-menu',
 			name: 'Basic Menu',
@@ -137,6 +160,14 @@ describe('formatting plugin', () => {
 				size: 1,
 			},
 		});
+	});
+
+	it('fails activation without the required API instead of registering a disconnected toolbar', () => {
+		const { context } = setup();
+		expect(() => createFormattingPlugin().activate(context)).toThrow(
+			'Required word-processing API unavailable',
+		);
+		expect(context.contributions.toolbar).not.toHaveBeenCalled();
 	});
 
 	for (const [orientation, Component] of [
