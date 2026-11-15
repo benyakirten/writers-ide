@@ -75,13 +75,54 @@ Dependency compatibility, required/optional relationships, activation order, cyc
 
 ### Execution boundary and design validation
 
-A wrapper supplies compatibility, not isolation. Installing an upstream ProseMirror `Plugin` directly into an application editor still executes its callbacks with that environment's authority. A manifest declaration or wrapper cannot make this safe by itself. Execution and isolation must be enforced below the shared API, equally for official and third-party extensions; no privileged built-in compatibility path is approved.
+A wrapper supplies compatibility, not isolation. Installing an upstream ProseMirror `Plugin` directly into an application editor executes its callbacks with that environment's authority. Official and third-party wrappers must use the same supported APIs, but frontend code is trusted rather than sandboxed under the revised direction below.
 
-The next design work should exercise a simple input-rule package, a decoration-based feature, and a custom-node/node-view integration. Use these concrete wrapper cases to identify API and execution requirements before implementing the deeper extension model. Hook execution locations, messaging, permissions, schema lifecycle, and dependency contracts remain open architectural decisions requiring owner approval. Current trusted in-process composition is not proof that this future model is implemented or safe for external code.
+The next design work should exercise a simple input-rule package, a decoration-based feature, and a Svelte custom-node/node-view integration. Use these concrete wrapper cases to identify API and execution requirements before implementing the deeper extension model. Hook ordering, permissions, schema lifecycle, and dependency contracts remain open architectural decisions requiring owner approval.
+
+## Accepted direction: frontend trust and native restrictions
+
+**Owner-approved revision to the original isolation plan; not a new runtime implementation:** frontend plugins may use ordinary Svelte, their own DOM rendering, and supported deep editor APIs. Preventing access to the application's or other plugins' DOM is deferred, not a prerequisite for the next frontend extension APIs. Same-environment frontend JavaScript is trusted code and can reach ambient browser facilities. Public APIs remain the supported integration path; plugins should not modify another plugin's UI or private state, but this is a behavioral contract, not an enforced DOM boundary.
+
+External network calls are allowed in principle under an explicit user trust model. A plugin able to read manuscript content and make requests can exfiltrate that content; copied snapshots, contribution declarations, wrappers, and DOM boundaries do not prevent this. Permission disclosures must distinguish informational declarations from enforced restrictions. Exact installation review and network disclosure UX remain open. This decision does not enable an external loader today.
+
+Backend/native extensions must remain highly restrictive. Frontend trust must not imply unrestricted Tauri IPC, filesystem, shell/process, native-library, or other backend authority. Define and verify narrow native APIs and their actual enforcement before external loading; do not mistake TypeScript interfaces or frontend checks for that boundary. Project-supplied requirements must not automatically install or execute code or grant permissions.
+
+Ordinary Svelte node views are a design goal without requiring iframe-per-node rendering or a bespoke UI DSL. No iframe, ShadowRealm, secure DOM membrane, separate-process runtime, or future isolation mechanism is selected. Frontend DOM isolation can be investigated later without claiming present security guarantees.
+
+## Accepted direction: actions and cooperative execution
+
+**Accepted design, not implemented plugin APIs:** reuse the [pagination work queue](../pagination/context.md#generic-work-queue) as shared cooperative infrastructure. Provide useful, ergonomic helpers and APIs that consume them rather than requiring a generator for every action or routing every UI callback through a queue. Plugin authors choose the appropriate execution mode:
+
+| Mode                    | Intended use                                                   | Contract                                                                   |
+| ----------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Immediate synchronous   | Small editing commands and hooks requiring an immediate answer | Keep callbacks short; scheduling cannot preempt them.                      |
+| Async                   | Network requests and other asynchronous APIs                   | Promises do not offload CPU work; cancellation is cooperative.             |
+| Cooperative main-thread | Incremental DOM-dependent work and other bounded tasks         | Yield between short units; edits and cancellation can occur between units. |
+| Worker                  | CPU-heavy computation over cloneable/transferable inputs       | No live DOM, editor state, or transaction crosses the worker boundary.     |
+
+### Make the cooperative path attractive
+
+- Offer iteration/batching helpers that manage yielding and progress, with an advanced generator API when authors need explicit checkpoints. No mandatory generator or mandatory execution-mode declaration for every UI action is approved.
+- Let contributed commands and higher-level APIs use task helpers so a Svelte button or shortcut can invoke the same managed operation without implementing scheduling itself. Ordinary short actions remain straightforward.
+- The host scopes task ownership, cancellation, labels/errors and replacement keys to plugin activation. Authors should not manage queue start leases or remember unload cleanup. Link per-task cancellation to plugin lifetime and, where appropriate, document/view closure; cancelling one task must not abort all plugin work.
+- Share the application scheduler with pagination rather than giving every plugin a separate frame allowance. Preserve fairness and cancellation; exact APIs, quotas and priority policy remain open.
+- Keep each unit short. The current queue has an 8 ms **soft** frame budget and cannot interrupt an executing generator step. A callback wrapper cannot make an arbitrary loop cooperative. Slow-step diagnostics and concrete responsiveness measurements are useful follow-up work, not existing guarantees.
+
+These are convenience and performance contracts, not sandbox enforcement. Trusted frontend code can still put expensive work in event handlers or Svelte effects. The approach is a carrot: good examples, useful helpers, and natural consumers rather than pretending to intercept all JavaScript execution. Truly synchronous ProseMirror hooks remain synchronous; do not defer event-handling decisions or browser operations requiring user activation indiscriminately.
+
+### Computation, cancellation and result application
+
+Task utilities should separate capture/computation from result application. When results are ready, obtain current editor state, validate the target, and construct/apply a transaction synchronously. Do not retain a mutable transaction or assume a live selection remains valid across `await` or a cooperative yield. Current state alone does not make an old result applicable: map and validate captured targets, discard stale results, or recompute according to the operation's semantics. Multiple incremental edits need explicit partial-completion and undo-grouping behavior.
+
+Prefer bundled worker modules with a small worker-side protocol helper over `calcFn.toString()` blobs: function serialization loses imports/closures and does not supply a messaging protocol. A managed worker task should handle result payloads, errors, cancellation, late-result rejection, termination and resource cleanup. Dedicated one-shot workers are a simple starting proposal; pooling/reuse is not selected. Worker computation may also update plugin-local UI without producing an editor transaction.
+
+Async task cancellation requires the operation to honor its signal; a dedicated worker can be terminated. Main-thread synchronous work cannot be interrupted while it blocks. Check cancellation before starting and before applying results, and surface failures with plugin/task identity. Latest-request-wins behavior and progress are useful optional helpers. If an API exposes both an immediate and eventual result, it must define whether the latter replaces or supplements the former to avoid duplicate application; no such signature is finalized.
+
+General queue/task mechanics belong in reusable infrastructure, plugin lifecycle scoping belongs in the host, and current-state validation/transaction application belongs in the word-processing subsystem. Formatting commands do not belong in these generic APIs. This direction does not authorize redesigning model-mutating pagination.
 
 ## Accepted implementation stages
 
-The owner approved the following sequence. Stages 1 and 2 support trusted, bundled plugins only; arbitrary third-party code must not be loaded before Stage 3 isolation and enforcement are implemented. These stages are not release dates or claims of completed work.
+Stages 1 and 2 support trusted, bundled plugins only. The owner subsequently revised Stage 3's original frontend-isolation prerequisite: frontend DOM isolation is deferred, while external loading still requires a concrete trust/installation design and verified native restrictions. These stages are not release dates or claims of completed work.
 
 ### Stage 1 — Contracts, host, and formatting plugin
 
@@ -107,13 +148,14 @@ The owner approved the following sequence. Stages 1 and 2 support trusted, bundl
 - Clearly identify bundled plugins as trusted. Capability declarations and narrow interfaces do not sandbox in-process JavaScript. Do not offer installation from files or URLs yet.
 - Disabling a plugin removes its active contributions, not its saved data. Keep the management shell host-owned so a failing plugin cannot prevent users from disabling it.
 
-### Stage 3 — Isolated third-party plugins
+### Stage 3 — Third-party loading, trust and native enforcement
 
-- Approve and implement frontend isolation, messaging, runtime validation, permission enforcement, and isolated UI contributions before enabling external installation/loading.
-- Define external-package validation and compatibility checks. Add permission review, revocation, and failure handling to the plugin manager.
-- Test that plugins cannot bypass granted access, including through dependencies or ambient browser/native facilities.
+- Define external-package validation, compatibility, installation review and explicit frontend trust/network disclosures before enabling external loading.
+- Approve and verify restrictive backend/native access, runtime request validation, revocation and failure handling. Do not promise that same-environment frontend JavaScript is confined by capability declarations.
+- Support ordinary Svelte and shared official/third-party extension APIs. Frontend DOM isolation is deferred; no iframe or alternative runtime is required or selected by this plan.
+- Add dependency/provider lifecycle and extension contracts through separately approved designs; test native denial and actual lifecycle guarantees rather than nonexistent frontend isolation.
 
-Defer the implementation of isolation, not its architectural constraints. From Stage 1, use transferable data, scoped IDs, and explicit requests at the data/command boundary. Direct Svelte component registration is a trusted rendering adapter, not the universal external-plugin interface. The eventual built-in and third-party feature APIs must converge on the accepted shared extension contracts; trusted adapters must not establish feature-only privileged shortcuts.
+Keep transferable data, scoped IDs, explicit requests and lifecycle ownership where useful. Direct Svelte components are trusted execution, whether supplied by an official or third-party feature. Shared APIs must not introduce official-feature-only privileged shortcuts. The task/scheduler direction above is accepted, but exact implementation scope and public signatures remain to be designed.
 
 The undo-tree plugin remains a future consumer once host history plumbing exists. These stages do not select a history/storage model or implement durable branching history.
 
@@ -140,9 +182,9 @@ Reading history metadata, reading historical content, navigating history, and de
 
 ## Safety and data contracts
 
-Packaging is not isolation. Current in-process components and imported libraries execute with the authority of their execution environment. Third-party dependencies running inside an isolated plugin must not become a route around that boundary.
+Packaging is not isolation. In-process frontend components and imported libraries execute with their environment's authority; frontend DOM isolation is deferred and external network calls are allowed in principle. Treat document access plus network access as the ability to disclose that document.
 
-Plugin APIs should expose versioned data or scoped handles and validated requests, not mutable references to application singletons or unrestricted editor views. Permission enforcement belongs to the host; TypeScript types and declared capabilities alone do not enforce it. Filesystem, network, shell, native execution, and unrelated project data are not ambient plugin privileges.
+Public APIs should favor versioned data, scoped handles and validated requests over mutable application singletons. Deep editor access must be designed within the word-processing API for both official and third-party features. Native permission enforcement belongs below frontend code; TypeScript types and declared capabilities alone do not enforce it. Frontend trust does not grant unrestricted filesystem, shell, native execution, or backend access.
 
 Schema-owning features require versioning and missing-plugin preservation contracts before extraction. Removing a toolbar is different from removing the implementation of saved content. Preserve plugin-owned data when a plugin is disabled or unavailable; basic preservation must not require executing it.
 
@@ -155,7 +197,7 @@ Schema-owning features require versioning and missing-plugin preservation contra
 - Trusted presentations have a local Svelte boundary with a fallback for rendering/effect failures, leaving the host-owned manager available for disable/re-enable. Shared tooltip snippets have their own local boundary because they render outside the plugin view; replacing the descriptor/content or dismissing the tooltip allows recovery. This is presentation-error containment, not protection from arbitrary JavaScript errors, event-handler failures, malicious code, or ambient host access.
 - Stage 2 `@writers-ide/components` exports `TooltipState`, `TooltipProvider`, `IconButton`, `Tooltip`, and `Pointer` with explicit state/context dependencies and no application singleton. Legacy app wrappers share the application tooltip manager; the route wraps `Editor` with that manager and `renderPointer={false}` because the app still renders its pointer. Drag suppression uses the same manager.
 - The application adapts toolbar/view contributions to existing registries and command contributions to host-owned command handles. `defineSveltePresentation(component, props)` checks explicit feature props before type erasure; the descriptor/rendering adapter has no hardcoded context prop. A component receives the common context only if it needs it and the plugin explicitly supplies it. Formatting receives only its scoped formatting service, not legacy workspace/editor props. Central-view instance metadata and contributed shortcut routing are not implemented. The built-in word processor still uses the legacy path; its extraction is intentionally deferred.
-- `createFormattingPlugin(service)` receives a trusted singleton from the route, injected only into this plugin rather than the general host. Feature-local `scopeFormattingService` clones snapshot data and requests, owns subscriptions through `context.own`, and revokes callbacks/requests through `context.signal`. It preserves early release, initial-listener failure cleanup, disposer/error behavior, and stale-activation rejection. This is trusted feature dependency injection, not a generic service bus, new extensible permission model, or external security grant; Stage 3 isolation and permissions remain open.
+- `createFormattingPlugin(service)` receives a trusted singleton from the route, injected only into this plugin rather than the general host. Feature-local `scopeFormattingService` clones snapshot data and requests, owns subscriptions through `context.own`, and revokes callbacks/requests through `context.signal`. It preserves early release, initial-listener failure cleanup, disposer/error behavior, and stale-activation rejection. This is trusted feature dependency injection, not a generic service bus, new extensible permission model, or external security grant; Stage 3 loading/native enforcement remain open and frontend DOM isolation is deferred.
 - Formatting delivers immediate, copied, data-only snapshots: view ID, monotonic revision, mark/block ratios, and command availability. Requests specify view ID, revision, and command. The service validates live active view/state/editability, rejecting stale requests even before a reactive flush; tab document IDs are resolved to distinct registered view IDs. Existing caret mark no-ops, superscript/subscript exclusion, and continuation-aware paragraph commands are preserved. Unavailable/no-op controls are disabled.
 - Formatting subscriptions start the shared bridge lazily and release its bus/effect resources when unused. Availability queries inspect content without generating speculative transactions. Peer grouping must safely traverse page boundaries, final leaf blocks and document-end selections; errors in this query can otherwise escape a ProseMirror update before subscriber notification. Update-listener failures are reported without interrupting other subscribers or editor dispatch. No rich-text content or mutable editor reference crosses the formatting boundary.
 - Disabling a toolbar removes its presentation but retains placement IDs and declared orientation costs, avoiding overfill on re-enable. Missing-item placeholders remain, and reactivation restores the registered presentations. Registry `clear()` releases retained metadata. This is in-memory preservation, not durable layout or plugin-state storage.
@@ -185,8 +227,9 @@ These are private, evolving contracts and internal discovery points, not a stabl
 - Detailed package boundaries and names within the approved scope, dependency rules, and any later publication strategy. Initial packages are private workspace packages.
 - Extensions beyond the synchronous lifecycle and API version 1, user-grant policy, persistent activation preferences, and richer contribution/view-instance contracts.
 - Subsystem-provided versioned APIs and required/optional runtime dependencies, including compatibility, ordering, cycles, provider removal and cleanup.
-- The shared word-processing extension API and ProseMirror wrapper compatibility: supported hooks, synchronous execution, schema lifecycle, and isolated rendering.
-- Frontend isolation, messaging, and permission enforcement mechanisms.
+- The shared word-processing extension API and ProseMirror wrapper compatibility: supported hooks, synchronous execution, schema lifecycle, and ordinary Svelte node views.
+- Task helper signatures, scheduler extraction, worker protocol, cancellation/result policies, and performance diagnostics; cooperation remains encouraged rather than universally mandatory.
+- External loading/review and network disclosure UX, restrictive native enforcement, and any later frontend isolation research.
 - Document/view ownership and command contracts, schema evolution, and content preservation.
 - History scope, granularity, branch/navigation semantics, collaboration, persistence, and retention.
 
