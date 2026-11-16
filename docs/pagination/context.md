@@ -2,7 +2,7 @@
 
 This guide explains how the editor currently makes pages. It also records future direction approved by the owner. Future direction is not permission to redesign the implementation. Discuss every significant architectural change with the owner first.
 
-Read [CONTRIBUTING.md](../../CONTRIBUTING.md) for development rules and [project context](../project-context.md) for the broader plan. The [change log](change-log.md) separates merged history from current branch work. Parts 1–2 and 3A–3B below are implemented on `bh/phase-2-plugin-transition`. They are unmerged, with no known PR or merge date.
+Read [CONTRIBUTING.md](../../CONTRIBUTING.md) for development rules and [project context](../project-context.md) for the broader plan. The [change log](change-log.md) separates merged history from current branch work. Parts 1–2, 3A–3B and Part 3C's first rendering slice below are implemented on `bh/phase-2-plugin-transition`. They are unmerged, with no known PR or merge date.
 
 ## Model and architectural boundary
 
@@ -67,6 +67,12 @@ Before installing candidate states, the service checks whether sources, plugin l
 A failing transaction filter rejects the current transaction. Once disabled, its guard allows later transactions. Disabled append hooks return `null`. State application temporarily keeps its previous value until removal. See the [behavior contracts](../plugins/context.md#lifecycle-owned-behaviors-part-3b-implemented--unmerged) for other callback fallbacks and error reporting.
 
 These checks cannot undo arbitrary callback side effects. They cannot interrupt a running CPU loop or an unlimited chain of appended transactions. They are not a sandbox.
+
+The first Part 3C rendering slice adds dedicated APIs for node and mark views using existing schema types. A renderer can change geometry without changing document content. Optional `sources.invalidateLayout(viewId)` connects these changes to `PageObserver.invalidate(viewId)` through the app's word-processing adapter.
+
+Renderer installation and removal request layout invalidation after the new plugin set is installed. One lazy resize observer per editor view tracks registered renderer roots and editable elements. Inline renderers also observe a containing layout box. A shared child-list observer updates those targets after mounting or page reparenting. The work visits registered resources rather than traversing the document model. Initial size notifications establish baselines. Later dimension changes are coalesced into one animation frame. Ordinary source notifications, selection changes and renderer reconstruction do not themselves invalidate layout. A final invalidation survives provider disposal when a still-live view has returned to schema rendering.
+
+The [renderer author guide](../../packages-js/word-processing/README.md#part-3c-renderers-for-existing-content) explains ownership and failure recovery. The [production-pagination fixture](../../e2e/fixtures/word-processing/README.md#production-pagination-example) tests block UI resizing and inline mark font changes with the real schema, editor dispatch and pagination queue. These additions do not change the model-mutating pagination algorithm or provide arbitrary custom layout support.
 
 View identity and document identity are different. Teardown cancels view-scoped work, disconnects observation and destroys the `EditorView`. Events keyed by document ID can invalidate several views. They do not synchronize those views' contents. Shared editing is not implemented.
 

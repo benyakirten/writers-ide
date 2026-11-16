@@ -1,6 +1,6 @@
 import type { Dispose } from '@writers-ide/plugins';
 import type { Command, EditorState, Plugin, Transaction } from 'prosemirror-state';
-import type { EditorView } from 'prosemirror-view';
+import type { EditorView, NodeViewConstructor, MarkViewConstructor } from 'prosemirror-view';
 
 export type { Dispose } from '@writers-ide/plugins';
 
@@ -14,6 +14,7 @@ export interface WordProcessingSources {
 	activeViewId(): string | null | undefined;
 	subscribe(listener: () => void): Dispose;
 	reportBehaviorError?(failure: EditorBehaviorFailure): void;
+	invalidateLayout?(viewId: string): void;
 	/** Prepare managed appended transactions for host model invariants before application. Must be synchronous. */
 	prepareTransaction?(transaction: Transaction): Transaction;
 }
@@ -41,6 +42,26 @@ export interface EditorBehaviorRegistration {
 	priority?: number;
 	views?: readonly string[];
 	create(context: EditorBehaviorContext): Plugin | readonly Plugin[];
+}
+
+export interface EditorRendererContext extends EditorBehaviorContext {
+	reportError(error: unknown): void;
+}
+
+export interface EditorNodeViewRegistration {
+	id: string;
+	name: string;
+	nodeType: string;
+	views?: readonly string[];
+	create(context: EditorRendererContext): NodeViewConstructor;
+}
+
+export interface EditorMarkViewRegistration {
+	id: string;
+	name: string;
+	markType: string;
+	views?: readonly string[];
+	create(context: EditorRendererContext): MarkViewConstructor;
 }
 
 export interface EditorBehaviorSnapshot {
@@ -125,6 +146,8 @@ export interface WordProcessingApi {
 		command: Command,
 		options?: EditorEditOptions,
 	): EditorResult<boolean>;
+	registerNodeView(registration: EditorNodeViewRegistration): Dispose;
+	registerMarkView(registration: EditorMarkViewRegistration): Dispose;
 	registerBehavior(registration: EditorBehaviorRegistration): Dispose;
 	behaviors(): readonly EditorBehaviorSnapshot[];
 	subscribeBehaviors(listener: (snapshot: readonly EditorBehaviorSnapshot[]) => void): Dispose;

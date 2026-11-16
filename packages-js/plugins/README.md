@@ -221,7 +221,7 @@ Use `registerBehavior` to install ProseMirror plugins for input rules, decoratio
 
 The [word-processing guide](../word-processing/README.md) explains signatures, failure results, lifecycle and limitations. The [Quick Format example](../../src/lib/editor/prosemirror/menu/quick-format/menu.ts) uses only this provider and an upstream command, without the default formatting plugin. It is an opt-in example, not registered or placed by the application route.
 
-Live callback objects are trusted access, not a sandbox. Do not retain mutable transactions across `await` or cooperative yields, or directly dispatch through a retained view. Behavior registration reconfigures the existing editor state, not the schema or editor instance. Dynamic schemas and Svelte node/mark-view registration are still later work; this does not redesign pagination or provide a security sandbox.
+Live callback objects are trusted access, not a sandbox. Do not retain mutable transactions across `await` or cooperative yields, or directly dispatch through a retained view. Behavior registration reconfigures the existing editor state, not the schema or editor instance. For existing schema types, use dedicated `registerNodeView` and `registerMarkView` APIs. Ordinary behaviors still forbid renderer maps. The optional Svelte adapter supports ordinary components with ProseMirror-owned editable content. See [renderer contracts and complete examples](../word-processing/README.md#part-3c-renderers-for-existing-content). New content-type registration and dynamic schemas remain separately gated. This does not redesign pagination or provide a security sandbox.
 
 ## Run managed work without managing a scheduler
 

@@ -91,7 +91,7 @@ Ordering stays predictable:
 
 Plugin state is associated with a key. Surviving plugins keep that key and their state. This includes generated keys from upstream plugins that did not declare an explicit key. Surviving factories and wrapped Plugin objects also remain the same objects. ProseMirror may still recreate resources attached to plugin views.
 
-`nodeViews` and `markViews`, which customize node and mark rendering, remain rejected pending Part 3C.
+Ordinary behavior registrations reject `nodeViews` and `markViews`. Part 3C's first slice supplies separate registration APIs for rendering existing schema types.
 
 **Accepted transaction events.** App dispatch now uses `applyTransaction`. The root is the transaction sent to dispatch. A filter can reject it. Plugins can also append transactions after accepted changes.
 
@@ -125,7 +125,11 @@ Failure reporting stays separate from removal:
 
 Official and third-party features use the same APIs. They do not provide privileged built-in access or a security sandbox. See [behavior contracts](../plugins/context.md#lifecycle-owned-behaviors-part-3b-implemented--unmerged).
 
-**Editorial clarity.** The pagination and docking guides now explain their terms and event flow in shorter sentences. This documentation revision changes no runtime behavior.
+**Renderer geometry, Part 3C first slice.** The app's word-processing sources now implement optional `invalidateLayout(viewId)` by calling `PageObserver.invalidate`. Renderer installation/removal requests invalidation after reconfiguration. One lazy resize observer per view tracks registered renderer resources. Inline renderers include a containing layout box. A shared child-list observer refreshes those targets after mounting and page reparenting. The work visits registered resources, not the document model.
+
+Initial size delivery establishes a baseline. Later dimensions and installed-set changes are coalesced into an animation frame. Source notifications, selection changes and renderer reconstruction do not themselves invalidate layout. Provider disposal preserves a final fallback invalidation for live, identity-matching sources. Schema fallback and Svelte boundary recovery preserve document content and history. Pagination algorithms and schema remain unchanged. See the [renderer contracts](../plugins/context.md#existing-content-renderers-part-3c-first-slice-implemented--unmerged).
+
+**Editorial clarity.** The pagination and docking guides also explain their terms and event flow in shorter sentences.
 
 #### Tests and recorded validation
 
@@ -141,22 +145,22 @@ Part 3B adds three [opt-in proof consumers](../../src/lib/editor/prosemirror/beh
 
 `BehaviorFixture.svelte` extends the existing fixture behind explicit opt-in, not on the default route. Six new scenarios/twelve cases join the existing twelve for 24 word-processing cases across Chromium/WebKit. Existing CI includes both files; main app e2e excludes the new file.
 
-Recorded cumulative validation passed:
+Latest cumulative validation passed:
 
-- 1,111 unit tests in 49 files. These include 79 behavior cases, 53 existing service cases and five actual-dispatch regressions.
+- 1,191 unit tests in 52 files. These include 79 behavior cases, 53 existing service cases and five actual-dispatch regressions.
 - Final Chromium/WebKit app and smoke suites: 116 and 22 cases. They retain pagination geometry, caret/reflow/undo, docking, stylesheet and provider lifecycle coverage.
-- Dedicated word-processing, provider and task fixtures: 24, 8 and 8 cases, with production builds.
+- Dedicated word-processing, provider and task fixtures: 50, 8 and 8 cases, with production builds. The word-processing suite includes six real-pagination geometry cases for renderer installation, block UI resizing, inline mark font changes, removal, caret/undo preservation and stable idle revisions.
 - Lint, local Markdown target checks and whitespace checks.
 
-`pnpm check` reported only the existing Modal type error and five old DnD warnings. There were no changed-file diagnostics. See the [plugin entry](../plugins/change-log.md) for cumulative outcomes and [docking](../dnd/change-log.md) for layout work. These results were verified during implementation. They were not rerun for the editorial revision.
+`pnpm check` reported only the existing Modal type error and five old DnD warnings. There were no changed-file diagnostics. See the [plugin entry](../plugins/change-log.md) for cumulative outcomes and [docking](../dnd/change-log.md) for layout work. These results were verified during implementation. The earlier editorial revision did not rerun runtime tests. The Part 3C rendering work reran these suites.
 
-Editorial validation passed Oxfmt, preserved heading-anchor checks, local file-link and fragment checks, and whitespace checks. No runtime tests were rerun.
+The earlier editorial-only validation passed Oxfmt, heading-anchor, local file-link, fragment and whitespace checks without rerunning runtime tests.
 
 #### Limits and follow-up
 
-Initial app validation and a focused repeat hit an intermittent Chromium collapsed-selection timeout while establishing the caret regression's range. Pre-3B dispatch and current dispatch each passed five isolated caret runs. Final full and smoke suites passed without helper or assertion changes. This does not establish the cause or prove selection timing fixed.
+Initial app validation and a focused repeat hit an intermittent Chromium collapsed-selection timeout while establishing the caret regression's range. Pre-3B dispatch and current dispatch each passed five isolated caret runs. Part 3C's first full app run also encountered the caret timeout: 115 cases passed and one failed. A full repeat passed all 116 cases, and smoke passed all 22, without helper or assertion changes. This does not establish the cause or prove selection timing fixed.
 
-The behavior fixture's structural split is not pagination geometry verification. No native checks were run. Trusted callback guards are not security isolation. Parts 3C/4 remain separately gated, and no PR or merge date is assigned.
+The behavior fixture's structural split is not pagination geometry verification; the separate renderer pagination fixture uses real production geometry. No native or real-IME checks were run. Local validation used Node 24.6.0, below the repository's supported Node 24 range. Trusted callback guards are not security isolation. Part 3C's new-content/schema work and Part 4's loading/security design remain separately gated. No PR or merge date is assigned.
 
 ## Merged PRs
 

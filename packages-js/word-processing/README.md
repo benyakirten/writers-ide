@@ -1,6 +1,6 @@
-# Word processing (Parts 3A–3B)
+# Word processing (Parts 3A–3C)
 
-`@writers-ide/word-processing` lets a feature work with an open editor without depending on the default formatting toolbar. You can read a selection, insert text, run a ProseMirror command, or add editor behavior such as input rules and highlights. The provider checks that an edit still belongs to the view and state you chose.
+`@writers-ide/word-processing` lets a feature work with an open editor without depending on the default formatting toolbar. You can read a selection, insert text, run a ProseMirror command, add editor behavior such as input rules and highlights, or customize rendering of existing nodes and marks. The provider checks that an edit still belongs to the view and state you chose.
 
 This is a private workspace package with an evolving API. The application still owns editor creation, the document schema, history, dispatch, and pagination. A **schema** defines the document's allowed nodes and marks. Current extensions use that existing schema; they cannot register new content types.
 
@@ -21,7 +21,7 @@ const dependency = {
 // Include dependency in the consumer manifest's dependencies.
 ```
 
-Then resolve the API inside your synchronous `activate(context)` function:
+The plugin host calls your synchronous `activate(context)` function when it enables your registered feature. Resolve the API there:
 
 ```ts
 const editor = context.apis.get(WORD_PROCESSING_PLUGIN_ID, wordProcessingApi);
@@ -274,13 +274,13 @@ The `create` function is a **factory**: it creates an actual upstream `Plugin` o
 
 Each instance receives its own abort signal. That signal aborts when the view closes, detaches, or is replaced. It also aborts when the registration is removed or fails, the connection is revoked, or the service is disposed.
 
-Registration IDs are unique within the service; duplicates throw. Priority defaults to zero. Higher priorities run first, and ties preserve registration order. Array order from each factory is retained.
+Registration IDs share one service-wide namespace with node-view and mark-view registrations; duplicates throw. Priority defaults to zero. Higher priorities run first, and ties preserve registration order. Array order from each factory is retained.
 
 The **baseline** means the existing host plugins: plugins installed outside this service. Managed plugins run before them, so managed key handlers can override existing handlers. The existing plugins keep their identities and relative order. This also applies to plugins added outside the service after a behavior is registered.
 
 A **plugin key** identifies a ProseMirror plugin in an editor state. Duplicate keys fail the new registration rather than replacing an existing plugin. This includes duplicates within one factory result, against another behavior, or against existing host plugins. Key validation follows registration order, independently of priority.
 
-Part 3B uses the existing schema only. `nodeViews` and `markViews` are rejected. Custom content, schema lifecycle, and Svelte node/mark views remain separately gated Part 3C work. Compatibility also depends on each upstream package's assumptions; this API does not make every ProseMirror package compatible.
+Ordinary behaviors use the existing schema only. Their `nodeViews` and `markViews` props are forbidden. Use the [dedicated renderer APIs](#part-3c-renderers-for-existing-content) instead. New content types and schema lifecycle still need separate approval. Compatibility also depends on each upstream package's assumptions; this API does not make every ProseMirror package compatible.
 
 ### What reconfiguration preserves
 
@@ -352,6 +352,123 @@ These APIs integrate trusted frontend code; they do not isolate it. They cannot 
 
 Use the supported API rather than mutating source-owned editor internals. Frontend code shares the application's DOM and browser authority, including network access. A plugin with manuscript access can send that data elsewhere. DOM isolation is deferred. External loading and restrictive native access remain future work; frontend trust does not authorize unrestricted Tauri IPC, filesystem, shell/process, or native-library access. See the [plugin safety guide](../plugins/README.md#boundaries-and-next-steps).
 
+## Part 3C: renderers for existing content
+
+The first rendering slice is implemented and unmerged. A **node view** controls how an existing schema node appears inside the editor. A **mark view** controls the wrapper around marked content. Neither changes the saved document format. Schema serialization still controls copy/paste and serialized HTML; Svelte controls are not manuscript content.
+
+Use these connection-owned methods:
+
+- `registerNodeView({ id, name, nodeType, views?, create })`
+- `registerMarkView({ id, name, markType, views?, create })`
+
+Here `views?` means the field is optional. Both methods return a disposer. `nodeType` and `markType` name types already present in each matching view's schema. `views` is an optional view-ID allowlist; omission includes all live views. There is no renderer priority or implicit replacement policy.
+
+### Factories, ownership, and conflicts
+
+The service calls `create(ctx: EditorRendererContext)` once per matching live view/document identity. It must return a standard ProseMirror `NodeViewConstructor` or `MarkViewConstructor` synchronously. ProseMirror then calls that constructor for each rendered instance and calls the returned view's lifecycle methods.
+
+`ctx` contains `viewId`, `documentId`, `name`, `state`, `view`, and a per-view-instance `signal`, just like a behavior factory. It also provides `reportError(error)` for later renderer failures. Do not retain the initial `state` as current editor state. Use current ProseMirror callback inputs for updates. The signal aborts on removal, quarantine, view closure or replacement, connection revocation, and service disposal. Revoked or obsolete error reporters cannot fail a later activation.
+
+Registration IDs share the behaviors' namespace. Two active renderers with the same type name cannot have overlapping view scopes. Disjoint explicit allowlists are allowed. Omitting either allowlist means overlap. This check includes node and mark registrations with the same name because ProseMirror combines them into one renderer map. Baseline renderers also block registration. The baseline includes direct view props, direct-prop plugins, and unmanaged state plugins, in either renderer map. Conflicts reject the new registration; they do not replace the existing renderer. Unknown types or conflicts found when later views arrive quarantine the registration.
+
+The connection owns registrations even if you ignore their disposers. Disabling the consumer or provider removes its renderers without deleting content. Installation and removal reconfigure the existing state with the same schema. Document, selection, stored marks, history, and surviving keyed state remain. Reconfiguration changes the provider revision, so previously captured targets become stale. Follow the [registration timing rules](#registration-and-removal-timing); source changes and guarded callback removal use the shared reconciliation engine.
+
+### Write an ordinary Svelte component
+
+The optional `@writers-ide/word-processing/svelte` entry exports `defineSvelteNodeView`, `defineSvelteMarkView`, and their prop types. Each helper returns a normal synchronous ProseMirror constructor. Direct DOM-based constructors can use the same registration API without Svelte.
+
+For example, put this component in your feature as `ParagraphView.svelte`. The adapter supplies `node` and the `contentDOM` action. ProseMirror owns the editable children; Svelte owns the surrounding UI.
+
+```svelte
+<script lang="ts">
+	import type { SvelteNodeViewProps } from '@writers-ide/word-processing/svelte';
+	let { node, contentDOM }: SvelteNodeViewProps = $props();
+</script>
+
+<div>
+	<div contenteditable="false">{node.type.name}</div>
+	<div use:contentDOM></div>
+</div>
+```
+
+After [connecting your feature](#connect-your-feature), add these imports to its module and the registration to its host-called `activate(context)` function. Here `editor` is the API resolved in that function. This example requires an existing `paragraph` schema type.
+
+```ts
+import { defineSvelteNodeView } from '@writers-ide/word-processing/svelte';
+import ParagraphView from './ParagraphView.svelte';
+
+const removeParagraph = editor.registerNodeView({
+	id: 'my-plugin.paragraph-renderer',
+	name: 'Paragraph renderer',
+	nodeType: 'paragraph',
+	create(ctx) {
+		return defineSvelteNodeView(ParagraphView, {
+			props: {},
+			contentDOM: true,
+			onError: ctx.reportError,
+		});
+	},
+});
+// Call removeParagraph() for early removal. Connection cleanup also owns it.
+```
+
+For marks, put this component in the same feature as `StrongView.svelte`:
+
+```svelte
+<script lang="ts">
+	import type { SvelteMarkViewProps } from '@writers-ide/word-processing/svelte';
+	let { mark, contentDOM }: SvelteMarkViewProps = $props();
+</script>
+
+<span data-mark={mark.type.name} style="font-weight: bold">
+	<span use:contentDOM></span>
+</span>
+```
+
+Add the following imports to the feature module and register inside the same activation function. This example requires an existing `strong` mark. Use the actual schema name: the production app uses `bold`, while the small renderer fixture uses `strong`.
+
+```ts
+import { defineSvelteMarkView } from '@writers-ide/word-processing/svelte';
+import StrongView from './StrongView.svelte';
+
+editor.registerMarkView({
+	id: 'my-plugin.strong-renderer',
+	name: 'Strong renderer',
+	markType: 'strong',
+	create(ctx) {
+		return defineSvelteMarkView(StrongView, {
+			props: {},
+			onError: ctx.reportError,
+		});
+	},
+});
+```
+
+Adapter options are:
+
+- `props`: required explicit feature props, including command closures. Adapter-owned props take precedence.
+- `tag`: optional outer element. Defaults to `div` for block nodes and `span` for inline nodes and marks.
+- `contentDOM`: node-only option, default `false`. Enable it for editable children. Marks always have editable content.
+- `onError`: pass `ctx.reportError` to attribute later Svelte boundary failures to the registration. Without it, the adapter logs those failures instead of quarantining through the service.
+
+Node props are `node`, `decorations`, `innerDecorations`, `selected`, `getPos`, and `contentDOM`. Call `getPos()` when needed; it can return `undefined`. The adapter updates props for same-type nodes and node selection. It cannot render ProseMirror text nodes. Mark props are `mark`, `inline`, and `contentDOM`. The installed ProseMirror supports `MarkView.update`, and the adapter updates same-type marks reactively. Marks have no node-specific selection callbacks or `selected` prop.
+
+### DOM ownership and error recovery
+
+Attach `use:contentDOM` to exactly one empty, unconditional host element. Never render children into it or replace it through a conditional branch. The adapter inserts a stable editable element into that host synchronously. Both `dom` and `contentDOM` must remain stable throughout a view instance's lifetime.
+
+The adapter leaves editable-subtree mutations and selection changes visible to ProseMirror. It ignores Svelte-owned UI mutations. For node views, native controls outside editable content stop editor event handling; wrapper clicks and editable-content events still reach ProseMirror. Put non-document controls in `contenteditable="false"` UI. Mark views do not have the node-specific `stopEvent` hook.
+
+Factory, constructor, and guarded callback failures quarantine the entire registration across all views. Invalid synchronous results, thenables, and changing DOM identities are failures too. Guards stop immediately, instance signals abort, and physical removal waits until outside the callback. Normal schema rendering resumes. Cleanup is attempted once for each resource even after an error. Reports use the connection and optional `sources.reportBehaviorError`; the whole feature plugin is not automatically disabled. Renderer registrations are not listed by `behaviors()` or `subscribeBehaviors()`.
+
+The Svelte host uses a boundary for render/effect failures. It rescues ProseMirror's editable content before a failed branch is torn down. Passing `onError: ctx.reportError` connects later boundary failures to registration-wide quarantine and schema fallback. This is not a universal async exception handler. Arbitrary event handlers, timers, promises, and external effects are not all caught by Svelte boundaries. Authors must catch and report failures they own. These APIs cannot undo arbitrary effects or interrupt CPU loops.
+
+### Layout and examples
+
+Hosts can supply optional `sources.invalidateLayout(viewId)`. The app connects it to `PageObserver.invalidate`. Renderer-set changes after installation/removal request invalidation. A lazy `ResizeObserver` per managed editor view observes renderer roots and editable elements. Renderers in that view share it. For inline renderers, it also observes the nearest containing layout box because inline elements do not reliably produce resize notifications. A shared child-list observer refreshes those targets after mounting or page reparenting. It visits registered renderer resources, not the document model. The first size delivery only establishes a baseline. Later width/height changes and renderer-set invalidation are coalesced into an animation frame. Provider disposal delivers any final invalidation after schema fallback for still-live matching views. Ordinary source notifications, selection updates, and resource reconstruction with an unchanged renderer set do not each invalidate layout. Without the callback, the package allocates no resize observer or animation frame for this work.
+
+The [fixture guide](../../e2e/fixtures/word-processing/README.md) explains opt-in node/mark examples and production-pagination geometry coverage. These renderers are not enabled in the default app. Tests do not establish real IME behavior, arbitrary custom layout support, or native isolation. New node/mark registration, schema lifecycle, missing-content preservation, and complex structures such as columns still need separate approval. See the [remaining Part 3C plan](../../docs/plugins/implementation-plan.md#3c--custom-content-and-svelte-node-views).
+
 ## Provider wiring
 
 This section is for host integrations, not ordinary feature consumers. The package supplies a standalone service and connection-scoped API objects. It imports no application singleton and does not register the provider, create editors, intercept their dispatch, or destroy them. The application integrates the provider and its consumers, including formatting.
@@ -389,6 +506,7 @@ It also accepts:
 
 - `reportBehaviorError({ ownerId, id, viewId?, phase, error }): void` for application-owned error reporting.
 - `prepareTransaction(transaction: Transaction): Transaction` to prepare managed appended transactions synchronously, as described below.
+- `invalidateLayout(viewId: string): void` for [renderer-driven layout changes](#layout-and-examples).
 
 View IDs must be unique. Document identity is separate from view identity. Destroyed views are excluded. Closure and removal must be observable through sources. The service cannot detect removal and readdition entirely between reads without a source notification. Adapter reads may use Svelte runes.
 

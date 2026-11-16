@@ -1,4 +1,7 @@
 import { untrack } from 'svelte';
+import { wrapRenderer } from './renderers';
+import { createRendererLayoutObserver } from './renderer-layout';
+import type { RendererType } from './renderers';
 import { Plugin, Selection, Transaction } from 'prosemirror-state';
 import { Slice } from 'prosemirror-model';
 import type { EditorState } from 'prosemirror-state';
@@ -16,6 +19,7 @@ type Callback = (...args: never[]) => unknown;
 type Instance = { source: Source; controller: AbortController; plugins: Plugin[] };
 type Entry = {
 	registration: EditorBehaviorRegistration;
+	renderer?: RendererType;
 	ownerId: string;
 	signal?: AbortSignal;
 	onError?: (failure: EditorBehaviorFailure) => void;
@@ -90,6 +94,12 @@ function validateResult(phase: string, result: unknown) {
 export function createBehaviorManager(sources: WordProcessingSources, busy: () => boolean) {
 	const entries = new Map<string, Entry>();
 	const managed = new WeakSet<Plugin>();
+	const rendererPlugins = new WeakSet<Plugin>();
+	const layouts = new Map<
+		string,
+		{ source: Source; observer: ReturnType<typeof createRendererLayoutObserver> }
+	>();
+	const pendingLayoutChanges = new Map<string, Source>();
 	const retired = new Set<Instance>();
 	const listeners = new Set<(snapshot: readonly EditorBehaviorSnapshot[]) => void>();
 	let syncing = false;
@@ -102,19 +112,83 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 	let mutation = 0;
 	let stop: Dispose | undefined;
 
+	function sourceIsLive(source: Source) {
+		return (
+			!source.view.isDestroyed &&
+			sources
+				.listViews()
+				.some(
+					(current) =>
+						current.viewId === source.viewId &&
+						current.view === source.view &&
+						current.documentId === source.documentId,
+				)
+		);
+	}
+
+	function flushFinalLayoutChanges() {
+		if (!disposed) {
+			return;
+		}
+		for (const [viewId, source] of pendingLayoutChanges) {
+			if (!sourceIsLive(source)) {
+				pendingLayoutChanges.delete(viewId);
+				continue;
+			}
+			if (source.view.state.plugins.some((plugin) => rendererPlugins.has(plugin))) {
+				continue;
+			}
+			// The observer's frame is canceled during teardown. Fallback geometry
+			// still needs one notification after physical renderer removal.
+			pendingLayoutChanges.delete(viewId);
+			sources.invalidateLayout?.(viewId);
+		}
+	}
+
+	function layoutFor(source: Source) {
+		if (!sources.invalidateLayout || disposed || source.view.isDestroyed) {
+			return undefined;
+		}
+		let layout = layouts.get(source.viewId);
+		if (
+			layout &&
+			(layout.source.view !== source.view || layout.source.documentId !== source.documentId)
+		) {
+			layout.observer.dispose();
+			layouts.delete(source.viewId);
+			layout = undefined;
+		}
+		if (!layout) {
+			layout = {
+				source,
+				observer: createRendererLayoutObserver(source.view, source.viewId, (viewId) => {
+					if (!sourceIsLive(source)) {
+						return;
+					}
+					pendingLayoutChanges.delete(viewId);
+					sources.invalidateLayout?.(viewId);
+				}),
+			};
+			layouts.set(source.viewId, layout);
+		}
+		return layout.observer;
+	}
+
 	function snapshots(): readonly EditorBehaviorSnapshot[] {
 		return Object.freeze(
-			[...entries.values()].map((entry) =>
-				Object.freeze({
-					id: entry.registration.id,
-					name: entry.registration.name,
-					ownerId: entry.ownerId,
-					priority: entry.registration.priority ?? 0,
-					...(entry.registration.views ? { views: entry.registration.views } : {}),
-					status: entry.active ? ('active' as const) : ('failed' as const),
-					...(entry.error === undefined ? {} : { error: entry.error }),
-				}),
-			),
+			[...entries.values()]
+				.filter((entry) => !entry.renderer)
+				.map((entry) =>
+					Object.freeze({
+						id: entry.registration.id,
+						name: entry.registration.name,
+						ownerId: entry.ownerId,
+						priority: entry.registration.priority ?? 0,
+						...(entry.registration.views ? { views: entry.registration.views } : {}),
+						status: entry.active ? ('active' as const) : ('failed' as const),
+						...(entry.error === undefined ? {} : { error: entry.error }),
+					}),
+				),
 		);
 	}
 	function notify() {
@@ -233,7 +307,30 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 			const result: Record<string, unknown> = {};
 			for (const name of Object.keys(value)) {
 				const item = (value as Record<string, unknown>)[name];
-				if (name === 'handleDOMEvents' && item && typeof item === 'object') {
+				if (entry.renderer && (name === 'nodeViews' || name === 'markViews')) {
+					const constructors: Record<string, unknown> = {};
+					for (const [type, constructor] of Object.entries(item as object)) {
+						constructors[type] = wrapRenderer(
+							constructor as Callback,
+							entry.renderer.kind,
+							live,
+							(fn) => {
+								depth++;
+								try {
+									return fn();
+								} finally {
+									depth--;
+								}
+							},
+							(phase, error) => fail(entry, `renderer.${phase}`, error, instance.source.viewId),
+							sources.invalidateLayout
+								? (dom, contentDOM) =>
+										layoutFor(instance.source)?.observe(dom, contentDOM) ?? (() => {})
+								: undefined,
+						);
+					}
+					result[name] = constructors;
+				} else if (name === 'handleDOMEvents' && item && typeof item === 'object') {
 					result[name] = props(item, `${path}.${name}`);
 				} else if (typeof item === 'function') {
 					result[name] = callback(item as Callback, original, `${path}.${name}`, (...args) => {
@@ -348,6 +445,9 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 			props: { value: props(original.props, 'props') },
 		});
 		managed.add(wrapped);
+		if (entry.renderer) {
+			rendererPlugins.add(wrapped);
+		}
 		return wrapped;
 	}
 	function create(entry: Entry, source: Source): Instance {
@@ -360,6 +460,39 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 					...source,
 					state: source.view.state,
 					signal: instance.controller.signal,
+					...(entry.renderer
+						? {
+								reportError(error: unknown) {
+									if (
+										!entry.active ||
+										entry.removed ||
+										entry.signal?.aborted ||
+										instance.controller.signal.aborted ||
+										source.view.isDestroyed
+									) {
+										return;
+									}
+									if (
+										!sources
+											.listViews()
+											.some(
+												(current) =>
+													current.viewId === source.viewId &&
+													current.documentId === source.documentId &&
+													current.view === source.view,
+											)
+									) {
+										return;
+									}
+									depth++;
+									try {
+										fail(entry, 'renderer.render', error, source.viewId);
+									} finally {
+										depth--;
+									}
+								},
+							}
+						: {}),
 				}),
 			);
 			const plugins = Array.isArray(result) ? result : [result];
@@ -367,8 +500,8 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 				throw new TypeError('Behavior factories must return a Plugin or a Plugin array');
 			}
 			for (const plugin of plugins) {
-				if (plugin.props.nodeViews || plugin.props.markViews) {
-					throw new TypeError('nodeViews and markViews require Part 3C');
+				if (!entry.renderer && (plugin.props.nodeViews || plugin.props.markViews)) {
+					throw new TypeError('Use dedicated registerNodeView/registerMarkView APIs');
 				}
 				instance.plugins.push(wrap(plugin, entry, instance));
 			}
@@ -384,12 +517,26 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 		const started = mutation;
 		const pendingRetired = [...retired];
 		const liveSources = () =>
-			[...entries.values()].some((entry) => entry.active)
+			layouts.size > 0 || [...entries.values()].some((entry) => entry.active)
 				? sources.listViews().filter((source) => !source.view.isDestroyed)
 				: [];
 		const views = liveSources().map((source) => ({ ...source }));
 		if (new Set(views.map((source) => source.viewId)).size !== views.length) {
 			throw new Error('Duplicate editor view IDs in behavior sources');
+		}
+		for (const [viewId, layout] of layouts) {
+			if (
+				!views.some(
+					(source) =>
+						source.viewId === viewId &&
+						source.view === layout.source.view &&
+						source.documentId === layout.source.documentId,
+				)
+			) {
+				layout.observer.dispose();
+				layouts.delete(viewId);
+				pendingLayoutChanges.delete(viewId);
+			}
 		}
 		const states = new Map(views.map((source) => [source.view, source.view.state]));
 		const fresh = () => {
@@ -476,6 +623,34 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 				if (!instance || instance.source.view !== source.view) {
 					continue;
 				}
+				if (entry.renderer) {
+					const { kind, type } = entry.renderer;
+					const schemaType =
+						kind === 'node'
+							? source.view.state.schema.nodes[type]
+							: source.view.state.schema.marks[type];
+					const baselineProps = [
+						source.view.props,
+						...(source.view.props.plugins ?? []).map((plugin) => plugin.props),
+						...baseline.map((plugin) => plugin.props),
+					];
+					if (
+						!schemaType ||
+						baselineProps.some((props) => props.nodeViews?.[type] || props.markViews?.[type])
+					) {
+						fail(
+							entry,
+							'renderer.conflict',
+							new Error(
+								!schemaType
+									? `Unknown schema ${kind} type: ${type}`
+									: `Existing baseline renderer for type: ${type}`,
+							),
+							source.viewId,
+						);
+						return false;
+					}
+				}
 				for (const plugin of instance.plugins) {
 					if (keys.has(key(plugin))) {
 						fail(
@@ -522,7 +697,30 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 			if (!fresh()) {
 				return false;
 			}
+			const previousRenderers = source.view.state.plugins.filter((plugin) =>
+				rendererPlugins.has(plugin),
+			);
 			source.view.updateState(state);
+			const installedRenderers = source.view.state.plugins.filter((plugin) =>
+				rendererPlugins.has(plugin),
+			);
+			if (
+				(previousRenderers.length !== installedRenderers.length ||
+					previousRenderers.some((plugin) => !installedRenderers.includes(plugin))) &&
+				sources
+					.listViews()
+					.some(
+						(current) =>
+							current.viewId === source.viewId &&
+							current.view === source.view &&
+							current.documentId === source.documentId,
+					)
+			) {
+				if (sources.invalidateLayout) {
+					pendingLayoutChanges.set(source.viewId, source);
+					layoutFor(source)?.invalidate();
+				}
+			}
 			// Plugin-view initialization may dispatch. Retain that newer state, but
 			// never install another view's stage if a callback changed its input.
 			if (states.has(source.view)) {
@@ -532,10 +730,16 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 		for (const instance of pendingRetired) {
 			retired.delete(instance);
 		}
+		if (!entries.size && !layouts.size) {
+			const cleanup = stop;
+			stop = undefined;
+			cleanup?.();
+		}
 		return fresh() && retired.size === 0;
 	}
 	function sync() {
-		if (!entries.size && !retired.size) {
+		if (!entries.size && !retired.size && !layouts.size) {
+			flushFinalLayoutChanges();
 			return;
 		}
 		if (depth || busy() || notifying) {
@@ -574,6 +778,7 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 			}
 		} finally {
 			syncing = false;
+			flushFinalLayoutChanges();
 		}
 	}
 	function assertLifecycle() {
@@ -667,6 +872,7 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 			ownerId: string,
 			signal?: AbortSignal,
 			onError?: (failure: EditorBehaviorFailure) => void,
+			renderer?: RendererType,
 		): Dispose {
 			assertLifecycle();
 			if (disposed || signal?.aborted) {
@@ -688,7 +894,21 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 			if (entries.has(registration.id)) {
 				throw new Error(`Duplicate behavior ID: ${registration.id}`);
 			}
+			if (renderer) {
+				for (const existing of entries.values()) {
+					if (
+						existing.renderer?.type === renderer.type &&
+						existing.active &&
+						(!registration.views ||
+							!existing.registration.views ||
+							registration.views.some((id) => existing.registration.views!.includes(id)))
+					) {
+						throw new Error(`Overlapping renderer registration for type: ${renderer.type}`);
+					}
+				}
+			}
 			const entry: Entry = {
+				renderer,
 				registration: {
 					...registration,
 					...(registration.views ? { views: Object.freeze([...registration.views]) } : {}),
@@ -722,7 +942,7 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 				} else {
 					sync();
 				}
-				if (!entries.size) {
+				if (!entries.size && !layouts.size) {
 					const cleanup = stop;
 					stop = undefined;
 					cleanup?.();
@@ -755,6 +975,10 @@ export function createBehaviorManager(sources: WordProcessingSources, busy: () =
 		},
 		dispose() {
 			disposed = true;
+			for (const layout of layouts.values()) {
+				layout.observer.dispose();
+			}
+			layouts.clear();
 			mutation++;
 			listeners.clear();
 			for (const entry of entries.values()) {

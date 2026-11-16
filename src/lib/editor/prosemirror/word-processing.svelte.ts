@@ -7,6 +7,7 @@ import {
 	type WordProcessingSources,
 } from '@writers-ide/word-processing';
 import Editors from './prose-mirror-editor.svelte';
+import { PageObserver } from '../state/page-observer.svelte';
 import { normalizePageIndexes } from './view/page-indexes';
 import TabState from '../state/tab-state.svelte';
 import eventBus, { ProseMirrorEventBusEventType } from '../state/event-bus.svelte';
@@ -14,6 +15,7 @@ import eventBus, { ProseMirrorEventBusEventType } from '../state/event-bus.svelt
 /** Application composition only; plugin consumers use the public provider contract. */
 export const defaultWordProcessingSources: WordProcessingSources = {
 	listViews: () => Object.values(Editors.editors),
+	invalidateLayout: (viewId: string) => PageObserver.invalidate(viewId),
 	activeViewId: () => {
 		const documentId = TabState.active;
 		return documentId ? Editors.get(documentId)?.viewId : null;

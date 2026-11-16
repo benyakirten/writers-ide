@@ -8,6 +8,8 @@ export default defineConfig({
 		'plugin-dependencies.test.ts',
 		'word-processing.test.ts',
 		'word-processing-behaviors.test.ts',
+		'word-processing-renderers.test.ts',
+		'word-processing-renderer-pagination.test.ts',
 	],
 	forbidOnly: Boolean(process.env.CI),
 	workers: process.env.CI ? 2 : undefined,

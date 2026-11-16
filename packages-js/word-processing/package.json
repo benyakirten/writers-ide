@@ -10,6 +10,11 @@
 			"types": "./index.ts",
 			"svelte": "./index.ts",
 			"default": "./index.ts"
+		},
+		"./svelte": {
+			"types": "./svelte.ts",
+			"svelte": "./svelte.ts",
+			"default": "./svelte.ts"
 		}
 	},
 	"dependencies": {

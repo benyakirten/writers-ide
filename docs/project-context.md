@@ -153,11 +153,13 @@ Plugins can register ProseMirror **behaviors**, such as input rules, decorations
 
 Basic Menu now uses this provider. Its formatting rules remain part of the feature. Quick Format and the [behavior examples](../src/lib/editor/prosemirror/behaviors/README.md) demonstrate independent consumers. They are opt-in examples, not enabled in the default application.
 
-Read the [plugin context](plugins/context.md) and [word-processing guide](../packages-js/word-processing/README.md) for complete rules. The current editor still uses the existing schema and pagination model. Custom nodes, schema changes and Svelte node-view registration remain future work.
+Plugins can register node and mark renderers for existing schema types. This first Part 3C slice is implemented and unmerged. Dedicated APIs own conflicts, connection cleanup, and registration-wide quarantine with schema fallback. An optional Svelte adapter supports ordinary components and stable ProseMirror-owned editable content. Ordinary behaviors still cannot supply renderer maps. Optional layout invalidation connects renderer-set and dimension changes to PageObserver without invalidating on every source notification.
+
+Read the [plugin context](plugins/context.md#existing-content-renderers-part-3c-first-slice-implemented--unmerged) and [word-processing guide](../packages-js/word-processing/README.md#part-3c-renderers-for-existing-content) for complete rules. The [renderer examples](../e2e/fixtures/word-processing/README.md) are opt-in, not enabled in the default app. The current editor still uses the existing schema and pagination model. New node/mark types, schema lifecycle, and missing-content preservation need separate approval.
 
 ## Plugin developer experience
 
-**Accepted direction:** ordinary Svelte should be easy to use. Other UI frameworks should remain possible. Do not require Svelte for every future third-party interface. Current rendering uses a Svelte adapter; support for other approaches still needs design.
+**Accepted direction:** ordinary Svelte should be easy to use. Other UI frameworks should remain possible. Do not require Svelte for every future third-party interface. Current editor renderer APIs accept standard ProseMirror constructors, with an optional Svelte adapter. Broader cross-framework UI integration still needs design.
 
 Developer tooling priorities are:
 
@@ -256,11 +258,10 @@ Most editor source is under `src/lib/editor/prosemirror/`:
 | Default formatting        | `menu/basic/`                                                                                       |
 | Independent examples      | `menu/quick-format/`, `behaviors/`                                                                  |
 | Existing plugin assembly  | `plugins.svelte.ts`, `view/editor.ts`                                                               |
-| Early node-view work      | `node/SvelteViewNode.svelte.ts`                                                                     |
 
 The editor currently loads sample content. View IDs differ from document IDs. Multiple views of one document do not synchronize edits.
 
-`packages-js/word-processing/` contains public editor contracts and reusable service code. It supports synchronous access, commands, strict result validation and behavior registration. New behaviors update existing editor states. Accepted root and appended transactions pass through app dispatch; `view/page-indexes.ts` normalizes page indexes.
+`packages-js/word-processing/` contains public editor contracts and reusable service code. It supports synchronous access, commands, strict result validation, behavior registration, and dedicated existing-type node/mark renderers. Its `svelte` entry supplies component adapters. Package implementation starts in `src/rendering-manager.svelte.ts`, `src/renderers.ts`, `src/svelte-views.svelte.ts`, and `src/renderer-layout.ts`. Renderer service, adapter, and layout tests are linked in the [plugin source map](plugins/context.md#editor-and-feature-integrations). New behaviors update existing editor states. Accepted root and appended transactions pass through app dispatch; `view/page-indexes.ts` normalizes page indexes.
 
 Pagination lives in `src/lib/editor/state/page-layout.svelte.ts`, `src/lib/editor/state/page-observer.svelte.ts` and `src/lib/components/pagination/`. The app's `src/lib/editor/state/work-queue.svelte.ts` exports its shared queue from `packages-js/tasks/`.
 
@@ -281,7 +282,7 @@ These features remain unfinished or unimplemented:
 - Branching project history and collaboration.
 - Synchronized views of the same document.
 - External plugin loading and enforced native permissions.
-- Custom-content schema lifecycle and Svelte node-view registration.
+- New content-type registration, schema lifecycle, and missing-content preservation.
 - Complete extraction of editor assembly into plugins.
 - Frontend isolation, if pursued later.
 - A complete central tab/split interface.

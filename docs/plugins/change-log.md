@@ -11,8 +11,8 @@ Read [context.md](context.md) for the current design and terminology.
 
 This branch moves shared layout, UI and task code into reusable packages.
 It also lets plugins use one another's APIs and extend the existing editor.
-The work includes Parts 1–2 and 3A–3B of the [implementation plan](implementation-plan.md).
-Custom content and schema changes remain Part 3C. External plugin loading remains Part 4.
+The work includes Parts 1–2, 3A–3B and Part 3C's first rendering slice in the [implementation plan](implementation-plan.md).
+New content types and schema lifecycle remain separately gated within Part 3C. External plugin loading remains Part 4.
 
 #### Shared layout and UI libraries
 
@@ -219,7 +219,7 @@ Surviving factories, wrapped Plugin objects and signals remain stable.
 
 Wrappers preserve original generated keys, including keys of upstream plugins that did not specify one.
 This preserves `getState` and transaction metadata behavior.
-`nodeViews` and `markViews` are rejected until Part 3C.
+Ordinary behavior registrations reject `nodeViews` and `markViews`; dedicated renderer APIs are described below.
 
 A dedicated observer detects views being added, replaced or closed.
 Source-driven updates run after the current JavaScript call stack, not inside an editor hook.
@@ -258,6 +258,20 @@ It preserves incoming stored marks and validates the current document.
 The schema and model-mutating pagination design are unchanged.
 See the [pagination entry](../pagination/change-log.md).
 
+#### Existing-content rendering — Part 3C first slice
+
+The owner approved dedicated node/mark registration, rejection of overlapping renderers, schema fallback on removal or failure, and reusable Svelte adapters. New content types and schema lifecycle remain outside this slice.
+
+`registerNodeView` and `registerMarkView` accept a type name, optional view allowlist and synchronous per-view constructor factory. Factories receive a cancellation signal and `reportError` for later failures. Connection ownership removes registrations on disable or provider teardown. Renderer IDs share the behavior namespace, but renderer entries are excluded from behavior snapshots. Conflicts include existing direct view props and unmanaged plugin maps; there is no priority-based replacement. Ordinary behavior registrations still cannot supply renderer maps.
+
+One reconciliation engine installs behaviors and renderers. It preserves the schema, document, selection, stored marks, history and surviving keyed state. Guards retain constructor and callback receivers and enforce synchronous results and stable DOM identities. Native mark updates are supported by the installed ProseMirror version and forwarded correctly. Nullable `contentDOM` is accepted. Invalid native DOM is rejected before it can fail outside the owning renderer's guard.
+
+The optional `@writers-ide/word-processing/svelte` entry mounts ordinary components. Its action attaches ProseMirror-owned content to one stable, empty host. Svelte owns surrounding UI only. Adapters update node and mark props, route events and mutations, and unmount resources once. On boundary failure, editable content is rescued before Svelte removes its failed branch. `onError: ctx.reportError` quarantines that registration across views and restores schema rendering without authored edits. Arbitrary event-handler and async failures remain outside the boundary's guarantee.
+
+Optional `sources.invalidateLayout` connects renderer geometry to PageObserver. One lazy resize observer per view tracks renderer resources. Inline renderers include a containing layout box, with a shared child-list observer refreshing targets after mounting or page reparenting. Initial size notifications establish baselines. Actual size and installed-set changes are coalesced without restarting pagination for every source update or resource reconstruction. Provider disposal preserves final fallback invalidation for still-live matching sources. Pagination algorithms and the document schema are unchanged. See the [pagination entry](../pagination/change-log.md).
+
+Opt-in fixtures cover ordinary node/mark rendering and async failure recovery. A separate fixture uses production schema, dispatch, PageObserver and Paginator to verify block UI resizing and inline font changes against real page bounds. The default app does not enable these examples. Tests do not establish real IME, native isolation, general upstream compatibility or responsiveness at large-document scale.
+
 #### Behavior examples and developer guides
 
 Three independent examples use only the public provider API:
@@ -281,25 +295,25 @@ The five writing rules are prominent in `AGENTS.md` and `CONTRIBUTING.md`. They 
 The task guide explains who calls `activate(context)`, when activation happens, and how application setup registers a plugin. Its example supplies its own inputs. Current guides describe the supported design without unreleased migration commentary or rejected alternatives. Changelogs retain the history.
 Agent instructions also require owner approval for architecture and API design. Agents must explain unresolved choices and tradeoffs rather than assume an answer. Routine implementation details remain autonomous. Documentation maintenance applies to every affected guide in the same change.
 The project overview describes ProseMirror as the baseline for document modeling and editing behaviors. Commit and branch-status tracking stays in changelogs rather than a dedicated overview section.
-The Part 3C plan now separates custom rendering of existing schema types from adding new content types. It records proposed renderer registration, conflict and fallback policies, Svelte adapter responsibilities, lifecycle/failure questions, schema-preservation decisions and browser/pagination validation. These remain future investigation requiring owner approval, not implemented or approved API contracts.
+The Part 3C plan separates the implemented existing-type renderers from future new-content/schema work. Current guides explain the approved registration, conflict, fallback and Svelte contracts. Schema lifecycle and unsupported-content preservation still require owner approval.
 The owner approved separately packaging Basic Menu as a required outcome by the end of Part 4. The plan requires the same supported loading mechanism and public APIs as third-party plugins, plus real-feature regression coverage. Package format, build, distribution and default installation policy remain open; this approval does not settle those designs. Current context and the Basic Menu guide link to that deliverable.
-This documentation work changes no runtime code or contracts.
+The owner also approved Part 4 packages demonstrating toolbar UI, editor behavior, workers and custom rendering. The plan reuses current examples where practical and does not require enabling them by default. Full editor extraction, independent pagination packaging and undo-tree history infrastructure remain outside that requirement. The approved first Part 3C slice now implements existing-content rendering; new-content contracts remain open.
 
 #### Tests and known limits
 
-These are the recorded implementation results before the documentation-only rewrite:
+Latest cumulative validation, including Part 3C's first rendering slice:
 
 | Check                                                          | Recorded result               |
 | -------------------------------------------------------------- | ----------------------------- |
-| Unit tests                                                     | 1,111 passed in 49 files      |
+| Unit tests                                                     | 1,191 passed in 52 files      |
 | Full app browser suite                                         | 116 passed in Chromium/WebKit |
 | Exact smoke command                                            | 22 passed                     |
-| Word-processing browser fixture                                | 24 passed                     |
+| Word-processing browser fixture                                | 50 passed                     |
 | Provider browser fixture                                       | 8 passed                      |
 | Task/worker browser fixture                                    | 8 passed                      |
 | Production builds, lint, local Markdown targets and whitespace | Passed                        |
 
-Unit coverage includes 79 behavior cases, 53 existing service cases and five actual-dispatch regressions.
+Unit coverage includes 59 renderer cases, 16 Svelte adapter cases, five layout-observer cases, 79 behavior cases, 53 existing service cases and five actual-dispatch regressions.
 The provider suite includes 54 graph/API/reporting cases.
 Manager tests cover confirmation, changed dependency lists and protected plugins.
 
@@ -308,8 +322,8 @@ Other app tests cover docking, tooltips, capacity, formatting, pagination geomet
 The exact CI smoke command includes manager and pagination-selection regressions.
 
 The dedicated fixtures have separate production builds.
-`test:word-processing` includes its original six scenarios plus six behavior scenarios, for 24 engine-specific cases.
-The existing Browser Smoke CI step runs both files.
+`test:word-processing` includes editor access, behaviors, renderer lifecycle/failure recovery and production-pagination geometry, for 50 Chromium/WebKit cases.
+The existing Browser Smoke CI step runs the dedicated configuration, including the new renderer files.
 Main app e2e excludes all dedicated-fixture files.
 
 `pnpm check` reported the existing `Modal.svelte` `$props` type-argument error and five older DnD warnings.
@@ -317,13 +331,11 @@ It reported no diagnostics in changed implementation files.
 
 Initial app validation and a focused repeat hit an intermittent Chromium collapsed-selection timeout.
 Both pre-3B and current dispatch passed five isolated caret runs.
-The final full and smoke runs passed without changing the helper or assertions.
-The cause remains unestablished; selection timing is not claimed fixed.
+Part 3C validation also hit the Chromium collapsed-selection timeout once: 115 app cases passed and one failed in the existing range helper. A full repeat passed all 116 cases, and smoke passed all 22. No selection helper or assertion changed. The cause remains unestablished; selection timing is not claimed fixed.
 
-No packaged Tauri, native-permission, real-touch or performance-target validation is claimed.
-The documentation-only pass passed Oxfmt, local link and heading-fragment checks, and whitespace checks.
-Original heading anchors were preserved.
-Only Markdown files changed. Runtime suites were not rerun for this editorial work.
+Validation used pnpm 12.4.1 and installed Node 24.6.0. That Node release is below the repository's required `^24.15.0` range, so these runs do not verify the supported Node toolchain.
+No packaged Tauri, native-permission, real-touch, real-IME or performance-target validation is claimed.
+The earlier documentation-only pass preserved original heading anchors. Current implementation validation includes unit and browser suites, production builds, repository lint and documentation checks. Type checking remains blocked as described above.
 
 #### Security decisions and remaining work
 
@@ -339,7 +351,7 @@ Backend/system access must still be restricted before external loading is added.
 This branch does not add external installation, persistent activation preferences, native permission grants or schema migration.
 It also does not add general component-state transfer, durable history storage, full editor extraction or plugin translations.
 New manager/fallback text remains English.
-Parts 3C and 4 need separate design approval.
+Part 3C's new-content/schema work and Part 4's loading/security design still need separate approval.
 PR and merge metadata remain to be verified.
 
 ## Merged PRs

@@ -180,7 +180,7 @@ See the [word-processing guide](../../packages-js/word-processing/README.md) for
 
 Behavioral registrations let consumers install input rules, decorations, plugin state, and supported editor hooks. `registerBehavior({ id, name, priority?, views?, create })` returns a connection-owned disposer. IDs are service-global; duplicates throw. `views` is an optional view-ID allowlist, not a document filter. Omission means all live views.
 
-`create({ viewId, documentId, name, state, view, signal })` synchronously returns an actual ProseMirror `Plugin` or readonly array of plugins for each matching live view/document identity. Each instance's signal aborts on view closure, detach or replacement, registration removal or failure, connection revocation, or service disposal. `nodeViews` and `markViews` are rejected until custom-content work is approved.
+`create({ viewId, documentId, name, state, view, signal })` synchronously returns an actual ProseMirror `Plugin` or readonly array of plugins for each matching live view/document identity. Each instance's signal aborts on view closure, detach or replacement, registration removal or failure, connection revocation, or service disposal. Ordinary behaviors forbid `nodeViews` and `markViews`; use the dedicated renderer APIs below.
 
 #### Ordering and state preservation
 
@@ -266,13 +266,41 @@ Three opt-in consumers in `src/lib/editor/prosemirror/behaviors/` exercise the s
 - Selection highlight stores keyed `DecorationSet` metadata and maps ranges through transaction mappings. It does not add authored marks, scan text, or mutate content.
 - Word analysis captures at most 32,768 selection model positions and 1,024 text-node chunks, then uses a bundled module worker. Tokens do not match across nodes or chunks, including mark boundaries. Complete repeated tokens across chunks count together. Per-view signals and activation ownership cancel work. Exact-target `applyResult` builds fresh metadata synchronously. There is no full-manuscript scan or stale-output mapping.
 
-The [example guide](../../src/lib/editor/prosemirror/behaviors/README.md) lists public command IDs. Only the fixture's **Mount behavior proofs** control mounts `BehaviorFixture.svelte`. The default route and other fixture scenarios do not enable them. The dedicated suite has 24 Chromium/WebKit cases: twelve original cases and twelve behavior cases. Browser Smoke CI includes both test files. Main app e2e excludes them. Structural layout edits in this fixture do not validate real pagination geometry. Recorded results and remaining diagnostic and selection-timing limits are in the [branch changelog](change-log.md).
+The [example guide](../../src/lib/editor/prosemirror/behaviors/README.md) lists public command IDs. Only the fixture's **Mount behavior proofs** control mounts `BehaviorFixture.svelte`. The default route and other fixture scenarios do not enable them. Part 3B added twelve behavior cases to the original twelve Chromium/WebKit cases. The current dedicated suite also includes renderer and production-pagination test files. Browser Smoke CI runs the dedicated configuration. Main app e2e excludes them. Structural layout edits in this fixture do not validate real pagination geometry. Recorded results and remaining diagnostic and selection-timing limits are in the [branch changelog](change-log.md).
+
+### Existing-content renderers (Part 3C first slice implemented / unmerged)
+
+The dedicated `registerNodeView({ id, name, nodeType, views?, create })` and `registerMarkView({ id, name, markType, views?, create })` APIs render types already present in each matching view's schema. They do not register new content types. Normal schema serialization remains responsible for saved content and copy/paste.
+
+The service calls each factory once per matching live view/document identity. It returns a standard ProseMirror constructor synchronously. ProseMirror calls that constructor for individual rendered instances. `EditorRendererContext` includes the behavior context's view/document IDs, name, state, view, and per-instance abort signal. Its additional `reportError(error)` method attributes later renderer failures to the registration. Obsolete or revoked reporters cannot quarantine a later activation.
+
+Connections own registrations and returned disposers. IDs share the behavior namespace. `views` is an optional view-ID allowlist, not a document filter. Active registrations for the same type name reject overlapping scopes, including node/mark name collisions in ProseMirror's shared renderer map. Disjoint explicit allowlists are allowed. Existing baseline renderers also block registration. Checks include direct view props, direct-prop plugins, and unmanaged state plugins in either map. No priority-based replacement is supported. Later source conflicts or unknown types quarantine the registration.
+
+The shared reconciliation engine installs and removes renderer plugins on existing editor states. It preserves the schema, content, selection, stored marks, history, and surviving keyed state. Reconfiguration changes provider revisions and makes captured targets stale. Signals abort on closure, replacement, removal, failure, connection revocation, or service disposal. Registration/removal timing follows the behavior engine's callback guards and deferred source updates. Renderer entries are not exposed by `behaviors()` or `subscribeBehaviors()`.
+
+#### Svelte rendering and content ownership
+
+The optional `@writers-ide/word-processing/svelte` entry exports `defineSvelteNodeView` and `defineSvelteMarkView`. Both return ordinary ProseMirror constructors. Direct DOM constructors use the same registration API without Svelte. Options supply explicit feature `props`, an optional outer `tag`, and `onError: ctx.reportError`. Node adapters default to no editable content; enable `contentDOM` for editable children. Marks always have editable content.
+
+The supplied `contentDOM` action belongs on one empty, stable, unconditional host. ProseMirror owns the inserted editable subtree. Svelte owns surrounding UI and must not render its children. Adapter-owned props take precedence over explicit props. Node props include the current node, decorations, inner decorations, selection flag, and `getPos`. Mark props include the current mark and inline flag. The installed ProseMirror supports `MarkView.update`; both adapters update same-type content reactively. Marks do not have node-specific selection callbacks. The Svelte node adapter cannot render text nodes.
+
+The adapter leaves editable mutations and selection changes visible to ProseMirror. Native controls outside node content stop editor handling; editable-content events and wrapper clicks do not. Cleanup unmounts components once. The [author guide](../../packages-js/word-processing/README.md#part-3c-renderers-for-existing-content) gives complete component/registration examples and exact DOM rules.
+
+#### Renderer failures and layout changes
+
+Factory, constructor, and guarded callback failures quarantine the whole registration across views. Invalid results, thenables, and changed DOM identities are failures. Guards stop immediately, signals abort, and physical removal waits until outside the callback. Schema rendering resumes without deleting content. Cleanup continues after errors. Owner-attributed reports use the connection and optional `sources.reportBehaviorError`; a renderer error does not automatically disable the feature plugin.
+
+The Svelte boundary handles render/effect failures and rescues editable content before a failed branch is torn down. `onError: ctx.reportError` connects later boundary failures to registration-wide quarantine. Arbitrary event handlers, timers, promises, and external effects are not universally caught. Authors must catch and report failures they own. These guards cannot undo side effects or preempt CPU work.
+
+Optional `sources.invalidateLayout(viewId)` delegates geometry changes to the app, which calls `PageObserver.invalidate`. A lazy `ResizeObserver` per editor view is shared across renderer roots and editable elements. Inline renderers also observe their nearest containing layout box. A shared child-list observer refreshes target attachment after mounting or page reparenting. It visits registered renderer resources, not the document model. The first size delivery establishes a baseline without invalidation. Subsequent dimension changes and actual installed renderer-set changes request coalesced animation-frame invalidation. Ordinary source notifications, selection changes, and renderer reconstruction with the same installed set do not each invalidate layout. No resize observer or frame is allocated for this work without the host callback. Provider disposal preserves a final schema-fallback invalidation for still-live matching sources.
+
+The [fixture guide](../../e2e/fixtures/word-processing/README.md) explains opt-in Svelte node/mark examples and coverage. The separate paginated fixture uses the production schema, `createView`, and `Paginator`; its tests measure actual page bounds during renderer installation, component-only resizing, removal, editing, and undo. These are test entry points, not newly verified outcomes. Synthetic composition tests do not establish real IME behavior. Complex layouts and new content types remain separately gated.
 
 ### Execution boundary and design validation
 
 A wrapper adapts a package; it does not isolate it. ProseMirror callbacks execute with the frontend environment's authority. Input rules, decorations, and bounded worker analysis have working examples. Broader compatibility remains package- and schema-dependent.
 
-A small ordinary Svelte custom-node integration is proposed next. Schema lifecycle, missing-content preservation, and external/native enforcement need separate approval. None is completed by the current behavior API.
+Ordinary Svelte node/mark rendering for existing schema types is implemented. New content registration, schema lifecycle, missing-content preservation, and external/native enforcement still need separate approval. Rendering does not complete those capabilities.
 
 ## Accepted direction: frontend trust and native restrictions
 
@@ -282,7 +310,7 @@ External network calls are allowed in principle under explicit user trust. A plu
 
 Native access means authority outside ordinary browser code, such as Tauri IPC, filesystem access, shell/process execution, or native libraries. Frontend trust must not grant unrestricted native access. Narrow native APIs need actual enforcement and verification before external loading. TypeScript interfaces and frontend checks are not that enforcement. Arbitrary native-plugin execution is not approved.
 
-Project-supplied requirements must not automatically install or execute code or grant permissions. Ordinary Svelte node views remain a goal. Frontend isolation is deferred and must not be described as a current guarantee.
+Project-supplied requirements must not automatically install or execute code or grant permissions. Ordinary Svelte rendering for existing nodes and marks is implemented. Frontend isolation is deferred and must not be described as a current guarantee.
 
 ## Accepted direction: actions and cooperative execution
 
@@ -331,7 +359,7 @@ The library owns execution mechanics. The host owns plugin task lifetimes. The w
 
 Two numbering schemes describe this work. **Stages** are the original architectural rollout. **Parts** are the later implementation sequence in [implementation-plan.md](implementation-plan.md). Part 3 does not mean Stage 3.
 
-Stages 1 and 2 support bundled trusted plugins. Stage 2 includes Parts 1 and 2 and the implemented editor portions, Parts 3A and 3B. Part 3C covers proposed custom content. Part 4 covers external loading and corresponds to the remaining Stage 3 work. These are scopes, not release dates.
+Stages 1 and 2 support bundled trusted plugins. Stage 2 includes Parts 1 and 2 and the implemented editor portions, Parts 3A, 3B, and Part 3C's existing-type rendering slice. Part 3C's new-content/schema work remains proposed. Part 4 covers external loading and corresponds to the remaining Stage 3 work. These are scopes, not release dates.
 
 ### Stage 1 — Contracts, host, and formatting plugin
 
@@ -355,7 +383,7 @@ The manager lists trusted bundled plugins, metadata, status, capabilities, contr
 
 Ordinary Svelte and the same official/third-party APIs are the accepted direction. Frontend DOM isolation is deferred. Tests must establish real native denial and lifecycle behavior without claiming frontend isolation.
 
-**Approved completion requirement:** by the end of Part 4, Basic Menu must be a separately packaged plugin using the same supported loading mechanism and public APIs as third-party plugins. It is currently bundled in the app source. Package format, build, distribution and default installation policy still need approval. See the [packaging deliverable](implementation-plan.md#required-outcome-separately-packaged-basic-menu).
+**Approved completion requirement:** by the end of Part 4, Basic Menu must be a separately packaged plugin using the same supported loading mechanism and public APIs as third-party plugins. It is currently bundled in the app source. The owner also approved packaged examples covering toolbar UI, editor behavior, workers and custom rendering. Reuse existing examples where practical; they need not be enabled by default. Package format, build, distribution and default installation policy still need approval. See the [Basic Menu deliverable](implementation-plan.md#required-outcome-separately-packaged-basic-menu) and [example-package requirements](implementation-plan.md#required-outcome-packaged-extension-examples).
 
 External loading should build on the current provider/dependency lifecycle. Custom content still has its own approval gate. The stages do not select storage or history models. An undo-tree feature remains a possible future consumer of host-managed history.
 
@@ -431,12 +459,17 @@ These are private implementation entry points, not a published stable SDK. Recor
 
 - `packages-js/word-processing/src/contracts.ts`, `service.svelte.ts`, and [guide](../../packages-js/word-processing/README.md): standalone API, exact targets, result handling, and ownership. `src/lib/testing/word-processing.svelte.test.ts` covers service regressions.
 - `packages-js/word-processing/src/behaviors.svelte.ts` and `src/lib/testing/word-processing-behaviors.svelte.test.ts`: wrappers, ordering, key/state preservation, staging, quarantine, and cleanup.
+- `packages-js/word-processing/src/rendering-manager.svelte.ts`, `renderers.ts`, and `src/lib/testing/word-processing-renderers.svelte.test.ts`: dedicated renderer factories, conflict checks, guarded callbacks, ownership, schema fallback, and layout integration.
+- `packages-js/word-processing/svelte.ts`, `src/svelte-views.svelte.ts`, `src/svelte-view-host.svelte`, and `src/lib/testing/word-processing-svelte-views.svelte.test.ts`: component props, stable editable DOM, mark updates, selection, boundary recovery, and teardown. Test components are `src/lib/testing/SvelteWordProcessingNodeAdapterFixture.svelte` and `SvelteWordProcessingMarkAdapterFixture.svelte`.
+- `packages-js/word-processing/src/renderer-layout.ts` and `src/lib/editor/prosemirror/renderer-layout.svelte.test.ts`: shared observation, initial baselines, dimension-change coalescing, and cleanup.
 - `src/lib/editor/prosemirror/word-processing.svelte.ts` and `word-processing.svelte.test.ts`: app sources/provider. `src/routes/+page.svelte` composes provider and formatting and still directly registers the editor view.
 - `src/lib/editor/prosemirror/view/editor.ts`, `page-indexes.ts`, and `editor-behaviors.svelte.test.ts`: accepted-transaction integration and normalization. `plugins.svelte.ts` in the parent directory supplies baseline editor factories, separately from the application-plugin host.
 - `src/lib/editor/prosemirror/menu/basic/` ([guide](../../src/lib/editor/prosemirror/menu/basic/README.md)): plugin definition, contracts, formatting bridge, scoped service, and presentations. `formatting-service.svelte.test.ts`, `scope-formatting-service.test.ts`, and `menu.test.ts` cover formatting queries, stale targets, ownership, and both orientations.
 - `src/lib/editor/prosemirror/menu/quick-format/menu.ts` and `QuickFormat.svelte`: independent public-API command consumer.
 - `src/lib/editor/prosemirror/behaviors/` ([guide](../../src/lib/editor/prosemirror/behaviors/README.md)): input rules, mapped decorations, bounded worker analysis, and public command IDs.
 - `e2e/word-processing.test.ts`, `e2e/word-processing-behaviors.test.ts`, `e2e/fixtures/word-processing/BehaviorFixture.svelte`, and `playwright.word-processing.config.ts`: real views/history, app adapter, independent consumers, and workers. Run `pnpm test:word-processing` separately from app e2e. The fixture imports no Basic Menu implementation.
+
+- `e2e/word-processing-renderers.test.ts`, `e2e/word-processing-renderer-pagination.test.ts`, and the [fixture guide](../../e2e/fixtures/word-processing/README.md): opt-in Svelte rendering, multi-view failure recovery, and production-pagination geometry. Both run through `playwright.word-processing.config.ts`, separately from main app e2e.
 
 ### Libraries, scheduling, and browser coverage
 
@@ -451,12 +484,12 @@ The root and five private packages are workspace members. Shortcuts, broader UI/
 
 ## Open implementation decisions
 
-The implemented task/provider and editor behavior contracts are approved, not pending decisions. Remaining questions include:
+The implemented task/provider, editor behavior, and existing-type renderer contracts are approved, not pending decisions. Remaining questions include:
 
 - Package boundaries beyond current scope, dependency rules, publication, and API stabilization.
 - Lifecycle beyond synchronous API version 1, richer view-instance contracts, user grants, and persisted activation preferences.
 - Domain APIs beyond the current provider system and broader editor assembly extraction.
-- Custom rendering and content, Part 3C: distinguish renderers for existing schema types from registration of new types. Renderer registration, conflict policy, fallback, failures and Svelte adapters need approval. New types also need schema lifecycle and missing-content preservation. The [Part 3C investigation plan](implementation-plan.md#3c--custom-content-and-svelte-node-views) records the proposals and validation needs; no API choice is approved yet.
+- New content types, Part 3C: approve node/mark registration, schema lifecycle, and missing-content preservation separately. Existing-type rendering, conflicts, fallback, failures, and Svelte adapters are implemented and approved. The [remaining Part 3C plan](implementation-plan.md#3c--custom-content-and-svelte-node-views) separates those contracts from the open design gates.
 - Task quotas, slow-step diagnostics, responsiveness measurements, and any demonstrated need for worker pooling, progress, or timeouts.
 - External loading, review/network disclosures, restrictive native enforcement, and possible later frontend isolation. External loading is Part 4 and needs owner approval.
 - Broader document/view ownership, schema evolution, persistence, history, collaboration, and retention.

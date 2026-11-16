@@ -26,6 +26,8 @@
 	import PluginPresentation from '$lib/plugins/PluginPresentation.svelte';
 	import { PluginHost } from '$lib/plugins/plugin-host';
 	import BehaviorFixture from './BehaviorFixture.svelte';
+	import RendererFixture from './RendererFixture.svelte';
+	import PaginatedRendererFixture from './PaginatedRendererFixture.svelte';
 
 	const schema = new Schema({
 		nodes: {
@@ -39,6 +41,8 @@
 	let secondMount: HTMLDivElement;
 	let laterMount: HTMLDivElement;
 	let behaviorProofs = $state(false);
+	let rendererProofs = $state(false);
+	let paginatedRendererProofs = $state(false);
 	function createLaterView(): void {
 		if (entries.some((entry) => entry.viewId === 'view-later')) {
 			return;
@@ -382,6 +386,22 @@
 	>
 	{#if behaviorProofs}
 		<BehaviorFixture {host} createView={createLaterView} />
+	{/if}
+	<button
+		onclick={() => {
+			rendererProofs = true;
+		}}>Mount renderer proofs</button
+	>
+	{#if rendererProofs}
+		<RendererFixture {host} createView={createLaterView} />
+	{/if}
+	<button
+		onclick={() => {
+			paginatedRendererProofs = true;
+		}}>Mount paginated renderer proofs</button
+	>
+	{#if paginatedRendererProofs}
+		<PaginatedRendererFixture />
 	{/if}
 	<div bind:this={laterMount}></div>
 	<section aria-label="Editor controls">

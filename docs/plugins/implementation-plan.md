@@ -6,9 +6,9 @@ This plan explains what plugin authors can use now and what needs design approva
 
 ## Status and scope
 
-Bundled plugins can contribute UI and commands, run managed tasks, depend on versioned APIs, and extend existing editors. The next proposed work is custom content rendered with Svelte, followed by external package loading. Neither proposal is authorized for implementation yet.
+Bundled plugins can contribute UI and commands, run managed tasks, depend on versioned APIs, and extend existing editors. They can render existing schema nodes and marks through dedicated APIs, including ordinary Svelte components. New content types and external package loading remain separately gated.
 
-Parts 1, 2, 3A, and 3B are owner-approved and implemented on `bh/phase-2-plugin-transition`. The branch is unmerged, with no known PR. Contracts remain private and evolving, not a published stable SDK. Parts 3C and 4 need separate owner approval.
+Parts 1, 2, 3A, 3B, and the first rendering slice of 3C are owner-approved and implemented, but unmerged. Contracts remain private and evolving, not a published stable SDK. Part 3C's new-content/schema work and Part 4's external-loading design still need separate owner approval. See the [changelog](change-log.md) for branch and PR metadata.
 
 The [changelog](change-log.md) records cumulative branch outcomes and validation. [Project context](../project-context.md) supplies repository-wide constraints. A plan is not evidence that proposed functionality exists.
 
@@ -26,16 +26,16 @@ Keep execution mechanics, plugin lifetime management, and editor APIs separate. 
 
 The older **stages** describe the architectural rollout: establish a bundled host, extract libraries and add management UI, then support external loading. The **parts** below describe the later implementation sequence. They are not the same numbering scheme. Part 3 is editor extensibility, not Stage 3 external loading.
 
-Stage 1 merged in [#80](https://github.com/benyakirten/writers-ide/pull/80) on 2026-11-14. The current branch implements Stage 2, including Parts 1, 2, 3A, and 3B. Part 3C is proposed custom-content work. Part 4 addresses the remaining Stage 3 external-loading work. See the [stage history](context.md#accepted-implementation-stages).
+Stage 1 merged in [#80](https://github.com/benyakirten/writers-ide/pull/80) on 2026-11-14. The current branch implements Stage 2, including Parts 1, 2, 3A, 3B, and Part 3C's existing-content rendering slice. Part 3C's new-content/schema work remains proposed. Part 4 addresses the remaining Stage 3 external-loading work. See the [stage history](context.md#accepted-implementation-stages).
 
-| Work                       | Outcome                                               | Status                      |
-| -------------------------- | ----------------------------------------------------- | --------------------------- |
-| Part 1: managed tasks      | Shared scheduling and owned execution                 | Implemented, unmerged       |
-| Part 2: provider APIs      | Declared plugin dependencies and connection lifetimes | Implemented, unmerged       |
-| Part 3A: editor operations | Observations, commands, and strict result application | Implemented, unmerged       |
-| Part 3B: editor behaviors  | Managed ProseMirror plugins in existing editors       | Implemented, unmerged       |
-| Part 3C: custom content    | Schema lifecycle and Svelte content views             | Proposed; approval required |
-| Part 4: external packages  | Installation, trust disclosures, native restrictions  | Proposed; approval required |
+| Work                       | Outcome                                                                | Status                          |
+| -------------------------- | ---------------------------------------------------------------------- | ------------------------------- |
+| Part 1: managed tasks      | Shared scheduling and owned execution                                  | Implemented, unmerged           |
+| Part 2: provider APIs      | Declared plugin dependencies and connection lifetimes                  | Implemented, unmerged           |
+| Part 3A: editor operations | Observations, commands, and strict result application                  | Implemented, unmerged           |
+| Part 3B: editor behaviors  | Managed ProseMirror plugins in existing editors                        | Implemented, unmerged           |
+| Part 3C: custom content    | Existing-type renderers and Svelte adapters; schema work remains gated | Rendering implemented, unmerged |
+| Part 4: external packages  | Installation, trust disclosures, native restrictions                   | Proposed; approval required     |
 
 ## Part 1 — Shared scheduler and managed tasks
 
@@ -158,7 +158,7 @@ The approved `EditorState.reconfigure` changes the existing editor's plugin list
 - History.
 - State for plugins whose keys remain in the list. This is surviving **keyed state**.
 
-Reconfiguration creates no transaction or undo entry and does not recreate the view. Surviving behaviors keep their factory, wrapped Plugin identity, and signal. ProseMirror may still destroy and recreate resources from a plugin's `view()` callback when the list changes. `nodeViews` and `markViews` remain rejected pending custom-content approval.
+Reconfiguration creates no transaction or undo entry and does not recreate the view. Surviving behaviors keep their factory, wrapped Plugin identity, and signal. ProseMirror may still destroy and recreate resources from a plugin's `view()` callback when the list changes. Ordinary behaviors still reject `nodeViews` and `markViews`; renderers use the dedicated Part 3C APIs.
 
 When views arrive, change identity, or close, the service updates their installed behaviors. This process is called reconciliation. Source-driven changes wait for a microtask, which runs after the current synchronous call stack returns. This keeps reconfiguration outside editor hooks.
 
@@ -182,7 +182,7 @@ Optional synchronous `sources.prepareTransaction` prepares transactions returned
 
 Three opt-in examples exercise real upstream input rules/undo, mapped keyed decorations, and bounded worker analysis of selected chunks. Analysis captures at most 32,768 model positions and 1,024 chunks. Tokens do not span nodes or chunks. It uses per-view cancellation and strict-target synchronous result application, not a full-manuscript scan. `prosemirror-inputrules` is declared as `^1.6.0` and locked to `1.6.0`.
 
-See the [example guide](../../src/lib/editor/prosemirror/behaviors/README.md) for commands and fixture controls. The fixture enables behaviors only on request, not in the default app. Twelve behavior cases join the original twelve for 24 Chromium/WebKit cases. The existing CI step includes both files; main app e2e excludes them. Structural edits in this fixture do not establish real pagination geometry.
+See the [example guide](../../src/lib/editor/prosemirror/behaviors/README.md) for commands and fixture controls. The fixture enables behaviors only on request, not in the default app. Part 3B added twelve behavior cases to the original twelve Chromium/WebKit cases. The dedicated configuration now also includes the renderer and production-pagination tests. The existing CI step uses that configuration; main app e2e excludes these files. Structural edits in this fixture do not establish real pagination geometry.
 
 See the [cumulative entry](change-log.md) for recorded validation results and outstanding diagnostics. Browser selection tests have shown intermittent collapsed-selection failures with an unestablished cause. No native/security guarantee is inferred from these suites.
 
@@ -190,49 +190,33 @@ The service cannot undo arbitrary side effects, started async bodies, or raw dis
 
 ### 3C — Custom content and Svelte node views
 
-**Future investigation; separate owner approval required.** The recommendations below are proposals, not approved API contracts or permission to begin implementation.
+**First rendering slice implemented and owner-approved; unmerged.** Rendering existing schema types is available. Registering new content types remains a separate design gate.
 
 #### Rendering existing content versus defining new content
 
-ProseMirror's schema defines the document's allowed node and mark types. By default, schema rules also describe how they become DOM elements. A **node view** customizes a node's rendering and interaction inside the editor. A **mark view** customizes the wrapper around marked content. Mark views have a smaller interface; they do not provide the same update and selection hooks as node views.
+ProseMirror's schema defines allowed nodes and marks. A **node view** customizes an existing node's editor DOM and interactions. A **mark view** customizes the wrapper around marked content. Both support `update` in the installed ProseMirror version. Marks do not have node-specific selection callbacks.
 
-There are two separate capabilities to investigate:
-
-1. Render an existing schema type differently, such as adding Svelte controls around an existing image node. This need not change the schema.
-2. Add a new node or mark type, such as a columns container. This requires schema assembly and content-preservation rules as well as rendering.
-
-A custom editor view is not a saved document format. Serialization, copy/paste and export still need model-level representations.
+The implemented slice renders existing types without changing the schema. It does not register new nodes or marks. Schema rules still define serialization and copy/paste. Renderer UI is not a saved document format.
 
 #### Registration and conflict policy
 
-The current [behavior manager](../../packages-js/word-processing/src/behaviors.svelte.ts) rejects `nodeViews` and `markViews`. Removing that check alone would not supply rendering lifecycle or failure handling.
+`registerNodeView({ id, name, nodeType, views?, create })` and `registerMarkView({ id, name, markType, views?, create })` are dedicated connection-owned APIs. Ordinary behaviors still forbid `nodeViews` and `markViews`. Factories synchronously return standard ProseMirror constructors for each matching live view/document identity. `EditorRendererContext` extends the behavior context with `reportError(error)` for later failures.
 
-Decide whether rendering belongs in existing behavior registrations or a separate registration API. The recommendation is a separate API because renderers need explicit DOM ownership, component mounting and fallback rules. It could reuse behavior ownership infrastructure. Official and third-party plugins must use the same supported contracts.
-
-Also decide what happens when two plugins register a renderer for the same type. The initial recommendation is to reject conflicts rather than silently select a winner by priority. An intentional renderer-replacement mechanism would need its own approved policy.
-
-For existing schema types, the proposed fallback when a renderer is removed is normal schema rendering. Verify that switching preserves content, selection and editing. These recommendations still need approval.
+IDs share one namespace with behaviors. View allowlists may be disjoint. Overlapping scopes for the same type name reject the new registration, including a node/mark name collision in ProseMirror's shared renderer map. Existing baseline renderer props also block registration. There is no priority-based replacement. Later source conflicts or unknown types quarantine the affected registration.
 
 #### Svelte adapter and DOM ownership
 
-The existing [SvelteNodeView scaffold](../../src/lib/editor/prosemirror/node/SvelteViewNode.svelte.ts) is not a complete adapter. It does not mount a component or implement a full update lifecycle. Its unconditional `ignoreMutation()` result is not a suitable general policy because it can hide edits ProseMirror must observe.
+`@writers-ide/word-processing/svelte` exports `defineSvelteNodeView` and `defineSvelteMarkView`. These helpers mount ordinary Svelte components and return standard constructors. Direct DOM renderers use the same registration API.
 
-Investigate a reusable adapter that lets authors write ordinary Svelte components. Direct ProseMirror renderer implementations should also be considered within the same public registration contract. Required responsibilities include:
+Authors supply explicit `props`, an optional outer `tag`, and `onError: ctx.reportError`. Nodes can enable `contentDOM`; marks always have editable content. The component attaches the supplied action to one stable, empty, unconditional host. ProseMirror alone owns its editable children. The adapter owns component UI, updates props synchronously, preserves DOM identities, routes editable mutations to ProseMirror, and tears down component resources once.
 
-- Create the DOM required by ProseMirror synchronously and mount the component.
-- Supply current node attributes, decorations and selection information where the renderer interface supports them.
-- Keep `contentDOM` stable when used. This is the element where ProseMirror manages editable children. Svelte must not also manage those children.
-- Distinguish component controls from events ProseMirror should handle.
-- Distinguish component DOM mutations from document edits ProseMirror should observe.
-- Unmount components and release resources exactly once.
-
-Node and mark adapters need contracts that reflect their different ProseMirror interfaces. Do not promise node-view hooks on mark views.
+The adapter supports reactive mark updates. Only node views receive node selection props and callbacks. See the [author guide](../../packages-js/word-processing/README.md#part-3c-renderers-for-existing-content) for complete examples, options, and event rules.
 
 #### Ownership, removal and failures
 
-Define behavior for editors opening, closing or changing documents. Cover plugin disable, restart, registration removal and replacement of already-rendered content. Disabling a renderer must not delete document content.
+Registrations follow consumer connection ownership and per-view signals through opening, closure, replacement, removal, disable, and provider teardown. Installation/removal preserves the existing schema, content, selection, stored marks, history, and surviving keyed state. Removed renderers return to schema rendering without deleting content.
 
-Renderer failures need explicit recovery rules. A constructor can fail before a view exists. A later callback can fail after DOM and component resources have been created. Ordinary editor-hook fallback values do not resolve both cases. Decide how cleanup, fallback rendering and owner-attributed errors work.
+Factory, constructor, and guarded callback failures quarantine the registration across all views. Guards stop immediately; physical removal is deferred outside executing callbacks. Invalid results, thenables, and changed DOM identities also fail. Source and connection reporters retain owner attribution. The Svelte boundary rescues editable content before a failed component branch is removed. Passing `onError: ctx.reportError` connects later boundary failures to quarantine. Arbitrary event/async failures are not universally caught, and arbitrary side effects cannot be rolled back.
 
 #### New content types and schema lifecycle
 
@@ -248,20 +232,21 @@ Removing support for a content type is not equivalent to disabling a toolbar or 
 
 #### Browser and pagination validation
 
-Use real-browser tests for typing, selection, keyboard navigation, composition input, copy/paste and undo/redo. Cover component mount, update and destruction; multiple editor views; disable/re-enable; renderer conflicts; and failure recovery.
+The opt-in [renderer fixtures](../../e2e/fixtures/word-processing/README.md) cover editing, selection, controls, serialization, history, lifecycle, conflicts, and synchronous/async-boundary failure recovery. Composition coverage uses synthetic events, not a real IME. Test references describe coverage, not a claim that validation passed.
 
-Custom rendering can change node dimensions. Verify pagination after document changes and component size changes. The initial work must preserve current model-mutating pagination. Supporting node views does not establish support for arbitrary structures such as multi-column pagination. Those need additional layout design.
+Optional `sources.invalidateLayout(viewId)` connects renderer changes to host layout. The app calls `PageObserver.invalidate`. One lazy resize observer per editor view is shared across renderers. Inline renderers include a containing layout box. A shared child-list observer refreshes those targets after attachment or page reparenting. Initial size deliveries establish baselines only. Actual renderer-set changes and subsequent dimension changes request coalesced frame invalidation. Ordinary source notifications and selection changes do not each restart pagination.
+
+The paginated fixture uses the production schema, `createView`, and `Paginator`. Its browser tests measure page-content bounds after installation, component-only growth/shrink, removal, edits, and undo. Current model-mutating pagination remains intact. Arbitrary structures such as columns still require separate layout design.
 
 #### Recommended investigation sequence
 
-1. Approve registration, conflict, fallback and failure policies.
-2. Prototype rendering for existing schema types with one small Svelte node view and a mark view. Validate lifecycle and editing before expanding the API.
-3. Design new node/mark registration separately. Approve schema lifecycle and missing-content preservation before implementing it.
-4. Evaluate complex content such as columns after those foundations work. Layout and conversion integrations need separate design decisions.
+1. Keep existing-type renderer contracts and focused examples covered as the private API evolves.
+2. Design new node/mark registration separately. Approve schema lifecycle and missing-content preservation before implementing it.
+3. Evaluate complex content such as columns only after approval of its layout and conversion design.
 
 ## Part 4 — External packages and user-facing trust
 
-**Design approval required before implementation.** The goal is to load external plugins without claiming frontend isolation that does not exist. The owner has approved one required outcome: Basic Menu must be a separately packaged plugin by the end of Part 4.
+**Design approval required before implementation.** The goal is to load external plugins without claiming frontend isolation that does not exist. The owner has approved separate packaging of Basic Menu and example plugins covering toolbar UI, editor behavior, workers and custom rendering by the end of Part 4.
 
 Before external loading:
 
@@ -283,7 +268,20 @@ The package must use the supported package-loading mechanism and public APIs ava
 
 Validate the packaged plugin's horizontal and vertical controls, formatting behavior, disable/re-enable cleanup, docking capacity and undo preservation. Use it as a real-feature test of the package-loading system, not only a synthetic fixture.
 
-The outcome is approved, but the package format, build and Svelte dependency handling, distribution location, default installation policy and detailed loading contracts still need design approval. Separate packaging does not require public registry publication. Part 3C's schema and rendering proposals remain separately gated.
+The outcome is approved, but the package format, build and Svelte dependency handling, distribution location, default installation policy and detailed loading contracts still need design approval. Separate packaging does not require public registry publication. Part 3C's new-content and schema work remains separately gated. Existing-type rendering is implemented.
+
+### Required outcome: packaged extension examples
+
+Package examples that exercise the main extension capabilities through the same supported loading mechanism as Basic Menu:
+
+- Toolbar UI: Quick Format or an equivalent independent formatting example.
+- Editor behavior: the smart-punctuation and selection-highlighting examples.
+- Workers: the word-analysis example, including its emitted worker assets.
+- Custom rendering: the node/mark-view example developed during Part 3C.
+
+Reuse the existing examples where practical. Their purpose is to verify public APIs, package assets and lifecycle behavior. Packaging does not make them finished user-facing features or require enabling them in the default app. Exact example boundaries and distribution details can be refined later.
+
+This requirement does not include extracting the entire word-processing editor, independently packaging pagination, or implementing history plumbing for an undo-tree plugin.
 
 ## Validation and documentation
 
@@ -295,10 +293,10 @@ Report passed, failed, and unavailable checks. Keep verified results in the chan
 
 ## Decisions needed before implementation
 
-The task/provider policies and current synchronous editor access, provider-owned edits, provider-based formatting, behavioral ordering/removal, and in-place reconfiguration are approved and implemented. They do not need a new approval decision.
+The task/provider policies and current synchronous editor access, provider-owned edits, provider-based formatting, behavioral ordering/removal, in-place reconfiguration, and existing-type renderer registration with Svelte adapters are approved and implemented. They do not need a new approval decision.
 
 Remaining gates are:
 
-1. **Custom content, Part 3C:** first approve renderer registration, conflicts, fallback, failure handling and Svelte node/mark-view contracts. New content types also need approved schema lifecycle and missing-content preservation.
+1. **New custom content, Part 3C:** approve new node/mark registration, schema lifecycle, and missing-content preservation. Existing-type rendering does not need a new approval decision.
 2. **External loading, Part 4:** approve installation/trust disclosures and a verified restrictive native-enforcement design.
 3. **Broader work:** separately justify and approve extraction or features beyond the implemented scope. API publication, stability, universal upstream compatibility, and performance targets are not established.
