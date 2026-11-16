@@ -348,10 +348,16 @@ It is trusted JavaScript, not sandboxed code.
 Document access plus network access permits data disclosure.
 Backend/system access must still be restricted before external loading is added.
 
+The owner approved native-request attribution through host-issued activation tokens held privately by frontend service objects. Services attach tokens to `invoke` requests. Rust resolves identity and approved grants from its own registry, authorizes operations and validates arguments. Native endpoints must not accept untrusted plugin IDs as identity or allow direct `invoke` calls to bypass checks. Token issuance remains host-controlled. Tokens are revoked on activation end and replaced on reactivation; completed effects are not rolled back.
+
+The package direction allows multiple frontend and backend components and static permission declarations in `manifest.toml`. Declarations are requests rather than grants. Field definitions, grant scopes, issuance protocol, backend runtime, narrow native service APIs and in-flight cancellation still need approval. Attribution identifies the credential whose authority is exercised, not tamper-proof JavaScript provenance. Logging is deferred. This decision is documented in context, plan and project overview; native enforcement is not implemented.
+
+Documentation validation for this decision passed Oxfmt, whitespace checks and 96 local links, including 27 heading fragments. These checks are separate from the earlier implementation test results above. No runtime tests were rerun for this documentation-only change.
+
 This branch does not add external installation, persistent activation preferences, native permission grants or schema migration.
 It also does not add general component-state transfer, durable history storage, full editor extraction or plugin translations.
 New manager/fallback text remains English.
-Part 3C's new-content/schema work and Part 4's loading/security design still need separate approval.
+Part 3C's new-content/schema work and the remaining Part 4 loading/security designs still need separate approval. The token-enforcement direction is approved, but its detailed APIs and enforcement are not implemented.
 PR and merge metadata remain to be verified.
 
 ## Merged PRs

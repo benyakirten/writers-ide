@@ -246,12 +246,12 @@ The paginated fixture uses the production schema, `createView`, and `Paginator`.
 
 ## Part 4 — External packages and user-facing trust
 
-**Design approval required before implementation.** The goal is to load external plugins without claiming frontend isolation that does not exist. The owner has approved separate packaging of Basic Menu and example plugins covering toolbar UI, editor behavior, workers and custom rendering by the end of Part 4.
+**Remaining API and loading designs need approval before implementation.** The goal is to load external plugins without claiming frontend isolation that does not exist. The owner approved token-based native-request identity and Rust-side enforcement, as described below. The owner also approved separate packaging of Basic Menu and example plugins covering toolbar UI, editor behavior, workers and custom rendering by the end of Part 4.
 
 Before external loading:
 
 - Audit Tauri commands and native capabilities reachable from frontend code.
-- Approve restrictive native APIs and verify denial in packaged applications.
+- Define the narrow native operations, token issuance protocol and grant scopes within the approved token-enforcement direction. Verify denial in packaged applications.
 - Define package identity, entry points, compatibility, and dependency metadata.
 - Design installation/removal and persisted activation preferences.
 - Explain frontend trust and document/network risks. Distinguish disclosures from enforced restrictions.
@@ -259,6 +259,24 @@ Before external loading:
 - Prevent project data and plugin requirements from automatically installing or executing extensions.
 
 Frontend DOM isolation remains deferred. If a claimed native restriction cannot be enforced, resolve it before external loading. A manifest checkbox is not a substitute.
+
+### Native request attribution and authorization
+
+**Approved direction; not implemented.** Keep trusted frontends in the application's JavaScript environment. Require host-issued tokens for protected native requests and enforce permissions in Rust. The [native-request contract](context.md#native-request-identity-and-token-enforcement) explains the flow and its limits.
+
+The host issues a fresh token for each activation and revokes it when that activation ends. Service objects keep credentials private and attach them to `invoke` calls. Rust resolves identity and approved grants from its registry. It must not trust a plugin ID supplied as a request argument. Direct use of `invoke` must not bypass checks. Include Tauri plugin commands and other native routes in the audit.
+
+Before implementing issuance or native services, approve:
+
+- How the host establishes installed package and component identities before issuing credentials.
+- The `manifest.toml` permission fields and approval rules. Declarations are requests, not grants. Decide whether grants belong to packages, components or both.
+- The narrow native operations and allowed resources. Service method names and file-access contracts are not selected by the token decision.
+- Token issuance and delivery, activation/component binding, revocation and backend execution identity. The package direction allows multiple frontend and backend components; their runtime and lifecycle details remain open.
+- Treatment of native work already running when credentials are revoked. Revocation cannot undo completed effects.
+
+Validation must cover missing, invalid and revoked tokens; attempts to supply a different plugin identity; requests beyond approved operation/resource scopes; old services after disable/re-enable; and alternate native entry points. Verify token issuance cannot be used to impersonate a different package or grant new privileges. Test enforcement in packaged Tauri runtimes, not only mocked IPC or browser tests.
+
+Successful attribution means a request used a particular activation's credential. It is not proof of the originating JavaScript code against malicious same-environment interference or deliberate delegation. Logging remains deferred and is not a prerequisite for deciding this attribution contract.
 
 ### Required outcome: separately packaged Basic Menu
 
@@ -298,5 +316,5 @@ The task/provider policies and current synchronous editor access, provider-owned
 Remaining gates are:
 
 1. **New custom content, Part 3C:** approve new node/mark registration, schema lifecycle, and missing-content preservation. Existing-type rendering does not need a new approval decision.
-2. **External loading, Part 4:** approve installation/trust disclosures and a verified restrictive native-enforcement design.
+2. **External loading, Part 4:** token-based native attribution and Rust-side enforcement are approved direction. Approve the remaining package/loading APIs, permission/grant model, issuance protocol, narrow native operations, and installation/trust disclosures. Verify enforcement before external loading.
 3. **Broader work:** separately justify and approve extraction or features beyond the implemented scope. API publication, stability, universal upstream compatibility, and performance targets are not established.

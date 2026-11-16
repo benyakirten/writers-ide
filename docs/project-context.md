@@ -119,6 +119,8 @@ A plugin that can read manuscript text and make network requests can send that t
 
 Backend access must remain much more restrictive. Frontend trust must not imply unrestricted filesystem access, process execution, native libraries or Tauri IPC. IPC is the communication mechanism used to call the Rust side of a Tauri application. Narrow system APIs need actual enforcement and packaged-app tests before external loading is enabled.
 
+**Approved direction, not implemented:** native services will attach private, host-issued activation tokens to requests. Rust will resolve the token's plugin/component identity and grants, validate each operation, and reject invalid or revoked credentials. Tokens identify whose authority is used; they do not prove which JavaScript code initiated a call in the shared frontend environment. See [native request identity](plugins/context.md#native-request-identity-and-token-enforcement) for the lifecycle, manifest direction and remaining design decisions. Logging is deferred.
+
 No arbitrary native-plugin loading is approved. Frontend plugins currently run in the application's JavaScript environment without isolation.
 
 Project files must not automatically install code, execute plugin requirements or grant permissions. This also matters when receiving data from collaborators.

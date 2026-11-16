@@ -312,6 +312,25 @@ Native access means authority outside ordinary browser code, such as Tauri IPC, 
 
 Project-supplied requirements must not automatically install or execute code or grant permissions. Ordinary Svelte rendering for existing nodes and marks is implemented. Frontend isolation is deferred and must not be described as a current guarantee.
 
+### Native request identity and token enforcement
+
+**Approved direction; not implemented.** Frontend components remain trusted code in the application's JavaScript environment. Native requests must use host-issued credentials and Rust-side permission checks. This identifies whose native authority is used without claiming frontend isolation.
+
+The intended package model allows frontend components, backend components, or both, potentially with multiple components of each kind. Permissions will be declared statically in `manifest.toml`. A declaration requests authority; it does not grant it. Manifest fields, grant approval rules, package-versus-component permission scopes and the backend execution runtime still need design approval. No arbitrary native library or process execution is authorized by this direction.
+
+The native request flow is:
+
+1. The host establishes the plugin's identity and approved grants. It issues a fresh, opaque token for an activation rather than one reusable credential for the whole application session. The host-controlled registry associates the token with the plugin, activation, relevant component identity and grants.
+2. The frontend receives service objects with the token held privately. Plugin code calls a named method such as `service.readFile(...)`. That method supplies the token and operation arguments to Tauri's `invoke`. The file-service name is illustrative; file-access APIs and scopes are not selected yet.
+3. Rust looks up the token and verifies that it is active. It derives the identity and grants from that registry, not a caller-supplied plugin ID. It authorizes the operation, validates its target and arguments, and performs or rejects it.
+4. Ending an activation revokes its token. Re-enabling the plugin receives a new token. Retained services cannot use an old token to start further native operations. Revocation cannot undo completed effects. Cancellation of already-running operations needs a separate policy.
+
+Frontend wrapping is not the enforcement point. Calling Tauri's original `invoke` directly must not bypass Rust validation. Every protected native endpoint must reject missing, invalid or revoked credentials. Audit Tauri plugin commands and other native routes as well as application commands. Token issuance must not let plugin code select another plugin's identity or expand its grants. The exact issuance protocol remains open.
+
+A valid token establishes: **this request used the credential issued to this plugin/component activation**. It does not prove which JavaScript code originally caused the call. Private fields help avoid accidental access; they do not isolate hostile code sharing the same environment. Deliberate delegation can also make the initiator different from the component exercising authority. Backend identity and permission enforcement must be grounded in the selected restricted runtime when backend components are introduced.
+
+Logging design is deferred. This decision concerns native-request attribution and authorization, not interception or logging of every frontend operation. See the [Part 4 implementation and validation requirements](implementation-plan.md#native-request-attribution-and-authorization).
+
 ## Accepted direction: actions and cooperative execution
 
 Plugins can use activation-owned `context.tasks`. Private `@writers-ide/tasks` contains the extracted [pagination work queue](../pagination/context.md#generic-work-queue) and task helpers. The application host shares pagination's singleton queue. A standalone host accepts an optional `workQueue` or creates an independent queue.
