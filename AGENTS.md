@@ -60,6 +60,7 @@ Before substantive work, read [docs/project-context.md](docs/project-context.md)
 
 ## Required code style
 
+- Use `type` for struct-like data, including records, props, options, snapshots, contexts and callback-bearing registrations. Use `interface` for behavioral contracts, including service/lifecycle operations and callable function signatures. Behavioral contracts may include supporting state. Keep interfaces required for declaration merging or module augmentation. See [TypeScript declaration style](CONTRIBUTING.md#use-types-for-data-and-interfaces-for-behavior) for examples and refactoring constraints.
 - Keep mutations out of conditions. Do not use assignments, `++`, or `--` inside `if`, `while`, `do…while`, or `for` conditions. Perform updates in separate statements and preserve prefix/postfix semantics.
 - Increment/decrement expressions are allowed outside conditions, including a `for` loop's update clause.
 - Always use braces for control-flow bodies, including single-statement `if`, `else`, and loop bodies. Ordinary `else if` chains are allowed.

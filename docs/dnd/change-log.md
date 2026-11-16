@@ -23,6 +23,8 @@ Private `@writers-ide/layout` now owns reusable layout mechanics:
 
 Each workbench receives its registry, ID and title helpers, and the factory that creates items. Independent instances need not import shared app state or ProseMirror.
 
+The repository-wide [TypeScript declaration convention](../../CONTRIBUTING.md#use-types-for-data-and-interfaces-for-behavior) also applies here. Droppable props are a data type. Layout services and the drop-validation controller are behavioral interfaces. Members and runtime behavior are unchanged. The [plugin entry](../plugins/change-log.md#typescript-declaration-convention) records the audit and validation.
+
 The app keeps its shared instance in `src/lib/editor/state/workbench.svelte.ts`. Existing state paths adapt or re-export it for compatibility. Custom bar and feature rendering stay in the app. `Editor.svelte` still connects gesture detection, target selection, preview and committing the move.
 
 The extraction preserves existing rules:

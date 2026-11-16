@@ -2,9 +2,9 @@
 	import { useDroppable, type UseDroppableArguments } from '@dnd-kit-svelte/core';
 	import type { Snippet } from 'svelte';
 
-	interface DroppableProps extends UseDroppableArguments {
+	type DroppableProps = UseDroppableArguments & {
 		children: Snippet<[ReturnType<typeof useDroppable>]>;
-	}
+	};
 
 	let { children, ...rest }: DroppableProps = $props();
 

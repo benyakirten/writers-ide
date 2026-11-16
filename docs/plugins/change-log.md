@@ -299,6 +299,14 @@ The Part 3C plan separates the implemented existing-type renderers from future n
 The owner approved separately packaging Basic Menu as a required outcome by the end of Part 4. The plan requires the same supported loading mechanism and public APIs as third-party plugins, plus real-feature regression coverage. Package format, build, distribution and default installation policy remain open; this approval does not settle those designs. Current context and the Basic Menu guide link to that deliverable.
 The owner also approved Part 4 packages demonstrating toolbar UI, editor behavior, workers and custom rendering. The plan reuses current examples where practical and does not require enabling them by default. Full editor extraction, independent pagination packaging and undo-tree history infrastructure remain outside that requirement. The approved first Part 3C slice now implements existing-content rendering; new-content contracts remain open.
 
+#### TypeScript declaration convention
+
+The owner requires `type` for struct-like data and `interface` for behavioral contracts. `AGENTS.md` and the [contributor guide](../../CONTRIBUTING.md#use-types-for-data-and-interfaces-for-behavior) now state this rule. Callback-bearing options, registrations, props and context records remain data types. Service, lifecycle and callable function contracts use interfaces. Declaration-merging interfaces remain where TypeScript requires them.
+
+The repository-wide audit applies this distinction to plugin manifests, dependency metadata, contributions, host options, formatting data, editor targets and snapshots, renderer props, benchmark data and browser fixture arguments. Named callback contracts use callable interfaces. Existing member names, generics, modifiers and callback signatures are preserved. Inherited data shapes use intersections. No runtime behavior changes are intended. Related records are in the [docking](../dnd/change-log.md), [pagination](../pagination/change-log.md) and [browser-performance](../browser-performance/change-log.md) entries.
+
+Validation for the declaration refactor passed all 1,191 unit tests, `pnpm check:performance`, repository lint, local Markdown file/fragment links and whitespace checks. Emitted JavaScript was identical for all 20 changed TypeScript/Svelte files, excluding comments. `pnpm check` still reports the existing Modal error and five DnD warnings, with no new diagnostics. Browser runtime suites were not rerun for this declaration-only refactor; earlier browser results below remain evidence for the renderer implementation.
+
 #### Tests and known limits
 
 Latest cumulative validation, including Part 3C's first rendering slice:

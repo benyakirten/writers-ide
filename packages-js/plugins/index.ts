@@ -1,18 +1,20 @@
 import type { TaskService } from '@writers-ide/tasks';
 
-export type Dispose = () => void;
+export interface Dispose {
+	(): void;
+}
 
-export interface PluginApiIdentity {
+export type PluginApiIdentity = {
 	readonly id: string;
 	readonly major: number;
-}
+};
 
 declare const apiType: unique symbol;
 
 /** Immutable contract identity; the phantom member preserves its facade type. */
-export interface PluginApi<T extends object> extends PluginApiIdentity {
+export type PluginApi<T extends object> = PluginApiIdentity & {
 	readonly [apiType]?: (value: T) => T;
-}
+};
 
 export function definePluginApi<T extends object>(identity: PluginApiIdentity): PluginApi<T> {
 	if (typeof identity.id !== 'string' || identity.id.trim().length === 0) {
@@ -24,12 +26,12 @@ export function definePluginApi<T extends object>(identity: PluginApiIdentity): 
 	return Object.freeze({ id: identity.id, major: identity.major });
 }
 
-export interface PluginDependency {
+export type PluginDependency = {
 	readonly provider: string;
 	readonly api: string;
 	readonly major: number;
 	readonly optional?: boolean;
-}
+};
 
 export interface PluginApiConnection {
 	readonly consumerId: string;
@@ -61,7 +63,7 @@ export type PluginCapability =
 	| 'contributions.view'
 	| 'contributions.command';
 
-export interface PluginManifest {
+export type PluginManifest = {
 	readonly id: string;
 	readonly version: string;
 	readonly apiVersion: 1;
@@ -70,27 +72,27 @@ export interface PluginManifest {
 	readonly capabilities: readonly PluginCapability[];
 	readonly provides?: readonly PluginApiIdentity[];
 	readonly dependencies?: readonly PluginDependency[];
-}
+};
 
 /** Presentation values are interpreted only by the trusted host's rendering adapter. */
-export interface ToolbarContribution<Presentation> {
+export type ToolbarContribution<Presentation> = {
 	readonly id: string;
 	readonly name: string;
 	readonly horizontal: { readonly presentation: Presentation; readonly size: 1 | 2 | 3 };
 	readonly vertical: { readonly presentation: Presentation; readonly size: 1 | 2 | 3 };
-}
+};
 
-export interface ViewContribution<Presentation> {
+export type ViewContribution<Presentation> = {
 	readonly id: string;
 	readonly name: string;
 	readonly presentation: Presentation;
-}
+};
 
-export interface CommandContribution {
+export type CommandContribution = {
 	readonly id: string;
 	readonly name: string;
 	readonly execute: () => boolean;
-}
+};
 
 /** IDs are unique within each contribution kind across all active plugins. */
 export interface PluginContributions<Presentation> {
@@ -99,7 +101,7 @@ export interface PluginContributions<Presentation> {
 	command(contribution: CommandContribution): Dispose;
 }
 
-export interface PluginContext<Presentation> {
+export type PluginContext<Presentation> = {
 	readonly signal: AbortSignal;
 	/** Returns an idempotent early-release handle; late ownership disposes immediately. */
 	readonly own: (dispose: Dispose) => Dispose;
@@ -107,7 +109,7 @@ export interface PluginContext<Presentation> {
 	/** Activation-owned helpers; optional to use, not a sandbox or editor API. */
 	readonly tasks: TaskService;
 	readonly apis: PluginApis;
-}
+};
 
 /** Trusted bundled code only. Activation and the optional returned disposer are synchronous. */
 export interface BundledPlugin<Presentation> {
@@ -120,19 +122,19 @@ export interface ContributionRegistry<Contribution> {
 	register(ownerId: string, contribution: Contribution): Dispose;
 }
 
-export interface PluginRegistries<Presentation> {
+export type PluginRegistries<Presentation> = {
 	readonly toolbar: ContributionRegistry<ToolbarContribution<Presentation>>;
 	readonly view: ContributionRegistry<ViewContribution<Presentation>>;
 	readonly command: ContributionRegistry<CommandContribution>;
-}
+};
 
 export type PluginStatus = 'disabled' | 'activating' | 'active' | 'deactivating' | 'failed';
 export type ContributionKind = 'toolbar' | 'view' | 'command';
 
-export interface PluginError {
+export type PluginError = {
 	readonly phase: 'activation' | 'cleanup' | 'task' | 'dependency' | 'provider';
 	readonly message: string;
-}
+};
 
 /** Host-owned management, never supplied as a plugin capability.
  * Snapshots contain only frozen metadata. Subscribe delivers immediately; listener
@@ -147,7 +149,7 @@ export interface PluginManagementService {
 	deactivate(id: string, options?: { cascade?: boolean }): PluginInfo;
 }
 
-export interface PluginInfo {
+export type PluginInfo = {
 	readonly manifest: PluginManifest;
 	readonly status: PluginStatus;
 	readonly errors: readonly PluginError[];
@@ -163,4 +165,4 @@ export interface PluginInfo {
 		readonly kind: ContributionKind;
 		readonly id: string;
 	}[];
-}
+};

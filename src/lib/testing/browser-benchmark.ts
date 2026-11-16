@@ -7,23 +7,23 @@ export interface BrowserBenchmark<Result extends BenchmarkResult = BenchmarkResu
 	verify(result: Result): void | Promise<void>;
 }
 
-export interface BenchmarkOptions {
+export type BenchmarkOptions = {
 	variants: string[];
 	warmups?: number;
 	samples?: number;
-}
+};
 
-export interface BenchmarkSample {
+export type BenchmarkSample = {
 	variant: string;
 	durationMs: number;
 	result: BenchmarkResult;
-}
+};
 
-export interface BenchmarkReport {
+export type BenchmarkReport = {
 	samples: BenchmarkSample[];
 	summaries: Record<string, { medianMs: number; minMs: number; maxMs: number }>;
 	environment: { userAgent: string; devicePixelRatio: number; viewport: [number, number] };
-}
+};
 
 declare global {
 	interface Window {

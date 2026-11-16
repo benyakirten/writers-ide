@@ -29,25 +29,25 @@ const capabilities = new Set<PluginCapability>([
 	'contributions.command',
 ]);
 
-interface ApiConnection {
+type ApiConnection = {
 	provider: Activation;
 	consumer: Activation;
 	key: string;
 	live: boolean;
 	facade?: object;
 	revoke: Dispose;
-}
+};
 
-interface ApiSubscription {
+type ApiSubscription = {
 	consumer: Activation;
 	entryId: string;
 	providerId: string;
 	contract: PluginApiIdentity;
 	last: Activation | null | undefined;
 	listener: (api: object | null) => void;
-}
+};
 
-interface Activation {
+type Activation = {
 	live: boolean;
 	controller: AbortController;
 	cleanups: Set<Dispose>;
@@ -55,20 +55,20 @@ interface Activation {
 	providers: Map<string, (connection: PluginApiConnection) => object>;
 	connections: Set<ApiConnection>;
 	consumed: Map<string, ApiConnection>;
-}
+};
 
-interface Entry<Presentation> {
+type Entry<Presentation> = {
 	plugin: BundledPlugin<Presentation>;
 	status: PluginStatus;
 	errors: PluginError[];
 	activation?: Activation;
-}
+};
 
-export interface PluginHostOptions<Presentation> {
+export type PluginHostOptions<Presentation> = {
 	readonly registries: PluginRegistries<Presentation>;
 	/** Supply the application's shared queue; standalone hosts get an independent queue. */
 	readonly workQueue?: WorkQueue;
-}
+};
 
 /** Synchronous lifecycle for explicitly supplied, trusted bundled plugins; not a sandbox. */
 export class PluginHost<Presentation> implements PluginManagementService {

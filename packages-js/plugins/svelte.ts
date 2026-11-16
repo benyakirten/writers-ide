@@ -8,10 +8,10 @@ import type {
 } from './index';
 
 /** Trusted rendering descriptor; feature dependencies are supplied explicitly as props. */
-export interface SveltePresentation {
+export type SveltePresentation = {
 	readonly component: Component<Record<string, unknown>>;
 	readonly props: Readonly<Record<string, unknown>>;
-}
+};
 
 /** Check component props before erasing their type for the generic rendering adapter. */
 export function defineSveltePresentation<Props extends object>(

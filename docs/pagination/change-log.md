@@ -16,6 +16,8 @@ This branch separates feature services and reusable tasks from the general plugi
 
 #### What changed and why
 
+**TypeScript declarations.** The repository-wide convention uses types for data and interfaces for behavior. Formatting summaries, requests and node-view props are data types. Split-search predicates and plugin factories are callable interfaces. Search, formatting and pagination runtime behavior is unchanged. See the [contributor rule](../../CONTRIBUTING.md#use-types-for-data-and-interfaces-for-behavior) and [audit validation](../plugins/change-log.md#typescript-declaration-convention).
+
 **Reliable undo baselines.** Formatting/reflow range tests now show the first page and wait for fitting content before recording its split. A smoke trace had recorded an unpaginated offscreen page containing all 4,340 characters. Undo then correctly produced a 1,792-character split, which did not match that baseline. This test correction does not weaken assertions or change selection helpers or production pagination algorithms.
 
 **Feature-owned formatting.** Formatting contracts and the code that connects formatting to ProseMirror moved to `src/lib/editor/prosemirror/menu/basic/`. The general host no longer requires formatting.

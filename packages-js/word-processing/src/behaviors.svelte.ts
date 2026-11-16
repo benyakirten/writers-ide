@@ -15,7 +15,9 @@ import type {
 
 type Source = ReturnType<WordProcessingSources['listViews']>[number];
 // Callback signatures vary across ProseMirror props; erasure is confined to this adapter.
-type Callback = (...args: never[]) => unknown;
+interface Callback {
+	(...args: never[]): unknown;
+}
 type Instance = { source: Source; controller: AbortController; plugins: Plugin[] };
 type Entry = {
 	registration: EditorBehaviorRegistration;

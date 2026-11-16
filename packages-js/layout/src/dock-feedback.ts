@@ -6,10 +6,10 @@ import type {
 import { VerticalBarPosition } from './vertical-bar-state.svelte';
 
 /** The target primitive needs validation/orientation, not access to host state or rendering. */
-export type DockController = {
+export interface DockController {
 	canDrop: (source: DockDragSource, target: DockDropTarget) => boolean;
 	isVertical: (location: BarTransferLocation, barId?: string) => boolean;
-};
+}
 
 export type DockColor = 'vertical' | 'horizontal' | 'floating' | 'invalid' | 'none';
 

@@ -32,14 +32,14 @@ const management: PluginManagementService = {
 	},
 };
 
-interface PresentationProps {
+type PresentationProps = {
 	management: PluginManagementService;
 	failure: 'init' | null;
-}
+};
 
-interface LabelProps {
+type LabelProps = {
 	label: string;
-}
+};
 
 // Delegate successful rendering to a real compiled component with specific required props.
 const Presentation: Component<PresentationProps> = (anchor, props) => {
@@ -64,9 +64,9 @@ function checkProps(labelComponent: Component<LabelProps>) {
 	defineSveltePresentation(labelComponent, { label: 'x' });
 	const labelProps: LabelProps = { label: 'x' };
 	defineSveltePresentation(labelComponent, labelProps);
-	// @ts-expect-error Named-interface props still require their mandatory fields.
+	// @ts-expect-error Named props still require their mandatory fields.
 	defineSveltePresentation(labelComponent, {});
-	// @ts-expect-error Named-interface props still reject incorrect value types.
+	// @ts-expect-error Named props still reject incorrect value types.
 	defineSveltePresentation(labelComponent, { label: 42 });
 	defineSveltePresentation(PluginManager, { management });
 	// @ts-expect-error The component's required prop must be supplied.

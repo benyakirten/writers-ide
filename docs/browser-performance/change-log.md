@@ -6,7 +6,13 @@ After confirmed merge, move the completed entry into `Merged PRs` in chronologic
 
 ## In progress
 
-No in-progress browser-performance entries are currently recorded.
+### `bh/phase-2-plugin-transition` — TypeScript declaration convention
+
+**Status: In progress / unmerged.** No PR identity or merge date has been verified.
+
+The repository-wide [declaration convention](../../CONTRIBUTING.md#use-types-for-data-and-interfaces-for-behavior) uses types for data and interfaces for behavior. Benchmark options, lifecycle callback configuration, results and story arguments now use data types. `StorybookPage` uses an interface extending Playwright's `Page` because it defines additional operations. The benchmark service remains an interface. The global `Window` interface remains an interface because it extends an existing declaration through declaration merging.
+
+The refactor preserves members and runtime behavior. `pnpm check:performance` passed with no errors or warnings. All 1,191 unit tests passed. Emitted JavaScript was identical for the changed TypeScript and Svelte script blocks. The [plugin entry](../plugins/change-log.md#typescript-declaration-convention) records cross-repository validation and existing diagnostics. Browser performance measurements were not rerun because no runtime implementation changed.
 
 ## Merged PRs
 

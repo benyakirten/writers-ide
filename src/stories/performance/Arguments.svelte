@@ -1,10 +1,10 @@
 <script module lang="ts">
-	export interface ArgumentsArgs {
+	export type ArgumentsArgs = {
 		label?: string;
 		enabled?: boolean;
 		amount?: number;
 		optional?: string | null;
-	}
+	};
 </script>
 
 <script lang="ts">

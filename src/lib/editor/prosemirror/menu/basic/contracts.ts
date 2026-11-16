@@ -19,19 +19,19 @@ export type FormattingBlockCommand =
 
 export type FormattingCommand = FormattingMark | FormattingBlockCommand;
 
-export interface FormattingSnapshot {
+export type FormattingSnapshot = {
 	viewId: string;
 	revision: number;
 	marks: Record<FormattingMark, number>;
 	blocks: Record<FormattingBlockCommand, number>;
 	enabled: Record<FormattingCommand, boolean>;
-}
+};
 
-export interface FormattingRequest {
+export type FormattingRequest = {
 	viewId: string;
 	revision: number;
 	command: FormattingCommand;
-}
+};
 
 /**
  * The service validates view identity, revision, and command availability on execute.

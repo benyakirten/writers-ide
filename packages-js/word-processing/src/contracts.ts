@@ -19,52 +19,52 @@ export interface WordProcessingSources {
 	prepareTransaction?(transaction: Transaction): Transaction;
 }
 
-export interface EditorBehaviorFailure {
+export type EditorBehaviorFailure = {
 	ownerId: string;
 	id: string;
 	viewId?: string;
 	phase: string;
 	error: unknown;
-}
+};
 
-export interface EditorBehaviorContext {
+export type EditorBehaviorContext = {
 	readonly viewId: string;
 	readonly documentId: string;
 	readonly name: string;
 	readonly state: EditorState;
 	readonly view: EditorView;
 	readonly signal: AbortSignal;
-}
+};
 
-export interface EditorBehaviorRegistration {
+export type EditorBehaviorRegistration = {
 	id: string;
 	name: string;
 	priority?: number;
 	views?: readonly string[];
 	create(context: EditorBehaviorContext): Plugin | readonly Plugin[];
-}
+};
 
-export interface EditorRendererContext extends EditorBehaviorContext {
+export type EditorRendererContext = EditorBehaviorContext & {
 	reportError(error: unknown): void;
-}
+};
 
-export interface EditorNodeViewRegistration {
+export type EditorNodeViewRegistration = {
 	id: string;
 	name: string;
 	nodeType: string;
 	views?: readonly string[];
 	create(context: EditorRendererContext): NodeViewConstructor;
-}
+};
 
-export interface EditorMarkViewRegistration {
+export type EditorMarkViewRegistration = {
 	id: string;
 	name: string;
 	markType: string;
 	views?: readonly string[];
 	create(context: EditorRendererContext): MarkViewConstructor;
-}
+};
 
-export interface EditorBehaviorSnapshot {
+export type EditorBehaviorSnapshot = {
 	readonly id: string;
 	readonly name: string;
 	readonly ownerId: string;
@@ -72,29 +72,29 @@ export interface EditorBehaviorSnapshot {
 	readonly views?: readonly string[];
 	readonly status: 'active' | 'failed';
 	readonly error?: string;
-}
+};
 
-export interface EditorTarget {
+export type EditorTarget = {
 	readonly viewId: string;
 	readonly documentId: string;
 	readonly revision: number;
-}
+};
 
-export interface EditorSnapshot extends EditorTarget {
+export type EditorSnapshot = EditorTarget & {
 	readonly name: string;
 	readonly editable: boolean;
-}
+};
 
-export interface WordProcessingSnapshot {
+export type WordProcessingSnapshot = {
 	readonly activeViewId: string | null;
 	readonly views: readonly EditorSnapshot[];
-}
+};
 
 /** Trusted live objects for this synchronous callback only. Do not retain them. */
-export interface EditorContext extends EditorSnapshot {
+export type EditorContext = EditorSnapshot & {
 	readonly state: EditorState;
 	readonly view: EditorView;
-}
+};
 
 export type EditorFailureReason =
 	| 'unavailable'
@@ -107,26 +107,26 @@ export type EditorFailureReason =
 
 export type EditorResult<T> = { ok: true; value: T } | { ok: false; reason: EditorFailureReason };
 
-export interface EditorReadOptions {
+export type EditorReadOptions = {
 	readonly signal?: AbortSignal;
 	readonly requireActive?: boolean;
-}
+};
 
-export interface EditorEditOptions extends EditorReadOptions {
+export type EditorEditOptions = EditorReadOptions & {
 	readonly focus?: boolean;
-}
+};
 
-export interface EditorCommandRegistration {
+export type EditorCommandRegistration = {
 	readonly id: string;
 	readonly name: string;
 	readonly command: Command;
-}
+};
 
-export interface EditorCommandSnapshot {
+export type EditorCommandSnapshot = {
 	readonly id: string;
 	readonly name: string;
 	readonly ownerId: string;
-}
+};
 
 export interface WordProcessingApi {
 	snapshot(): WordProcessingSnapshot;

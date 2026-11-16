@@ -1,7 +1,9 @@
 import { Plugin } from 'prosemirror-state';
 import { createEventBusPlugin } from './plugins/event-bus.plugin';
 
-type CreatePluginFn = (id: string) => Plugin;
+interface CreatePluginFn {
+	(id: string): Plugin;
+}
 
 export class ProseMirrorPluginManager {
 	record = $state<Record<string, CreatePluginFn>>({});

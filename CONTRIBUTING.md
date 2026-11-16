@@ -38,6 +38,33 @@ See [dependency maintenance](docs/dependencies.md) for upgrade commands and outs
 
 These rules apply to JavaScript, TypeScript and Svelte `<script>` blocks.
 
+### Use types for data and interfaces for behavior
+
+Use `type` for struct-like data: records, component props, options, snapshots, event payloads and registration descriptions. A data record can contain callbacks without becoming a behavioral contract. Context objects that group data and service references are also data types.
+
+Use `interface` for behavioral contracts. These describe operations an implementation must provide, such as service methods, lifecycle methods or a callable function signature. A class can use `implements` to declare that it fulfills one of these contracts. An object literal can fulfill the same contract without a class. Behavioral interfaces may include state needed by their operations, such as a task handle's status and cancellation signal.
+
+The following declarations illustrate the convention. They are not application APIs:
+
+```ts
+type DocumentSummary = {
+	id: string;
+	title: string;
+};
+
+interface DocumentReader {
+	read(id: string): DocumentSummary | null;
+}
+
+interface Dispose {
+	(): void;
+}
+```
+
+Use type aliases for unions, tuples, mapped types and aliases of existing types as well. Use intersections to combine data shapes. Preserve method-versus-function-property syntax when refactoring; changing it can change TypeScript's function assignability rules.
+
+Keep interfaces where TypeScript requires declaration merging or module augmentation. For example, adding a property to the browser's global `Window` interface requires another interface declaration. Do not rewrite generated declarations or third-party code to enforce this convention.
+
 ### Keep mutations out of conditions
 
 Do not put assignments, `++` or `--` in an `if`, `while`, `do…while` or `for` condition.

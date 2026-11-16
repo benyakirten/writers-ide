@@ -15,22 +15,22 @@ import SvelteViewHost from './svelte-view-host.svelte';
 /** Attach to one empty, unconditional element with `use:contentDOM`. Never render its children. */
 export type SvelteContentDOM = Action<HTMLElement, undefined>;
 
-export interface SvelteNodeViewProps {
+export type SvelteNodeViewProps = {
 	node: ProseMirrorNode;
 	decorations: readonly Decoration[];
 	innerDecorations: DecorationSource;
 	selected: boolean;
 	getPos: () => number | undefined;
 	contentDOM: SvelteContentDOM;
-}
+};
 
-export interface SvelteMarkViewProps {
+export type SvelteMarkViewProps = {
 	mark: Mark;
 	inline: boolean;
 	contentDOM: SvelteContentDOM;
-}
+};
 
-export interface SvelteViewOptions<Props extends object, Base extends object> {
+export type SvelteViewOptions<Props extends object, Base extends object> = {
 	/** Explicit feature props, including command closures. Adapter-owned props take precedence. */
 	props: Omit<Props, keyof Base>;
 	/** Outer element. Defaults to div for block nodes and span for inline nodes/marks. */
@@ -39,7 +39,7 @@ export interface SvelteViewOptions<Props extends object, Base extends object> {
 	contentDOM?: boolean;
 	/** Pass the registration context's reportError to quarantine managed asynchronous failures. */
 	onError?: (error: unknown) => void;
-}
+};
 
 function createDOM(view: EditorView, tag: keyof HTMLElementTagNameMap, editable: boolean) {
 	const document = view.dom.ownerDocument;

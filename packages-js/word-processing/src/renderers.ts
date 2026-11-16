@@ -3,7 +3,9 @@ import type { Mark, Node as ProseMirrorNode } from 'prosemirror-model';
 import type { MarkView, NodeView } from 'prosemirror-view';
 
 export type RendererType = { kind: 'node' | 'mark'; type: string };
-type Callback = (...args: never[]) => unknown;
+interface Callback {
+	(...args: never[]): unknown;
+}
 
 export function synchronousRendererResult<T>(value: T): T {
 	if (value != null && typeof (value as { then?: unknown }).then === 'function') {
