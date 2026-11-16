@@ -121,6 +121,10 @@ Backend access must remain much more restrictive. Frontend trust must not imply 
 
 **Approved direction, not implemented:** native services will attach private, host-issued activation tokens to requests. Rust will resolve the token's plugin/component identity and grants, validate each operation, and reject invalid or revoked credentials. Tokens identify whose authority is used; they do not prove which JavaScript code initiated a call in the shared frontend environment. See [native request identity](plugins/context.md#native-request-identity-and-token-enforcement) for the lifecycle, manifest direction and remaining design decisions. Logging is deferred.
 
+Part 4 will load frontend packages; executable backend components will be designed later. The package model must leave room for multiple frontend/backend components. Mandatory permissions can be declared per package and/or component. Users acknowledge them per project, with an explicit application-wide approval option. Initial installation is local, updates are manual, and fresh installs include default feature packages. These are approved plans, not current loading or permission guarantees. See [package direction](plugins/context.md#package-loading-updates-and-defaults).
+
+Prebuilt packages and SHA-256 integrity verification are approved direction, not implemented. The host will record accepted digests and verify contents before use without a file-replacement gap. Unexpected changes require an explicit reinstall or update. Hashes detect changes against trusted records; they do not authenticate publishers or establish code safety. Publisher signing remains a separate decision. See [package integrity](plugins/context.md#package-integrity-and-publisher-identity).
+
 No arbitrary native-plugin loading is approved. Frontend plugins currently run in the application's JavaScript environment without isolation.
 
 Project files must not automatically install code, execute plugin requirements or grant permissions. This also matters when receiving data from collaborators.

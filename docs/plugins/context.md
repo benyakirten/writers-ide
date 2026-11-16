@@ -316,7 +316,9 @@ Project-supplied requirements must not automatically install or execute code or 
 
 **Approved direction; not implemented.** Frontend components remain trusted code in the application's JavaScript environment. Native requests must use host-issued credentials and Rust-side permission checks. This identifies whose native authority is used without claiming frontend isolation.
 
-The intended package model allows frontend components, backend components, or both, potentially with multiple components of each kind. Permissions will be declared statically in `manifest.toml`. A declaration requests authority; it does not grant it. Manifest fields, grant approval rules, package-versus-component permission scopes and the backend execution runtime still need design approval. No arbitrary native library or process execution is authorized by this direction.
+The intended package model allows frontend components, backend components, or both, potentially with multiple components of each kind. Part 4 implements frontend loading; executable backend components and their restricted runtime will be designed later. Installation identity and component execution lifetimes are separate.
+
+Permissions are declared statically in `manifest.toml` at package level, component level or both. A declaration requests authority; it does not grant it. All applicable declared permissions are mandatory for activation. Users acknowledge them per project unless they explicitly choose application-wide approval. Updates requesting additional authority need renewed approval. Manifest fields, effective grant composition, persistence and revocation details still need design approval. No arbitrary native library or process execution is authorized by this direction.
 
 The native request flow is:
 
@@ -330,6 +332,24 @@ Frontend wrapping is not the enforcement point. Calling Tauri's original `invoke
 A valid token establishes: **this request used the credential issued to this plugin/component activation**. It does not prove which JavaScript code originally caused the call. Private fields help avoid accidental access; they do not isolate hostile code sharing the same environment. Deliberate delegation can also make the initiator different from the component exercising authority. Backend identity and permission enforcement must be grounded in the selected restricted runtime when backend components are introduced.
 
 Logging design is deferred. This decision concerns native-request attribution and authorization, not interception or logging of every frontend operation. See the [Part 4 implementation and validation requirements](implementation-plan.md#native-request-attribution-and-authorization).
+
+### Package loading, updates and defaults
+
+**Approved direction; not implemented.** Part 4 provides author build tooling and an explicit shared-host dependency set, including controlled sharing of Svelte and identity-sensitive ProseMirror packages. Ordinary private dependencies can be bundled. Exact runtime versions and loading contracts remain open.
+
+Begin with explicit local installation and manual updates. Validate replacements before switching and retain the previous version until acceptance. Preserve saved plugin data unless deletion is explicitly requested. Check compatibility before executing code and report missing dependencies rather than fetching or executing them automatically. Initially allow one active version per package identity, but keep identity and version separate so future multiple-version installation is not unnecessarily blocked.
+
+Fresh installs include default feature packages, with Basic Menu, undo functionality and word-count/data features as intended examples. The exact roster and permission onboarding remain open. This direction does not itself implement unfinished features or select an undo-tree history design. Installation UI must explain package identity, version, components, requested native authority and frontend trust risks.
+
+Normal packages are self-contained and prebuilt. They contain frontend JavaScript, CSS and assets compiled by their authors. Archive format, manifest fields and entry points still need decisions. Optional developer directory loading is still a proposal. See the [Part 4 package decisions](implementation-plan.md#approved-scope-and-package-direction) for approved policies and open details.
+
+### Package integrity and publisher identity
+
+**Approved direction; not implemented.** Use SHA-256 to verify installed package contents against digests accepted at installation and stored in host-managed records. A digest stored only beside plugin files is not a trusted reference. Cover the manifest, executable modules, workers, styles and other assets. Verify before use and prevent contents being replaced between verification and loading. Unexpected changes must block use until an explicit reinstall or update; do not silently regenerate the accepted digest.
+
+This detects changes relative to accepted bytes while the host's records remain trustworthy. It does not authenticate a publisher or prove that code is safe. Replacing both contents and the trusted record defeats the check. Official package digests can be supplied with the application. Unsigned external packages establish their accepted contents at installation.
+
+Publisher signatures and their trusted-key, key-replacement and revocation policies remain separate decisions. Logging is still deferred. See the [integrity implementation and validation requirements](implementation-plan.md#package-integrity-verification).
 
 ## Accepted direction: actions and cooperative execution
 
@@ -402,7 +422,7 @@ The manager lists trusted bundled plugins, metadata, status, capabilities, contr
 
 Ordinary Svelte and the same official/third-party APIs are the accepted direction. Frontend DOM isolation is deferred. Tests must establish real native denial and lifecycle behavior without claiming frontend isolation.
 
-**Approved completion requirement:** by the end of Part 4, Basic Menu must be a separately packaged plugin using the same supported loading mechanism and public APIs as third-party plugins. It is currently bundled in the app source. The owner also approved packaged examples covering toolbar UI, editor behavior, workers and custom rendering. Reuse existing examples where practical; they need not be enabled by default. Package format, build, distribution and default installation policy still need approval. See the [Basic Menu deliverable](implementation-plan.md#required-outcome-separately-packaged-basic-menu) and [example-package requirements](implementation-plan.md#required-outcome-packaged-extension-examples).
+**Approved completion requirement:** by the end of Part 4, Basic Menu must be a separately packaged plugin using the same supported loading mechanism and public APIs as third-party plugins. It is currently bundled in the app source. The owner also approved packaged examples covering toolbar UI, editor behavior, workers and custom rendering. Reuse existing examples where practical; they need not be enabled by default. Frontend build tooling, controlled shared dependencies, local/manual installation and default feature packages are approved direction. Exact package format, dependency versions, distribution details and permission onboarding still need approval. See the [Basic Menu deliverable](implementation-plan.md#required-outcome-separately-packaged-basic-menu) and [example-package requirements](implementation-plan.md#required-outcome-packaged-extension-examples).
 
 External loading should build on the current provider/dependency lifecycle. Custom content still has its own approval gate. The stages do not select storage or history models. An undo-tree feature remains a possible future consumer of host-managed history.
 

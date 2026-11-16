@@ -248,6 +248,50 @@ The paginated fixture uses the production schema, `createView`, and `Paginator`.
 
 **Remaining API and loading designs need approval before implementation.** The goal is to load external plugins without claiming frontend isolation that does not exist. The owner approved token-based native-request identity and Rust-side enforcement, as described below. The owner also approved separate packaging of Basic Menu and example plugins covering toolbar UI, editor behavior, workers and custom rendering by the end of Part 4.
 
+### Approved scope and package direction
+
+Part 4 implements frontend package loading. The manifest model must allow multiple components and leave room for frontend-only, backend-only and mixed packages. Executable backend components and their restricted runtime will be designed later. Do not implement backend execution or select a runtime as part of this phase.
+
+Installation identity is separate from execution identity. Each executing component needs an identifiable lifetime. Independent enablement, startup ordering and sibling failure policies still need decisions. Do not infer those policies from support for multiple components.
+
+### Frontend builds and shared dependencies
+
+Provide build tooling with an explicit set of host-supplied dependencies. Control sharing of Svelte and identity-sensitive ProseMirror packages. Authors may bundle ordinary private dependencies. Exact versions, import resolution and the asset/worker loading protocol still need design approval.
+
+Frontend build output means executable JavaScript, CSS and assets produced from the author's source. Svelte components are compiled before they run in the application. Normal distribution is approved as self-contained and prebuilt; its archive format and entry-point schema are not selected yet. Do not run package installation scripts or compile arbitrary plugin source during normal installation.
+
+Developer directory mode is a separate proposal, not an approved installation mechanism. It would let an author explicitly load a local directory containing the manifest and built output. The author's build tool would rebuild that output during development. Whether the app supports this mode, and whether reload is manual or watched, still needs approval.
+
+### Package integrity verification
+
+**Approved direction; not implemented.** Use SHA-256 digests to identify accepted package contents and detect changes. The host records accepted digests at installation in host-managed records, not solely in files beside the plugin. Verification must cover the manifest, executable modules, workers, styles and other package assets.
+
+Verify installed contents before use. The loading design must prevent a file being replaced between verification and consumption. Do not execute an entry point or load an unchecked worker or asset after only checking the manifest. The exact digest record format, archive/extracted-file coverage and safe-loading mechanism still need design approval.
+
+Reject unexpected changes and require an explicit reinstall or update. Do not silently accept changed files by recomputing their expected digests. Accepted replacement records must follow the update-validation policy and retain the previous version until acceptance.
+
+Hashing establishes that bytes match a trusted expected digest. It does not establish publisher identity or whether code is safe. An attacker who can replace both the package and its host-managed records can defeat this check. Do not describe local integrity records as tamper-proof against compromise of the host itself.
+
+Official packages shipped with the application can have expected digests included in the application's distribution. For unsigned external packages, installation establishes the accepted bytes; it does not authenticate a publisher. Digital signing remains a separate decision covering trusted keys, replacement and revocation. Signatures also do not prove plugin safety.
+
+Validation must cover changed, missing and unexpected package files; modified manifests and workers; replacement of plugin-local digest files; and attempts to swap contents after verification. Verify that integrity failure prevents loading and does not automatically rewrite the accepted record. Optional developer directory mode will need an explicit policy for rebuilt output; it must not silently weaken normal package checks.
+
+### Permissions and acknowledgement
+
+Permissions may be declared at package level, component level or both in `manifest.toml`. All applicable declared permissions are mandatory for activation. Do not activate with only a subset of the required grants.
+
+Users must explicitly acknowledge permissions for each project unless they choose an application-wide grant. Application-wide approval is an explicit alternative, not the default scope. New authority requested by an update requires renewed approval. Prefer resource-scoped native operations to broad filesystem or process authority.
+
+Detailed manifest fields, effective grant composition, project identity, persistence, revocation and acknowledgement UI still need design approval. Declared frontend permissions are not a sandbox for browser activity; keep the trusted-frontend warning explicit.
+
+### Installation, updates, versions and defaults
+
+Start with explicit local package installation and manual updates. Validate a replacement before switching versions and retain the previous version until the replacement is accepted. Preserve plugin-owned saved data on uninstall unless the user explicitly requests its deletion. Automatic updates and a public catalog are later work.
+
+Initially support one active version per package identity. Keep identity and version separate in the design. Do not build unnecessary assumptions that prevent multiple installed versions later; support for that workflow is deferred. Check compatibility before executing code. Report missing dependencies instead of automatically downloading or executing them. Exact compatibility fields, update/restart behavior and rollback UI remain open.
+
+Installation and management must show package identity, version, components, requested native authority and frontend trust risks. Fresh application installations will include default feature packages. Basic Menu, undo functionality, and word-count/data features are intended examples of that default set. This does not make unfinished features implemented or require an undo-tree/history redesign in Part 4. The exact initial roster, enablement defaults and permission onboarding still need refinement. Example test packages need not be enabled by default.
+
 Before external loading:
 
 - Audit Tauri commands and native capabilities reachable from frontend code.
@@ -269,9 +313,9 @@ The host issues a fresh token for each activation and revokes it when that activ
 Before implementing issuance or native services, approve:
 
 - How the host establishes installed package and component identities before issuing credentials.
-- The `manifest.toml` permission fields and approval rules. Declarations are requests, not grants. Decide whether grants belong to packages, components or both.
+- The `manifest.toml` fields and effective grant rules within the approved policy: package and/or component declarations, mandatory grants for activation, per-project acknowledgement and an explicit application-wide option. Declarations are requests, not grants.
 - The narrow native operations and allowed resources. Service method names and file-access contracts are not selected by the token decision.
-- Token issuance and delivery, activation/component binding, revocation and backend execution identity. The package direction allows multiple frontend and backend components; their runtime and lifecycle details remain open.
+- Token issuance and delivery, activation/component binding and revocation. The package model leaves room for multiple frontend and backend components. Backend execution identity and its restricted runtime are deferred to later backend design.
 - Treatment of native work already running when credentials are revoked. Revocation cannot undo completed effects.
 
 Validation must cover missing, invalid and revoked tokens; attempts to supply a different plugin identity; requests beyond approved operation/resource scopes; old services after disable/re-enable; and alternate native entry points. Verify token issuance cannot be used to impersonate a different package or grant new privileges. Test enforcement in packaged Tauri runtimes, not only mocked IPC or browser tests.
@@ -286,7 +330,7 @@ The package must use the supported package-loading mechanism and public APIs ava
 
 Validate the packaged plugin's horizontal and vertical controls, formatting behavior, disable/re-enable cleanup, docking capacity and undo preservation. Use it as a real-feature test of the package-loading system, not only a synthetic fixture.
 
-The outcome is approved, but the package format, build and Svelte dependency handling, distribution location, default installation policy and detailed loading contracts still need design approval. Separate packaging does not require public registry publication. Part 3C's new-content and schema work remains separately gated. Existing-type rendering is implemented.
+Basic Menu is an approved separately packaged deliverable and a default package for fresh installations. Host-controlled shared dependencies and author build tooling are approved direction. The exact package format, runtime versions, distribution location, loading contracts and permission onboarding still need design approval. Separate packaging does not require public registry publication. Part 3C's new-content and schema work remains separately gated. Existing-type rendering is implemented.
 
 ### Required outcome: packaged extension examples
 
@@ -316,5 +360,5 @@ The task/provider policies and current synchronous editor access, provider-owned
 Remaining gates are:
 
 1. **New custom content, Part 3C:** approve new node/mark registration, schema lifecycle, and missing-content preservation. Existing-type rendering does not need a new approval decision.
-2. **External loading, Part 4:** token-based native attribution and Rust-side enforcement are approved direction. Approve the remaining package/loading APIs, permission/grant model, issuance protocol, narrow native operations, and installation/trust disclosures. Verify enforcement before external loading.
+2. **External loading, Part 4:** frontend-only execution for this phase, shared-dependency build tooling, component execution identity, mandatory project-scoped grants with an application-wide option, local/manual installation and updates, one initially active package version, default packages and token enforcement are approved direction. Approve the exact manifest/loading APIs, component lifecycle policies, grant composition/storage, issuance protocol, narrow native operations and installation UI. Prebuilt distribution and SHA-256 verification against host-managed records are approved. Package/digest formats, safe loading without a verification-to-use gap and optional developer directory mode remain to be decided. Publisher signing is a separate future decision. Verify enforcement before external loading.
 3. **Broader work:** separately justify and approve extraction or features beyond the implemented scope. API publication, stability, universal upstream compatibility, and performance targets are not established.
