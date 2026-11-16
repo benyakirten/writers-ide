@@ -190,13 +190,74 @@ The service cannot undo arbitrary side effects, started async bodies, or raw dis
 
 ### 3C — Custom content and Svelte node views
 
-**Proposed; separate owner approval required.** Start with a small custom node rendered by ordinary Svelte. A node view controls how document content appears and behaves inside the editor.
+**Future investigation; separate owner approval required.** The recommendations below are proposals, not approved API contracts or permission to begin implementation.
 
-The prototype should cover mount, update, destruction, selection, events, editable content where needed, serialization, copy/paste, pagination interaction, and missing-plugin preservation.
+#### Rendering existing content versus defining new content
 
-Before arbitrary node/mark registration, approve schema assembly and lifecycle rules. Decide what provider changes mean for open documents and how unsupported content survives. Removing content support is not equivalent to disabling a toolbar.
+ProseMirror's schema defines the document's allowed node and mark types. By default, schema rules also describe how they become DOM elements. A **node view** customizes a node's rendering and interaction inside the editor. A **mark view** customizes the wrapper around marked content. Mark views have a smaller interface; they do not provide the same update and selection hooks as node views.
 
-Keep the prototype focused on one small node so its lifecycle and preservation contracts can be evaluated independently of broader layout and conversion systems.
+There are two separate capabilities to investigate:
+
+1. Render an existing schema type differently, such as adding Svelte controls around an existing image node. This need not change the schema.
+2. Add a new node or mark type, such as a columns container. This requires schema assembly and content-preservation rules as well as rendering.
+
+A custom editor view is not a saved document format. Serialization, copy/paste and export still need model-level representations.
+
+#### Registration and conflict policy
+
+The current [behavior manager](../../packages-js/word-processing/src/behaviors.svelte.ts) rejects `nodeViews` and `markViews`. Removing that check alone would not supply rendering lifecycle or failure handling.
+
+Decide whether rendering belongs in existing behavior registrations or a separate registration API. The recommendation is a separate API because renderers need explicit DOM ownership, component mounting and fallback rules. It could reuse behavior ownership infrastructure. Official and third-party plugins must use the same supported contracts.
+
+Also decide what happens when two plugins register a renderer for the same type. The initial recommendation is to reject conflicts rather than silently select a winner by priority. An intentional renderer-replacement mechanism would need its own approved policy.
+
+For existing schema types, the proposed fallback when a renderer is removed is normal schema rendering. Verify that switching preserves content, selection and editing. These recommendations still need approval.
+
+#### Svelte adapter and DOM ownership
+
+The existing [SvelteNodeView scaffold](../../src/lib/editor/prosemirror/node/SvelteViewNode.svelte.ts) is not a complete adapter. It does not mount a component or implement a full update lifecycle. Its unconditional `ignoreMutation()` result is not a suitable general policy because it can hide edits ProseMirror must observe.
+
+Investigate a reusable adapter that lets authors write ordinary Svelte components. Direct ProseMirror renderer implementations should also be considered within the same public registration contract. Required responsibilities include:
+
+- Create the DOM required by ProseMirror synchronously and mount the component.
+- Supply current node attributes, decorations and selection information where the renderer interface supports them.
+- Keep `contentDOM` stable when used. This is the element where ProseMirror manages editable children. Svelte must not also manage those children.
+- Distinguish component controls from events ProseMirror should handle.
+- Distinguish component DOM mutations from document edits ProseMirror should observe.
+- Unmount components and release resources exactly once.
+
+Node and mark adapters need contracts that reflect their different ProseMirror interfaces. Do not promise node-view hooks on mark views.
+
+#### Ownership, removal and failures
+
+Define behavior for editors opening, closing or changing documents. Cover plugin disable, restart, registration removal and replacement of already-rendered content. Disabling a renderer must not delete document content.
+
+Renderer failures need explicit recovery rules. A constructor can fail before a view exists. A later callback can fail after DOM and component resources have been created. Ordinary editor-hook fallback values do not resolve both cases. Decide how cleanup, fallback rendering and owner-attributed errors work.
+
+#### New content types and schema lifecycle
+
+Before arbitrary node or mark registration, approve:
+
+- How schema definitions are assembled and how type identities are chosen.
+- When schema changes can take effect and what they mean for open documents.
+- How documents identify required content support.
+- How unsupported content survives when its provider is absent.
+- What disabling a content provider means for editing, serialization and recovery.
+
+Removing support for a content type is not equivalent to disabling a toolbar or replacing its renderer. Do not remove unsupported content merely because its plugin is unavailable.
+
+#### Browser and pagination validation
+
+Use real-browser tests for typing, selection, keyboard navigation, composition input, copy/paste and undo/redo. Cover component mount, update and destruction; multiple editor views; disable/re-enable; renderer conflicts; and failure recovery.
+
+Custom rendering can change node dimensions. Verify pagination after document changes and component size changes. The initial work must preserve current model-mutating pagination. Supporting node views does not establish support for arbitrary structures such as multi-column pagination. Those need additional layout design.
+
+#### Recommended investigation sequence
+
+1. Approve registration, conflict, fallback and failure policies.
+2. Prototype rendering for existing schema types with one small Svelte node view and a mark view. Validate lifecycle and editing before expanding the API.
+3. Design new node/mark registration separately. Approve schema lifecycle and missing-content preservation before implementing it.
+4. Evaluate complex content such as columns after those foundations work. Layout and conversion integrations need separate design decisions.
 
 ## Part 4 — External packages and user-facing trust
 
@@ -228,6 +289,6 @@ The task/provider policies and current synchronous editor access, provider-owned
 
 Remaining gates are:
 
-1. **Custom content, Part 3C:** approve schema lifecycle, missing-content preservation, and Svelte node/mark-view contracts.
+1. **Custom content, Part 3C:** first approve renderer registration, conflicts, fallback, failure handling and Svelte node/mark-view contracts. New content types also need approved schema lifecycle and missing-content preservation.
 2. **External loading, Part 4:** approve installation/trust disclosures and a verified restrictive native-enforcement design.
 3. **Broader work:** separately justify and approve extraction or features beyond the implemented scope. API publication, stability, universal upstream compatibility, and performance targets are not established.

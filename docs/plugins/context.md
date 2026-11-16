@@ -454,7 +454,7 @@ The implemented task/provider and editor behavior contracts are approved, not pe
 - Package boundaries beyond current scope, dependency rules, publication, and API stabilization.
 - Lifecycle beyond synchronous API version 1, richer view-instance contracts, user grants, and persisted activation preferences.
 - Domain APIs beyond the current provider system and broader editor assembly extraction.
-- Custom content: schema lifecycle, preservation, and Svelte node/mark views. This is Part 3C and needs owner approval.
+- Custom rendering and content, Part 3C: distinguish renderers for existing schema types from registration of new types. Renderer registration, conflict policy, fallback, failures and Svelte adapters need approval. New types also need schema lifecycle and missing-content preservation. The [Part 3C investigation plan](implementation-plan.md#3c--custom-content-and-svelte-node-views) records the proposals and validation needs; no API choice is approved yet.
 - Task quotas, slow-step diagnostics, responsiveness measurements, and any demonstrated need for worker pooling, progress, or timeouts.
 - External loading, review/network disclosures, restrictive native enforcement, and possible later frontend isolation. External loading is Part 4 and needs owner approval.
 - Broader document/view ownership, schema evolution, persistence, history, collaboration, and retention.

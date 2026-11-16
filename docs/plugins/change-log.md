@@ -281,7 +281,8 @@ The five writing rules are prominent in `AGENTS.md` and `CONTRIBUTING.md`. They 
 The task guide explains who calls `activate(context)`, when activation happens, and how application setup registers a plugin. Its example supplies its own inputs. Current guides describe the supported design without unreleased migration commentary or rejected alternatives. Changelogs retain the history.
 Agent instructions also require owner approval for architecture and API design. Agents must explain unresolved choices and tradeoffs rather than assume an answer. Routine implementation details remain autonomous. Documentation maintenance applies to every affected guide in the same change.
 The project overview describes ProseMirror as the baseline for document modeling and editing behaviors. Commit and branch-status tracking stays in changelogs rather than a dedicated overview section.
-This editorial pass changes no runtime code or contracts.
+The Part 3C plan now separates custom rendering of existing schema types from adding new content types. It records proposed renderer registration, conflict and fallback policies, Svelte adapter responsibilities, lifecycle/failure questions, schema-preservation decisions and browser/pagination validation. These remain future investigation requiring owner approval, not implemented or approved API contracts.
+This documentation work changes no runtime code or contracts.
 
 #### Tests and known limits
 
