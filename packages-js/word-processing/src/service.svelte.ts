@@ -1,4 +1,5 @@
 import { untrack } from 'svelte';
+import { behaviorErrorMessage, createBehaviorManager } from './behaviors.svelte';
 import { Transaction } from 'prosemirror-state';
 import type { Command } from 'prosemirror-state';
 import type { Dispose, PluginApiConnection } from '@writers-ide/plugins';
@@ -56,11 +57,13 @@ export function createWordProcessingService(sources: WordProcessingSources): Wor
 		EditorCommandRegistration & { ownerId: string; connection?: PluginApiConnection }
 	>();
 	const resources = new Set<Dispose>();
+	const behaviors = createBehaviorManager(sources, () => operationDepth > 0 || notifying);
 
 	function read(): WordProcessingSnapshot {
 		if (disposed) {
 			return { activeViewId: null, views: [] };
 		}
+
 		const next = new Map<string, EditorContext>();
 		for (const source of sources.listViews()) {
 			if (source.view.isDestroyed) {
@@ -327,7 +330,7 @@ export function createWordProcessingService(sources: WordProcessingSources): Wor
 			if (!initial.ok) {
 				return initial;
 			}
-			if (editing && (operationDepth > 0 || notifying)) {
+			if (editing && (operationDepth > 0 || notifying || behaviors.isBusy())) {
 				return failure('busy');
 			}
 			operationDepth++;
@@ -461,6 +464,40 @@ export function createWordProcessingService(sources: WordProcessingSources): Wor
 			inspect: (target, callback, options) => operate(target, callback, options, false),
 			edit,
 			runCommand,
+			registerBehavior(registration) {
+				if (status()) {
+					return noop;
+				}
+				return owned(
+					behaviors.register(
+						registration,
+						connection?.consumerId ?? 'writers-ide.word-processing',
+						connection?.signal,
+						connection
+							? (failure) => {
+									const viewId = failure.viewId ? `, view ${failure.viewId}` : '';
+									connection.reportError(
+										new Error(
+											`Behavior ${failure.id} (${failure.phase}${viewId}): ${behaviorErrorMessage(failure.error)}`,
+											{ cause: failure.error },
+										),
+									);
+								}
+							: undefined,
+					),
+					connection,
+				);
+			},
+			behaviors: () => (status() ? [] : behaviors.behaviors()),
+			subscribeBehaviors(listener) {
+				if (status()) {
+					return noop;
+				}
+				return owned(
+					behaviors.subscribe(connection ? connection.guard(listener) : listener),
+					connection,
+				);
+			},
 			registerCommand(registration) {
 				if (status()) {
 					return noop;
@@ -526,6 +563,7 @@ export function createWordProcessingService(sources: WordProcessingSources): Wor
 			if (disposed) {
 				return;
 			}
+			behaviors.assertDisposal();
 			disposed = true;
 			listeners.clear();
 			current.clear();
@@ -537,6 +575,11 @@ export function createWordProcessingService(sources: WordProcessingSources): Wor
 				} catch (error) {
 					errors.push(error);
 				}
+			}
+			try {
+				behaviors.dispose();
+			} catch (error) {
+				errors.push(error);
 			}
 			try {
 				stopIfUnused();

@@ -35,6 +35,8 @@ export interface PluginApiConnection {
 	readonly consumerId: string;
 	readonly signal: AbortSignal;
 	readonly own: (dispose: Dispose) => Dispose;
+	/** Attribute a provider-mediated failure to this consumer; ignored after revocation. */
+	reportError(error: unknown): void;
 	/** Late callbacks are ignored after either endpoint is revoked. */
 	guard<Args extends unknown[], Result>(
 		callback: (...args: Args) => Result,

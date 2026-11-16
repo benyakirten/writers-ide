@@ -1,6 +1,6 @@
-# Word processing (Part 3A)
+# Word processing (Parts 3A–3B)
 
-Private, source-exported `@writers-ide/word-processing` supplies a standalone live-editor service and connection-scoped provider facades. It imports no application singleton and does not create, configure, intercept or destroy editors. The application supplies sources and owns the existing ProseMirror dispatch pipeline, schema, history and model-mutating pagination.
+Private, source-exported `@writers-ide/word-processing` supplies a standalone live-editor service and connection-scoped provider facades. It imports no application singleton and does not create, intercept dispatch for, or destroy editors. Part 3B reconfigures existing editor states to install lifecycle-owned behaviors. The application supplies sources and owns the existing ProseMirror dispatch pipeline, schema, history and model-mutating pagination.
 
 ## Provider wiring
 
@@ -40,11 +40,12 @@ This package does not register the provider or migrate formatting. Those are app
 
 ## Sources and observations
 
-`WordProcessingSources` contains exactly:
+`WordProcessingSources` contains:
 
 - `listViews(): readonly { viewId, documentId, name, view: EditorView }[]`
 - `activeViewId(): string | null | undefined`
 - `subscribe(listener: () => void): Dispose`
+- Optional `reportBehaviorError({ ownerId, id, viewId?, phase, error }): void` for application-owned error reporting.
 
 View IDs must be unique. Document identity is separate: two views may refer to the same document without synchronizing their states. Destroyed views are excluded. Closure/removal must be observable through the sources. A service cannot detect a removal and readdition that happens entirely between reads without any source notification.
 
@@ -179,4 +180,56 @@ Operations return `{ ok: true, value }` or `{ ok: false, reason }`:
 | `unknown-command` | No live registration for the requested ID.                             |
 | `busy`            | Nested editing or editing during notification.                         |
 
-Thrown callback/contract errors are not converted to task failures. `service.dispose()` revokes resources, clears listeners/commands, releases source/effect subscriptions and is idempotent; cleanup continues across errors and aggregates failures. Afterwards snapshots/command lists are empty, new registrations/subscriptions return harmless disposers, and editor operations return unavailable (or revoked for an aborted connection). The service never destroys source-owned views. No API reconfiguration, schema registration, task framework, security isolation, or application root registration is included.
+Thrown callback/contract errors are not converted to task failures. `service.dispose()` revokes resources, clears listeners/commands, releases source/effect subscriptions and is idempotent; cleanup continues across errors and aggregates failures. Afterwards snapshots/command lists are empty, new registrations/subscriptions return harmless disposers, and editor operations return unavailable (or revoked for an aborted connection). The service never destroys source-owned views. No schema registration, task framework, security isolation, or application root registration is included.
+
+## Part 3B: lifecycle-owned editor behaviors
+
+A consumer can wrap an actual upstream ProseMirror `Plugin` through the same connection API used for commands:
+
+```ts
+import { Plugin } from 'prosemirror-state';
+
+const remove = editor.registerBehavior({
+	id: 'my-plugin.typing',
+	name: 'Typing assistance',
+	priority: 10,
+	// Optional explicit view-ID allowlist; omitted means all live views.
+	// views: ['manuscript-view'],
+	create({ viewId, documentId, name, state, view, signal }) {
+		// Called once per matching live view identity, not per transaction.
+		// Return an actual upstream Plugin or a readonly Plugin array.
+		return new Plugin({
+			props: {
+				handleKeyDown(view, event) {
+					return false;
+				},
+			},
+		});
+	},
+});
+
+const stopObserving = editor.subscribeBehaviors((registrations) => {
+	// Immediate frozen metadata, then registry/failure updates (not editor edits).
+	// { id, name, ownerId, priority, views?, status: 'active' | 'failed', error? }
+});
+const diagnostics = editor.behaviors();
+// Optional early cleanup; connection revocation also owns both resources.
+stopObserving();
+remove();
+```
+
+Registration IDs are service-global; duplicates throw. Priority defaults to zero, sorts descending, and ties preserve registration order. Managed plugins run **before** the actual current baseline plugins, allowing key handlers to override baseline handlers. Baseline identities/order are preserved, including foreign plugins added after registration. Duplicate plugin keys (within a factory result, against another behavior, or against the baseline) fail the newcomer rather than replace existing keys. `nodeViews`/`markViews` are rejected: custom content and schema lifecycle remain Part 3C.
+
+Factories are synchronous and per live view/document identity. Each receives a separate abort signal tied to view closure/detach/replacement, registration removal/failure, connection revocation, and service disposal. Sources remain observed through a dedicated source subscription and Svelte tracking effect while registrations exist, even without ordinary snapshot subscribers. Notifications must make closures/replacements observable. Source-driven reconciliation (including reactive-only changes) is deferred to a microtask, so notifications raised inside baseline or managed ProseMirror hooks cannot reconfigure a view on that hook's stack. Service reads observe live state but do not flush pending reconfiguration. No document scan/copy or view recreation is used.
+
+Installation uses `EditorState.reconfigure` with the **existing schema instance**. Document, selection, stored marks, history, and surviving keyed plugin state remain intact. Reconfiguration changes the service revision, but dispatches no transaction and creates no undo entry. ProseMirror can destroy/recreate plugin-view resources when the plugin list changes; a surviving behavior's factory, wrapped Plugin identity, signal and keyed state remain stable, but its plugin-view `view()` resource is not promised to survive such changes.
+
+Wrappers inherit from the actual Plugin, not a newly constructed Plugin: generated keys, `instanceof Plugin`, original `getState(state)` and `transaction.setMeta(originalPlugin, value)` identity work even for an **unkeyed** upstream plugin (such as input rules). Callback receivers preserve the upstream Plugin/state-field/plugin-view resource semantics. Package compatibility still depends on the existing document schema and the upstream package's assumptions; this is not universal compatibility.
+
+Factory/key/state-init validation is staged across all current matching views before installing candidate states. Stages are discarded and rebuilt if factories, state initialization, or plugin-view setup change source identity, lifecycle, or another view's input state. Dispatches from plugin-view setup/update are retained rather than overwritten by an older stage. A reconciliation drain is capped at 16 passes; failure to stabilize quarantines all still-active registrations rather than hanging the editor. This conservative fallback cannot identify which trusted callback caused arbitrary source mutations. Failures leave a removable `failed` diagnostic and abort all instances of that registration. Runtime callback errors or thenables quarantine the whole registration immediately; physical removal is deferred out of executing hooks. A failing filter rejects that transaction, append returns null, decorations return null, event handlers return false, and state apply preserves its previous value until removal. Plugin-view update/destroy failures are attributed and contained, and remaining managed cleanup is still attempted. Failures are reported through the owning consumer's connection `reportError`, with behavior ID, phase, optional view ID, and a meaningful thrown-value description. The generic host authenticates the connection's exact consumer activation and ignores reports after revocation; cleanup can still notify the optional source observer. Optional `sources.reportBehaviorError` independently receives owner/registration/view/phase attribution. Each reporter is independently caught, so one failing reporter does not suppress the other. Standalone services with neither reporter log failures to `console.error` instead of silently dropping them; diagnostic observer errors are also isolated. String/slice transforms fall back to their unchanged input, editable to true, attributes to an empty object, clipboard text serialization to plain text, and nullable handlers to their ProseMirror default/no-op path. Invalid known hook return types and thenables also quarantine the behavior; arbitrary plugin state values remain allowed.
+
+Do not register inside synchronous editor callbacks, behavior hooks or notifications: lifecycle registration throws; explicitly defer it until after execution returns. Removal/revocation immediately disables callbacks. Signal-driven revocation always defers physical removal, including cancellation from baseline hooks; explicit removal defers while managed hooks or service operations are executing. Registration signal listeners are detached on removal and service disposal, even when every source view has already been destroyed. Public diagnostic notifications disallow synchronous subscription/registration/removal lifecycle mutation; observer exceptions are logged without stopping peers. Explicit registration/removal outside callbacks is synchronous.
+
+**Limits:** trusted same-environment integration is not security isolation. The manager cannot preempt arbitrary callback code or an infinite append-transaction loop, undo side effects of an already-started async body, or roll back arbitrary factory/plugin-view DOM effects. Staged state-init rollback does not undo arbitrary external effects of init callbacks. Do not dispatch raw views or mutate source-owned editor internals behind the API. The application adapter must account for appended transactions in its own transaction invalidation pipeline; this standalone package neither replaces that pipeline nor redesigns pagination.
+
+An optional source-level `prepareTransaction(transaction)` hook prepares managed appended transactions synchronously before ProseMirror applies them. This is host model-invariant plumbing, not a plugin permission: the app adapter uses it to normalize page indexes and preserve incoming stored marks just as it does for root transactions. The returned transaction must still start from the supplied current state's document; malformed/thenable results quarantine the behavior. The app dispatch pipeline uses `applyTransaction` and emits pre-DOM invalidation for every accepted root/appended transaction, none for a filtered root.

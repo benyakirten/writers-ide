@@ -25,6 +25,7 @@
 	} from '$lib/editor/prosemirror/menu/quick-format/menu';
 	import PluginPresentation from '$lib/plugins/PluginPresentation.svelte';
 	import { PluginHost } from '$lib/plugins/plugin-host';
+	import BehaviorFixture from './BehaviorFixture.svelte';
 
 	const schema = new Schema({
 		nodes: {
@@ -36,6 +37,37 @@
 	});
 	let firstMount: HTMLDivElement;
 	let secondMount: HTMLDivElement;
+	let laterMount: HTMLDivElement;
+	let behaviorProofs = $state(false);
+	function createLaterView(): void {
+		if (entries.some((entry) => entry.viewId === 'view-later')) {
+			return;
+		}
+		const view = new EditorView(laterMount, {
+			state: EditorState.create({
+				schema,
+				doc: schema.node('doc', null, [schema.node('paragraph', null, schema.text('later view'))]),
+				plugins: [history()],
+			}),
+			attributes: { role: 'textbox', 'aria-label': 'Later editor' },
+			dispatchTransaction(transaction) {
+				view.updateState(view.state.apply(transaction));
+				notify();
+			},
+			handleDOMEvents: {
+				focus() {
+					activeViewId = 'view-later';
+					notify();
+					return false;
+				},
+			},
+		});
+		entries = [
+			...entries,
+			{ viewId: 'view-later', documentId: 'later-document', name: 'Later view', view },
+		];
+		notify();
+	}
 	let entries: ReturnType<WordProcessingSources['listViews']> = [];
 	let activeViewId: string | null = 'view-a';
 	const listeners = new Set<() => void>();
@@ -343,6 +375,15 @@
 	>
 	<div bind:this={firstMount}></div>
 	<div bind:this={secondMount}></div>
+	<button
+		onclick={() => {
+			behaviorProofs = true;
+		}}>Mount behavior proofs</button
+	>
+	{#if behaviorProofs}
+		<BehaviorFixture {host} createView={createLaterView} />
+	{/if}
+	<div bind:this={laterMount}></div>
 	<section aria-label="Editor controls">
 		<button onclick={selectAll}>Select active text</button>
 		<button onclick={caretAtEnd}>Caret at end</button>

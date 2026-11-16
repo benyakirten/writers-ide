@@ -91,6 +91,7 @@ function connection(id = 'consumer') {
 	const controller = new AbortController();
 	const owned = new Set<() => void>();
 	const conn: PluginApiConnection = {
+		reportError: vi.fn(),
 		consumerId: id,
 		signal: controller.signal,
 		own(dispose) {

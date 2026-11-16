@@ -999,3 +999,37 @@ describe('plugin contract validation', () => {
 		expect(host.activate('duplicate').errors[0].message).toContain('Duplicate API');
 	});
 });
+
+describe('authenticated connection error reporting', () => {
+	it.each(['consumer', 'provider'] as const)(
+		'attributes failures only to the connected consumer and ignores reports after %s revocation',
+		(endpoint) => {
+			const { host, consumer, provider, contexts } = setup();
+			let connection!: PluginApiConnection;
+			provider('provider', (value) => {
+				connection = value;
+				return { read: () => 'ok' };
+			});
+			consumer('consumer', [dependency('provider', true)]);
+			host.activate('provider');
+			host.activate('consumer');
+			contexts.get('consumer')!.apis.get('provider', valueApi);
+			const old = connection;
+			old.reportError(new Error('Behavior failed'));
+			expect(host.get('consumer')).toMatchObject({
+				status: 'active',
+				errors: [{ phase: 'provider', message: 'Behavior failed' }],
+			});
+			expect(host.get('provider')!.errors).toEqual([]);
+			host.deactivate(endpoint);
+			host.activate(endpoint);
+			contexts.get('consumer')!.apis.get('provider', valueApi);
+			const before = host.get('consumer')!.errors;
+			old.reportError(new Error('Late failure'));
+			expect(host.get('consumer')!.errors).toEqual(before);
+			expect(connection).not.toBe(old);
+			connection.reportError(new Error('Fresh failure'));
+			expect(host.get('consumer')!.errors.at(-1)?.message).toBe('Fresh failure');
+		},
+	);
+});

@@ -7,6 +7,7 @@ import {
 	type WordProcessingSources,
 } from '@writers-ide/word-processing';
 import Editors from './prose-mirror-editor.svelte';
+import { normalizePageIndexes } from './view/page-indexes';
 import TabState from '../state/tab-state.svelte';
 import eventBus, { ProseMirrorEventBusEventType } from '../state/event-bus.svelte';
 
@@ -44,7 +45,11 @@ export function createWordProcessingPlugin(
 			provides: [wordProcessingApi],
 		},
 		activate(context) {
-			const service = createWordProcessingService(sources);
+			const service = createWordProcessingService({
+				...sources,
+				prepareTransaction: (transaction) =>
+					normalizePageIndexes(sources.prepareTransaction?.(transaction) ?? transaction),
+			});
 			context.own(() => service.dispose());
 			context.apis.provide(wordProcessingApi, (connection) =>
 				createWordProcessingConnection(service, connection),

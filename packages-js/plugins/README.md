@@ -156,11 +156,13 @@ Only declared dependencies can be read/subscribed. Availability listeners cannot
 
 ### Connection lifetimes and subscriptions
 
-Each provider factory receives an authenticated `consumerId`, a connection `signal`, `own(dispose)`, and `guard(callback)`. A connection is cached per consumer activation and provider API activation. Factories return a plain or null-prototype **method-only object**: no mutable fields, accessors, symbol methods, class instances, `then` methods, or asynchronous factories. Methods can return snapshots or promises; the facade factory itself is synchronous.
+Each provider factory receives an authenticated `consumerId`, a connection `signal`, `own(dispose)`, `guard(callback)`, and `reportError(error)`. A connection is cached per consumer activation and provider API activation. Factories return a plain or null-prototype **method-only object**: no mutable fields, accessors, symbol methods, class instances, `then` methods, or asynchronous factories. Methods can return snapshots or promises; the facade factory itself is synchronous.
 
 The host wraps top-level methods. Retained methods reject after either endpoint stops and never revive on reactivation. Already-running synchronous calls may finish; async continuations must honor the connection signal. Returned objects/functions are **not recursively wrapped or revoked**, so provider authors must avoid leaking unscoped live authority.
 
 For a subscription method, wrap its callback with `connection.guard(listener)` and register its disposer with `connection.own(dispose)`. The guard suppresses late callbacks after revocation and returns `undefined` then; it does not catch listener exceptions or cancel already-running work. Ownership handles remain idempotently callable after revocation and automatically release when either endpoint stops. Register cleanup before delivering an initial event, releasing it if initial delivery throws. Factory failure also rolls back connection-owned resources. Cleanup failures are reported without preventing remaining cleanup.
+
+A provider can call `connection.reportError(error)` to attribute a mediated failure to that connected consumer. The host records it as a provider-phase error without disabling the plugin. Reporting is bound to the exact connection/activation; retained reporting functions become no-ops after either endpoint is revoked and cannot report against a new activation or another plugin ID.
 
 Factory/subscription/cleanup failure reporting is not a security boundary: arbitrary trusted frontend code can still import private code or modify shared objects outside these supported contracts.
 
@@ -177,9 +179,11 @@ Declare a required dependency on `WORD_PROCESSING_PLUGIN_ID` and `wordProcessing
 | Publish an editor command                    | `registerCommand`, `commands`, `executeCommand` | Connection-owned registration and discoverable metadata, independent of the default toolbar.                                                   |
 | Apply asynchronous/worker results            | `applyResult`                                   | Revalidates the exact captured target before synchronous transaction construction; stale results are rejected rather than silently retargeted. |
 
+`registerBehavior`, `behaviors`, and `subscribeBehaviors` additionally install and observe lifecycle-owned ProseMirror behavior factories. They support existing-schema input rules, decorations, plugin state, synchronous transaction hooks and editor event handlers. Per-view reconfiguration preserves the existing document, selection, history and surviving plugin state; priorities order managed plugins before protected baseline plugins. Failed registrations are quarantined and reported to their owning consumer. See the [input-rule, decoration and worker examples](../../src/lib/editor/prosemirror/behaviors/README.md).
+
 The [word-processing guide](../word-processing/README.md) explains signatures, failure results, lifecycle and limitations. The [Quick Format example](../../src/lib/editor/prosemirror/menu/quick-format/menu.ts) uses only this provider and an upstream command, without the default formatting plugin. It is an opt-in example, not registered or placed by the application route.
 
-Live callback objects are trusted access, not a sandbox. Do not retain mutable transactions across `await` or cooperative yields, or directly dispatch through a retained view. Arbitrary ProseMirror plugin registration, dynamic schemas and Svelte node-view APIs are still later work; this API does not reconfigure the editor or redesign pagination.
+Live callback objects are trusted access, not a sandbox. Do not retain mutable transactions across `await` or cooperative yields, or directly dispatch through a retained view. Behavior registration reconfigures the existing editor state, not the schema or editor instance. Dynamic schemas and Svelte node/mark-view registration are still later work; this does not redesign pagination or provide a security sandbox.
 
 ## Run managed work without managing a scheduler
 

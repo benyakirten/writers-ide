@@ -819,6 +819,11 @@ export class PluginHost<Presentation> implements PluginManagementService {
 					consumerId: consumerEntry.plugin.manifest.id,
 					signal: controller.signal,
 					own,
+					reportError: (error: unknown) => {
+						if (live() && consumerEntry.activation === consumer) {
+							this.#error(consumerEntry, 'provider', error);
+						}
+					},
 					guard: <Args extends unknown[], Result>(callback: (...args: Args) => Result) => {
 						return function (this: unknown, ...args: Args): Result | undefined {
 							if (live()) {

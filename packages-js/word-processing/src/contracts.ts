@@ -1,5 +1,5 @@
 import type { Dispose } from '@writers-ide/plugins';
-import type { Command, EditorState, Transaction } from 'prosemirror-state';
+import type { Command, EditorState, Plugin, Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
 export type { Dispose } from '@writers-ide/plugins';
@@ -13,6 +13,44 @@ export interface WordProcessingSources {
 	}[];
 	activeViewId(): string | null | undefined;
 	subscribe(listener: () => void): Dispose;
+	reportBehaviorError?(failure: EditorBehaviorFailure): void;
+	/** Prepare managed appended transactions for host model invariants before application. Must be synchronous. */
+	prepareTransaction?(transaction: Transaction): Transaction;
+}
+
+export interface EditorBehaviorFailure {
+	ownerId: string;
+	id: string;
+	viewId?: string;
+	phase: string;
+	error: unknown;
+}
+
+export interface EditorBehaviorContext {
+	readonly viewId: string;
+	readonly documentId: string;
+	readonly name: string;
+	readonly state: EditorState;
+	readonly view: EditorView;
+	readonly signal: AbortSignal;
+}
+
+export interface EditorBehaviorRegistration {
+	id: string;
+	name: string;
+	priority?: number;
+	views?: readonly string[];
+	create(context: EditorBehaviorContext): Plugin | readonly Plugin[];
+}
+
+export interface EditorBehaviorSnapshot {
+	readonly id: string;
+	readonly name: string;
+	readonly ownerId: string;
+	readonly priority: number;
+	readonly views?: readonly string[];
+	readonly status: 'active' | 'failed';
+	readonly error?: string;
 }
 
 export interface EditorTarget {
@@ -87,6 +125,9 @@ export interface WordProcessingApi {
 		command: Command,
 		options?: EditorEditOptions,
 	): EditorResult<boolean>;
+	registerBehavior(registration: EditorBehaviorRegistration): Dispose;
+	behaviors(): readonly EditorBehaviorSnapshot[];
+	subscribeBehaviors(listener: (snapshot: readonly EditorBehaviorSnapshot[]) => void): Dispose;
 	registerCommand(registration: EditorCommandRegistration): Dispose;
 	executeCommand(
 		target: EditorTarget,
