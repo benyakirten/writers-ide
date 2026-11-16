@@ -261,7 +261,7 @@ Custom rendering can change node dimensions. Verify pagination after document ch
 
 ## Part 4 — External packages and user-facing trust
 
-**Proposed; separate owner approval required.** The goal is to load external plugins without claiming frontend isolation that does not exist.
+**Design approval required before implementation.** The goal is to load external plugins without claiming frontend isolation that does not exist. The owner has approved one required outcome: Basic Menu must be a separately packaged plugin by the end of Part 4.
 
 Before external loading:
 
@@ -274,6 +274,16 @@ Before external loading:
 - Prevent project data and plugin requirements from automatically installing or executing extensions.
 
 Frontend DOM isolation remains deferred. If a claimed native restriction cannot be enforced, resolve it before external loading. A manifest checkbox is not a substitute.
+
+### Required outcome: separately packaged Basic Menu
+
+Basic Menu is currently a bundled application plugin under `src/lib/editor/prosemirror/menu/basic/`. By the end of Part 4, its feature implementation must live in a separate plugin package. A separate directory or an app-specific activation wrapper alone does not satisfy this requirement.
+
+The package must use the supported package-loading mechanism and public APIs available to third-party plugins. It must not depend on private application imports or privileged formatting hooks. The word-processing provider remains its declared editor API dependency. Shared controls can come from reusable libraries.
+
+Validate the packaged plugin's horizontal and vertical controls, formatting behavior, disable/re-enable cleanup, docking capacity and undo preservation. Use it as a real-feature test of the package-loading system, not only a synthetic fixture.
+
+The outcome is approved, but the package format, build and Svelte dependency handling, distribution location, default installation policy and detailed loading contracts still need design approval. Separate packaging does not require public registry publication. Part 3C's schema and rendering proposals remain separately gated.
 
 ## Validation and documentation
 

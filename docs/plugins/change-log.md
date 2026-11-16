@@ -282,6 +282,7 @@ The task guide explains who calls `activate(context)`, when activation happens, 
 Agent instructions also require owner approval for architecture and API design. Agents must explain unresolved choices and tradeoffs rather than assume an answer. Routine implementation details remain autonomous. Documentation maintenance applies to every affected guide in the same change.
 The project overview describes ProseMirror as the baseline for document modeling and editing behaviors. Commit and branch-status tracking stays in changelogs rather than a dedicated overview section.
 The Part 3C plan now separates custom rendering of existing schema types from adding new content types. It records proposed renderer registration, conflict and fallback policies, Svelte adapter responsibilities, lifecycle/failure questions, schema-preservation decisions and browser/pagination validation. These remain future investigation requiring owner approval, not implemented or approved API contracts.
+The owner approved separately packaging Basic Menu as a required outcome by the end of Part 4. The plan requires the same supported loading mechanism and public APIs as third-party plugins, plus real-feature regression coverage. Package format, build, distribution and default installation policy remain open; this approval does not settle those designs. Current context and the Basic Menu guide link to that deliverable.
 This documentation work changes no runtime code or contracts.
 
 #### Tests and known limits

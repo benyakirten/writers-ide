@@ -12,6 +12,8 @@ hosting, controls, and layout mechanics. This feature owns formatting behavior.
 See the [general plugin guide](../../../../../../packages-js/plugins/README.md)
 for contribution and lifecycle basics.
 
+**Approved future work:** by the end of Part 4, Basic Menu must become a separate plugin package. It must use the same supported loading mechanism and public APIs as third-party plugins. Packaging is not implemented yet. See the [Part 4 deliverable](../../../../../../docs/plugins/implementation-plan.md#required-outcome-separately-packaged-basic-menu) for requirements and open design decisions.
+
 ## Composition and ownership
 
 ### Provider dependency

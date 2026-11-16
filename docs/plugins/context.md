@@ -355,6 +355,8 @@ The manager lists trusted bundled plugins, metadata, status, capabilities, contr
 
 Ordinary Svelte and the same official/third-party APIs are the accepted direction. Frontend DOM isolation is deferred. Tests must establish real native denial and lifecycle behavior without claiming frontend isolation.
 
+**Approved completion requirement:** by the end of Part 4, Basic Menu must be a separately packaged plugin using the same supported loading mechanism and public APIs as third-party plugins. It is currently bundled in the app source. Package format, build, distribution and default installation policy still need approval. See the [packaging deliverable](implementation-plan.md#required-outcome-separately-packaged-basic-menu).
+
 External loading should build on the current provider/dependency lifecycle. Custom content still has its own approval gate. The stages do not select storage or history models. An undo-tree feature remains a possible future consumer of host-managed history.
 
 ## Examples and candidate boundaries
