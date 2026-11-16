@@ -279,6 +279,8 @@ The package guides, feature guides, architecture pages and roadmap have also bee
 They now introduce terms before using them and separate current behavior from future work.
 The five writing rules are prominent in `AGENTS.md` and `CONTRIBUTING.md`. They require simple sentences, clarity, little assumed context, explicit API usage context, and removal of discarded designs from current guides.
 The task guide explains who calls `activate(context)`, when activation happens, and how application setup registers a plugin. Its example supplies its own inputs. Current guides describe the supported design without unreleased migration commentary or rejected alternatives. Changelogs retain the history.
+Agent instructions also require owner approval for architecture and API design. Agents must explain unresolved choices and tradeoffs rather than assume an answer. Routine implementation details remain autonomous. Documentation maintenance applies to every affected guide in the same change.
+The project overview describes ProseMirror as the baseline for document modeling and editing behaviors. Commit and branch-status tracking stays in changelogs rather than a dedicated overview section.
 This editorial pass changes no runtime code or contracts.
 
 #### Tests and known limits

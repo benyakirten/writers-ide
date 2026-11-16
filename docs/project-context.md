@@ -66,7 +66,7 @@ The technology choices are settled:
 
 - **Tauri** provides the desktop application and system integration.
 - **Svelte 5** provides the user interface.
-- **ProseMirror** provides the rich-text document model and editing behavior.
+- **ProseMirror** provides the baseline rich-text document model and editing behaviors. The word-processing layer and plugins build on that baseline.
 - **Rust** provides backend functionality.
 
 Old exploratory issues do not reopen these choices.
@@ -76,14 +76,6 @@ The macOS minimum is **13.3 Ventura**. Tauri's configuration enforces this requi
 Keep the application core small. It provides shared workspace, translation, import/export and plugin-hosting infrastructure. The accepted direction is to implement word processing and feature interfaces as plugins. Official and third-party features must use the same public extension APIs.
 
 Reusable code should live in cohesive packages. Do not create a package for every small helper. Package publication and broader extraction still need decisions.
-
-### Current branch status
-
-The last verified merged baseline is [#80](https://github.com/benyakirten/writers-ide/pull/80), merged on 2026-11-14. Its merge commit is `4b39895c5218498fd1c0e79c99b1ea8012f1b67a`.
-
-The `bh/phase-2-plugin-transition` branch contains further implementation. It includes reusable libraries, the plugin manager, managed tasks, provider APIs, synchronous editor access and editor behaviors. These correspond to Parts 1–2 and 3A–3B of the [implementation plan](plugins/implementation-plan.md).
-
-This work is recorded as unmerged. No PR identity or merge date has been verified. Custom content and schema changes (Part 3C) still need approval. External plugin loading and native restrictions (Part 4) also need approval and implementation.
 
 ## Project and content model
 

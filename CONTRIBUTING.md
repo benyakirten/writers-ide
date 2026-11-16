@@ -140,6 +140,10 @@ Separate current behavior, approved plans and open decisions. Put detailed histo
 
 Keep examples accurate and supply their prerequisites. Link to exact sections rather than asking the reader to search another guide.
 
+**Keep all documentation up to date.** Review documentation whenever behavior, APIs, examples, setup or plans change. Update every affected guide in the same change, including related references. Do not defer known stale instructions to a later cleanup. Preserve historical changelogs as records of their time; keep current guidance accurate separately.
+
+Keep commit IDs, branch status and merge metadata in changelogs rather than general overviews. General guides should explain the current system without requiring an edit for every commit or merge.
+
 ## Validation
 
 Start with tests for the changed behavior. Then run broader checks as needed:
