@@ -264,9 +264,13 @@ Developer directory mode is a separate proposal, not an approved installation me
 
 ### Package integrity verification
 
-**Approved direction; not implemented.** Use SHA-256 digests to identify accepted package contents and detect changes. The host records accepted digests at installation in host-managed records, not solely in files beside the plugin. Verification must cover the manifest, executable modules, workers, styles and other package assets.
+**Internal Rust foundation implemented; installer and loader integration remain open.** The owner approved per-file records, verified-byte consumption and rejection of symlinks/special files as the first slice. The implementation is in [plugin_integrity](../../src-tauri/src/plugin_integrity/mod.rs). It adds no Tauri commands and enables no external code.
 
-Verify installed contents before use. The loading design must prevent a file being replaced between verification and consumption. Do not execute an entry point or load an unchecked worker or asset after only checking the manifest. The exact digest record format, archive/extracted-file coverage and safe-loading mechanism still need design approval.
+`create_record` inspects a host-selected directory and returns a candidate record. `IntegrityRecord::from_json` parses a supplied host record. `verify_package` compares the directory against that record and returns an immutable `VerifiedPackage` containing the exact checked bytes. These internal functions do not persist or accept records. The future installer must store explicitly accepted records outside package directories.
+
+Record version 1 is a JSON object with `format_version: 1` and a `files` map. Each portable relative path maps to `byte_length` and a lowercase hexadecimal SHA-256 digest. Duplicate paths/fields, unknown fields, malformed digests and unsupported versions are rejected. All files are included regardless of extension, including manifest, executable modules, workers, styles and other assets. This record format does not select the plugin manifest schema or archive format.
+
+Verify installed contents before use. The loading design must prevent a file being replaced between verification and consumption. Do not execute an entry point or load an unchecked worker or asset after only checking the manifest. The per-file record format and owned-byte result are implemented. Archive handling, accepted-record storage and delivery of verified resources to the browser still need design approval and integration. A later loader must consume `VerifiedPackage` bytes rather than reopening filesystem paths.
 
 Reject unexpected changes and require an explicit reinstall or update. Do not silently accept changed files by recomputing their expected digests. Accepted replacement records must follow the update-validation policy and retain the previous version until acceptance.
 
@@ -274,7 +278,13 @@ Hashing establishes that bytes match a trusted expected digest. It does not esta
 
 Official packages shipped with the application can have expected digests included in the application's distribution. For unsigned external packages, installation establishes the accepted bytes; it does not authenticate a publisher. Digital signing remains a separate decision covering trusted keys, replacement and revocation. Signatures also do not prove plugin safety.
 
-Validation must cover changed, missing and unexpected package files; modified manifests and workers; replacement of plugin-local digest files; and attempts to swap contents after verification. Verify that integrity failure prevents loading and does not automatically rewrite the accepted record. Optional developer directory mode will need an explicit policy for rebuilt output; it must not silently weaken normal package checks.
+The directory reader uses capability-based no-follow opens and checks opened file types. It rejects root/descendant symlinks, Windows reparse points, special files, invalid UTF-8 names and nonportable paths. The host must supply a trusted root and ancestors. Collection is not an atomic directory snapshot; verification checks every returned buffer against the trusted record. Empty directories are validated and bounded but do not have file digests.
+
+Default limits are 2,048 files, 16 MiB per file, 64 MiB total file bytes, 1,024 bytes per path and 16 path components. Directory enumeration has a separate derived budget. Callers can supply stricter limits. Inspection and verification are synchronous and bounded, not automatically offloaded from a caller's thread.
+
+Tests cover changed/missing/unexpected files, manifest/worker/assets, plugin-local digest replacement, malformed records, limits, symlink/path-swap handling and immutable bytes after source replacement or deletion. Verification returns no partial package and never rewrites a trusted record. The macOS Rust suite passes; native Windows/Linux validation remains required before integration. This does not establish packaged Tauri enforcement or safe external loading yet.
+
+Optional developer directory mode will need an explicit policy for rebuilt output; it must not silently weaken normal package checks.
 
 ### Permissions and acknowledgement
 
@@ -360,5 +370,5 @@ The task/provider policies and current synchronous editor access, provider-owned
 Remaining gates are:
 
 1. **New custom content, Part 3C:** approve new node/mark registration, schema lifecycle, and missing-content preservation. Existing-type rendering does not need a new approval decision.
-2. **External loading, Part 4:** frontend-only execution for this phase, shared-dependency build tooling, component execution identity, mandatory project-scoped grants with an application-wide option, local/manual installation and updates, one initially active package version, default packages and token enforcement are approved direction. Approve the exact manifest/loading APIs, component lifecycle policies, grant composition/storage, issuance protocol, narrow native operations and installation UI. Prebuilt distribution and SHA-256 verification against host-managed records are approved. Package/digest formats, safe loading without a verification-to-use gap and optional developer directory mode remain to be decided. Publisher signing is a separate future decision. Verify enforcement before external loading.
+2. **External loading, Part 4:** frontend-only execution for this phase, shared-dependency build tooling, component execution identity, mandatory project-scoped grants with an application-wide option, local/manual installation and updates, one initially active package version, default packages and token enforcement are approved direction. Approve the exact manifest/loading APIs, component lifecycle policies, grant composition/storage, issuance protocol, narrow native operations and installation UI. Prebuilt distribution and SHA-256 verification against host-managed records are approved. The internal per-file record format and verified-byte result are implemented. Archive format, accepted-record persistence, browser delivery of verified resources and optional developer directory mode remain to be decided. Publisher signing is a separate future decision. Verify enforcement before external loading.
 3. **Broader work:** separately justify and approve extraction or features beyond the implemented scope. API publication, stability, universal upstream compatibility, and performance targets are not established.

@@ -1,3 +1,7 @@
+// Internal foundation only; the installer and verified-byte loader are not wired yet.
+#[allow(dead_code)]
+mod plugin_integrity;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {

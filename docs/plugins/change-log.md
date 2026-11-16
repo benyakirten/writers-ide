@@ -12,7 +12,7 @@ Read [context.md](context.md) for the current design and terminology.
 This branch moves shared layout, UI and task code into reusable packages.
 It also lets plugins use one another's APIs and extend the existing editor.
 The work includes Parts 1–2, 3A–3B and Part 3C's first rendering slice in the [implementation plan](implementation-plan.md).
-New content types and schema lifecycle remain separately gated within Part 3C. External plugin loading remains Part 4.
+New content types and schema lifecycle remain separately gated within Part 3C. Part 4 now has an internal native integrity foundation; external installation and loading are not implemented.
 
 #### Shared layout and UI libraries
 
@@ -307,9 +307,21 @@ The repository-wide audit applies this distinction to plugin manifests, dependen
 
 Validation for the declaration refactor passed all 1,191 unit tests, `pnpm check:performance`, repository lint, local Markdown file/fragment links and whitespace checks. Emitted JavaScript was identical for all 20 changed TypeScript/Svelte files, excluding comments. `pnpm check` still reports the existing Modal error and five DnD warnings, with no new diagnostics. Browser runtime suites were not rerun for this declaration-only refactor; earlier browser results below remain evidence for the renderer implementation.
 
+#### Native package integrity foundation — Part 4 first slice
+
+The owner approved an internal Rust implementation before installer/loader integration. `src-tauri/src/plugin_integrity/` now creates candidate records, parses supplied host records and verifies installed file sets. Version-1 JSON records map relative file paths to byte lengths and lowercase SHA-256 digests. Object-only parsing rejects duplicate paths/fields, unknown fields, malformed hashes and unsupported versions.
+
+`verify_package` returns immutable owned bytes only after every file matches. Later source overwrite, deletion or replacement cannot alter that result. Missing or unexpected files fail the whole operation. Candidate creation and verification neither persist nor replace accepted records. A plugin-local checksum file has no special authority. The future loader must consume verified bytes rather than reopen paths.
+
+The directory reader rejects root/descendant symlinks, Windows reparse points, special files, invalid UTF-8 names and nonportable paths. Capability-based no-follow opens and opened-handle checks protect against replacement after classification. Unix opens are nonblocking before type validation so a FIFO swap cannot block the reader. The host supplies trusted root ancestors. Collection is not an atomic filesystem snapshot; every returned buffer still has to match the trusted record. Empty directories are checked and bounded but not hashed.
+
+Default limits bound file count, depth, path length, directory work and actual bytes read: 2,048 files, 16 MiB per file and 64 MiB total. Work is synchronous and must be scheduled appropriately by the eventual installer. The implementation uses `sha2` 0.10.9, capability filesystem crates locked to 3.4.6, and `tempfile` for tests. The module remains private with no new Tauri commands or loading path.
+
+On macOS, all 31 Rust tests passed with `cargo test --locked --lib`. `cargo fmt --all -- --check` and `cargo clippy --locked --lib --tests -- -D warnings` also passed. Tests cover independent SHA vectors, exact records/file sets, malformed/duplicate JSON, limits, unsafe paths, source replacement, symlink swaps, special files and unchanged trusted records on failure. Validation used Rust/Cargo 1.99.1, not the minimum supported Rust 1.90. Native Windows/Linux execution, packaged Tauri enforcement, archive extraction, host-record persistence and browser delivery remain unverified or unimplemented. Frontend browser suites were not rerun for this internal Rust-only slice; their recorded results below belong to the earlier frontend implementation.
+
 #### Tests and known limits
 
-Latest cumulative validation, including Part 3C's first rendering slice:
+Recorded frontend validation, including Part 3C's first rendering slice:
 
 | Check                                                          | Recorded result               |
 | -------------------------------------------------------------- | ----------------------------- |
@@ -364,7 +376,7 @@ The owner also approved shared-host dependency build tooling, distinct component
 
 The owner approved SHA-256 integrity checks for prebuilt packages. Host-managed records hold the digests accepted at installation. Contents are verified before use, including manifest, executable modules, workers, styles and assets. Loading must prevent a verification-to-use replacement gap. Unexpected changes block use pending explicit reinstall/update rather than silently replacing the accepted digest. SHA-256 was chosen instead of MD5 because MD5 is unsuitable for security-sensitive tamper detection. Digests are not publisher authentication or proof of safe code. Publisher signing and key policy remain separate decisions; logging remains deferred.
 
-Documentation validation for these decisions passed Oxfmt, whitespace checks and 104 local links, including 32 heading fragments. These checks are separate from the earlier implementation test results above. No runtime tests were rerun for this documentation-only change.
+The earlier documentation-only decision pass checked Oxfmt, whitespace and local links without rerunning runtime suites. The native integrity foundation above now has its own Rust validation. Current context and the plan distinguish that implementation from the installer and loader work still required.
 
 This branch does not add external installation, persistent activation preferences, native permission grants or schema migration.
 It also does not add general component-state transfer, durable history storage, full editor extraction or plugin translations.

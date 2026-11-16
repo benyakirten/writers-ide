@@ -345,7 +345,15 @@ Normal packages are self-contained and prebuilt. They contain frontend JavaScrip
 
 ### Package integrity and publisher identity
 
-**Approved direction; not implemented.** Use SHA-256 to verify installed package contents against digests accepted at installation and stored in host-managed records. A digest stored only beside plugin files is not a trusted reference. Cover the manifest, executable modules, workers, styles and other assets. Verify before use and prevent contents being replaced between verification and loading. Unexpected changes must block use until an explicit reinstall or update; do not silently regenerate the accepted digest.
+**Internal Rust foundation implemented; no installer or loader integration yet.** [plugin_integrity](../../src-tauri/src/plugin_integrity/mod.rs) provides `create_record`, `IntegrityRecord::from_json` and `verify_package`. It is internal host code, not a frontend API or Tauri command. It enables no external execution.
+
+`create_record` returns candidate metadata for explicit installation acceptance. The version-1 JSON record maps each portable relative path to its byte length and lowercase SHA-256 digest. Parsing rejects duplicate entries/fields, unknown fields, invalid paths/digests and unsupported versions. Verification compares the complete file set and returns an immutable `VerifiedPackage`. Its file slices are the same owned bytes that were checked; later filesystem replacement or deletion cannot change them.
+
+The future installer must keep explicitly accepted records in host-managed storage outside package directories. A digest beside plugin files is not a trusted reference. The module neither persists records nor silently regenerates them on mismatch. It covers all regular files without selecting the manifest or archive format. A future loader must consume verified bytes for modules, workers, styles and other assets rather than reopening the original paths. Browser delivery and persistent installation records remain unimplemented.
+
+The [directory reader](../../src-tauri/src/plugin_integrity/filesystem.rs) uses capability-based no-follow opens and checks opened handles. Root/descendant symlinks, Windows reparse points, special files, invalid UTF-8 names and nonportable paths are rejected. The host supplies trusted root ancestors. File count, per-file/total bytes, depth, path length and directory work are bounded. Defaults cap file bytes at 16 MiB per file and 64 MiB total. Collection is not an atomic filesystem snapshot, but every returned buffer must match the trusted record. Empty directories are validated but not hashed. The synchronous work must be scheduled appropriately by future callers.
+
+The [Rust tests](../../src-tauri/src/plugin_integrity/tests.rs) cover tampering, malformed records, limits, and bytes surviving source overwrite/deletion. Filesystem tests also cover no-follow races and special files. macOS validation does not establish Windows/Linux behavior or packaged Tauri enforcement.
 
 This detects changes relative to accepted bytes while the host's records remain trustworthy. It does not authenticate a publisher or prove that code is safe. Replacing both contents and the trusted record defeats the check. Official package digests can be supplied with the application. Unsigned external packages establish their accepted contents at installation.
 
