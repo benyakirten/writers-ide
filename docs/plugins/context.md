@@ -1,291 +1,462 @@
 # Plugins, reusable libraries, and core responsibilities
 
+Writer's IDE separates feature plugins, reusable libraries, and the application core. A plugin adds a feature, such as a formatting toolbar. A library supplies code that other code imports. The core hosts features and coordinates the workspace. A plugin and the core can both use libraries.
+
+This document explains those responsibilities and the current extension contracts. Use the [plugin author guide](../../packages-js/plugins/README.md) to build a bundled plugin. Use the [word-processing guide](../../packages-js/word-processing/README.md) for editor integrations and the [task guide](../../packages-js/tasks/README.md) for managed background work.
+
 ## Status and scope
 
-This topic distinguishes plugins, reusable libraries, and the application core. **Stage 1 merged in [#80](https://github.com/benyakirten/writers-ide/pull/80) on 2026-11-14. Stage 2 is implemented on `bh/phase-2-plugin-transition` (unmerged; no PR known). Stage 3 remains planned.** Stage 2 adds private layout/component/task libraries and a host-owned plugin manager, not a sandbox or published SDK. Parts 1–2 and Parts 3A–3B of the follow-on implementation plan are owner-authorized and implemented on this branch; Parts 3C and 4 retain separate approval gates. Part 3B includes approved in-place `EditorState.reconfigure`, not schema migration or completion of all Part 3. Public API stabilization, broader extraction, isolation mechanisms, and storage designs remain open and require owner approval.
+The current implementation supports explicitly registered, trusted bundled plugins. They can contribute toolbars, view presentations, and commands. They can also share versioned APIs, run managed tasks, and extend existing editors. There is no external plugin loader or sandbox. The workspace packages are private and evolving, not a published stable SDK.
 
-Read [project context](../project-context.md) for accepted product direction and security requirements. See [implementation-plan.md](implementation-plan.md) for implemented Parts 1–2/3A–3B and the remaining Parts 3C/4 approval gates, and [change-log.md](change-log.md) for cumulative PR outcomes.
+The implementation described here includes unmerged work on `bh/phase-2-plugin-transition`. No PR is known. The original host merged in [#80](https://github.com/benyakirten/writers-ide/pull/80) on 2026-11-14.
+
+Future work includes custom document content and external loading. Both need separate owner approval. The [implementation plan](implementation-plan.md) distinguishes completed work from those proposals. The [implementation stages](#accepted-implementation-stages) group the work by architectural scope. See [project context](../project-context.md) for product direction and [change-log.md](change-log.md) for cumulative branch outcomes and recorded validation.
 
 ## The distinction
 
-**Plugin versus core describes responsibility within the application. Library versus application-specific code describes reuse and packaging. These are different axes.** A core service can use a reusable library; a plugin can also use reusable libraries.
+A **plugin** is an identifiable application feature with declared extension points and a host-managed lifetime. It can supply UI, behavior, or both. A **reusable library** has a useful imported contract outside Writer's IDE application state. Importing it does not give it a plugin lifetime or permissions. The **application core** composes features and enforces shared workspace and platform rules.
 
-| Role             | Purpose                                                                                                                                                                                              | Example                                                                                          |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Plugin           | An independently identifiable feature that contributes through declared extension points, receives scoped capabilities, and has a managed lifecycle.                                                 | Formatting toolbar or word-processing view.                                                      |
-| Reusable library | Functionality imported by other code, with explicit dependencies and a useful contract independent of Writer's IDE application state. It does not inherently have a plugin lifecycle or permissions. | Docking components, scheduling, or editing helpers.                                              |
-| Application core | The host responsibilities that compose features, enforce shared rules, and keep the application safe and usable independently of any particular feature plugin.                                      | Extension hosting, workspace coordination, permission enforcement, and shared platform services. |
-
-A plugin is not necessarily a UI component, a library is not necessarily framework-independent, and a package is not necessarily a plugin. Internal reuse does not require publishing a package.
+These roles describe different things. Plugin versus core describes responsibility. Library versus application-specific code describes reuse. A core service can use a library, and a plugin can use the same library. A package is not necessarily a plugin. Internal reuse does not require publishing a package. A Svelte-specific library is still a reusable library.
 
 ### Plugin terminology
 
-- A **plugin package** is the unit of feature identity, compatibility, activation, and permissions. Packaging and loading formats are not selected.
-- A **contribution** is something the plugin provides: a bar item, central view, command, or provider. One plugin may provide several contributions.
-- A **capability** in the current bundled host authorizes a contribution kind: `contributions.toolbar`, `contributions.view`, or `contributions.command`. These declarations do not grant data access or sandbox JavaScript. Permission-checked access to content/platform services remains Stage 3 design work; injecting a trusted feature dependency is not a generic security grant.
-- A **ProseMirror plugin** is an editor implementation mechanism, not an application-plugin identity or security boundary. An application plugin may use several ProseMirror plugins or none; unrestricted ProseMirror hooks are not automatically safe external APIs.
+The following terms describe the contracts used below:
+
+- **Lifecycle:** registration, activation, deactivation, and cleanup. Registration makes a plugin known to the host. Activation starts its feature and creates a new activation context. Deactivation ends that activation and releases its resources.
+- **Contribution:** something a plugin adds through a host extension point, such as a toolbar item, view presentation, or command. One plugin can add several contributions.
+- **Capability:** a manifest declaration required to use a contribution API. Current values are `contributions.toolbar`, `contributions.view`, and `contributions.command`. They do not grant manuscript or native access, or restrict JavaScript outside the API.
+- **Provider and consumer:** a provider plugin publishes a named, versioned API. A consumer plugin declares that it needs that API. A connection supplies an API object for one consumer activation and provider activation.
+- **Revocation:** ending the right to use an activation or connection. Retained top-level API methods then throw. Owned cleanup runs and cancellation signals abort. Revocation cannot undo completed work or automatically invalidate everything a method returned.
+- **Application plugin versus ProseMirror `Plugin`:** an application plugin has a feature identity and host lifecycle. A ProseMirror `Plugin` is an editor extension object. It can hold editor state and callbacks. An application plugin may use several ProseMirror plugins or none. Neither kind of plugin is a security boundary.
+- **Hook:** a callback that ProseMirror invokes at a defined point, such as filtering a transaction, appending another transaction, or handling a key event. Hooks that need an immediate answer must remain synchronous.
+- **Behavioral registration:** a consumer's request to install ProseMirror plugins in matching live editor views. The word-processing provider owns their installation and removal for that connection's lifetime.
+
+A plugin package is intended to be the unit of feature identity, compatibility, activation, and permissions. External package and loading formats have not been selected.
 
 ## Responsibility boundaries
 
-The accepted direction is a small core with word processing, formatting bars, and other feature views implemented as plugins. Built-in features must use the same extension APIs offered to third parties, without feature-only privileged shortcuts. Exact extraction boundaries remain open.
+The accepted direction is a small core with word processing, formatting bars, and other feature views implemented as plugins. Official and third-party plugins must use the same supported public APIs. Official features must not receive privileged shortcuts into raw editor or application internals. Exact extraction boundaries remain open.
 
-The core hosts contributions and enforces their contracts. Its responsibilities include workspace layout infrastructure, internationalization, import/export infrastructure, and safe access to platform and project services. Features contribute their own behavior and presentation rather than directly mutating host internals.
+The core hosts contributions and enforces their contracts. It owns workspace layout infrastructure, internationalization, import/export infrastructure, and safe access to platform and project services. Plugins supply feature behavior and presentation through those contracts.
 
-For example, a formatting toolbar contributes horizontal and vertical presentations, observes formatting summaries, and invokes commands. The workbench owns docking, capacity checks, placement, and focus routing. Moving the toolbar is not the toolbar's responsibility; feature state must not depend solely on a presentation instance surviving relocation.
+For example, a formatting toolbar supplies horizontal and vertical presentations. It observes formatting summaries and invokes commands. The workbench decides docking, capacity, placement, and focus routing. Moving the toolbar can remount its UI. State that must survive the move cannot live only in that presentation instance.
 
 ### Libraries underneath these boundaries
 
-The Stage 2 `@writers-ide/layout` library implements registry, capacity, transfer, floater, and drag primitives without manuscript, ProseMirror, or application-singleton dependencies. Explicit dependency injection supports independent workbenches. Writer's IDE retains compatibility state facades, feature rendering, and `Editor.svelte` DnD composition as application adapters.
+Private `@writers-ide/layout` supplies registry, capacity, transfer, floater, and drag primitives. It has no manuscript, ProseMirror, or application-singleton dependency. Explicit dependencies allow independent workbenches. The application supplies state adapters, feature rendering, and `Editor.svelte` drag-and-drop composition.
 
-Libraries should not import Writer's IDE application singletons or assume access to its project state. Framework-specific libraries are valid: a Svelte library need not acquire a framework-independent abstraction without a real use case. Extract cohesive functionality rather than creating a package for every utility or thin dependency wrapper.
+Reusable libraries should not import application singletons or assume project access. Extract cohesive functionality, not a package for every utility or thin dependency wrapper. Do not add framework-independent abstractions without a real use case. See [DnD context](../dnd/context.md) for layout contracts.
 
 ## Accepted direction: editor extensions and package wrappers
 
-**Accepted direction, not current implementation:** official and third-party plugins must use the same public extension APIs. There must be no official-feature-only escape hatch for raw editor or application access. The goal is broad, open-ended editor extensibility, not just alternate toolbar layouts or a closed list of formatting commands.
+The goal is broad editor extensibility, not only alternate toolbars or a fixed set of formatting commands. The generic host manages plugins and their relationships. Subsystem providers define domain APIs, such as editing a document. Formatting concepts do not belong in the generic plugin package. Shared editing tools must remain usable without the default toolbar.
 
-The generic platform owns hosting and cross-plugin relationships; subsystem providers define their own domain APIs. Part 3A's word-processing provider now supports observations, synchronous editing and commands for independent formatting interfaces and workflows. Part 3B now supplies lifecycle-owned ProseMirror behaviors; document semantics and custom content remain Part 3C design work. Formatting concepts remain outside the generic plugin package. Shared editing/toolkit functionality should be reusable without requiring the default formatting toolbar to be enabled.
+Today the word-processing provider supports observations, synchronous editing, commands, and behavioral registrations. Custom content, schema changes, custom views, and conversion registrations remain future work. Acceptance of that direction does not approve their implementation or API signatures.
 
 ### Wrapping existing ProseMirror packages
 
-A Writer's IDE plugin may wrap an existing ProseMirror package rather than reimplement it. The wrapper is the application plugin; the upstream package is a library dependency. Both official and third-party wrappers use the same supported extension points.
+An application plugin can wrap an existing ProseMirror package instead of reimplementing it. The application plugin supplies identity, configuration, and lifecycle ownership. The upstream package remains a library dependency. Official and third-party wrappers use the same supported extension points.
 
-A wrapper adapts configuration and registers the package's functionality through those APIs, connects state and lifecycle, and supplies content serialization, migrations or fallback behavior where applicable. This is not permission to modify another plugin's internals or directly install arbitrary callbacks into the host editor.
+A wrapper adapts configuration and registers behavior through the provider. Where relevant, it must also address serialization, migration, and missing-content fallback. It must not modify another plugin's private state or install callbacks outside the supported APIs.
 
-Compatibility may require a thin adapter, translation between models, or a partial integration. Some packages may need upstream changes or remain unsupported. Broad ecosystem compatibility is a goal, not a guarantee that every existing ProseMirror plugin can run unchanged.
+Compatibility depends on the current schema and the upstream package's assumptions. Some packages need adapters or upstream changes. Some may remain unsupported. Current extension domains are:
 
-Candidate extension domains to design within the word-processing subsystem include:
+- **Commands and workflows:** observations, synchronous edits, and editor command registration are implemented. Automatic keybindings and grouped-edit policies are not.
+- **Editor behavior:** input rules, plugin state, supported transaction hooks, decorations, and event handlers are implemented through behavioral registrations.
+- **Document content:** node, mark, attribute, parsing, serialization, and schema-evolution contracts still need design.
+- **Presentation and conversion:** custom content views, layout contracts, and import/export providers still need design.
 
-| Domain                         | Intended kinds of contributions                                                                    |
-| ------------------------------ | -------------------------------------------------------------------------------------------------- |
-| Commands and editing workflows | Actions, availability checks, keybindings, parameterized operations and grouped edits.             |
-| Document content               | Nodes, marks, attributes, validation, parsing, serialization and schema evolution.                 |
-| Editor behavior                | Input rules, plugin state, supported transaction-processing hooks and decorations.                 |
-| Presentation and layout        | Custom content views, controls, measurement and layout behavior.                                   |
-| Conversion                     | Import/export handlers and format-specific representations, through conversion-provider contracts. |
-
-Parts 3A–3B implement observations, synchronous editing, an editor command registry and behavioral registrations; content/schema, custom-view and conversion domains remain design goals, not implemented registrations or approved signatures. Synchronous hooks require explicit ordering, execution and invariant contracts; live schema changes require compatibility and preservation rules rather than ordinary UI toggles.
+Live schema changes need compatibility and preservation rules. They are not ordinary UI toggles.
 
 ### Cross-plugin contracts and dependencies
 
-Plugins should be able to provide versioned contracts that other plugins depend on or extend. A library dependency shares implementation code; a runtime plugin dependency requires a compatible, active provider. Interaction should use explicit APIs, events and owned registrations, not private imports or mutable singleton references. This direction does not reintroduce a universal context containing every feature's services.
+A library dependency shares implementation code. A runtime plugin dependency requires a compatible, active provider. Consumers use declared APIs and owned subscriptions or registrations, not private imports or mutable application singletons. There is no universal context containing every feature's services.
 
-For example, a columns extension could depend on the word processor, while an optional columns-to-LaTeX adapter also uses a LaTeX conversion provider. Columns need not require LaTeX when useful independently. This is a motivating design example, not implemented columns, a selected content representation, a chosen compiler, or approval to redesign pagination. LaTeX conversion does not imply arbitrary native-process execution.
+For example, a columns extension might need the word processor. A separate columns-to-LaTeX adapter might also need a conversion provider. This would not make LaTeX a dependency of columns themselves. This example does not select a content model or compiler, approve pagination changes, or permit arbitrary native-process execution.
 
-**Part 2 authorized and implemented in the working tree:** the host resolves explicitly pinned provider/API-major dependencies and owns connection lifetimes. The contract below defines compatibility, activation, optional arrival/removal, cycles and dependent-first removal. Declarations do not automatically install code, execute project-supplied requirements, or grant data/native permissions. Disabling a provider must preserve its saved content, independently of whether its implementation is available.
+#### Contract identity and activation
 
-- `definePluginApi<T>({ id, major })` freezes a nonempty contract ID and positive safe-integer major. Providers declare `provides: [{ id, major }]`; consumers declare `dependencies: [{ provider, api, major, optional? }]`, pinned to an exact provider plugin ID, API ID and integer major, not package-version ranges. Self/duplicate dependencies are rejected. During synchronous activation only, `context.apis.provide(contract, factory)` must publish every declared API, once; undeclared or late publication fails.
-- `context.apis.get(providerId, contract)` and `subscribe(providerId, contract, listener)` require a matching declared dependency. Optional dependencies never auto-activate providers: `get` returns `null` while unavailable, and activation-owned subscriptions deliver immediately, then on provider arrival/removal/reactivation with a facade or `null`. Releasing a subscription stops notifications; it does not independently revoke a shared cached connection.
-- Required activation preflights the entire registered-only required graph before running activators, rejects missing/incompatible contracts and required cycles with a path, then activates dependencies before consumers. Optional edges do not participate in activation ordering/cycle rejection; optional cycles between distinct plugins are allowed. Graph mutations are serialized; lifecycle changes during host notifications must be deferred. Newly enabled providers remain enabled if a downstream activation fails; rollback cleans the failing activation, not the whole graph.
-- Factories are synchronous and lazy per consumer activation and provider activation/contract. They return plain objects (`Object.prototype` or null prototype) containing only own string-named methods: no fields, accessors/getters, symbols, class/prototype methods, promises or `then`. The host caches a frozen facade whose top-level methods throw after either endpoint stops; a new activation gets a new connection. Return values, nested objects/functions and promises returned by methods are **not recursively revoked**.
-- Each factory receives `connection.consumerId`, `signal`, `own`, `guard` and `reportError(error)`. Either endpoint stopping revokes the connection, aborts its signal and runs owned cleanup in reverse order. `own` supplies an idempotent early-release handle, disposes late ownership immediately and attributes cleanup failures to the provider. Providers must own registrations/subscriptions and guard callbacks or honor the signal; the host cannot cancel arbitrary returned work. `guard(callback)` preserves arguments/receiver while live and suppresses late invocation by returning `undefined`, so its honest return type is `Result | undefined`; it does not catch live callback errors or revoke results already returned.
-- `PluginApiConnection.reportError(error)` attributes a provider-mediated failure only to that connection's exact consumer activation while both endpoints remain live. Late reports from revoked/old connections are ignored, including after consumer reactivation. This generic host facility uses phase `provider`, does not disable the consumer, and is not a behavior-specific host API or an arbitrary plugin-ID reporting escape hatch.
-- Availability snapshots distinguish `missing` (provider unregistered), `incompatible` (exact declared API/major absent), `inactive` (compatible provider not live/active), and `available`. Active provider metadata lists published contract identities; availability is not proof that a per-consumer factory succeeds. Factory/connection-cleanup errors are provider-attributed; subscription listener/resolution errors are consumer-attributed, all with phase `provider`. These and task errors remain visible without disabling an otherwise active plugin or failing otherwise successful deactivation. Required preflight/downstream failures use `dependency`; activation and host cleanup failures retain their lifecycle effects.
-- `planDeactivation(id)` returns a frozen dependent-first plan including transitive active required dependents and the target. `deactivate(id)` refuses affected dependents without explicit `{ cascade: true }`; optional consumers stay active and receive removal. The manager shows the ordered impact, focuses Cancel, rechecks the plan on confirmation and requires renewed review if it changed. It protects `requiredPluginIds` anywhere in the transitive plan, not only the clicked row, and restores launcher focus after cancellation/completion. Required-ID protection is host UI policy, not a plugin permission or sandbox.
+`definePluginApi<T>({ id, major })` defines a frozen contract identity. The ID must be nonempty and the major must be a positive safe integer. Providers declare `provides: [{ id, major }]`. Consumers declare `dependencies: [{ provider, api, major, optional? }]`.
+
+A dependency pins an exact provider plugin ID, API ID, and integer major. It is not a package-version range. Self-dependencies and duplicate dependencies are rejected. The separate host compatibility field must be exactly `apiVersion: 1`; plugin package `version` does not negotiate either contract.
+
+During synchronous activation, `context.apis.provide(contract, factory)` must publish every declared API exactly once. Undeclared or late publication fails. `get(providerId, contract)` and `subscribe(providerId, contract, listener)` require a matching declared dependency.
+
+Before activation, the host follows every required dependency, including dependencies of dependencies. This set of relationships is the required dependency graph. Only registered plugins participate; the host does not discover or install others.
+
+The host checks the entire graph before calling any activation function. Missing or incompatible contracts fail this check. A cycle, where required dependencies lead back to the same plugin, also fails. The error includes the path through that cycle. Providers activate before their consumers. If a consumer then fails to activate, the host releases that failed activation's resources. Successfully enabled providers stay enabled.
+
+Optional dependencies do not activate providers or affect activation order. Optional cycles between distinct plugins are allowed. An unavailable optional API resolves to `null`.
+
+Subscriptions deliver immediately, then on provider arrival, removal, or reactivation. Releasing a subscription stops its notifications. It does not revoke the shared connection used by other lookups or subscriptions.
+
+The host processes dependency and lifecycle changes one at a time. Code called during a host notification must schedule lifecycle changes for after that notification returns.
+
+#### API objects and connection cleanup
+
+A factory is the provider function that creates a consumer's API object. The host calls it only when the consumer requests a connection. It must finish synchronously. The host reuses the resulting frozen API object for the same consumer activation, provider activation, and contract.
+
+The factory's result has strict shape rules:
+
+- It must be a plain object with `Object.prototype`, or an object with a null prototype.
+- Each member must be a method stored directly on that object with a string name.
+- Data fields, getters/setters, symbol members, and inherited or class methods are not allowed.
+- The result cannot be a promise and cannot have a `then` method.
+
+Individual API methods may return promises. That does not make asynchronous factories valid.
+
+Top-level methods throw after either endpoint stops. Reactivation creates a new connection; old methods never become live again. Returned objects, nested functions, and method-returned promises are not recursively revoked. Providers must manage their lifetimes explicitly.
+
+Each factory receives `consumerId`, `signal`, `own`, `guard`, and `reportError(error)`. Register resource cleanup with `own`, for example to remove an event listener or subscription.
+
+Stopping either the provider or consumer revokes the connection and aborts its signal. Cleanup functions then run in reverse registration order. The handle returned by `own` lets the provider release a resource early. Calling that handle again has no additional effect. If code registers cleanup after revocation, it runs immediately. A cleanup error is attributed to the provider and does not stop the remaining cleanup.
+
+Providers must own registrations and subscriptions. They must guard callbacks or honor cancellation. `guard(callback)` preserves arguments and receiver while live. After revocation it suppresses invocation and returns `undefined`, so its return type is `Result | undefined`. It does not catch live callback errors, retract returned values, or cancel arbitrary work.
+
+`reportError(error)` attributes a provider-mediated failure to the connection's exact consumer activation while both endpoints remain live. Revoked or old connections cannot report against a later activation or another plugin. Reports use phase `provider` and do not disable the consumer.
+
+#### Availability, errors, and removal
+
+Management snapshots report each dependency's availability:
+
+- `missing`: the provider is not registered.
+- `incompatible`: the provider does not declare the exact API ID and major.
+- `inactive`: the provider is compatible but not live and active.
+- `available`: the provider has published the contract and is live.
+
+Availability does not prove that the factory for a particular consumer will succeed.
+
+Factory and connection-cleanup errors are recorded against the provider. Subscription listener and resolution errors are recorded against the consumer. All of these use error phase `provider`.
+
+Failures while checking required dependencies, or activating them for a consumer, use phase `dependency`. Provider and task errors do not disable an otherwise active plugin. They also do not make an otherwise successful deactivation fail. Activation and host-cleanup failures still affect lifecycle status.
+
+Stopping a provider can require stopping its consumers. A consumer's own required consumers must stop too. `planDeactivation(id)` includes all of these active plugins in a frozen plan. Consumers appear before the providers they require, with the target last.
+
+`deactivate(id)` refuses this cascade without explicit `{ cascade: true }` consent. Optional consumers stay active and are notified that the API is no longer available.
+
+The manager shows the ordered impact and initially focuses Cancel. It rechecks the plan on confirmation and asks for renewed review if it changed. `requiredPluginIds` protects every matching ID in the transitive plan, not just the clicked row. Cancellation or completion restores launcher focus. Required-ID protection is host UI policy, not a permission or sandbox.
+
+See the [provider author guide](../../packages-js/plugins/README.md#share-a-versioned-api-with-another-plugin) for examples and exact connection rules. Dependency declarations do not install code, execute project requirements, grant data/native permissions, or authorize deletion of saved content.
 
 ### Word-processing provider (Part 3A implemented / unmerged)
 
-The owner explicitly approved live `EditorState`/`EditorView` access inside synchronous callbacks, with the provider owning edits. Private `@writers-ide/word-processing` owns contracts and service mechanics without application imports. The app's `createWordProcessingPlugin(sources = defaultWordProcessingSources)` adapts existing registered views, active-tab resolution and update notifications; it owns API resources, not editor creation/destruction. The route registers provider and formatting, activates formatting (resolving its required provider first), and cascades provider deactivation on teardown. The provider retains source-owned views, the existing history and fixed schema, and model-mutating pagination. Part 3B now adds in-place behavioral reconfiguration and updates the app dispatch pipeline to account for filtering and appended transactions; see below.
+The provider gives consumers access to existing editors. Private `@writers-ide/word-processing` owns the contracts and service mechanics without application imports. The app's `createWordProcessingPlugin(sources = defaultWordProcessingSources)` connects registered views, active-tab resolution, and update notifications. It owns API resources, not editor creation or destruction.
 
-- `snapshot`/`subscribe` expose data-only view summaries; `inspect` supplies live read access. `edit`, `runCommand`, `registerCommand`, `executeCommand`, `commands`, and `applyResult` support provider-owned editing and connection-owned command registrations. This is an editor command registry, not registration of ProseMirror `Plugin` instances or automatic keybindings.
-- Targets are exact `{ viewId, documentId, revision }`. Revision tokens increase across service instances within the module, including provider restarts; changed state (even selection-only), view, document identity, name or editability invalidates the token. Reads consult live sources before reactive flush. Result application checks caller/connection signals, lifetime, target, editability and optional active-view requirements before/after callbacks and before dispatch. Stale results are discarded, never mapped or silently retargeted; recomputation is explicit. These tokens are separate from pagination's layout revisions.
-- Live objects, transactions and dispatch callbacks are synchronous-only: do not retain them or directly mutate/dispatch through the raw view. The provider dispatches returned transactions through the actual app pipeline. Thenable returns throw, but cannot undo an already-started async body or direct raw dispatch. `tr.before === current.state.doc` checks the document, not originating state: a retained old transaction supplied with a fresh target against the same document can pass and violates the contract. No provenance or security membrane is claimed.
-- A command must return a synchronous boolean and capture at most one dispatch. The provider closes capture after invocation, revalidates, and dispatches only for `true`; false, throwing, thenable or multi-dispatch callbacks do not partially dispatch through the provider. `true` without a transaction is handled success. Nested inspection is allowed; nested edits and edits during notifications return `busy`.
-- Source/effect subscriptions are lazy/shared and released when unused; initial-listener failure rolls back setup, later failures are isolated, and reentrant changes are drained. Connections own subscriptions/command registrations and guard callbacks; revocation removes them, and service disposal clears resources without destroying source-owned views.
-- `createFormattingPlugin()` declares the required provider dependency and builds `FormattingService(provider)` per activation. Formatting-specific semantics stay in `menu/basic/`, including caret mark no-ops, exclusivity and continuation-aware paragraph policies; its scoped presentation API remains copied snapshots and validated requests. No formatting singleton or route injection remains.
-- `menu/quick-format/` independently consumes the same public API and wraps upstream `toggleMark`, supporting production `bold` and conventional `strong`. It intentionally supports caret stored marks, unlike Basic Menu. Both orientations share a connection-owned editor command. This opt-in proof is registered only in the browser fixture, not the default app, and imports no Basic Menu implementation.
+The route registers the provider and formatting plugin. Activating formatting resolves its required provider first. Route teardown cascades provider deactivation. Source-owned views, history, the fixed schema, and model-mutating pagination remain in place. Views that share a document ID do not automatically synchronize edits.
 
-See the [package author guide](../../packages-js/word-processing/README.md) for exact result/error, callback and ownership contracts. Worker/cooperative computation captures only needed data and an exact target, then uses a new synchronous `applyResult` callback with cancellation checks; it does not retain transactions or add mapping, undo grouping or partial-edit recovery.
+#### Reading, editing, and exact targets
+
+`snapshot` and `subscribe` supply data-only view summaries. `inspect` permits live reads in a short synchronous callback. `edit`, `runCommand`, and `applyResult` let the provider dispatch edits through the actual application pipeline. `registerCommand`, `executeCommand`, and `commands` supply a connection-owned editor command registry. This registry does not install ProseMirror plugins or automatic keybindings.
+
+Every edit target is exactly `{ viewId, documentId, revision }`. Revision tokens increase across service instances within the module, including provider restarts. A different state, even a selection-only change, invalidates a target. Changes to view identity, document identity, name, or editability also invalidate it. These tokens are separate from pagination's layout revisions. Reads consult live sources before a reactive flush.
+
+Result application checks target freshness, caller and connection signals, lifetime, editability, and any active-view requirement. It checks around callbacks and before dispatch. Stale results are discarded, not mapped or retargeted. Recomputation must be explicit.
+
+Live state, views, transactions, and dispatch callbacks are available only for synchronous use. Do not retain them for later application. Do not mutate the raw view or dispatch through it directly. Construct transactions from the state supplied to the callback.
+
+These callbacks must return their result immediately, not a promise. An object with a callable `then` method is also promise-like; it is called a thenable. Returning either kind of async result throws. This check cannot stop an async function body that has already started. It also cannot undo a direct call to the raw view's dispatch method.
+
+There is also a transaction-origin limitation. `tr.before === current.state.doc` proves that the starting document matches, not that the transaction came from the current state. An old transaction from a different selection can pass with a fresh target if the document is identical. Supplying it violates the contract. This API does not enforce transaction provenance or isolate live objects.
+
+A command must return a boolean synchronously. Its dispatch callback captures at most one transaction. That callback stops accepting transactions when the command returns. The provider then checks that the target is still valid and dispatches only if the command returned `true`.
+
+The provider dispatches nothing if the command returns `false`, throws, returns a promise or other thenable, or tries to dispatch more than once. Returning `true` without a transaction means the command handled the request successfully without an edit.
+
+A callback can inspect the editor again while another inspection or edit is running. It cannot start another edit: nested edits return `busy`. Editing during notifications also returns `busy`.
+
+The service subscribes to editor sources and starts reactive tracking only when needed. Consumers share those resources, and the service releases them when unused. If a listener throws during its initial notification, its setup is undone. Later listener failures do not stop other listeners.
+
+A listener can trigger another source change during notification. The service rereads those changes before it finishes, rather than losing them. Connections own subscriptions and commands and guard late callbacks. Disposal releases those resources without destroying source-owned views.
+
+#### Formatting consumers
+
+`createFormattingPlugin()` resolves its required provider and builds an activation-owned `FormattingService(provider)`. Formatting policies stay in `menu/basic/`, including caret mark no-ops, mark exclusivity, and continuation-aware paragraph commands. Presentations receive copied summaries and validated requests, not raw editor objects.
+
+The independent `menu/quick-format/` example consumes the same public API and upstream `toggleMark`. It supports production `bold` and conventional `strong`. Unlike Basic Menu, it supports caret stored marks. Both orientations share a connection-owned command. It is opt-in, registered only in the browser fixture, and imports no Basic Menu implementation.
+
+See the [word-processing guide](../../packages-js/word-processing/README.md) for exact results, errors, callback rules, and ownership. Async work captures only needed data and an exact target. It later calls `applyResult` with a new synchronous callback and cancellation checks. The API does not map stale output, group undo, or recover partially completed edits.
 
 ### Lifecycle-owned behaviors (Part 3B implemented / unmerged)
 
-The owner approved in-place `EditorState.reconfigure` using the existing schema, preserving document, selection, stored marks, history and surviving keyed plugin state. No view/document recreation, schema migration, transaction or undo entry is introduced by reconfiguration itself. Reconfiguration changes editor-state revision tokens, so captured asynchronous results become stale.
+Behavioral registrations let consumers install input rules, decorations, plugin state, and supported editor hooks. `registerBehavior({ id, name, priority?, views?, create })` returns a connection-owned disposer. IDs are service-global; duplicates throw. `views` is an optional view-ID allowlist, not a document filter. Omission means all live views.
 
-- `registerBehavior({ id, name, priority?, views?, create })` returns a connection-owned disposer. IDs are service-global; duplicates throw. `create({ viewId, documentId, name, state, view, signal })` synchronously returns an actual ProseMirror `Plugin` or readonly Plugin array per matching live view/document identity. `views` is an optional explicit **view-ID allowlist**, not a document filter; omission means all live views. Each instance's signal aborts on closure/detach/replacement, removal/failure, connection revocation or service disposal.
-- `behaviors()` and `subscribeBehaviors(listener)` expose frozen metadata (`id`, `name`, `ownerId`, `priority`, optional `views`, `status: 'active' | 'failed'`, optional `error`). Subscriptions deliver immediately, then registry/failure changes, not every edit. Diagnostic observer errors are isolated. Registration/subscription lifecycle changes inside callbacks or diagnostic notifications must be explicitly deferred; explicit registration/removal outside callbacks is synchronous. Removal/revocation disables callback guards immediately; signal-driven physical detach always waits for a microtask, and explicit removal also defers while managed hooks/service operations execute.
-- Priority defaults to zero and sorts descending, with insertion-order ties and factory-array order retained. Managed plugins run **before** the actual current baseline. Baseline Plugin identities/order remain untouched, including foreign plugins added later. Duplicate keys within a factory result, against baseline or against another registration fail the newcomer, not an existing registration; validation follows registration order independently of priority. `nodeViews` and `markViews` are rejected pending Part 3C.
-- Wrappers inherit from the actual upstream Plugin rather than constructing a new Plugin: generated keys (including unkeyed upstream packages), `instanceof Plugin`, original `getState(state)` and metadata addressed to the original Plugin remain usable. Callback receivers retain upstream Plugin/state-field/plugin-view resource semantics. A surviving factory, wrapped Plugin identity, signal and keyed state remain stable across other registrations changing. ProseMirror may nevertheless destroy/recreate plugin-view `view()` resources when its plugin list changes; resource identity is not promised.
-- Dedicated source subscription plus Svelte tracking observes arrivals, closures and replacements even with no ordinary snapshot subscriber. Source-driven reconciliation is microtask-deferred, including notifications raised inside baseline hooks; service reads do not flush pending reconfiguration. No document traversal/copy is required. Factory/key/state-init checks stage candidate states across matching views before installation; source/lifecycle/input-state changes discard and rebuild stale stages. Dispatches from plugin-view setup/update are retained instead of overwritten. A drain is bounded to 16 passes; nonstabilization conservatively quarantines all still-active registrations, since arbitrary trusted mutations cannot reliably be attributed to one callback.
-- Runtime errors, invalid supported return values and thenables quarantine the registration across all views immediately, abort its instances and leave removable failed metadata; physical detach runs outside the executing hook. A filter fails closed on its first error, then its inactive guard allows transactions until removal. Append returns `null`; `state.apply` transiently retains its previous value until removal; decorations/selection helpers return `null`, event handlers return `false`, string/slice transforms preserve input, editable falls back to `true`, attributes to `{}`, and clipboard text serialization to plain text. Plugin-view update/destroy failures are contained and remaining cleanup is attempted.
-- Errors independently reach optional `sources.reportBehaviorError` (owner/registration/view/phase/error) and the owning connection's `reportError` (behavior ID, phase, optional view and meaningful thrown-value description). One reporter throwing does not suppress the other. Revoked connection reports are ignored by the host; source observers can still receive cleanup errors. Standalone services without either reporter log failures instead of dropping them.
+`create({ viewId, documentId, name, state, view, signal })` synchronously returns an actual ProseMirror `Plugin` or readonly array of plugins for each matching live view/document identity. Each instance's signal aborts on view closure, detach or replacement, registration removal or failure, connection revocation, or service disposal. `nodeViews` and `markViews` are rejected until custom-content work is approved.
 
-These are synchronous trusted-code integration contracts, **not a sandbox or general rollback**. Staging cannot undo arbitrary factory/state-init/plugin-view side effects, raw dispatch, or bodies of async callbacks already started before a thenable is reported. The service cannot preempt a CPU loop or guarantee termination of unbounded ProseMirror append-transaction cycles; the 16-pass bound covers reconciliation only. Official and third-party wrappers share this API, with no privileged built-in raw escape hatch.
+#### Ordering and state preservation
 
-The app now uses `state.applyTransaction(root)`, skips `PreUpdate` and DOM update for a filtered root, emits `PreUpdate` for every accepted root/append before one `view.updateState`, and lets PageObserver use each transaction's own `before`/`doc` coordinates. Optional synchronous `sources.prepareTransaction(transaction)` prepares managed appends before ProseMirror applies them, followed by a current-document check. The app provider composes it with unchanged `normalizePageIndexes`, extracted to `view/page-indexes.ts`, preserving page attributes and stored marks. This is an application-invariant hook, not schema migration or pagination redesign; standalone sources need not adopt app page semantics. See [pagination flow](../pagination/context.md#current-transaction-and-layout-flow).
+The editor also has plugins installed outside behavioral registrations. These form its current **baseline**. Managed plugins run before that list. The service preserves the baseline plugins and their order, including plugins added outside the service later.
 
-Three independent opt-in proof consumers live in `src/lib/editor/prosemirror/behaviors/` ([README and public command IDs](../../src/lib/editor/prosemirror/behaviors/README.md)):
+Managed ordering follows these rules:
 
-- Smart punctuation wraps real `prosemirror-inputrules` `inputRules({ rules: [ellipsis, emDash] })` and `undoInputRule`, exercising original unkeyed Plugin state/metadata identity. Root `package.json` and lockfile currently specify `^1.6.0`, resolved to `1.6.0`.
-- Selection highlight uses keyed `DecorationSet` metadata and maps existing ranges through transaction mappings; no authored marks, text scan or content mutation.
-- Word analysis explicitly captures at most 32,768 selection model positions and 1,024 text-node chunks, then uses a real bundled module worker. Tokens never match across nodes/chunks (including mark boundaries); repeated complete tokens across chunks count together. Per-view signals/activation ownership cancel work; exact-target `applyResult` constructs fresh metadata synchronously. No full-manuscript scan or asynchronous output mapping/retargeting is implied.
+- Higher priority runs first. The default priority is zero.
+- Equal priorities keep registration order.
+- Plugins returned in one factory array keep that array's order.
 
-Only the dedicated fixture's **Mount behavior proofs** control mounts `BehaviorFixture.svelte`; neither the default app route nor existing fixture scenarios enable these examples. Six new scenarios/twelve Chromium/WebKit cases join the existing six/twelve in `test:word-processing` (24 cases). Its existing Browser Smoke CI step includes both test files; main app e2e excludes the new file. Structural layout edits in this fixture are not real pagination geometry validation. Verified current validation and remaining selection-timing/diagnostic limits are recorded in the [cumulative branch entry](change-log.md).
+Each ProseMirror plugin has a key that identifies its state and transaction metadata. A package can supply a `PluginKey` explicitly. ProseMirror generates a key when it does not. Upstream packages use the original plugin or key to retrieve state and attach metadata.
+
+A new registration fails if it returns duplicate keys. This includes keys repeated within its own result, in the baseline, or in an earlier registration. Existing registrations are not replaced. These checks follow registration order, not priority order.
+
+The service wraps the actual upstream Plugin through inheritance instead of constructing a replacement Plugin. It preserves generated keys, `instanceof Plugin`, original `getState(state)`, and metadata addressed to the original Plugin. Callbacks also retain their expected `this` value. That value can be the upstream Plugin, its state-field object, or its plugin-view resource, depending on the callback.
+
+Installation and removal use owner-approved `EditorState.reconfigure` on the existing editor. The same schema instance stays in use. Reconfiguration preserves:
+
+- The document and selection.
+- Stored marks, which control formatting for subsequently typed text.
+- History.
+- State belonging to plugins whose keys remain in the new list. This is the surviving **keyed plugin state**.
+
+Reconfiguration itself creates no transaction or undo entry. It does not recreate the view or document. It does change the editor-state revision, so captured async results become stale.
+
+When another registration changes, a surviving behavior keeps its factory, wrapped Plugin identity, signal, and keyed state. There is a separate lifetime for resources returned by a Plugin's `view()` callback. ProseMirror may destroy and recreate those resources when the plugin list changes. Their identity is not guaranteed to survive.
+
+#### Deferred changes and cleanup
+
+A microtask runs after the current synchronous call stack returns. Source-driven changes use this delay so editor reconfiguration does not run inside a ProseMirror hook. Dedicated source observation and Svelte tracking detect view arrivals, closures, and replacements even without ordinary snapshot subscribers. Service reads do not force pending reconfiguration to run.
+
+Registration and subscription lifecycle changes inside editor callbacks or diagnostic notifications must be explicitly deferred. Explicit registration and removal outside callbacks are synchronous. Removal or revocation disables callback guards immediately. Signal-driven physical removal always waits for a microtask. Explicit removal also waits while managed hooks or service operations are executing.
+
+Before changing any matching view, the service prepares candidate editor states and checks their factories, keys, and state initialization. This preparation is called staging. If a source, lifetime, or input state changes, the service discards the affected preparation and rebuilds it. Transactions dispatched during plugin-view setup or update are retained. An older prepared state must not overwrite them. No document traversal or copy is required.
+
+Keeping installed behaviors consistent with current sources is called reconciliation. A reconciliation pass can itself trigger more source changes. The service repeats this work at most 16 times in one run.
+
+If changes still do not settle, the service disables callbacks for all still-active registrations. It aborts their instances and leaves removable `failed` metadata. This failure response is called quarantine. It applies to all active registrations because arbitrary trusted mutations cannot reliably be traced to one callback.
+
+**The 16-pass bound covers reconciliation only.** ProseMirror can separately call append hooks repeatedly as they produce more transactions. The bound does not limit that append-transaction loop. The service cannot interrupt CPU loops or guarantee that an unbounded append loop terminates.
+
+#### Failures and diagnostics
+
+A hook that throws, returns an invalid value, or returns a promise or other thenable causes immediate quarantine. The whole registration is disabled across all views, not just the failing instance. Instances abort and removable `failed` metadata remains. Removing plugins from editor state waits until execution is outside the hook.
+
+Disabled hooks need fallback results until that removal finishes:
+
+- A transaction filter rejects the transaction on its first error. Later calls to its disabled guard allow transactions until removal.
+- An append hook returns `null`, adding no transaction.
+- `state.apply` temporarily keeps its previous plugin-state value.
+- Decorations and selection helpers return `null`.
+- Event handlers return `false`.
+- String and slice transforms return their unchanged input.
+- Editable falls back to `true`, and attributes to `{}`.
+- Clipboard text serialization returns plain text.
+
+Plugin-view update and destroy failures do not prevent the service from attempting the remaining cleanup.
+
+`behaviors()` and `subscribeBehaviors(listener)` expose frozen registration metadata: identity, owner, priority, optional views, active/failed status, and optional error. Subscriptions deliver immediately and on registry or failure changes, not every edit. Diagnostic observer errors are isolated.
+
+Failures independently reach optional `sources.reportBehaviorError` and the owning connection's `reportError`. Reports identify the owner/registration, phase, optional view, and error; connection reports include a meaningful thrown-value description. A reporter throwing does not suppress the other. The host ignores reports from revoked connections, but source observers can still receive cleanup errors. Standalone services without either reporter log failures.
+
+These contracts govern trusted synchronous code. They are not a sandbox or a way to undo arbitrary effects. Preparing candidate states cannot reverse side effects from factories, state initialization, or plugin-view callbacks. It cannot undo direct raw-view dispatch or an async body that has already started. See the [behavior author guide](../../packages-js/word-processing/README.md#part-3b-lifecycle-owned-editor-behaviors) for detailed callback and cleanup rules.
+
+#### Accepted transactions and application invariants
+
+The transaction submitted to the editor is the root transaction. ProseMirror can reject it through a filter or accept it and append further transactions. The app uses `state.applyTransaction(root)` to obtain the accepted sequence.
+
+- If the root is rejected, the app emits no `PreUpdate` and performs no DOM update.
+- If accepted, each root and appended transaction gets its own `PreUpdate` notification. All those notifications run before one `view.updateState` updates the editor DOM.
+- PageObserver uses each transaction's own `before` and `doc` documents to interpret its positions.
+
+Sources can supply optional synchronous `sources.prepareTransaction(transaction)`. It prepares transactions returned by managed append hooks before ProseMirror applies them. After preparation, the service checks that the transaction still starts from the current document.
+
+The app combines this hook with unchanged `normalizePageIndexes`, extracted to `view/page-indexes.ts`. This preserves page attributes and stored marks. It maintains the app's required document rules; it changes neither schema nor pagination design. Standalone sources do not have to use the app's page rules. See [pagination flow](../pagination/context.md#current-transaction-and-layout-flow).
+
+#### Independent examples
+
+Three opt-in consumers in `src/lib/editor/prosemirror/behaviors/` exercise the shared API:
+
+- Smart punctuation wraps upstream `inputRules({ rules: [ellipsis, emDash] })` and `undoInputRule`. It tests original unkeyed Plugin state and metadata identity. Root `prosemirror-inputrules` is declared as `^1.6.0` and locked to `1.6.0`.
+- Selection highlight stores keyed `DecorationSet` metadata and maps ranges through transaction mappings. It does not add authored marks, scan text, or mutate content.
+- Word analysis captures at most 32,768 selection model positions and 1,024 text-node chunks, then uses a bundled module worker. Tokens do not match across nodes or chunks, including mark boundaries. Complete repeated tokens across chunks count together. Per-view signals and activation ownership cancel work. Exact-target `applyResult` builds fresh metadata synchronously. There is no full-manuscript scan or stale-output mapping.
+
+The [example guide](../../src/lib/editor/prosemirror/behaviors/README.md) lists public command IDs. Only the fixture's **Mount behavior proofs** control mounts `BehaviorFixture.svelte`. The default route and other fixture scenarios do not enable them. The dedicated suite has 24 Chromium/WebKit cases: twelve original cases and twelve behavior cases. Browser Smoke CI includes both test files. Main app e2e excludes them. Structural layout edits in this fixture do not validate real pagination geometry. Recorded results and remaining diagnostic and selection-timing limits are in the [branch changelog](change-log.md).
 
 ### Execution boundary and design validation
 
-A wrapper supplies compatibility, not isolation. Installing an upstream ProseMirror `Plugin` directly into an application editor executes its callbacks with that environment's authority. Official and third-party wrappers must use the same supported APIs, but frontend code is trusted rather than sandboxed under the revised direction below.
+A wrapper adapts a package; it does not isolate it. ProseMirror callbacks execute with the frontend environment's authority. Input rules, decorations, and bounded worker analysis have working examples. Broader compatibility remains package- and schema-dependent.
 
-Part 3B exercises input rules, decorations and bounded worker analysis through the shared behavior API. Broader upstream compatibility remains package/schema-dependent. A small ordinary Svelte custom-node/node-view integration is still proposed for Part 3C; schema lifecycle, missing-content preservation and external/native enforcement require separate owner approval.
+A small ordinary Svelte custom-node integration is proposed next. Schema lifecycle, missing-content preservation, and external/native enforcement need separate approval. None is completed by the current behavior API.
 
 ## Accepted direction: frontend trust and native restrictions
 
-**Owner-approved revision to the original isolation plan; not a new runtime implementation:** frontend plugins may use ordinary Svelte, their own DOM rendering, and supported deep editor APIs. Preventing access to the application's or other plugins' DOM is deferred, not a prerequisite for the next frontend extension APIs. Same-environment frontend JavaScript is trusted code and can reach ambient browser facilities. Public APIs remain the supported integration path; plugins should not modify another plugin's UI or private state, but this is a behavioral contract, not an enforced DOM boundary.
+Frontend plugins are trusted code in the same JavaScript environment as the app. The owner approved ordinary Svelte, plugin-owned DOM rendering, and supported deep editor APIs. Preventing access to other DOM is deferred. Public APIs are the supported path, but the rule against changing another plugin's UI or private state is behavioral, not an enforced DOM boundary.
 
-External network calls are allowed in principle under an explicit user trust model. A plugin able to read manuscript content and make requests can exfiltrate that content; copied snapshots, contribution declarations, wrappers, and DOM boundaries do not prevent this. Permission disclosures must distinguish informational declarations from enforced restrictions. Exact installation review and network disclosure UX remain open. This decision does not enable an external loader today.
+External network calls are allowed in principle under explicit user trust. A plugin that can read manuscript content and make requests can disclose that content. Copied snapshots, declarations, wrappers, and DOM boundaries do not prevent this. Installation disclosures must distinguish information from enforced restrictions. Review and network-disclosure UX remain open; no external loader exists today.
 
-Backend/native extensions must remain highly restrictive. Frontend trust must not imply unrestricted Tauri IPC, filesystem, shell/process, native-library, or other backend authority. Define and verify narrow native APIs and their actual enforcement before external loading; do not mistake TypeScript interfaces or frontend checks for that boundary. Project-supplied requirements must not automatically install or execute code or grant permissions.
+Native access means authority outside ordinary browser code, such as Tauri IPC, filesystem access, shell/process execution, or native libraries. Frontend trust must not grant unrestricted native access. Narrow native APIs need actual enforcement and verification before external loading. TypeScript interfaces and frontend checks are not that enforcement. Arbitrary native-plugin execution is not approved.
 
-Ordinary Svelte node views are a design goal without requiring iframe-per-node rendering or a bespoke UI DSL. No iframe, ShadowRealm, secure DOM membrane, separate-process runtime, or future isolation mechanism is selected. Frontend DOM isolation can be investigated later without claiming present security guarantees.
+Project-supplied requirements must not automatically install or execute code or grant permissions. Ordinary Svelte node views remain a goal. Frontend isolation is deferred and must not be described as a current guarantee.
 
 ## Accepted direction: actions and cooperative execution
 
-**Part 1 authorized and implemented on the unmerged branch:** private `@writers-ide/tasks` extracts the [pagination work queue](../pagination/context.md#generic-work-queue) and provides activation-owned `context.tasks`. The application host shares pagination's existing singleton; generic standalone hosts accept an optional `workQueue` and otherwise create independent queues. Helpers are opt-in, not a requirement to write generators or route every UI callback through a queue. Plugin authors choose the appropriate execution mode:
+Plugins can use activation-owned `context.tasks`. Private `@writers-ide/tasks` contains the extracted [pagination work queue](../pagination/context.md#generic-work-queue) and task helpers. The application host shares pagination's singleton queue. A standalone host accepts an optional `workQueue` or creates an independent queue.
 
-| Mode                    | Intended use                                                   | Contract                                                                   |
-| ----------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Immediate synchronous   | Small editing commands and hooks requiring an immediate answer | Keep callbacks short; scheduling cannot preempt them.                      |
-| Async                   | Network requests and other asynchronous APIs                   | Promises do not offload CPU work; cancellation is cooperative.             |
-| Cooperative main-thread | Incremental DOM-dependent work and other bounded tasks         | Yield between short units; edits and cancellation can occur between units. |
-| Worker                  | CPU-heavy computation over cloneable/transferable inputs       | No live DOM, editor state, or transaction crosses the worker boundary.     |
+Choose execution to suit the work:
+
+| Mode                    | Use it for                                      | Main constraint                             |
+| ----------------------- | ----------------------------------------------- | ------------------------------------------- |
+| Immediate synchronous   | Short commands and hooks needing an answer now  | Cannot be interrupted.                      |
+| Async                   | Network requests and asynchronous APIs          | Promises do not offload CPU work.           |
+| Cooperative main-thread | Incremental DOM-dependent or other bounded work | Yield between short units.                  |
+| Worker                  | CPU-heavy work on copied or transferable data   | No live DOM, editor state, or transactions. |
 
 ### Make the cooperative path attractive
 
-- `tasks.forEach` lazily consumes an iterable, yielding between short synchronous units and reporting progress; `tasks.cooperative` accepts advanced synchronous generators with explicit checkpoints. No mandatory generator or mandatory execution-mode declaration for every UI action is approved.
-- Let contributed commands and higher-level APIs use task helpers so a Svelte button or shortcut can invoke the same managed operation without implementing scheduling itself. Ordinary short actions remain straightforward.
-- The host scopes task ownership, cancellation, labels/errors and replacement keys to plugin activation. Authors should not manage queue start leases or remember unload cleanup. Link per-task cancellation to plugin lifetime and, where appropriate, document/view closure; cancelling one task must not abort all plugin work.
-- The application host shares the scheduler with pagination rather than giving every plugin a separate frame allowance. Existing round-robin scheduling, interactive/background fairness, cancellation and the 1,000-step cap are preserved. Quotas and slow-step diagnostics are not implemented.
-- Keep each unit short. The current queue has an 8 ms **soft** frame budget and cannot interrupt an executing generator step. A callback wrapper cannot make an arbitrary loop cooperative. Slow-step diagnostics and concrete responsiveness measurements are useful follow-up work, not existing guarantees.
+`tasks.forEach` lazily consumes an iterable and yields between short synchronous units. `tasks.cooperative` accepts synchronous generators with explicit checkpoints. Short UI actions run immediately. Buttons and shortcuts can invoke the same managed operation without implementing scheduling themselves.
 
-These are convenience and performance contracts, not sandbox enforcement. Trusted frontend code can still put expensive work in event handlers or Svelte effects. The approach is a carrot: good examples, useful helpers, and natural consumers rather than pretending to intercept all JavaScript execution. Truly synchronous ProseMirror hooks remain synchronous; do not defer event-handling decisions or browser operations requiring user activation indiscriminately.
+The host owns task lifetime, labels, errors, replacement keys, and cancellation. Cooperative work needs a request to keep the queue running. That request is a queue start lease. Helpers acquire it when needed and release it when finished; plugin authors do not manage it themselves. Cancelling one task does not cancel peer work or pagination. Document- or view-specific work should also stop when that document or view closes.
+
+All application plugins share pagination's frame allowance. The queue takes turns between jobs and preserves its existing balance between interactive and background work. Each frame has a 1,000-step cap and an 8 ms soft time budget. Soft means the queue checks the budget between steps. It cannot interrupt a step that is already running. Keep each unit short.
+
+Quotas, slow-step diagnostics, and measured responsiveness guarantees are not implemented.
+
+These helpers encourage responsive code; they do not intercept all JavaScript. Trusted code can still block in event handlers or Svelte effects. Truly synchronous ProseMirror hooks stay synchronous. Do not defer decisions that need an immediate answer or browser operations that require user activation.
 
 ### Computation, cancellation and result application
 
-Task utilities should separate capture/computation from result application. When results are ready, obtain current editor state, validate the target, and construct/apply a transaction synchronously. Do not retain a mutable transaction or assume a live selection remains valid across `await` or a cooperative yield. Current state alone does not make an old result applicable: map and validate captured targets, discard stale results, or recompute according to the operation's semantics. Multiple incremental edits need explicit partial-completion and undo-grouping behavior.
+Separate data capture, computation, and result application. Capture only needed data and the target. After computation, validate that the result still applies and construct a fresh transaction synchronously. Do not retain transactions or assume a selection survives `await` or a cooperative yield. The current editor API rejects stale results rather than mapping them. Incremental edits need explicit partial-completion and undo-grouping rules.
 
-`tasks.worker` uses bundled dedicated one-shot worker modules, explicit inputs/outputs and optional transfer lists. The separate `@writers-ide/tasks/worker` entry exports `defineTaskWorker` with no Svelte or application/DOM runtime imports. Its request/result/error protocol handles cloneable errors; the service handles transport/factory/application failures, cancellation, late responses, listener cleanup and termination. Function-string blobs are not supported: serialization loses imports/closures and does not supply a messaging protocol. Pooling, worker progress and timeouts are not implemented. Worker computation may update plugin-local UI without producing an editor transaction.
+`tasks.worker` starts a fresh dedicated worker for each task. The worker code is a module included in the build. Inputs and outputs are explicit. Optional transfer lists move supported values to the other thread rather than copying them.
 
-Async task cancellation requires the operation to honor its signal; a dedicated worker can be terminated. Main-thread synchronous work cannot be interrupted while it blocks. Check cancellation before starting and before applying results, and surface failures with plugin/task identity. Same-key submissions replace prior work across all four modes within one service; unique activation identities isolate queue keys across plugins and reactivations. Handles expose reactive status/progress/errors, a cancellation signal, and a nonrejecting `result: Promise<TaskOutcome<T>>` with completed/cancelled/failed outcomes. Cooperative handles also pause/resume. Worker `apply` runs synchronously at most once while active; do not also apply the awaited value unless intentionally performing a separate operation. See the [task guide](../../packages-js/tasks/README.md) and [contracts](../../packages-js/tasks/src/contracts.ts) for exact semantics.
+The separate `@writers-ide/tasks/worker` entry exports `defineTaskWorker`. It imports no Svelte, application, or DOM runtime code. Its message protocol represents errors as data that can be copied between threads.
 
-General queue/task mechanics belong in reusable infrastructure, plugin lifecycle scoping belongs in the host, and current-state validation/transaction application belongs in the word-processing subsystem. Formatting commands do not belong in these generic APIs. This direction does not authorize redesigning model-mutating pagination.
+The service handles worker creation and messaging failures, failed result application, cancellation, and late responses. It also removes listeners and terminates the worker.
+
+Worker pooling, progress, and timeouts are not implemented. A worker result can update local UI without editing a document.
+
+Async operations must honor cancellation signals. Dedicated workers can be terminated; synchronous main-thread work cannot be interrupted. Check cancellation before work and before applying results. Same-key submissions replace prior work across all four modes within one service. Activation identities isolate keys across plugins and reactivations.
+
+Each task returns a handle for observing and controlling it. Status, progress, and errors update reactively. The handle also exposes a cancellation signal and `result: Promise<TaskOutcome<T>>`. This promise never rejects. It resolves to a completed, cancelled, or failed outcome. Cooperative handles also support pause and resume. Worker `apply` runs synchronously at most once while active. Do not also apply the awaited result unless intentionally performing a separate operation. See the [task guide](../../packages-js/tasks/README.md) and [contracts](../../packages-js/tasks/src/contracts.ts) for exact semantics.
+
+The library owns execution mechanics. The host owns plugin task lifetimes. The word-processing provider owns editor validation and transaction application. Formatting commands belong to neither generic layer. This work does not authorize a pagination redesign.
 
 ## Accepted implementation stages
 
-Stages 1 and 2 support trusted, bundled plugins only. The owner subsequently revised Stage 3's original frontend-isolation prerequisite: frontend DOM isolation is deferred, while external loading still requires a concrete trust/installation design and verified native restrictions. These stages are not release dates or claims of completed work.
+Two numbering schemes describe this work. **Stages** are the original architectural rollout. **Parts** are the later implementation sequence in [implementation-plan.md](implementation-plan.md). Part 3 does not mean Stage 3.
+
+Stages 1 and 2 support bundled trusted plugins. Stage 2 includes Parts 1 and 2 and the implemented editor portions, Parts 3A and 3B. Part 3C covers proposed custom content. Part 4 covers external loading and corresponds to the remaining Stage 3 work. These are scopes, not release dates.
 
 ### Stage 1 — Contracts, host, and formatting plugin
 
-**Merged in #80:** contracts, bundled lifecycle host, registry/rendering adapters, and the formatting toolbar migration; see the contracts below.
+**Merged in #80 on 2026-11-14.** This established plugin identity, exact host API compatibility, synchronous lifecycle, contributions, explicit registration, duplicate-ID checks, activation rollback, and cleanup.
 
-- Establish plugin identity, API compatibility, lifecycle, and contribution contracts for toolbar items, commands and central views. Stage 1 also introduced formatting-state/command interfaces; the owner-approved Stage 2 correction below moves those feature contracts out of the general plugin package.
-- Keep data and command contracts independent of Svelte and ProseMirror; place Svelte presentation types in a separate adapter entry point.
-- Implement explicit bundled-plugin registration, contribution ownership, duplicate-ID validation, activation-failure rollback, and deactivation cleanup of contributions and subscriptions.
-- Migrate the basic formatting toolbar to formatting summaries and validated commands instead of raw editor views, selections, documents, or mutable workspace references. Preserve horizontal/vertical presentations, capacity rules, formatting behavior, and docking behavior.
-- Keep the existing ProseMirror editor behind the formatting service initially. Do not simultaneously extract the whole word processor or redesign pagination.
-- Test lifecycle/cleanup and existing formatting behavior.
+The host supports formatting toolbar contributions with horizontal and vertical presentations, capacity costs, and docking. Data contracts and the Svelte presentation adapter have separate entry points.
 
 ### Stage 2 — Reusable libraries and plugin management UI
 
-**Current `bh/phase-2-plugin-transition` working tree / unmerged:** the scoped libraries, manager, owner-requested feature-neutral correction and authorized task/provider Parts 1–2 and word-processing Parts 3A–3B below are connected in source. PR identity is not yet known. Verified validation and remaining limits are recorded in the current changelog entry.
+**Implemented on `bh/phase-2-plugin-transition`; unmerged, no PR known.** The branch adds private layout and component libraries and a host-owned manager. It keeps application rendering and composition outside the reusable libraries.
 
-- Extract cohesive docking/workbench infrastructure into `packages-js/layout`, removing ProseMirror and application-singleton dependencies from the reusable layer.
-- Extract the UI components and service pieces needed by the formatting plugin into `packages-js/components`, with explicit dependencies. Keep packages private to the workspace initially; publication and stable public-package APIs are not part of this stage.
-- Keep the shared plugin architecture feature-neutral: lifecycle context consists of `signal`, `own`, `contributions`, activation-owned `tasks`, and declared provider access through `apis`. Formatting contracts, feature policies and activation scoping belong to the formatting feature, now consuming the word-processing provider rather than a required general host service. This accepted owner correction removes feature coupling without adding a generic service bus or extensible permission model.
-- Part 1 extracts scheduling/task mechanics into private `@writers-ide/tasks`, with plugin host ownership and the unchanged application queue facade. Part 2 adds exact-major provider contracts, declared dependencies and consent-based dependent removal; neither migrates the editor. Part 3A adds private `@writers-ide/word-processing` and migrates formatting to its provider without extracting editor assembly. Part 3B adds lifecycle-owned behaviors and in-place reconfiguration with accepted root/append dispatch integration. Shortcut handling and broader editing-helper extraction remain deferred.
-- Add a user-facing plugin-management view backed by the host's public management API. Distinguish this UI from the developer-facing plugin API.
-- List bundled plugins with descriptions, versions, enabled/disabled/failed states, declared capabilities and contributions, and actionable activation errors. Allow enabling/disabling optional plugins.
-- Clearly identify bundled plugins as trusted. Capability declarations and narrow interfaces do not sandbox in-process JavaScript. Do not offer installation from files or URLs yet.
-- Disabling a plugin removes its active contributions, not its saved data. Keep the management shell host-owned so a failing plugin cannot prevent users from disabling it.
+The feature-neutral context contains `signal`, `own`, `contributions`, `tasks`, and `apis`. Domain services are supplied through declared provider contracts.
+
+The later implemented parts add shared task helpers, exact-major providers and dependencies, the word-processing API, and lifecycle-owned behaviors. Formatting consumes the provider. Editor assembly is not extracted. Shortcut routing and broader helper extraction remain deferred.
+
+The manager lists trusted bundled plugins, metadata, status, capabilities, contributions, provider availability, and actionable errors. It supports enable, disable, retry, and confirmed dependent cascades. The host owns the management shell so disabling a feature cannot remove it. There is no file/URL installation workflow or persistent activation preference.
 
 ### Stage 3 — Third-party loading, trust and native enforcement
 
-- Define external-package validation, compatibility, installation review and explicit frontend trust/network disclosures before enabling external loading.
-- Approve and verify restrictive backend/native access, runtime request validation, revocation and failure handling. Do not promise that same-environment frontend JavaScript is confined by capability declarations.
-- Support ordinary Svelte and shared official/third-party extension APIs. Frontend DOM isolation is deferred; no iframe or alternative runtime is required or selected by this plan.
-- Build external loading on the implemented Part 2 dependency/provider lifecycle; deeper editor extension contracts still require separate approval. Test native denial and actual lifecycle guarantees rather than nonexistent frontend isolation.
+**Planned; separate approval required.** External loading needs package validation, compatibility rules, installation review, and clear frontend trust/network disclosures. It also needs restrictive native APIs with verified request validation, revocation, and failure handling.
 
-Keep transferable data, scoped IDs, explicit requests and lifecycle ownership where useful. Direct Svelte components are trusted execution, whether supplied by an official or third-party feature. Shared APIs must not introduce official-feature-only privileged shortcuts. Task/provider Parts 1–2 and word-processing Parts 3A–3B are authorized and implemented as private, evolving contracts; custom content and external loading in Parts 3C/4 require separate approval.
+Ordinary Svelte and the same official/third-party APIs are the accepted direction. Frontend DOM isolation is deferred. Tests must establish real native denial and lifecycle behavior without claiming frontend isolation.
 
-The undo-tree plugin remains a future consumer once host history plumbing exists. These stages do not select a history/storage model or implement durable branching history.
+External loading should build on the current provider/dependency lifecycle. Custom content still has its own approval gate. The stages do not select storage or history models. An undo-tree feature remains a possible future consumer of host-managed history.
 
 ## Examples and candidate boundaries
 
-The table illustrates responsibility boundaries. Formatting-plugin migration and scoped layout/component/task extraction are implemented; the other examples remain candidates, not additional authorized extraction tasks or a publication roadmap.
+These examples illustrate responsibilities, not authorization for further extraction:
 
-| Area                   | Likely responsibility                                                                            | Possible library reuse / constraint                                                                                                                                                                   |
-| ---------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Formatting toolbar     | Feature plugin contributing bar presentations and invoking formatting commands.                  | Optional shared UI components; toolbar need not own editing semantics.                                                                                                                                |
-| Word-processing view   | Feature plugin hosted in a central-view container.                                               | ProseMirror editing helpers where schema assumptions are explicit. Current editor assembly remains coupled.                                                                                           |
-| Workbench docking      | Core workspace service used by plugin contributions.                                             | Implemented as private `@writers-ide/layout` in Stage 2, with application-specific rendering/composition remaining in the host. See [DnD context](../dnd/context.md).                                 |
-| UI foundations         | Shared presentation services and optional plugin-facing components.                              | Stage 2 extracts tooltip/icon-button primitives into private `@writers-ide/components`; broader components remain in the application.                                                                 |
-| Cooperative scheduling | Shared execution infrastructure, not a feature plugin.                                           | Implemented as private, Svelte-reactive `@writers-ide/tasks`, with no singleton or editor/host dependency. Steps must remain short; workers offload suitable computation, not isolate malicious code. |
-| Shortcut handling      | Shared routing; feature commands and default bindings are contributions.                         | Potential reusable normalization/routing module; focus scopes and conflict policies still need design.                                                                                                |
-| Pagination             | Currently a coupled word-processing subsystem, not an independently replaceable external plugin. | Possible later specialized library. Preserve current model-mutating behavior; extraction does not authorize a layout redesign. See [pagination context](../pagination/context.md).                    |
-| Undo-tree view         | Future plugin presenting and navigating host-managed history.                                    | History algorithms may eventually form a library; durable branching history is not implemented.                                                                                                       |
+- **Formatting toolbar:** an implemented plugin using optional shared controls and provider commands.
+- **Word-processing view:** intended to be a feature plugin in a central container. Editor assembly remains coupled to the app.
+- **Workbench docking:** core workspace infrastructure using private `@writers-ide/layout` and app-owned rendering.
+- **UI foundations:** private `@writers-ide/components` supplies tooltip and icon-button primitives. Broader UI remains application code.
+- **Scheduling:** shared infrastructure in `@writers-ide/tasks`, not a feature plugin. Workers offload computation; they do not establish a malicious-code sandbox.
+- **Shortcuts:** possible shared routing infrastructure. Focus scopes and conflict policy still need design.
+- **Pagination:** currently a coupled word-processing subsystem, not an independently replaceable external plugin. Preserve its model-mutating behavior.
 
 ### Undo tree as a boundary example
 
-The host history service would record and preserve changes, maintain stable identities, reconstruct authorized historical content, and validate navigation. An undo-tree plugin would visualize that history, request previews, and request navigation through public APIs. Disabling the view must not disable recovery or delete history.
+A future host history service would record changes, preserve stable identities, reconstruct authorized historical content, and validate navigation. An undo-tree plugin would display that history and request previews or navigation. Disabling its UI must not delete history or disable recovery.
 
-Reading history metadata, reading historical content, navigating history, and destructively pruning it are distinct authorities. Permission to read current content should not automatically expose deleted historical content. A history library, application history service, and undo-tree presentation are potential separate layers, not a selected storage or branching design. Existing ProseMirror undo is not durable project history.
+Reading metadata, reading historical content, navigating history, and pruning history are distinct authorities. Current-content access should not automatically reveal deleted historical content. A history library, host service, and plugin presentation could be separate. No storage or branching design is selected. ProseMirror typing undo is not durable project history.
 
 ## Safety and data contracts
 
-Packaging is not isolation. In-process frontend components and imported libraries execute with their environment's authority; frontend DOM isolation is deferred and external network calls are allowed in principle. Treat document access plus network access as the ability to disclose that document.
+Packaging does not isolate code. Imported frontend code runs with its environment's authority. See the [trust model](#accepted-direction-frontend-trust-and-native-restrictions) for network risks and native restrictions.
 
-Public APIs should favor versioned data, scoped handles and validated requests over mutable application singletons. Deep editor access must be designed within the word-processing API for both official and third-party features. Native permission enforcement belongs below frontend code; TypeScript types and declared capabilities alone do not enforce it. Frontend trust does not grant unrestricted filesystem, shell, native execution, or backend access.
+Favor versioned data, scoped handles, and validated requests over mutable application singletons. Deep editor access must use the shared word-processing API. Native enforcement belongs below frontend code.
 
-Schema-owning features require versioning and missing-plugin preservation contracts before extraction. Removing a toolbar is different from removing the implementation of saved content. Preserve plugin-owned data when a plugin is disabled or unavailable; basic preservation must not require executing it.
+Disabling or removing a plugin must preserve its saved data. Basic preservation must not require executing an unavailable plugin. Schema-owning features need versioning and missing-plugin preservation contracts before extraction. Removing a toolbar is not equivalent to removing support for saved content.
 
 ## Current contracts and limitations
 
-- `@writers-ide/plugins` is a private, source-exported workspace package. Root contracts use a type-only `TaskService` import, with no framework/editor runtime imports, `Formatting*` types, formatting-specific names, or `context.formatting`. The common context exposes `signal`, `own`, `contributions`, `tasks`, and `apis`; no task capability was added, and contribution capabilities are `contributions.toolbar`, `contributions.view`, and `contributions.command`. The general host requires no formatting service. API compatibility currently means exact `apiVersion: 1`, not a version-range negotiation scheme. See the [general package guide](../../packages-js/plugins/README.md), which links to the [feature-local formatting guide](../../src/lib/editor/prosemirror/menu/basic/README.md).
-- The synchronous bundled host explicitly registers, activates, deactivates, and reports metadata/errors for plugins. It checks manifest/capability declarations and contribution IDs, rolls back failed activation, aborts/revokes a context before reverse-order cleanup, and continues cleanup after disposer failures. Contributions and `own()` resources are activation-owned; retained contribution handles cannot act after deactivation or a later reactivation. Feature-specific subscription ownership is implemented by the feature through this common lifecycle.
-- These checks govern host API use, not ambient JavaScript authority. Only trusted bundled plugins execute. There is no external loader, sandbox, user-grant UI, package discovery, or persistent activation preference.
-- Stage 2 exposes `PluginManagementService` (`list`, `subscribe`, `activate`, `planDeactivation`, `deactivate`) with reactive frozen snapshots. The host-owned `PluginManager.svelte` accepts `management` and optional `requiredPluginIds`; it lists metadata, lifecycle status, declared capabilities, active contributions, provided contracts, dependency availability and activation/cleanup/task/dependency/provider errors, with enable/disable/retry and confirmed dependent-cascade actions and a bundled-trusted warning. The route owns its native `<dialog>` and passes `onplugins` through `Editor` to the Plugins button in `HorizontalBaseBar`, explicitly restoring launcher focus on close for keyboard and pointer use. This adds no installation workflow or new plugin i18n contract.
-- Each activation gets a task service without an extra manifest capability. Cooperative tasks own/release queue start leases automatically; async/worker tasks need no scheduler lease. Owner abort/disposal cancels active work and revokes submissions; per-task cancellation leaves peer work and pagination alive. Task failures are attributed with label/key as `phase: 'task'` management errors and notify the manager without disabling an active plugin or making otherwise successful deactivation fail. Activation and host cleanup failures still produce failed lifecycle status. Terminal handles may be retained by callers, not a host task-history registry; cleanup errors can update a cancelled handle without changing its settled outcome.
-- Trusted presentations have a local Svelte boundary with a fallback for rendering/effect failures, leaving the host-owned manager available for disable/re-enable. Shared tooltip snippets have their own local boundary because they render outside the plugin view; replacing the descriptor/content or dismissing the tooltip allows recovery. This is presentation-error containment, not protection from arbitrary JavaScript errors, event-handler failures, malicious code, or ambient host access.
-- Stage 2 `@writers-ide/components` exports `TooltipState`, `TooltipProvider`, `IconButton`, `Tooltip`, and `Pointer` with explicit state/context dependencies and no application singleton. Legacy app wrappers share the application tooltip manager; the route wraps `Editor` with that manager and `renderPointer={false}` because the app still renders its pointer. Drag suppression uses the same manager.
-- The application adapts toolbar/view contributions to existing registries and command contributions to host-owned command handles. `defineSveltePresentation(component, props)` checks explicit feature props before type erasure; the descriptor/rendering adapter has no hardcoded context prop. A component receives the common context only if it needs it and the plugin explicitly supplies it. Formatting receives only its scoped formatting service, not legacy workspace/editor props. Central-view instance metadata and contributed shortcut routing are not implemented. The built-in word processor still uses the legacy path; its extraction is intentionally deferred.
-- `createFormattingPlugin()` resolves its declared required word-processing provider and creates a per-activation `FormattingService(provider)`. Feature-local `scopeFormattingService` clones snapshots/requests, owns subscriptions through `context.own`, and revokes through `context.signal`. Early release, listener-failure cleanup and stale-activation rejection remain covered. This is a trusted provider integration, not a generic service bus, extensible permission model or external security grant; external loading/native enforcement remain open and frontend DOM isolation is deferred.
-- Formatting delivers immediate, copied, data-only snapshots: view ID, monotonic revision, mark/block ratios, and command availability. Requests specify view ID, revision, and command. The service validates live active view/state/editability, rejecting stale requests even before a reactive flush; tab document IDs are resolved to distinct registered view IDs. Existing caret mark no-ops, superscript/subscript exclusion, and continuation-aware paragraph commands are preserved. Unavailable/no-op controls are disabled.
-- Formatting subscriptions start the feature bridge/provider subscription lazily and release it when unused; the provider owns shared source/effect resources. Availability queries inspect content without generating speculative transactions. Peer grouping must safely traverse page boundaries, final leaf blocks and document-end selections; errors in this query can otherwise escape a ProseMirror update before subscriber notification. Update-listener failures are reported without interrupting other subscribers or editor dispatch. No rich-text content or mutable editor reference crosses the formatting boundary.
-- Disabling a toolbar removes its presentation but retains placement IDs and declared orientation costs, avoiding overfill on re-enable. Missing-item placeholders remain, and reactivation restores the registered presentations. Registry `clear()` releases retained metadata. This is in-memory preservation, not durable layout or plugin-state storage.
-- Relocation remounts formatting presentations against the same scoped service and current snapshot. No general arbitrary component-local-state transfer, custom schema lifecycle, or durable project history is introduced.
+### Host lifecycle and management
+
+`@writers-ide/plugins` is private and source-exported. Root contracts have no framework/editor runtime imports. They use a type-only `TaskService` import and contain no formatting types. The [general guide](../../packages-js/plugins/README.md) documents exact manifests, contribution APIs, and ownership.
+
+The synchronous host checks declarations and contribution IDs. It rolls back failed activation, revokes and aborts before reverse-order cleanup, and continues after disposer failures. Contributions and `own()` resources belong to one activation. Old handles cannot act after deactivation or regain authority on reactivation. Features must scope their own subscriptions through this lifecycle.
+
+`PluginManagementService` exposes `list`, `subscribe`, `activate`, `planDeactivation`, and `deactivate` with frozen reactive snapshots. `PluginManager.svelte` takes `management` and optional `requiredPluginIds`. The route owns the dialog, passes `onplugins` through `Editor` to `HorizontalBaseBar`, and restores launcher focus on close. This adds no plugin i18n contract, discovery, user-grant UI, or persisted preference.
+
+Each activation receives a task service without another capability. Cooperative tasks acquire and release the requests that keep the queue running. Async and worker tasks need no such lease. Disposal cancels owned work and rejects further submissions. Task errors include label/key and phase `task`, without disabling the plugin. Callers may keep handles after tasks finish; the host does not keep task history. A later cleanup error can update the error on a cancelled handle. It does not change the already-resolved cancelled outcome. See the [task guide](../../packages-js/tasks/README.md#exact-task-api).
+
+### Presentations and workspace adapters
+
+Trusted Svelte presentations have local render/effect error boundaries and fallbacks. Shared tooltip snippets have their own boundary because they render outside the plugin view. Replacing content or dismissing the tooltip permits recovery. These boundaries do not contain arbitrary JavaScript, event-handler failures, malicious code, or native access.
+
+`defineSveltePresentation(component, props)` checks explicit feature props before type erasure. The component receives the supplied props; include a context explicitly if the component needs one. Toolbar/view contributions adapt to existing registries; host command contributions use host-owned handles. Central-view instance metadata and contributed shortcut routing are not implemented. The application registers the built-in word processor directly.
+
+`@writers-ide/components` exports `TooltipState`, `TooltipProvider`, `IconButton`, `Tooltip`, and `Pointer` with explicit dependencies and no app singleton. App wrappers retain the shared tooltip manager. The route supplies it to `Editor` with `renderPointer={false}` because the app still renders its pointer. Drag suppression uses that same manager.
+
+### Formatting and relocation
+
+Formatting exposes immediate copied snapshots with view ID, monotonic revision, mark/block ratios, and command availability. Requests identify view, revision, and command. Validation uses live active view, state, and editability, including before reactive flush. Tab document IDs resolve to distinct registered view IDs. Unavailable and no-op controls are disabled.
+
+Formatting subscriptions are lazy. Availability queries inspect content without speculative transactions. Peer grouping must handle page boundaries, final leaf blocks, and document-end selections. Listener failures do not interrupt peers or editor dispatch. Feature-local scoping copies snapshots and requests, owns subscriptions, and rejects stale activations. See the [formatting guide](../../src/lib/editor/prosemirror/menu/basic/README.md) for these policies and regressions.
+
+Disabling a toolbar removes its presentation but retains placement IDs and orientation capacity costs. Missing-item placeholders remain, and reactivation restores presentations. Registry `clear()` releases retained metadata. This is in-memory preservation, not durable storage. Relocation remounts UI against the same scoped service and current snapshot. There is no general component-local-state transfer, schema lifecycle, or durable history API.
 
 ## Source and test entry points
 
-These are private, evolving contracts and internal discovery points, not a stable published SDK:
+These are private implementation entry points, not a published stable SDK. Recorded test results belong to the [changelog](change-log.md); the references below identify coverage, not newly run checks.
 
-- `packages-js/plugins/index.ts`, `svelte.ts`, and [README](../../packages-js/plugins/README.md): data/lifecycle contracts, trusted presentation descriptor, API reference.
-- `src/lib/plugins/plugin-host.ts`: lifecycle, ownership, revocation, rollback, reactive management, declared providers/dependency graphs and per-activation tasks; `plugin-dependencies.test.ts` covers exact majors, activation order/preflight, optional arrival/removal, connection facades/cleanup and errors; `plugin-host.test.ts` and `plugin-tasks.svelte.test.ts` cover task scoping, rollback, unload, reactivation, late results, error phases and shared application-queue integration.
-- `src/lib/plugins/PluginManager.svelte`, `PluginManager.svelte.test.ts`: host-owned management panel and service/action failures. Formatting declares only the toolbar contribution capability; the manager makes no formatting-permission claims. `PluginPresentation.svelte`, `plugin-presentation.svelte.test.ts`, and `generic-presentation.svelte.test.ts`: explicit-prop rendering, feature-neutral presentations, local presentation-failure fallback and recovery.
-- `src/lib/plugins/application-plugin-host.ts`, `PluginPresentation.svelte`: application registry adapters and restricted-prop rendering; `application-plugin-host.svelte.test.ts` covers collisions, rendering, ownership, disable/re-enable and capacity preservation.
-- `src/lib/editor/prosemirror/menu/basic/contracts.ts`, `formatting-service.svelte.ts`, `scope-formatting-service.ts`: feature-owned data/command contract, provider-consuming formatting bridge, and activation-scoping helper. The full bridge regression suite moved alongside the bridge as `formatting-service.svelte.test.ts`, retaining stale requests, separate tab/view IDs, summaries, availability, peer paragraphs, subscription cleanup/error isolation, and quiet-query coverage. `scope-formatting-service.test.ts` owns formatting-specific lifecycle regressions; generic host lifecycle tests are feature-neutral.
-- `packages-js/word-processing/` ([guide](../../packages-js/word-processing/README.md), [contracts](../../packages-js/word-processing/src/contracts.ts), [service](../../packages-js/word-processing/src/service.svelte.ts)): standalone synchronous editor API, strict targets and connection ownership without app imports. `src/lib/testing/word-processing.svelte.test.ts`: core service regressions.
-- `packages-js/word-processing/src/behaviors.svelte.ts`, `src/lib/testing/word-processing-behaviors.svelte.test.ts`, and `src/lib/editor/prosemirror/view/editor-behaviors.svelte.test.ts`: managed wrappers, ordering, identity/state preservation, staged reconciliation, source mutation guards, quarantine/fallbacks and accepted-transaction app integration.
-- `src/lib/editor/prosemirror/behaviors/` ([guide](../../src/lib/editor/prosemirror/behaviors/README.md)), `e2e/fixtures/word-processing/BehaviorFixture.svelte`, and `e2e/word-processing-behaviors.test.ts`: opt-in upstream input rules, mapped decorations, bounded module-worker analysis and public command IDs; existing word-processing CI command includes both fixture suites.
-- `src/lib/editor/prosemirror/word-processing.svelte.ts` and `word-processing.svelte.test.ts`: actual app source adapter/provider and integration regressions. `src/routes/+page.svelte`: registers provider and `createFormattingPlugin()`, activates formatting through required dependency resolution, and cascades provider teardown; still directly registers the ProseMirror view.
-- `src/lib/editor/prosemirror/menu/quick-format/menu.ts`, `QuickFormat.svelte`: independent opt-in public-API consumer wrapping upstream `toggleMark`, not registered by the default route. `e2e/word-processing.test.ts`, `e2e/fixtures/word-processing/`, and `playwright.word-processing.config.ts`: dedicated production-built fixture using the actual app provider adapter, generic host, real views/history and worker, with no Basic Menu import/registration. Run `pnpm test:word-processing` separately from app e2e; Browser Smoke CI runs it per selected engine.
-- `src/lib/editor/prosemirror/menu/basic/`: formatting plugin definition and explicit-service-prop, snapshot/command-only presentations; `menu.test.ts` covers both orientations and command routing. See the [feature guide](../../src/lib/editor/prosemirror/menu/basic/README.md).
-- `src/lib/editor/state/bar-item-registry.svelte.ts`, `bar-items.svelte.ts`, and `tab-state-registry.svelte.ts`: existing registries with trusted plugin presentation adapters and retained disabled-toolbar sizes.
-- `src/lib/editor/state/shared.types.ts`: legacy broad injected props, no longer supplied to the formatting plugin.
-- `src/lib/editor/prosemirror/plugins.svelte.ts` and `view/editor.ts`: ProseMirror factory registration and editor construction, separate from the bundled application-plugin host.
-- `src/lib/editor/bars/`, `src/lib/dnd/`, and bar/floater/transfer state: application rendering/composition and compatibility adapters over the layout library; `e2e/docking.test.ts` includes real formatting-button and docking regressions. The CI smoke command includes `e2e/smoke.test.ts`, `e2e/pagination-selection.test.ts`, and `e2e/plugin-manager.test.ts`; validating only smoke plus docking misses the multi-page selection/reflow/undo and management regressions.
-- `packages-js/layout/index.ts`, `src/`: injected workbench engine and drag primitives; `src/lib/editor/state/workbench.svelte.ts` composes the app compatibility instance. See [DnD context](../dnd/context.md).
-- `packages-js/components/index.ts`, `src/`: explicit tooltip state/provider and shared controls. `src/lib/testing/layout-library.svelte.test.ts` and `components-library.svelte.test.ts` cover library integration and instance independence.
-- `packages-js/tasks/index.ts`, `src/contracts.ts`, `src/task-service.svelte.ts`, `src/work-queue.svelte.ts`, and [task guide](../../packages-js/tasks/README.md): reusable queue, managed helpers and exact outcome/ownership contracts; `worker.ts` and `examples/count.worker.ts`: worker-only helper and bundled-module example. `src/lib/editor/state/work-queue.svelte.ts` preserves compatibility exports and the application-owned singleton.
-- `src/lib/testing/tasks-library.svelte.test.ts`, `tasks-library-worker.test.ts`, and the original `src/lib/editor/state/work-queue.svelte.test.ts`: service mechanics, mocked worker protocol and compatibility queue regressions. `e2e/tasks.test.ts`, `e2e/fixtures/tasks/`, and `playwright.tasks.config.ts`: separate production-built shared-queue/real-worker fixture in Chromium/WebKit, including transfers, started-worker cancellation, errors and recovery. Run `pnpm test:tasks`; the main app e2e config excludes these tests. `.github/workflows/browser_smoke.yml` adds a task-fixture step for each selected engine; browser checks are not native-runtime verification.
-- `e2e/plugin-dependencies.test.ts`, `e2e/fixtures/plugins/`, and `playwright.plugins.config.ts`: separate production-built provider/consumer and dependency-management fixture in Chromium/WebKit, run with `pnpm test:plugins` and included in Browser Smoke CI per selected engine. Main app e2e excludes this fixture. Verified results and remaining diagnostic limits are recorded in the [cumulative entry](change-log.md); browser tests do not establish native/security guarantees.
-- The root and five private packages are workspace members, including `@writers-ide/word-processing`. Shortcuts, broader UI/services, and editing helpers remain application code; no bulk extraction is implied.
+### Host and contributions
+
+- `packages-js/plugins/index.ts`, `svelte.ts`, and [guide](../../packages-js/plugins/README.md): lifecycle/data contracts and typed presentation descriptors.
+- `src/lib/plugins/plugin-host.ts`, `plugin-host.test.ts`, `plugin-dependencies.test.ts`, and `plugin-tasks.svelte.test.ts`: lifecycle, rollback, dependency preflight, exact majors, optional providers, connection cleanup, errors, and task ownership.
+- `src/lib/plugins/PluginManager.svelte` and `PluginManager.svelte.test.ts`: management actions, metadata, failures, and cascade consent.
+- `src/lib/plugins/PluginPresentation.svelte`, `plugin-presentation.svelte.test.ts`, and `generic-presentation.svelte.test.ts`: explicit props and local failure containment.
+- `src/lib/plugins/application-plugin-host.ts` and `application-plugin-host.svelte.test.ts`: registry adapters, collisions, ownership, reactivation, and retained capacity.
+- `src/lib/editor/state/bar-item-registry.svelte.ts`, `bar-items.svelte.ts`, and `tab-state-registry.svelte.ts`: registry integration. `shared.types.ts` defines the application workspace prop types.
+- `e2e/plugin-dependencies.test.ts`, `e2e/fixtures/plugins/`, and `playwright.plugins.config.ts`: production-built provider/consumer and manager fixture. Run `pnpm test:plugins` separately from app e2e.
+
+### Editor and feature integrations
+
+- `packages-js/word-processing/src/contracts.ts`, `service.svelte.ts`, and [guide](../../packages-js/word-processing/README.md): standalone API, exact targets, result handling, and ownership. `src/lib/testing/word-processing.svelte.test.ts` covers service regressions.
+- `packages-js/word-processing/src/behaviors.svelte.ts` and `src/lib/testing/word-processing-behaviors.svelte.test.ts`: wrappers, ordering, key/state preservation, staging, quarantine, and cleanup.
+- `src/lib/editor/prosemirror/word-processing.svelte.ts` and `word-processing.svelte.test.ts`: app sources/provider. `src/routes/+page.svelte` composes provider and formatting and still directly registers the editor view.
+- `src/lib/editor/prosemirror/view/editor.ts`, `page-indexes.ts`, and `editor-behaviors.svelte.test.ts`: accepted-transaction integration and normalization. `plugins.svelte.ts` in the parent directory supplies baseline editor factories, separately from the application-plugin host.
+- `src/lib/editor/prosemirror/menu/basic/` ([guide](../../src/lib/editor/prosemirror/menu/basic/README.md)): plugin definition, contracts, formatting bridge, scoped service, and presentations. `formatting-service.svelte.test.ts`, `scope-formatting-service.test.ts`, and `menu.test.ts` cover formatting queries, stale targets, ownership, and both orientations.
+- `src/lib/editor/prosemirror/menu/quick-format/menu.ts` and `QuickFormat.svelte`: independent public-API command consumer.
+- `src/lib/editor/prosemirror/behaviors/` ([guide](../../src/lib/editor/prosemirror/behaviors/README.md)): input rules, mapped decorations, bounded worker analysis, and public command IDs.
+- `e2e/word-processing.test.ts`, `e2e/word-processing-behaviors.test.ts`, `e2e/fixtures/word-processing/BehaviorFixture.svelte`, and `playwright.word-processing.config.ts`: real views/history, app adapter, independent consumers, and workers. Run `pnpm test:word-processing` separately from app e2e. The fixture imports no Basic Menu implementation.
+
+### Libraries, scheduling, and browser coverage
+
+- `packages-js/layout/index.ts` and `src/`: injected layout engine and drag primitives. `src/lib/editor/state/workbench.svelte.ts` composes the compatibility instance. `src/lib/editor/bars/` and `src/lib/dnd/` retain app rendering/composition. See [DnD context](../dnd/context.md).
+- `packages-js/components/index.ts` and `src/`: explicit tooltip services and controls. `src/lib/testing/layout-library.svelte.test.ts` and `components-library.svelte.test.ts` cover instance independence.
+- `packages-js/tasks/src/contracts.ts`, `task-service.svelte.ts`, `work-queue.svelte.ts`, and [guide](../../packages-js/tasks/README.md): queue and helper mechanics. Package `worker.ts` and `examples/count.worker.ts` provide worker-only helpers and an example. `src/lib/editor/state/work-queue.svelte.ts` retains compatibility exports and the app singleton.
+- `src/lib/testing/tasks-library.svelte.test.ts`, `tasks-library-worker.test.ts`, and `src/lib/editor/state/work-queue.svelte.test.ts`: task mechanics, mock worker protocol, and queue regressions. `e2e/tasks.test.ts`, `e2e/fixtures/tasks/`, and `playwright.tasks.config.ts` cover real workers, transfers, cancellation, recovery, and queue sharing. Run `pnpm test:tasks`.
+- `e2e/docking.test.ts`: real docking and formatting-button regressions. Smoke also includes `e2e/smoke.test.ts`, `pagination-selection.test.ts`, and `plugin-manager.test.ts`. Running only smoke and docking misses broader app regressions.
+- `.github/workflows/browser_smoke.yml`: selected-engine task, provider, and word-processing fixture steps alongside app smoke. Main app e2e excludes those dedicated fixtures. Browser checks do not establish Tauri/native enforcement. Use real pagination browser tests for geometry; behavior fixtures and jsdom cannot establish it.
+
+The root and five private packages are workspace members. Shortcuts, broader UI/services, and other editing helpers remain application code. This is not a bulk-extraction or publication plan.
 
 ## Open implementation decisions
 
-- Detailed package boundaries and names within the approved scope, dependency rules, and any later publication strategy. Initial packages are private workspace packages.
-- Extensions beyond the synchronous lifecycle and API version 1, user-grant policy, persistent activation preferences, and richer contribution/view-instance contracts.
-- Domain-specific subsystem APIs and any extensions beyond Part 2's implemented exact-major compatibility, required/optional activation, cycle, removal and connection-cleanup policies. Part 3A implements the word-processing provider and formatting consumer; full editor assembly/extraction is deferred.
-- Part 3C: schema lifecycle, content preservation and ordinary Svelte node views. Parts 3A–3B's synchronous live access, strict command/result application, behavioral ordering/removal and in-place reconfiguration are approved and implemented, not pending decisions. Broader upstream wrapper compatibility remains unproven.
-- Further task API stabilization, quotas, slow-step/performance diagnostics and any demonstrated need for worker pooling/progress/timeouts. Part 1's queue extraction, helper signatures, worker protocol and cancellation/outcome policies are implemented; cooperation remains opt-in.
-- External loading/review and network disclosure UX, restrictive native enforcement, and any later frontend isolation research.
-- Broader document/view ownership beyond the current source-owned views and provider-owned edits, schema evolution and content preservation.
-- History scope, granularity, branch/navigation semantics, collaboration, persistence, and retention.
+The implemented task/provider and editor behavior contracts are approved, not pending decisions. Remaining questions include:
 
-This document establishes vocabulary, responsibility boundaries, and the approved implementation sequence, not a complete API specification. Stage 1 is merged and the described Stage 2 behavior is working-tree implementation; candidate examples outside the approved scope do not authorize additional source migrations or imply runtime guarantees.
+- Package boundaries beyond current scope, dependency rules, publication, and API stabilization.
+- Lifecycle beyond synchronous API version 1, richer view-instance contracts, user grants, and persisted activation preferences.
+- Domain APIs beyond the current provider system and broader editor assembly extraction.
+- Custom content: schema lifecycle, preservation, and Svelte node/mark views. This is Part 3C and needs owner approval.
+- Task quotas, slow-step diagnostics, responsiveness measurements, and any demonstrated need for worker pooling, progress, or timeouts.
+- External loading, review/network disclosures, restrictive native enforcement, and possible later frontend isolation. External loading is Part 4 and needs owner approval.
+- Broader document/view ownership, schema evolution, persistence, history, collaboration, and retention.
+
+Candidate examples do not authorize further migrations. Use the [implementation plan](implementation-plan.md) for the remaining approval gates.

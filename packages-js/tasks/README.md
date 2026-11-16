@@ -1,36 +1,63 @@
 # Managed tasks
 
-Private, source-exported Svelte 5 library. `index.ts` exports `WorkQueue`, `createTaskService`, and all task/queue contracts. `worker.ts` is an independent worker-only entry: it imports neither Svelte nor application/DOM runtime code. The library has **no singleton queue** and no editor or plugin-host dependencies.
+`@writers-ide/tasks` manages work that can continue after the function that started it returns. It tracks progress, cancellation, results, and errors. Use it for a paragraph scan, a network request, or computation in a Web Worker.
+
+Choose how the work runs:
+
+- `forEach` splits iteration into short, synchronous main-thread units.
+- `cooperative` uses a generator: a function that can pause at `yield` and continue later. Here, **cooperative** means that your code returns control regularly so the browser can do other work. It does not mean a separate thread.
+- `async` manages an asynchronous API, such as `fetch`.
+- `worker` runs computation in a separate Web Worker over copied or transferred data.
+
+Use ordinary synchronous functions for short actions. Use managed tasks when work needs cancellation, progress tracking or time to run across multiple steps.
+
+This is a private Svelte 5 workspace library that exports source files, not a compiled distribution. Use a Svelte-aware bundler. [`index.ts`](index.ts) exports `WorkQueue`, `createTaskService`, and the task/queue contracts. [`worker.ts`](worker.ts) is a separate worker-only entry. It imports neither Svelte nor application or DOM runtime code. The library has no singleton queue and no editor or plugin-host dependencies. A feature plugin can use the library; the library is not itself a feature plugin.
 
 ## Use tasks in a plugin
 
-The plugin host provides `context.tasks` automatically. No extra manifest capability or queue lease is needed. Use `forEach` for short main-thread units, `cooperative` for algorithms needing explicit checkpoints, `async` for asynchronous APIs, and `worker` for off-thread computation. Short synchronous commands remain ordinary functions; none of these helpers is mandatory.
+A plugin is an object with a manifest and an `activate(context)` method. The **plugin host** is the application service that registers, enables and disables plugins. Application setup registers the object with `host.register(plugin)`. When setup or the Plugins manager enables it, the host calls its `activate` method synchronously. Plugin authors do not call that method themselves.
+
+The host supplies the `context` argument. Its `tasks` API starts managed work owned by that activation. The host cancels that work when the plugin is disabled or activation fails. Enabling the plugin again creates a new activation and context.
+
+See [Add a toolbar](../plugins/README.md#add-a-toolbar) for the plugin definition format and [Register and enable](../plugins/README.md#register-and-enable) for application setup. These explain how a bundled definition becomes an active feature. To use this library without a plugin host, skip to [Host integration](#host-integration).
+
+For example, put this definition in a TypeScript module in your bundled plugin. Application setup imports its `plugin` export, registers it, and enables `example.analysis`. The task starts during activation and logs the character count of each sample paragraph. The sample text is supplied here; it is not read from an open document.
 
 ```ts
-activate(context) {
-	context.contributions.command({
-		id: 'example.analysis/scan',
-		name: 'Scan paragraphs',
-		execute() {
-			context.tasks.forEach({
-				key: 'scan',
-				label: 'Scan paragraphs',
-				items: paragraphTexts,
-				run(text, index) {
-					counts[index] = inspectOneShortUnit(text);
-				},
-			});
-			return true;
-		},
-	});
-}
+import type { BundledPlugin } from '@writers-ide/plugins';
+
+export const plugin: BundledPlugin<unknown> = {
+	manifest: {
+		id: 'example.analysis',
+		version: '0.1.0',
+		apiVersion: 1,
+		name: 'Paragraph analysis',
+		description: 'Counts characters in sample paragraphs.',
+		capabilities: [],
+	},
+	activate(context) {
+		const paragraphTexts = ['The story begins.', 'Another paragraph follows.'];
+		context.tasks.forEach({
+			key: 'scan',
+			label: 'Scan paragraphs',
+			items: paragraphTexts,
+			run(text, index) {
+				console.info(`Paragraph ${index + 1}: ${text.length} characters`);
+			},
+		});
+	},
+};
 ```
 
-This excerpt assumes the plugin supplies `paragraphTexts`, `counts`, and its analysis function; there is no public manuscript API in this library. Repeating the command replaces the previous `scan`. Unloading the plugin cancels its managed work. A presentation may receive `context.tasks` as an explicit prop and cancel an individual task on unmount if that task belongs only to that presentation. Failed tasks appear in host management errors without disabling the plugin. The host does not retain completed handles; keep the returned handle if your UI needs its status or outcome.
+The task service calls `run` once per item, yielding to the browser between units as needed. It manages the queue's running lifetime. Tasks require no extra manifest capability.
+
+Submitting another task with key `scan` during the same activation replaces this task. Task failures appear in the host's management errors. They do not disable the plugin. For real document input, use the [word-processing guide](../word-processing/README.md#async-worker-and-cooperative-results) to capture editor data and validate results.
+
+A presentation can receive `context.tasks` as an explicit prop. If a task belongs only to that presentation, cancel it when the presentation unmounts. Keep the returned handle if your UI needs its status or outcome. The host does not retain completed handles.
 
 ## Host integration
 
-Create **one shared application queue**, including pagination, and one service per activation:
+If you are building a host, create one shared application queue. Include pagination in that queue so tasks share its main-thread budget. Create one task service per activation:
 
 ```ts
 import { createTaskService, WorkQueue, type TaskService } from '@writers-ide/tasks';
@@ -48,9 +75,19 @@ const tasks: TaskService = createTaskService({
 controller.abort();
 ```
 
-Services own queue leases for cooperative work; callers need not call `start()`. Queue handles expose their cancellation `signal` even before execution starts. Cancelling managed work through `queue.jobs` also settles the task and releases its lease; queue-level pause/resume is reflected by the managed handle. Async/worker tasks do not acquire scheduler leases. A raw `WorkQueue` consumer still uses `start()` and its returned idempotent release function. Releasing the final lease suspends raw work, without cancelling it. A service's `dispose()` is idempotent, cancels only its own active tasks, and revokes all four submission methods (subsequent calls throw). An already-aborted owner creates a revoked service.
+### Queue leases
 
-Writer's IDE registers this private workspace dependency and supplies the same application-owned queue to pagination and its application plugin host. Standalone hosts can inject a queue; otherwise each standalone host owns an independent queue. No installation or external plugin loader is provided.
+A lease keeps the queue running until its release function is called. Managed services acquire and release these leases for cooperative work. Plugin task callers do not call `start()`. Async and worker tasks do not acquire scheduler leases.
+
+Code using a raw `WorkQueue` calls `start()` itself. The returned release function is idempotent: calling it twice is safe. Releasing the final lease suspends raw queued work. It does not cancel that work.
+
+Queue handles expose their cancellation `signal` before execution starts. Cancelling managed work through `queue.jobs` also settles the task and releases its lease. Queue-level pause and resume changes appear on the managed handle.
+
+### Service lifetime
+
+`dispose()` cancels only that service's active tasks. It is safe to call more than once. It also revokes the service: all four submission methods stop accepting work and throw on later calls. Creating a service with an already-aborted owner signal creates a service that is already revoked.
+
+Writer's IDE supplies the same application-owned queue to pagination and its plugin host. A standalone plugin host can receive a queue explicitly. Otherwise, each standalone host creates an independent queue. This library does not install or load external plugins.
 
 ## Exact task API
 
@@ -84,9 +121,15 @@ tasks.worker<I, O>({
 tasks.dispose(): void
 ```
 
-`TaskHandle<T>` has readonly `key`, `label`, `status`, `progress`, `error`, `signal`, `result`, and `cancel()`. `CooperativeTaskHandle<T>` additionally has `pause()` and `resume()`. Retained terminal handles are safe to cancel/pause/resume; these calls become no-ops. Status, progress, and errors are Svelte-reactive. Status is `queued | running | paused | completed | cancelled | failed`; progress is `{ completed?: number; total?: number; message?: string }`. Array iteration reports a total; general iterables need not have one. Progress patches from generators are merged.
+### Handles and progress
 
-`result: Promise<TaskOutcome<T>>` **never rejects**:
+`TaskHandle<T>` exposes readonly `key`, `label`, `status`, `progress`, `error`, `signal`, `result`, and `cancel()`. `CooperativeTaskHandle<T>` also provides `pause()` and `resume()`. After a task completes, fails, or is cancelled, these control methods do nothing. Retaining and calling an old handle is safe.
+
+Status, progress, and errors are Svelte-reactive, so Svelte can track their changes. Status is `queued | running | paused | completed | cancelled | failed`. Progress is `{ completed?: number; total?: number; message?: string }`. Array iteration reports a total. A general iterable need not have one.
+
+Generators can yield partial progress records. Each record updates only the fields it supplies rather than replacing the entire progress record.
+
+`result: Promise<TaskOutcome<T>>` **never rejects**. It resolves to one of the following outcomes, including when the task fails. Check `outcome.status` rather than relying on a promise rejection:
 
 ```ts
 type TaskOutcome<T> =
@@ -95,9 +138,19 @@ type TaskOutcome<T> =
 	| { status: 'failed'; error: unknown };
 ```
 
-Errors are reported to `onError({ ownerId, key, label, error })`. Observer exceptions are contained. Generator cleanup errors are also attributed; a cancelled outcome remains cancelled, with cleanup failures retained on the handle. If cleanup fails after settlement (including cancellation inside an executing step), `handle.error` may update afterward. Multiple errors accumulate as `AggregateError` on the handle; failure outcomes carry the original failure. Terminal tasks are removed from the service's active ownership set.
+### Errors and cleanup
+
+Errors go to `onError({ ownerId, key, label, error })`. If that error observer throws, the exception does not escape into the task caller. Generator cleanup errors are also reported with the same owner, key, and label.
+
+A cleanup failure does not change a cancelled outcome into a failed one. The handle retains the cleanup error instead.
+
+Cleanup can finish after the result promise has resolved. This can happen when cancellation occurs inside a step that is still executing. In that case, `handle.error` can update later.
+
+If there are multiple errors, the handle stores them in an `AggregateError`, which groups errors together. A failed outcome still carries the original failure. The service stops tracking a task as active once it completes, is cancelled, or fails.
 
 ## Convenient iteration
+
+In this example, `tasks` is a live task service, `paragraphs` is an array of objects with a `text` string, and `counts` is a writable number array. Run it in an async function or a module that supports top-level `await`.
 
 ```ts
 const scan = tasks.forEach({
@@ -116,9 +169,11 @@ if (outcome.status === 'completed') {
 }
 ```
 
-`items` is consumed lazily, without copying or materializing it. Generators/iterators close on cancellation after iteration has started. The helper yields between individual units; it does not make an expensive callback interruptible.
+`items` is consumed as needed. The helper does not copy it or first build an array. After iteration starts, cancellation closes the generator or iterator. The helper yields between units, but cannot interrupt an expensive callback. Keep each callback short and synchronous.
 
 ## Advanced cooperative work
+
+Use a generator when the algorithm needs explicit checkpoints or a final return value. This example uses the same live `tasks` service and a `paragraphs` array. The host supplies a short, synchronous `inspectOneShortUnit` function.
 
 ```ts
 const scan = tasks.cooperative({
@@ -142,9 +197,13 @@ scan.pause();
 scan.resume();
 ```
 
-Each scheduler frame retains the original 8 ms soft budget, 1,000-step cap, round-robin order, and 3:1 interactive/background fairness. The queue cannot interrupt a running step. Cooperative generators and iteration callbacks must be synchronous and bounded. DOM measurement stays on the main thread.
+The scheduler chooses which queued work runs next. It has an 8 ms **soft** budget per frame and a 1,000-step cap. It takes turns among jobs in round-robin order. It balances interactive and background work at a 3:1 ratio.
+
+The budget is soft because the queue cannot interrupt a running step. Each generator step and iteration callback must be synchronous and bounded. A single long step can exceed the frame budget. DOM measurements must stay on the main thread.
 
 ## Async work
+
+Use this mode for an API that already supports asynchronous work. Here, `tasks` is a live service and `url` is the metadata endpoint supplied by your application.
 
 ```ts
 const download = tasks.async({
@@ -157,11 +216,17 @@ const download = tasks.async({
 });
 ```
 
-`run` starts immediately, can return a plain value or a promise, and may throw synchronously. A promise does not offload CPU work. Cancellation settles the managed task immediately and aborts its signal; the underlying operation must honor that signal. Late resolution/rejection is consumed and ignored. Do not perform unguarded side effects after `await` inside `run`; the service cannot undo them.
+`run` starts immediately. It can return a plain value or a promise, and it may throw synchronously. It still runs on the main thread. Use a worker for suitable CPU-heavy computation.
+
+Cancellation immediately resolves the managed task's result with a cancelled outcome and aborts its signal. The underlying operation must honor that signal to stop. If it later resolves or rejects, the service handles that result but ignores it.
+
+The service cannot undo side effects inside `run`. After an `await`, check cancellation and the current application target before changing state.
 
 ## Bundled one-shot workers
 
-Use a dedicated, fresh worker per invocation, not an already-running/shared worker:
+Use a dedicated, fresh worker for each invocation. Do not return an already-running or shared worker.
+
+This example runs in browser code compiled by a bundler that supports module-worker URLs. `tasks` is a live service, `paragraphTexts` is a string array, and `wordCount` is writable host state. Place the worker module below at `./count.worker.ts`, relative to this caller:
 
 ```ts
 const count = tasks.worker<string[], number>({
@@ -185,18 +250,69 @@ defineTaskWorker<string[], number>(self, (paragraphs) => {
 });
 ```
 
-`defineTaskWorker<I, O>(scope, run, { transfer?: (output: O) => Transferable[] }?)` accepts a structural `TaskWorkerScope`, handles one request, catches synchronous/asynchronous failures and result-clone failures, and returns an idempotent uninstaller. Worker builds should use their normal WebWorker TypeScript environment; no DOM runtime import is required. Input messages are `{ type: 'tasks:run', input }`; responses are `{ type: 'tasks:result', value }` or `{ type: 'tasks:error', error: { name, message, stack? } }`. Malformed requests/responses fail the task: request/result envelopes must include their `input`/`value` field (explicit `undefined` is allowed), and error envelopes require string `name`/`message` and an optional string `stack`. Disposing the worker helper before its deferred callback starts skips `run`. Error messages are plain cloneable data.
+### Worker helper and messages
 
-The service detaches listeners and terminates the worker on success, failure, cancellation, replacement, and owner teardown. It handles factory/postMessage exceptions, worker `error`/`messageerror`, remote failures, and synchronous `apply` failures. Late callbacks cannot apply cancelled results. A response is claimed before `apply`, preventing reentrant delivery from applying it twice. Every listener removal and termination is attempted independently; cleanup failures are attributed and retained without changing an already-settled outcome. Input transfer lists are forwarded to `postMessage`; transfer moves ownership and may detach buffers in the caller. Output transfers are selected by the worker helper. A broken transport that cannot send even the plain error envelope cannot report through this protocol; owner cancellation remains available. No pooling, progress protocol, timeout, or function serialization is implemented.
+`defineTaskWorker<I, O>(scope, run, { transfer?: (output: O) => Transferable[] }?)` handles one request. Its `scope` must supply the properties and methods described by `TaskWorkerScope`; it need not inherit from a particular class.
+
+The helper catches synchronous failures, asynchronous failures, and failures to copy the result into a message. It returns an uninstaller that is safe to call more than once. The request callback runs later rather than during message receipt. If you uninstall before that callback starts, `run` is skipped.
+
+Compile the worker in the normal WebWorker TypeScript environment. It needs no DOM runtime import.
+
+The transport is the message connection between the caller and the worker. It uses these message shapes:
+
+- Request: `{ type: 'tasks:run', input }`.
+- Result: `{ type: 'tasks:result', value }`.
+- Error: `{ type: 'tasks:error', error: { name, message, stack? } }`.
+
+Requests or responses with an invalid shape fail the task. Requests must include `input`. Results must include `value`. Either field may explicitly contain `undefined`.
+
+Error records must have string `name` and `message` fields. If present, `stack` must also be a string. Errors are sent as plain data that worker messaging can copy.
+
+### Worker lifetime and failures
+
+The service removes listeners and terminates the worker after success, failure, cancellation, replacement, or owner teardown.
+
+It handles exceptions from `createWorker` and `postMessage`. It also handles worker `error` events and `messageerror` events, which indicate that a message could not be deserialized. Failures reported by the worker and synchronous failures in `apply` are handled too.
+
+Late callbacks cannot apply cancelled results. Before calling `apply`, the service records that a response has been accepted. If another response arrives during that call, it cannot apply the result twice.
+
+Each listener removal and termination is attempted independently. One cleanup error does not prevent the remaining cleanup. Cleanup errors are reported and retained on the handle. They do not change an outcome that has already settled.
+
+### Copies, transfers, and transport limits
+
+Worker messages normally use structured cloning: the browser copies supported data into the receiving environment. Inputs and outputs must support that copy operation or a transfer.
+
+A transfer moves ownership instead of copying. It may detach a buffer, making it unavailable to the caller. Input transfer lists are forwarded to `postMessage`. The worker helper selects output transfers through its `transfer` option.
+
+If the transport cannot send even the plain error message, this protocol cannot report that failure. Owner cancellation remains available.
+
+Each task uses a dedicated bundled worker module. Worker pooling, worker progress messages and timeouts are not supported.
 
 ## Replacement, cancellation, and result application
 
-- Keys are local to one service. Submitting the same key replaces work **across all modes**. Internal queue keys include a unique service activation identity, so different owners and reactivations do not collide.
-- Caller cancellation affects only its task. Owner cancellation/disposal affects every active task in that service, not pagination or another service. Pre-aborted per-task signals skip all user work.
-- Cancellation aborts the handle signal before generator cleanup; cleanup during `next()` is deferred until the step returns. Reentrant cleanup can submit a newer same-key replacement, which wins.
-- `apply` is synchronous and called once only while the worker task is active. Awaiting a result and separately applying it is the caller's responsibility; do not duplicate application already done by `apply`.
-- Capture cloneable input, compute, then validate the current target before applying. Never send live DOM/editor objects to a worker or retain mutable transactions across `await`/yield. This library has no editor freshness, mapping, undo, or application transaction abstractions.
-- These are lifecycle/convenience contracts, not a sandbox. Trusted frontend code retains ambient authority and can still block the main thread or perform its own side effects.
+### Replacement keys
+
+Keys belong to one service. Submitting the same key replaces the earlier task across all four modes. For example, a worker task with key `scan` replaces a cooperative task with that key in the same service.
+
+Internal queue keys include a unique service activation identity. Separate services, different owners, and later activations do not collide.
+
+### Cancellation boundaries
+
+Caller cancellation affects only that task. Owner cancellation or service disposal affects every active task in that service. It does not cancel pagination or another service's work. A per-task signal that is already aborted skips all user work.
+
+Cancellation aborts the handle signal before generator cleanup. If `next()` is executing, cleanup waits until the step returns. Cleanup can itself submit another same-key replacement. That newer submission wins.
+
+### Applying results safely
+
+A worker's `apply` callback is synchronous. It is called at most once, and only while the task is active. If you also await the result, do not accidentally apply the same value a second time. If you choose to apply an awaited result yourself, you own its validation and lifetime checks.
+
+Capture cloneable data, compute, then validate the current target before applying. Never send live DOM objects, ProseMirror views, states, or transactions to a worker. Do not retain mutable transactions across `await` or a cooperative yield.
+
+This library does not check whether an editor result still matches the current state. It also does not map positions through edits, define undo behavior, or create application transactions.
+
+Use the [word-processing API](../word-processing/README.md) for its strict editor-result contract. That API discards stale results. It does not adjust their positions through later edits or apply them to a different target.
+
+These helpers manage lifetime and convenience, not security isolation. Trusted frontend code can still access its environment, block the main thread, or perform its own side effects.
 
 ## Tests
 

@@ -1,189 +1,304 @@
 # Project context
 
-This is durable project memory for contributors and agents, not a specification that every described feature already implements. Read [CONTRIBUTING.md](../CONTRIBUTING.md) for development conventions and [pagination context](pagination/context.md) when working on pagination, layout geometry, or cooperative editor work.
+Writer's IDE is a word processor with an extensible workspace. Writers can use rich-text documents, movable toolbars and multiple views of their work. Fiction authors are the first audience. Other writing uses are welcome.
 
-Current merged baseline: `4b39895c5218498fd1c0e79c99b1ea8012f1b67a` (`Add frontend plugin interface (#80)`, merged 2026-11-14). The plugin/layout/component/task entries also describe **Stage 2 changes on `bh/phase-2-plugin-transition`, unmerged with no PR known**; Stage 3 external loading/native enforcement remains planned; the owner has deferred frontend DOM isolation in favor of trusted frontend extensibility (see plugin context). The feature-neutral host correction, task/provider Parts 1–2 and word-processing Parts 3A–3B are owner-authorized working-tree behavior, including in-place behavioral reconfiguration. Parts 3C/4 (custom content/schema lifecycle and external loading/native enforcement) remain separately gated. No PR or merge metadata is assigned. The broader decisions below were confirmed with the project owner; source code remains the authority for current behavior.
+This page is the starting point for contributors. It separates working code from planned features. Read the relevant topic guide before changing a subsystem.
 
 ## Status vocabulary and maintenance
 
-- **Current:** implemented and connected in source; not a claim that every interaction has been verified.
-- **Accepted direction:** owner-approved product or architectural intent, not necessarily implemented.
-- **Open:** a choice requiring research and discussion; do not silently treat it as a requirement or authorization.
-- **Tentative priority:** guidance, not a release commitment.
+The documentation uses four status labels:
 
-Run every important architectural decision by the owner before implementing it. Explain the problem, alternatives, tradeoffs, and proposed choice. Accepted long-term direction does not authorize a large migration without a concrete design discussion.
+- **Current:** implemented and connected to the application. This does not mean every use case has been tested.
+- **Accepted direction:** approved by the owner, but not necessarily implemented.
+- **Open:** still needs a decision.
+- **Tentative priority:** a preference, not a release commitment.
 
-Read this general overview first, then the relevant topic's current context and only the historical entries needed for the task. [docs.md](../docs.md) is a navigation index, not another history. Topic `context.md` files describe current philosophy, contracts, rationale, source/tests, and limitations. Topic `change-log.md` files start one consolidated entry per PR under **In progress** when work begins, clearly marked **In progress / unmerged** and linked to the PR or identified by branch. Update the same entry with every commit so cumulative changes, rationale, outcomes, verified validation, and follow-ups are complete before merge. Review affected documentation before each commit; do not defer substantive writing until afterward. Once merge is confirmed, move the completed entry into **Merged PRs** in chronological merge-date order and finalize verified status/date/link metadata only. Do not append per-commit entries, agent-session histories, intermediate-decision diaries, or invented merge metadata.
+Ask the owner before making an important architectural change. Approval of a long-term goal does not approve every migration needed to reach it.
 
-Keep context focused on lasting behavior, constraints, decisions, rationale, and useful source entry points. Do not append session transcripts or duplicate the entire codebase. Update the relevant topic document when substantive changes land. Separate proposals from accepted decisions and remove or label superseded statements. GitHub issues provide feature ideas and historical context, not automatically current specifications or a complete roadmap.
+For documentation updates:
+
+1. Read this overview and the relevant topic's `context.md`.
+2. Read only the history needed for the task.
+3. Update the topic's description when its behavior changes.
+4. Keep one entry per pull request (PR) in each affected `change-log.md`. Update that entry as the work develops.
+5. Keep unmerged entries under **In progress**. Use the branch name until a PR is known.
+6. After a confirmed merge, move the entry to **Merged PRs**. Use the verified PR link and merge date.
+
+Write the explanation before merge. Do not use changelogs as session transcripts or repeated test logs. Preserve historical decisions as records of their time. Explain later changes in a new entry.
+
+[AGENTS.md](../AGENTS.md) contains the full update rules. [CONTRIBUTING.md](../CONTRIBUTING.md) covers code style and validation. [docs.md](../docs.md) is the documentation index. GitHub issues provide ideas and history, not authoritative specifications.
 
 ## Topic index
 
-| Area                                                         | Read next                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bars, docking, drag-and-drop                                 | [Current context](dnd/context.md), then relevant [PR change log](dnd/change-log.md). Docking/neutral main-area feedback and bundled presentations merged in #78–#80; Stage 2 layout extraction is working-tree behavior.                                                                                                                                                                                                                          |
-| Pagination, footnotes, page geometry, cooperative scheduling | [Current context](pagination/context.md), then relevant [PR change log](pagination/change-log.md).                                                                                                                                                                                                                                                                                                                                                |
-| Browser performance tests and benchmark fixtures             | [Current context](browser-performance/context.md), then relevant [PR change log](browser-performance/change-log.md).                                                                                                                                                                                                                                                                                                                              |
-| Dependency/toolchain maintenance                             | [Dependency guide](dependencies.md).                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Plugins, reusable libraries, core boundaries                 | [Current context](plugins/context.md), then relevant [PR change log](plugins/change-log.md). Stage 1 merged in #80; Stage 2 libraries/manager, task/provider Parts 1–2 and editor Parts 3A–3B are unmerged implementation. See the [task guide](../packages-js/tasks/README.md), [editor guide](../packages-js/word-processing/README.md) and [roadmap](plugins/implementation-plan.md); Parts 3C/4 remain gated, external loading unimplemented. |
-| Central views, persistence, collaboration, import/export     | Relevant sections and implementation entry points below; separate topic documents have not yet been established.                                                                                                                                                                                                                                                                                                                                  |
+| If you are working on…                                    | Read…                                                                                                                               |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Bars, floating toolbars and drag-and-drop                 | [Docking context](dnd/context.md) and [change log](dnd/change-log.md)                                                               |
+| Pagination, footnotes, page geometry or shared scheduling | [Pagination context](pagination/context.md) and [change log](pagination/change-log.md)                                              |
+| Plugins, public APIs or reusable packages                 | [Plugin context](plugins/context.md), [implementation plan](plugins/implementation-plan.md) and [change log](plugins/change-log.md) |
+| Browser benchmarks or Storybook test fixtures             | [Browser-performance context](browser-performance/context.md) and [change log](browser-performance/change-log.md)                   |
+| Toolchain upgrades or dependency checks                   | [Dependency guide](dependencies.md)                                                                                                 |
+| Persistence, history, collaboration or conversion         | The sections below. Most of this work is still planned.                                                                             |
 
-Existing standalone guides remain valid; migrate them incrementally when working on that topic. New substantive topics get the `context.md` / `change-log.md` pair and an index entry. See [AGENTS.md](../AGENTS.md) for the required maintenance and merge-verification workflow.
+Use an existing topic for related work. New substantial topics need a context page and a changelog. Existing standalone guides can move into this structure when relevant work requires it.
 
 ## Product and principles
 
-**Accepted direction:** Writer's IDE is a highly extensible, local-first word processor with an IDE-like workspace for writers. Fiction authors are the first audience because the owner writes fiction, but other writing use cases are welcome. This is a personal project with no time pressure to release; do not impose an artificial minimal scope at the expense of the intended architecture.
+**Accepted direction:** essential writing workflows must run locally, offline and without an account. A project should remain usable without a cloud service.
 
-A useful first release should let an author import an existing work in progress, organize and continue writing chapters, prepare print and ebook versions, and export material to an editor. Inspiration includes Scrivener, Ulysses, Novlr, Word, and Pages; these are references, not a promise to clone every feature.
+A useful first release should let an author:
 
-The application and official features will always be free, with no paid tiers or official paid-plugin marketplace. The purpose is cooperation and creativity, not revenue. Encourage sharing improvements and contributing upstream rather than monopolizing them. This is a community principle, **not a restriction on commercial reuse**: retain the existing MIT licensing terms and freedom to fork, extend, and redistribute. Do not invent a noncommercial license restriction.
+- Import existing work.
+- Organize and write chapters.
+- Prepare print and ebook versions.
+- Export material for an editor.
 
-Essential writing and project workflows must work locally, offline, without an account. Optional cloud services or integrations such as pushing projects to GitHub may be explored later. Collaboration should preferably be peer-to-peer, without requiring a central authority that can terminate access.
+Scrivener, Ulysses, Novlr, Word and Pages are references, not specifications to copy. This is a personal project with no fixed release deadline. Do not reduce the intended architecture merely to create an artificial minimal release.
+
+The application and official features will remain free. There are no planned paid tiers or official paid-plugin marketplace. Cooperation and creativity guide the project.
+
+This is not a restriction on commercial reuse. Preserve the MIT license and the freedom to fork, modify and redistribute the software.
+
+Optional cloud integrations may be useful later. Collaboration should preferably connect users directly rather than require a central account service.
 
 ## Accepted technology and platform boundaries
 
-- **Firm technology choices:** Tauri, Svelte 5, ProseMirror, and a Rust backend. Do not reopen the stack choice based solely on old exploratory issues.
-- **Approved macOS minimum:** macOS 13.3 Ventura, enforced by Tauri's bundle configuration to meet Tailwind 4's WebKit baseline. Native platform WebViews remain in use; this is not a fixed rendering-engine version or a guarantee of identical pagination.
-- The core should be as small as practical. It includes layout infrastructure, import/export infrastructure, internationalization, and the platform capabilities necessary to host extensions safely. Exact package/API boundaries remain open.
-- Word processing, its formatting bars, and other feature views should be plugins. Official and third-party features must use the same public extension APIs, including editor extensions; no privileged built-in path for raw ProseMirror or application access is approved. Existing ProseMirror packages may be integrated through wrappers, with compatibility limits and execution/isolation enforced below that shared API. See [editor extension and wrapper direction](plugins/context.md#accepted-direction-editor-extensions-and-package-wrappers).
-- Most functionality should eventually live in small packages within this monorepo. Private plugin contracts and Stage 2 layout/component/task boundaries are established below; broader package boundaries, publication, and dependency rules remain open.
+The technology choices are settled:
+
+- **Tauri** provides the desktop application and system integration.
+- **Svelte 5** provides the user interface.
+- **ProseMirror** provides the rich-text document model and editing behavior.
+- **Rust** provides backend functionality.
+
+Old exploratory issues do not reopen these choices.
+
+The macOS minimum is **13.3 Ventura**. Tauri's configuration enforces this requirement. The application uses the operating system's browser engine, not a bundled engine version. Page layout may therefore differ between platforms.
+
+Keep the application core small. It provides shared workspace, translation, import/export and plugin-hosting infrastructure. The accepted direction is to implement word processing and feature interfaces as plugins. Official and third-party features must use the same public extension APIs.
+
+Reusable code should live in cohesive packages. Do not create a package for every small helper. Package publication and broader extraction still need decisions.
+
+### Current branch status
+
+The last verified merged baseline is [#80](https://github.com/benyakirten/writers-ide/pull/80), merged on 2026-11-14. Its merge commit is `4b39895c5218498fd1c0e79c99b1ea8012f1b67a`.
+
+The `bh/phase-2-plugin-transition` branch contains further implementation. It includes reusable libraries, the plugin manager, managed tasks, provider APIs, synchronous editor access and editor behaviors. These correspond to Parts 1–2 and 3A–3B of the [implementation plan](plugins/implementation-plan.md).
+
+This work is recorded as unmerged. No PR identity or merge date has been verified. Custom content and schema changes (Part 3C) still need approval. External plugin loading and native restrictions (Part 4) also need approval and implementation.
 
 ## Project and content model
 
 ### Accepted direction
 
-A project is a Scrivener-style container for potentially many kinds of content, including plugin-defined data. It may contain several books in a series, shared character notes, chapters/scenes, research, media, and relationships. Do not assume a project is one manuscript or one ProseMirror document. Media-heavy projects may become large; responsiveness and incremental access matter more than arbitrary content-size restrictions.
+A project is more than one manuscript. It may contain several books, chapters, scenes, character notes, research, media and plugin-defined data. Large media collections should load incrementally rather than force the whole project into memory.
 
-Use an **extensible project model containing ProseMirror-based rich-text content**, rather than inventing a second live rich-text model upfront. ProseMirror's structure and editing semantics are valuable. Other views can work with project organization, relationships, and metadata without continuously translating the entire manuscript.
+Use ProseMirror for live rich-text content. Other views can operate on project organization and metadata. Do not translate the entire manuscript into another rich-text model after every edit.
 
-Plan for versioned rich-text structures and schema evolution; concrete persistence formats and migration APIs remain open. A conversion intermediate representation can be separate from the live editing model. Avoid a full-document import/export translation after every edit.
+Stored content will need versioning and migration rules. An import/export format may use a separate intermediate representation: a model used to convert between file formats rather than to edit the live document.
 
-Calculated page boundaries should ultimately be derived layout data, potentially per-view state/cache, while explicit page/section breaks, layout settings, text, formatting, and footnote semantics remain authored information. **The current implementation still stores page nodes and splits paragraphs in the ProseMirror model. Keep it working.** Any separation requires research, a prototype, and owner approval; see [pagination context](pagination/context.md).
+**Current pagination changes the ProseMirror document.** It stores page nodes and splits paragraphs across them. Keep this implementation working.
+
+The future direction is to separate calculated page boundaries from authored content. Text, formatting and explicit page breaks would remain stored content. Calculated layout could differ between views. That redesign needs research, a prototype and owner approval. See [pagination context](pagination/context.md).
 
 ### Open storage decisions
 
-Documents/projects are expected to comprise multiple pieces of content, assets, and connecting metadata. A directory, database such as SQLite, compressed archive/package, or combination may be appropriate. None is selected. Stable identities, asset handling, incremental loading, transactions, schema migration, and recovery require design. Do not claim that SQLite, a ZIP format, or Git has been adopted merely because it was discussed.
+No project storage format has been selected. A directory, SQLite database, archive or combination could be appropriate.
+
+The design must address stable IDs, assets, incremental loading, transactions, migrations and recovery. Do not describe SQLite, ZIP or Git as chosen merely because they have been discussed.
 
 ## Workspace and extension UX
 
-**Accepted direction:** IDE-style tabs in resizable split panes, including independently scrolled views of the same content. The default should feel familiar to word-processor users while exposing an approachable opportunity to discover the more flexible workspace; exact default composition is open.
+**Accepted direction:** use tabs and resizable split panes. Separate views should be able to scroll independently, including views of the same content. The exact default layout is still open.
 
-Bars can live above, below, or on either side of the workbench, or float inside the application. Plugins may contribute central views as well as bars and provide suitable horizontal/vertical presentations backed by shared feature state. Both bars and individual items are movable; relocation must preserve contents. See [DnD context](dnd/context.md) for the approved three-unit capacity model, target semantics, current interaction/transfer contracts, and limitations. That document distinguishes working-branch behavior from confirmed merged history; layout undo, persistence, and a general plugin state-transfer lifecycle are not implemented.
+Toolbars can sit at any edge of the workspace or float inside it. Plugins can supply central views and toolbar items. Both bars and individual items can move. A move must preserve their contents.
 
-Future views may include storyboard, sticky-note canvas, print layout, reflowable ebook, and other perspectives. Semantic analyses could use project data to flag narrative inconsistencies, such as a vampire appearing outdoors in daylight. These analysis features are deliberately not well defined yet and follow the interface/platform foundations; do not assume they require an LLM, cloud service, or a chosen analysis engine.
+The [docking guide](dnd/context.md) explains the three-unit capacity model and current transfer rules. Layout undo, persistent placement and general component-state transfer are not implemented.
+
+Possible future views include storyboards, sticky-note canvases, print layouts and reflowable ebook previews. Analysis features might identify narrative inconsistencies. These are ideas, not selected implementations. They do not imply an LLM or cloud dependency.
 
 ## Plugin safety and capability access
 
 ### Accepted requirements, not current guarantees
 
-**Revised owner-approved trust model:** frontend plugins are trusted, same-environment code. They may use ordinary Svelte, supported deep ProseMirror APIs, and external network calls. Frontend DOM isolation is deferred; public interfaces and contribution declarations are integration/lifecycle contracts, not a sandbox. Document access plus network access permits exfiltration, and installation disclosures must not imply otherwise. External loading and its review/disclosure UX are not implemented.
+Frontend plugins are trusted code running in the application's JavaScript environment. They may use ordinary Svelte, supported ProseMirror APIs and external network requests.
 
-Plugins should be able to integrate deeply with project and platform state through those APIs, including i18n helpers, commands, document operations, layout contributions, and subscriptions. This does not mean granting direct mutable references to all internal singleton state or access to unrelated projects.
+Frontend DOM isolation is deferred. Plugins are not currently prevented from reaching the application's DOM. Public APIs describe supported integrations; they are not a security sandbox.
 
-Backend/native extensions must remain highly restrictive. Frontend trust must not imply unrestricted Tauri IPC, filesystem, shell/process execution, or native libraries. Narrow native APIs and their actual enforcement require a concrete design and verification before external loading. Native Rust code executing inside the host process cannot be assumed safe; no arbitrary native-plugin loading is approved. No iframe, ShadowRealm, or other frontend isolation runtime is selected. Official and third-party plugins must still use the same public extension APIs. See [plugin trust and execution direction](plugins/context.md#accepted-direction-frontend-trust-and-native-restrictions).
+A plugin that can read manuscript text and make network requests can send that text elsewhere. Installation disclosures must state this risk. External installation and its review interface are not implemented.
 
-The native boundary must protect against malicious host-file deletion and process access. Frontend exfiltration is an explicitly accepted trust risk, not a prevented capability; propagation to collaborators must not happen implicitly. Receiving project data or plugin requirements must **not** automatically install/execute plugin code or grant permissions. Project data and executable extension packages are separate trust domains.
+Backend access must remain much more restrictive. Frontend trust must not imply unrestricted filesystem access, process execution, native libraries or Tauri IPC. IPC is the communication mechanism used to call the Rust side of a Tauri application. Narrow system APIs need actual enforcement and packaged-app tests before external loading is enabled.
 
-Project writes should participate in recoverable history. The intended damage boundary is granted project data, not the user's computer; even within a project, minimize access to what is needed. History is recovery protection, **not a sandbox**, and cannot undo data theft or host compromise. The exact grantable capabilities and enforcement mechanisms still require design.
+No arbitrary native-plugin loading is approved. Frontend plugins currently run in the application's JavaScript environment without isolation.
+
+Project files must not automatically install code, execute plugin requirements or grant permissions. This also matters when receiving data from collaborators.
+
+Project writes should participate in recoverable history. History can help recover damaged content. It cannot undo data theft or protect the user's computer from unrestricted system access.
 
 ### Missing plugins and data preservation
 
-- Preserve plugin-owned data when a plugin is unavailable, disabled, or removed.
-- Keep unrelated project content usable; do not require a destructive conversion merely to open the project.
-- Show a useful placeholder or safe saved preview when available, without executing untrusted content.
-- Offer enabling/installing a trusted plugin, inspection, or converting a copy to a supported representation.
-- Make destructive removal an explicit, separate action.
-- Plugins may supply migrations/fallback exporters through the restricted execution model. Basic preservation must not depend on executing an unavailable plugin.
+When a plugin is disabled or unavailable:
 
-The owner-approved Stage 2 correction keeps the shared plugin lifecycle/contribution architecture independent of formatting. Features consume explicitly declared providers, not a generic service bus or new extensible permission model. Provider integration is not a security grant: external loading/trust UX and restrictive native enforcement remain Stage 3 decisions; frontend DOM isolation is deferred. `defineSveltePresentation(component, props)` checks feature props; its descriptor has no hardcoded context. The formatting plugin declares only `contributions.toolbar`, and the manager makes no formatting-permission claims. See the [general package guide](../packages-js/plugins/README.md) and [feature-local formatting guide](../src/lib/editor/prosemirror/menu/basic/README.md).
+- Preserve its saved data.
+- Keep unrelated project content usable.
+- Show a placeholder or saved preview where possible.
+- Offer inspection, enabling a trusted plugin or conversion of a copy.
+- Make destructive removal a separate, explicit action.
 
-**Owner-authorized Part 2, implemented / unmerged:** plugins declare `provides: [{ id, major }]`, publish synchronous factories through activation-only `context.apis.provide`, and consume only declared dependencies pinned to exact provider ID/API ID/positive safe-integer major. Required graphs are preflighted and activated dependencies-first; required cycles fail, optional edges allow cycles and never auto-activate providers. Optional consumers receive `null`/arrival/removal; cached per-consumer/activation top-level method facades revoke on either endpoint stopping, not recursively through return values. Connections provide cancellation, owned cleanup, late-callback suppression and generic `reportError(error)`, attributable only to the exact connected consumer activation while live; revoked/old reports are ignored. Reports use phase `provider` without disabling the plugin. Dependent-first removal requires cascade consent; the manager rechecks plans and protects required IDs transitively. See [plugin contracts](plugins/context.md#cross-plugin-contracts-and-dependencies) for facade shape, error attribution and limitations. These are trusted-code integration contracts, not security enforcement, installation or backend permissions. Newly enabled providers remain enabled after downstream failure. The subsequent owner-approved Part 3A now implements the word-processing provider and formatting migration described below, not all of Part 3.
+A plugin may eventually supply migrations or fallback exporters. Basic preservation must not require executing the missing plugin.
 
-**Owner-authorized Part 3A, implemented / unmerged:** private `@writers-ide/word-processing` supplies source contracts/service without app imports; the app's `createWordProcessingPlugin()` supplies default sources. Live `EditorState`/`EditorView` access is approved inside synchronous callbacks, with provider-owned edits through actual app dispatch. Exact `{ viewId, documentId, revision }` targets use module-wide monotonic tokens across service restarts; selection-only changes stale targets. `inspect`/`edit`/`runCommand`, connection-owned command registration/execution/listing and `applyResult` validate targets/signals/lifetime; stale results are discarded without mapping or retargeting. Thenable checks cannot undo already-started async bodies or raw dispatch, and `tr.before` cannot prove originating state for a retained same-document transaction: synchronous-only construction/usage is a trusted contract, not a membrane. Formatting resolves a required provider per activation without route injection; independent opt-in QuickFormat wraps upstream `toggleMark` through the same API. Source-owned views, history, the fixed schema and model-mutating pagination remain intact. Separately approved Part 3B adds behavioral reconfiguration and accepted-transaction dispatch integration below; 3C schema/custom content and 4 external loading/native enforcement remain gated. See [plugin context](plugins/context.md#word-processing-provider-part-3a-implemented--unmerged) and the [author guide](../packages-js/word-processing/README.md).
+### Current plugin APIs
 
-**Owner-authorized Part 3B, implemented / unmerged:** `registerBehavior`, `behaviors` and `subscribeBehaviors` provide connection-owned synchronous per-view Plugin factories with optional view-ID allowlists and per-instance cancellation. Managed plugins run before the untouched current baseline, priority descending with insertion-order ties. In-place `EditorState.reconfigure` preserves document, selection, stored marks, history and surviving keyed state using the same schema, without a transaction/undo entry or view recreation. Original generated keys (even unkeyed upstream Plugins) and surviving factory/Plugin identities persist; ProseMirror may recreate plugin-view resources. `nodeViews`/`markViews` are rejected pending 3C. Source arrivals/replacements/closures reconcile in a microtask outside hooks; staging guards source/state mutation and a 16-pass reconciliation bound quarantines still-active registrations on instability. Runtime errors quarantine the registration across views immediately with deferred physical detach and safe hook/prop fallbacks; independent source/connection reporting retains attribution. These guards cannot undo arbitrary callback effects/started async bodies or preempt CPU loops/unbounded ProseMirror append cycles and are not a sandbox. App dispatch now uses `applyTransaction`, emitting `PreUpdate` for each accepted root/append before DOM update and neither for filtered roots. Optional synchronous `sources.prepareTransaction` prepares managed appends; the app composes it with unchanged page-index/stored-mark normalization extracted to `view/page-indexes.ts`. No schema migration or unrelated pagination redesign. Three [opt-in proofs](../src/lib/editor/prosemirror/behaviors/README.md) exercise upstream input rules/undo, mapped keyed decorations and bounded selected-chunk module-worker analysis through this same official/third-party API, only in the dedicated fixture, not the default app route. See [plugin behavior contracts](plugins/context.md#lifecycle-owned-behaviors-part-3b-implemented--unmerged) for exact contracts and [pagination flow](pagination/context.md#current-transaction-and-layout-flow).
+The generic host manages activation, cleanup, toolbar/view/command contributions and task utilities. It does not contain formatting commands or a formatting service.
 
-For the distinction between plugin features, reusable libraries, and core responsibilities, read [plugin and library context](plugins/context.md). It records the approved stages, merged Stage 1 and working-tree Stage 2 bundled-plugin contracts, candidate boundaries, and remaining decisions; external isolation/loading is not implemented.
+A **provider** is a plugin exposing an API that other plugins can use. Consumers declare the provider, contract name and exact API-major version they need. Required providers activate first. Optional integrations can be absent. Removing a required provider needs confirmation because its consumers must stop first.
+
+Provider API objects become unusable when either plugin stops. This prevents retained API methods from acting after cleanup. It does not restrict arbitrary browser JavaScript. See [provider contracts](plugins/context.md#cross-plugin-contracts-and-dependencies) for versioning, notifications and error-reporting rules.
+
+The word-processing provider lets consumers inspect live editor state and build edits inside synchronous callbacks. It validates the chosen view and revision before dispatch. Background results use the same validation. Changed state, including a selection change, makes an old target stale. Results are discarded rather than applied to another location.
+
+Do not retain a mutable transaction across `await` or a cooperative yield. The provider cannot prove where a retained transaction came from if its original document is unchanged. It also cannot undo direct edits made through a raw `EditorView`.
+
+Plugins can register ProseMirror **behaviors**, such as input rules, decorations and transaction hooks. Registration updates the existing editor state with the same schema. It preserves the document, selection, history and state of surviving plugins. Managed behaviors run before the existing host plugins. Failed behaviors are disabled and reported. These guards cannot interrupt arbitrary loops or undo callback side effects.
+
+Basic Menu now uses this provider. Its formatting rules remain part of the feature. Quick Format and the [behavior examples](../src/lib/editor/prosemirror/behaviors/README.md) demonstrate independent consumers. They are opt-in examples, not enabled in the default application.
+
+Read the [plugin context](plugins/context.md) and [word-processing guide](../packages-js/word-processing/README.md) for complete rules. The current editor still uses the existing schema and pagination model. Custom nodes, schema changes and Svelte node-view registration remain future work.
 
 ## Plugin developer experience
 
-**Accepted direction:** framework-flexible UI with a paved path for Svelte 5 and/or web components. Do not enforce Svelte for every third-party UI. Isolation and typed host APIs matter more than a shared rendering framework.
+**Accepted direction:** ordinary Svelte should be easy to use. Other UI frameworks should remain possible. Do not require Svelte for every future third-party interface. Current rendering uses a Svelte adapter; support for other approaches still needs design.
 
-Highest priorities are a scaffolding command, a ready-to-use development host with hot reload, and typed APIs. Also provide sample projects/fixtures, automated integration tests, packaging and compatibility tooling, and documentation usable by both humans and agents. A shared optional UI library should express the product language and provide useful basic components without forcing authors to build everything themselves. Grafana's plugin development workflow is a reference, not a dependency decision.
+Developer tooling priorities are:
 
-Internationalization belongs to the core platform and must be available to extensions. Paraglide is currently wired into the app, but the final plugin translation contract and locale authority are not settled.
+- A scaffolding command.
+- A development host with hot reload.
+- Typed APIs and sample projects.
+- Automated integration tests.
+- Packaging and compatibility tools.
+- Documentation for both people and agents.
+
+The optional shared UI library should provide useful components without forcing every author to use it. Grafana's plugin workflow is a reference, not a dependency decision.
+
+Translation support belongs to the core platform. Paraglide is connected to the app, but the plugin translation API and responsibility for choosing the locale remain open.
 
 ## History and collaboration
 
-**Accepted direction:** durable, navigable, branching project history for alternate versions and what-if exploration. It should include manuscript text/formatting, ordering, notes, characters, research, assets, and plugin data. Workspace layout and personal preferences can be tracked optionally.
+**Accepted direction:** durable project history with named branches and alternate versions. It should cover text, formatting, organization, notes, research, assets and plugin data. Workspace layout and preferences may be tracked separately or optionally.
 
-Expose meaningful zones of interest or categorized work, such as “working on character X” or “adding chapter 10,” rather than overwhelming users with an undifferentiated transaction tree. The relationship between typing undo, snapshots, named branches, and these groupings remains open. Git is a candidate implementation, **not a chosen history engine**.
+Users should be able to understand what a history entry means. Grouping work by chapter or character may be more useful than showing every low-level transaction.
 
-Collaboration should support people working from their own computers, preferably peer-to-peer and offline-capable rather than account/server-dependent. Synchronization, conflict handling, identity, transport, and collaboration data structures are undecided. Branch-based alternate versions and simultaneous collaboration are goals, not implemented features.
+The relationship between typing undo, snapshots, named branches and these groups is undecided. Git is a candidate, not a selected history engine.
 
-Pagination should default off in multiplayer/collaborative mode, with an explicit override. Different views may have different layout needs. This policy is future behavior; collaboration and automatic mode switching do not currently exist.
+Collaboration should work between users' computers where possible. Offline work should remain useful. Identity, transport, conflict handling and shared data structures are not selected. Neither simultaneous editing nor durable branching project history is implemented.
+
+Pagination should default off in future collaborative sessions, with an explicit override. Different views may need different layouts. This policy is not implemented because collaboration is not implemented.
 
 ## Import/export and compatibility UX
 
-**Accepted direction:** conversion through an intermediate representation, with visual fidelity as the primary conversion priority. Reuse existing tools/libraries when appropriate, but no converter framework has been selected. Target ideas include DOCX, EPUB, LaTeX, OpenDocument, and possibly Typst. Priorities and supported subsets need validation.
+**Accepted direction:** use a conversion model between file formats. Visual fidelity is the main priority. No conversion framework is selected.
 
-Do not promise universal fidelity. ProseMirror's extensibility does not automatically provide an editor, pagination, or exporter for every possible layout.
+Potential formats include DOCX, EPUB, LaTeX, OpenDocument and Typst. Supported subsets and priorities still need validation. ProseMirror's extensibility does not guarantee faithful editing or export of every layout.
 
-Preferred workflow:
+The intended workflow is:
 
-1. Choose an output format/profile and analyze compatibility.
-2. Export directly when supported.
-3. Otherwise offer deterministic **recommended conversions** or an optional detailed review.
-4. Distinguish exact preservation, visual approximation, appearance preserved with reduced editability, and omissions.
-5. Preserve the original project; apply lossy transformations to the output or a copy.
-6. Provide preview where practical, an expandable report, and reusable profiles/overrides so ordinary users need minimal input and experts can control precise behavior.
+1. Choose an output format and profile.
+2. Check compatibility.
+3. Export directly when supported.
+4. Otherwise explain recommended conversions and offer detailed review.
+5. Distinguish exact preservation, visual approximation, reduced editability and omitted content.
+6. Apply lossy changes to a copy or output, not the original project.
+7. Offer previews, reusable profiles and an expandable report where practical.
 
-For unsupported imported layouts, preserve original source/unsupported data where feasible, explain limitations, and offer usable fallback/conversion paths rather than silently discarding content or simply refusing the whole document. The exact fallback representations are open. Link users to [GitHub issues](https://github.com/benyakirten/writers-ide/issues) to request concrete layout/format support; encourage minimal, non-sensitive reproductions instead of asking them to publish private manuscripts.
+For unsupported imported content, preserve source data where feasible. Explain the limitation and offer a usable fallback. Do not silently discard content. The exact fallback representation is still open.
 
-Determinism means the same content, profile, converter version, and relevant resources produce the same conversion decisions. Font availability and rendering engines also affect visual output; deterministic rules alone do not guarantee identical pagination across machines.
+Link users to [GitHub issues](https://github.com/benyakirten/writers-ide/issues) for concrete format requests. Ask for small, non-sensitive examples, not private manuscripts.
+
+Conversion decisions should be repeatable for the same content, profile, converter version and resources. Font availability and browser layout can still produce different page breaks.
 
 ## Performance requirements
 
-**Accepted target, not a verified present capability:** a sleek, responsive experience on a baseline computer with **8 GB RAM**, including very large books and multi-book projects. Do not normalize visible frontend stalls as unavoidable because a project is large.
+**Accepted target:** responsive operation on a computer with **8 GB RAM**, including large books and multi-book projects. This is a target, not a verified capacity claim.
 
-- Aim for nearly instantaneous startup into a useful workspace and make visible content editable quickly.
-- Load/process offscreen content incrementally in the background; virtualize large collections and investigate document virtualization where appropriate.
-- Keep DOM work proportional to what the user needs now. Distinguish viewport-limited pagination from full document virtualization; only the former currently exists.
-- Reuse the pagination scheduler for plugin cooperative main-thread tasks, with ergonomic iteration/batching helpers and host-managed lifecycle cancellation. Encourage adoption through useful APIs, not a mandatory generator or scheduler requirement for every action. Keep synchronous hooks/short commands immediate; authors choose sync, async, cooperative or worker execution. Shared tasks must share the application frame budget, not allocate one per plugin. Each cooperative unit must remain short; cancellation/invalidation must account for intervening edits. See [task direction](plugins/context.md#accepted-direction-actions-and-cooperative-execution).
-- Prefer Web Workers for suitable frontend CPU work and explicit asynchronous request/result or event workflows for work handed to the Rust backend.
-- Promises do not themselves move CPU work off the main thread. Backend work also needs appropriate concurrency rather than blocking the UI through a synchronous call pattern.
-- Establish measurements and regression tests as features develop. The current [browser performance suite](browser-performance/context.md) measures focused paragraph split search with correctness and probe-bound gates, not timing thresholds. There is no end-to-end editor performance fixture or verified startup/latency target, maximum project size, or complete virtualization design.
+- Start quickly and make useful content editable early.
+- Load offscreen content incrementally.
+- Render only needed items in large collections where practical. This is called virtualization; full document virtualization is not implemented.
+- Keep DOM measurement work close to the visible area. Current pagination focuses on visible pages, but that is not full virtualization.
+- Split main-thread work into short cooperative steps. Other edits and cancellation can occur between steps.
+- Use one shared scheduler for pagination and plugin tasks. Do not give each plugin a separate frame allowance.
+- Encourage task helpers, but do not require a generator for every action. Short commands and synchronous hooks stay immediate.
+- Use Web Workers for suitable CPU-heavy frontend work. Promises alone do not move computation off the UI thread.
+- Use asynchronous request/result workflows for backend work. The backend must also avoid blocking the UI through synchronous calls.
+
+No end-to-end startup or latency target has been verified. No maximum project size is established. The [browser performance suite](browser-performance/context.md) checks paragraph split search and limits measurement probes. It does not enforce timing thresholds or measure the whole editor.
 
 ## Current implementation map
 
-Paths below are relative to the repository root. These are discovery entry points, not stable public plugin APIs.
+Paths are relative to the repository root. They are source entry points, not stable plugin APIs.
 
-| Area                    | Entry points                                                                                                                                                                       | Current behavior / limits                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bootstrap               | `src/routes/+page.svelte`, `src/routes/+layout.svelte`, `src/routes/+layout.ts`, `vite.config.ts`                                                                                  | Registers word-processing provider plus formatting, activates formatting through required-provider resolution, and cascades provider teardown without destroying source-owned views; directly registers the ProseMirror view; static, prerendered/client-only SvelteKit app for Tauri. Global keyboard events feed shortcuts.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Rust host               | `src-tauri/src/lib.rs`, `src-tauri/src/main.rs`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`                                                                               | Tauri 2 starter greeting command and opener plugin. No project persistence, history, collaboration, or converter backend yet.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Workbench               | `src/lib/editor/Editor.svelte`, `MainView.svelte`, `Tab.svelte`                                                                                                                    | Composes bars, central views, toasts/tooltips, pagination UI; forwards the Plugins action to the route-owned manager dialog in Stage 2. Base bars also contain development/test controls. All central windows currently render side by side, not a complete tab/split interface.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Toolbar extensions      | `src/lib/editor/state/bar-item-registry.svelte.ts`, `bar-items.svelte.ts`, `shared.types.ts`                                                                                       | Trusted orientation-specific presentations, item IDs and capacity units. Formatting uses explicit feature-service props scoped to activation, not legacy editor/workspace props. Trusted descriptors carry typed explicit props, with common context passed only when needed. Disabled placements retain capacity costs; unknown IDs render fallbacks. No sandbox.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Bar layout              | `src/lib/editor/state/vertical-bar-state.svelte.ts`, `horizontal-bar-state.svelte.ts`, `floater-state.svelte.ts`, `bar-transfer-handler.svelte.ts`; `src/lib/editor/bars/`         | Merged bar/item docking; Stage 2 app state facades over an explicitly injected private layout engine, with app-owned rendering/DnD composition. Capacity-validated transfers, floating orientation, geometry/resizing and menu moves are preserved. See [DnD context](dnd/context.md) for contracts, UI primitives and tests. Minimized-floater restoration, durable layout storage and general component-state transfer remain incomplete.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Central views           | `src/lib/editor/state/tab-state.svelte.ts`, `tab-state-registry.svelte.ts`                                                                                                         | Named component registry and view instances, active state, reordering/disposal. Generic `data` exists but built-in editor loads sample data instead.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Rich-text editor        | `src/lib/editor/prosemirror/prose-mirror-editor.svelte.ts`, `view/editor.ts`, `view/ProseMirrorView.svelte`, `view/schema.ts`, `view/nodes.ts`, `view/marks.ts`, `view/actions.ts` | ProseMirror registration, transactions, fixed schema, formatting, history, sample content. View IDs differ from document IDs; same-document views do not synchronize edits.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Bundled plugin host     | `packages-js/plugins/`, `src/lib/plugins/`                                                                                                                                         | Merged synchronous lifecycle, owned contributions, rollback and cleanup for trusted bundled code. Stage 2 keeps the shared context feature-neutral (`signal`, `own`, `contributions`, `tasks`, `apis`) with only toolbar/view/command contribution capabilities; no formatting types, `context.formatting`, or required host formatting service. It adds activation-owned task helpers and exact-major declared providers/dependencies without new contribution capabilities, frozen management snapshots with missing/incompatible/inactive/available dependency status, and a host-owned native-dialog manager with impact/consent/rechecked dependent cascades and transitive required-ID protection. Provider/task errors do not disable plugins or fail otherwise successful deactivation; activation/dependency/host-cleanup failures retain lifecycle effects; local Svelte presentation fallbacks contain render/effect failures, not arbitrary JS. No external loader or isolation. See [plugin context](plugins/context.md). |
-| Editor extension hooks  | `src/lib/editor/prosemirror/plugins.svelte.ts`, `view/editor.ts`, `node/SvelteViewNode.svelte.ts`                                                                                  | Baseline factories are read at creation; Part 3A adds provider observations/edits, command registry and strict result application in `packages-js/word-processing/`, adapted by `src/lib/editor/prosemirror/word-processing.svelte.ts`. Part 3B adds connection-owned per-view behaviors, managed-before-baseline ordering, key-preserving wrappers and approved in-place reconfiguration. `view/editor.ts` handles accepted root/appended transactions; `view/page-indexes.ts` supplies shared normalization. Opt-in `behaviors/` proofs use the same public API. Part 3C schema/Svelte node views remains gated.                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Basic menu example      | `src/lib/editor/prosemirror/menu/basic/`                                                                                                                                           | Bundled application plugin with feature-local `contracts.ts`, `formatting-service.svelte.ts` ProseMirror bridge, and `scope-formatting-service.ts`. `createFormattingPlugin()` resolves the required word-processing provider and builds `FormattingService(provider)` per activation; no singleton/route injection. Explicit props carry copied snapshots and validated requests, with `context.own`/`signal` scoping; Basic Menu retains its feature policies/regressions. Independent opt-in `menu/quick-format/` consumes the public API plus upstream `toggleMark` for `bold`/`strong`, registered only in its browser fixture, not the default app. Private evolving APIs, not an isolated third-party SDK or full editor extraction.                                                                                                                                                                                                                                                                                            |
-| Pagination / scheduling | `src/lib/editor/state/page-layout.svelte.ts`, `page-observer.svelte.ts`, `work-queue.svelte.ts`; `src/lib/components/pagination/`; `packages-js/tasks/`                            | Viewport-driven model-mutating pagination is unchanged. Private tasks library extracts the queue plus opt-in iteration/generator/async/bundled-worker helpers. The facade retains the app singleton, shared by default with the application plugin host; standalone hosts may inject a queue or default to independent ones. See [pagination context](pagination/context.md) and [task guide](../packages-js/tasks/README.md). Not whole-document virtualization; strict editor result application belongs to the separate Part 3A word-processing provider.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Reactive state/services | `src/lib/editor/state/`, `src/lib/services/`, `src/lib/utils/observable.ts`                                                                                                        | Mostly module-level singleton classes with Svelte runes; observables remain for events/shortcuts. No established durable workspace/settings storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Localization            | `project.inlang/settings.json`, `messages/`, `src/lib/i18n.ts`, `src/lib/services/locale-manager.svelte.ts`, `src/lib/paraglide/`                                                  | Paraglide JS 3 Vite compilation, English/French catalogs; browser-preferred language with English fallback, no locale URL routing. French currently contains English text and some UI is hard-coded English. Injected `LocaleManager` still initializes to English independently; locale preference settings and plugin i18n strategy remain incomplete.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| UI foundations          | `src/lib/components/`, `src/app.css`, `components.json`                                                                                                                            | Tailwind 4 with v3 compatibility styles, Bits UI 2 dropdown wrappers, icons, toasts, theme tokens. Stage 2 private components provide explicit tooltip state/provider, icon button, tooltip and pointer; app wrappers retain the shared manager. Not a finished theme/settings platform.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Packages / scaffolds    | `packages-js/plugins/`, `packages-js/components/`, `packages-js/layout/`, `packages-js/tasks/`, `packages-js/word-processing/`, `pnpm-workspace.yaml`, `src/lib/index.ts`          | Root and five private workspace packages: plugin contracts, reusable layout engine/primitives, explicit component/tooltip services, queue/task mechanics with a Svelte-free worker helper entry, and synchronous word-processing service/contracts. Independent library instances do not import app singletons; app adapters remain. No published SDK.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Test/dev infrastructure | `vite.config.ts`, `playwright.config.ts`, `playwright.performance.config.ts`, `src/**/*.test.ts`, `e2e/`, `performance/`, `.storybook/`, `src/stories/`, `.github/workflows/`      | jsdom unit tests; Chromium/WebKit app smoke, pagination geometry, stylesheet and separate production-built real-worker/shared-task, provider/dependency-management and word-processing/QuickFormat fixture tests; static-Storybook paragraph search benchmark. CI runs lint/unit tests, browser performance, and smoke/task/plugin/word-processing checks (Windows Chromium, macOS/Linux WebKit), not the full validation set or native Tauri runtime tests.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+### Application and workspace
+
+| Area                        | Start here                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| Startup and app composition | `src/routes/+page.svelte`, `src/routes/+layout.svelte`, `src/routes/+layout.ts`, `vite.config.ts` |
+| Workspace shell             | `src/lib/editor/Editor.svelte`, `src/lib/editor/MainView.svelte`, `src/lib/editor/Tab.svelte`     |
+| Central views and tabs      | `src/lib/editor/state/tab-state.svelte.ts`, `src/lib/editor/state/tab-state-registry.svelte.ts`   |
+| Bars and floating placement | `src/lib/editor/state/`, `src/lib/editor/bars/`, `packages-js/layout/`                            |
+| Plugin host and manager     | `packages-js/plugins/`, `src/lib/plugins/`                                                        |
+| Shared UI and tooltips      | `packages-js/components/`, `src/lib/components/`, `src/lib/services/tooltip.svelte.ts`            |
+
+The route registers the word-processing provider and formatting plugin. It also still registers the editor view directly. The provider owns API resources, not the editor views themselves.
+
+The workspace shows central windows side by side. A complete tab/split interface is not finished. Bars retain placement and capacity information while a plugin is disabled. Layout persistence and restoring minimized floating bars remain incomplete.
+
+App state files provide compatibility access to the layout library. Toolbar registries use explicit component props. Unknown toolbar IDs show placeholders.
+
+### Editor and extension implementation
+
+Most editor source is under `src/lib/editor/prosemirror/`:
+
+| Area                      | Entry points                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------- |
+| Registered editor views   | `prose-mirror-editor.svelte.ts`                                                                     |
+| View, schema and dispatch | `view/ProseMirrorView.svelte`, `view/editor.ts`, `view/schema.ts`, `view/nodes.ts`, `view/marks.ts` |
+| Shared editing helpers    | `view/actions.ts`, `view/selection.ts`                                                              |
+| Provider adapter          | `word-processing.svelte.ts`                                                                         |
+| Default formatting        | `menu/basic/`                                                                                       |
+| Independent examples      | `menu/quick-format/`, `behaviors/`                                                                  |
+| Existing plugin assembly  | `plugins.svelte.ts`, `view/editor.ts`                                                               |
+| Early node-view work      | `node/SvelteViewNode.svelte.ts`                                                                     |
+
+The editor currently loads sample content. View IDs differ from document IDs. Multiple views of one document do not synchronize edits.
+
+`packages-js/word-processing/` contains public editor contracts and reusable service code. It supports synchronous access, commands, strict result validation and behavior registration. New behaviors update existing editor states. Accepted root and appended transactions pass through app dispatch; `view/page-indexes.ts` normalizes page indexes.
+
+Pagination lives in `src/lib/editor/state/page-layout.svelte.ts`, `src/lib/editor/state/page-observer.svelte.ts` and `src/lib/components/pagination/`. The app's `src/lib/editor/state/work-queue.svelte.ts` exports its shared queue from `packages-js/tasks/`.
+
+### Other platform code
+
+- Rust startup is in `src-tauri/src/lib.rs` and `src-tauri/src/main.rs`. The backend currently has the Tauri greeting command and opener plugin, not project storage or conversion services.
+- Shared reactive services live in `src/lib/editor/state/` and `src/lib/services/`. Most still use module-level instances. `src/lib/utils/observable.ts` supports events and shortcuts.
+- Localization uses `project.inlang/settings.json`, `messages/`, `src/lib/i18n.ts`, `src/lib/services/locale-manager.svelte.ts` and generated `src/lib/paraglide/` code. Browser language falls back to English. French messages still include English text, and some UI text is hard-coded. `LocaleManager` independently starts in English. Saved language preferences are not implemented.
+- UI code uses Tailwind 4 with compatibility styles, Bits UI menus, icons, toasts and theme variables. This is not a finished theme/settings platform.
+- `pnpm-workspace.yaml` lists the root and five private packages: plugins, layout, components, tasks and word processing. None is a published SDK. Reusable library instances do not import application singletons.
 
 ### Current gaps that must not be described as completed
 
-Durable save/load, a project storage schema, conversion pipeline, history trees, peer-to-peer collaboration, synchronized same-document views, restrictive plugin native permissions, external plugin packaging/loading (Part 4), custom content/schema/Svelte node-view lifecycle (3C), full editor assembly extraction, optional future frontend isolation, conventional central-tab/split controls, complete translations, and large-project virtualization are not implemented.
+These features remain unfinished or unimplemented:
+
+- Durable save/load and a project storage schema.
+- Import/export conversion services.
+- Branching project history and collaboration.
+- Synchronized views of the same document.
+- External plugin loading and enforced native permissions.
+- Custom-content schema lifecycle and Svelte node-view registration.
+- Complete extraction of editor assembly into plugins.
+- Frontend isolation, if pursued later.
+- A complete central tab/split interface.
+- Complete translations and saved workspace/settings.
+- Full document virtualization for very large projects.
 
 ## Validation and topic navigation
 
-Run commands from the repository root. Use [CONTRIBUTING.md](../CONTRIBUTING.md) as the source for code style and validation conventions:
+Run checks from the repository root. [CONTRIBUTING.md](../CONTRIBUTING.md) explains the commands and supported toolchain. [Dependency maintenance](dependencies.md) covers upgrades and outstanding advisories.
 
 ```sh
 pnpm check
@@ -198,27 +313,38 @@ pnpm test:performance
 pnpm build
 ```
 
-The dependency/toolchain baseline and outstanding upstream security advisories are documented in [dependencies.md](dependencies.md). SvelteKit 3 configuration is passed to its Vite plugin; the static/client-only deployment and model-mutating pagination remain unchanged. `$lib` and `@/*` are retained as compatibility aliases rather than rewriting all application imports.
+Choose checks that exercise the changed behavior:
 
-Unit tests cover much of bar state/transfers, shortcuts, toast/tooltip behavior, editor actions, scheduling and pagination logic. jsdom cannot establish layout correctness. Use the browser tests and commands in [pagination context](pagination/context.md) for actual pagination geometry. `e2e/docking.test.ts` covers bar/item dragging, capacity rejection, empty docks, floating orientation, keyboard movement/focus, cancellation, overlapping floaters, viewport shrink, and formatting-control isolation in Chromium/WebKit. This does not establish complete workspace accessibility, real touch/native-window behavior, or plugin isolation. Storybook includes focused paragraph search performance and harness argument fixtures, not a finished editor/plugin development host or end-to-end editor performance fixture. See [browser-performance context](browser-performance/context.md) for the typed story catalog/visit API, generic benchmark lifecycle, fixture extension guide, artifacts and CI interpretation limits. Browser timings are diagnostic, not Tauri measurements or arbitrary cross-machine comparisons.
+| Check                  | What it covers                                                                                     |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| Unit tests             | State, transfer rules, commands, scheduling, pagination logic and plugin APIs                      |
+| App smoke/e2e          | Real typing, selection, undo, geometry, docking, focus, locale fallback and plugin management      |
+| `test:tasks`           | Built workers, buffer transfers, cancellation and shared queue ownership                           |
+| `test:plugins`         | Provider dependencies, removal confirmation, API invalidation and error reporting                  |
+| `test:word-processing` | Editor access, independent formatting, behavior registration, input rules, decorations and workers |
+| `test:performance`     | Focused Storybook paragraph-search benchmarks                                                      |
 
-`pnpm test:tasks` uses `playwright.tasks.config.ts` and `e2e/fixtures/tasks/` for emitted worker modules, real transfers, cancellation/error recovery and shared queue ownership. `pnpm test:plugins` uses `playwright.plugins.config.ts` and `e2e/fixtures/plugins/` for provider/dependency lifecycle and manager consent behavior. `pnpm test:word-processing` uses `playwright.word-processing.config.ts`, `e2e/word-processing.test.ts`, `e2e/word-processing-behaviors.test.ts` and `e2e/fixtures/word-processing/`: the actual app provider adapter, generic host, real ProseMirror views/history, bundled workers, independent QuickFormat and opt-in `BehaviorFixture.svelte`, without Basic Menu import/registration. Six new behavior scenarios/twelve cases expand the existing twelve to 24 Chromium/WebKit cases. Core/app coverage includes `src/lib/testing/word-processing.svelte.test.ts`, `word-processing-behaviors.svelte.test.ts`, `src/lib/editor/prosemirror/word-processing.svelte.test.ts` and `view/editor-behaviors.svelte.test.ts`. All three dedicated fixture commands remain separate production builds excluded from app e2e; the existing Browser Smoke CI word-processing step includes both test files. See the [plugin changelog](plugins/change-log.md) for current full-suite results, existing diagnostics and the intermittent selection-timing limitation. No native/security or pagination-geometry guarantee is implied by behavior fixtures.
+The three dedicated task/plugin/editor fixtures build separately from the app. Run their commands explicitly; the main app e2e configuration excludes their test files. Browser Smoke CI runs all three for its selected engine.
 
-The browser matrix targets Tauri's Chromium-based WebView2 and WebKit engine families; Firefox/Gecko is not a supported Tauri runtime. Playwright Chromium is not an actual WebView2 host, and Playwright WebKit does not pin the native WKWebView/WebKitGTK version.
+Unit tests use jsdom, which does not calculate browser layout. Use real-browser tests for geometry. The docking suite covers pointer and keyboard moves, capacity limits, floating bars, cancellation, overlapping bars and viewport changes. Pagination tests cover page creation, content preservation, forward/reverse selections and undo.
 
-The cross-engine smoke suite checks typing/selection/undo, dropdown keyboard/focus behavior, visible-page bounds/marker preservation, startup exceptions, locale fallback, and host-owned plugin-manager focus and disable/re-enable behavior. Reflow uses structural ProseMirror split/join mappings instead of whole-page replacement and text delete/reinsert, preserving logical text/inline-atom selections and undo mappings; explicit stored marks survive reflow and dispatch index normalization. Dedicated model and real-browser regressions cover carets through new-page creation and forward/reversed ranges through formatting reflow/undo. The current model-mutating pagination architecture is unchanged. Playwright's bundled engines are proxies for native WebViews, not validation of the minimum macOS version, Tauri IPC, or packaged-app startup.
+These tests do not establish complete accessibility, real-touch behavior, native plugin permissions or packaged-app safety. Playwright Chromium and WebKit represent Tauri's engine families, not the installed WebView2, WKWebView or WebKitGTK runtimes. Firefox is outside the Tauri browser matrix. Tests also do not verify the oldest supported macOS version.
 
-This document describes source inspection, not a standing claim that these checks pass. Report actual validation results for each change.
+Browser timing results are diagnostic. They are not Tauri timings or comparable limits for arbitrary machines. Storybook is not yet a complete plugin development host or end-to-end performance test environment.
+
+See the [plugin changelog](plugins/change-log.md) for recorded test results, existing diagnostics and the intermittent selection-timing limitation. Results are evidence for a particular change, not a promise that every future checkout passes.
+
+SvelteKit configuration lives in its Vite plugin. Deployment remains static and client-only. `$lib` and `@/*` remain compatibility aliases.
 
 ## Tentative priorities and issue references
 
-Owner's tentative sequence: finish pagination, then drag-and-drop interfaces, then importing/exporting. No fixed next milestone or release date is committed.
+The earlier tentative sequence was pagination, drag-and-drop, then import/export. It is not a fixed milestone or release commitment.
 
-Useful open issues from the inspection (not a frozen backlog):
+Useful issue references include:
 
-- [#15 editor feature umbrella](https://github.com/benyakirten/writers-ide/issues/15), [#24 WYSIWYG features](https://github.com/benyakirten/writers-ide/issues/24), [#72 headers/footers](https://github.com/benyakirten/writers-ide/issues/72).
-- [#20 main editor layout](https://github.com/benyakirten/writers-ide/issues/20), [#41 drag-and-drop](https://github.com/benyakirten/writers-ide/issues/41), [#45 plugin central content](https://github.com/benyakirten/writers-ide/issues/45), [#71 shared-document views](https://github.com/benyakirten/writers-ide/issues/71).
-- [#46 save/load](https://github.com/benyakirten/writers-ide/issues/46), [#50 format converters](https://github.com/benyakirten/writers-ide/issues/50), [#66 format-specific views](https://github.com/benyakirten/writers-ide/issues/66).
-- [#36 i18n](https://github.com/benyakirten/writers-ide/issues/36), [#65 shared UI package](https://github.com/benyakirten/writers-ide/issues/65), [#12 editor Storybook](https://github.com/benyakirten/writers-ide/issues/12).
+- Editing: [#15](https://github.com/benyakirten/writers-ide/issues/15), [#24](https://github.com/benyakirten/writers-ide/issues/24), [#72 headers/footers](https://github.com/benyakirten/writers-ide/issues/72).
+- Workspace: [#20](https://github.com/benyakirten/writers-ide/issues/20), [#41 drag-and-drop](https://github.com/benyakirten/writers-ide/issues/41), [#45 central views](https://github.com/benyakirten/writers-ide/issues/45), [#71 shared-document views](https://github.com/benyakirten/writers-ide/issues/71).
+- Storage/conversion: [#46](https://github.com/benyakirten/writers-ide/issues/46), [#50](https://github.com/benyakirten/writers-ide/issues/50), [#66](https://github.com/benyakirten/writers-ide/issues/66).
+- Developer experience: [#36 translation](https://github.com/benyakirten/writers-ide/issues/36), [#65 shared UI](https://github.com/benyakirten/writers-ide/issues/65), [#12 Storybook](https://github.com/benyakirten/writers-ide/issues/12).
 
-Old native/custom-editor exploration issues do not supersede the confirmed stack decision. Recheck issue status and actual implementation when starting related work.
+Check each issue's status and the current implementation before using it as a specification.

@@ -2,6 +2,18 @@
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before making changes. Its contributor and code-style conventions apply throughout this repository.
 
+## Documentation: five required writing rules
+
+Apply these rules whenever you write or update documentation, including READMEs, examples and design guides. Check your work against all five before finishing.
+
+1. **Use simple sentences.** Include only necessary clauses. Write more sentences when that makes the explanation clearer.
+2. **Choose clarity over cleverness.** Minimize metaphor. Use jargon only when it is the best term, and explain it before relying on it.
+3. **Assume little or no project context.** Do not assume the reader knows the repository, earlier discussions or implementation history.
+4. **Explain API-specific context.** Assume JavaScript knowledge, not knowledge of this project's API design. Explain where an example belongs, who calls it, when it runs and how its inputs are supplied. Make the example understandable on its own, or link directly to the prerequisite explanation. For example, do not mention `activate(context)` without explaining the plugin host's role or linking to that explanation.
+5. **Keep discarded designs out of current guides.** Describe the current design and genuinely planned work. Remove mentions of ideas rejected during discussion and APIs replaced before release. Keep that history only in changelogs. Do not add migration notes for unreleased designs that nobody has used. Preserve warnings about real current limitations.
+
+See [Writing documentation](CONTRIBUTING.md#writing-documentation) for related maintenance guidance.
+
 ## Project memory and architectural approval
 
 Writer's IDE is a local-first, highly extensible word processor with an IDE-like workspace, initially focused on fiction authors. Tauri + Svelte 5 + ProseMirror + Rust are firm choices. Official features are free; cooperation and creativity, not monetization, guide the project.

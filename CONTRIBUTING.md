@@ -1,21 +1,47 @@
 # Contributing
 
-Writer's IDE is an extensible word processor built with Svelte 5 and ProseMirror.
-Keep changes focused, follow existing project patterns, and add or update tests when behavior changes.
+Writer's IDE is a word processor built with Svelte 5, ProseMirror, Tauri and Rust.
+Keep changes focused. Follow the existing patterns and add tests when behavior changes.
 
 ## Toolchain
 
-Use pnpm 12.4.1 (pinned in `package.json`), Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`, and Rust 1.90 or newer. CI uses Node.js 24. Install frontend dependencies with `pnpm install --frozen-lockfile`; install the matching browsers with `pnpm exec playwright install chromium webkit` before browser tests (`--with-deps` also installs Linux system dependencies). The Node.js minimum follows jsdom's supported releases.
+Use these versions:
 
-The frontend uses SvelteKit 3, Vite 8, and Tailwind CSS 4. SvelteKit configuration lives in `vite.config.ts`, not `svelte.config.js`. Tailwind 4 requires Safari 16.4+, Chrome 111+, or Firefox 128+; desktop WebViews must satisfy that baseline too. The macOS application requires macOS 13.3 Ventura or newer, as configured in `src-tauri/tauri.conf.json`. See [dependency maintenance](docs/dependencies.md) for update/audit commands and outstanding upstream advisories.
+| Tool    | Required version                       |
+| ------- | -------------------------------------- |
+| pnpm    | 12.4.1, pinned in `package.json`       |
+| Node.js | `^22.22.2` or `^24.15.0` or `>=26.0.0` |
+| Rust    | 1.90 or newer                          |
+
+CI uses Node.js 24. The Node.js minimum follows jsdom's supported releases.
+
+Install dependencies and browser test engines:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm exec playwright install chromium webkit
+```
+
+On Linux, add `--with-deps` to the Playwright command to install system dependencies.
+
+The frontend uses SvelteKit 3, Vite 8 and Tailwind CSS 4.
+SvelteKit configuration lives in `vite.config.ts`, not `svelte.config.js`.
+
+Tailwind 4 requires Safari 16.4+, Chrome 111+ or Firefox 128+.
+The desktop application's browser engine must meet those requirements.
+The macOS minimum is 13.3 Ventura, as set in `src-tauri/tauri.conf.json`.
+Firefox is not part of the Tauri test matrix described below.
+
+See [dependency maintenance](docs/dependencies.md) for upgrade commands and outstanding advisories.
 
 ## Code style
 
-These conventions apply to JavaScript and TypeScript, including scripts in Svelte components.
+These rules apply to JavaScript, TypeScript and Svelte `<script>` blocks.
 
 ### Keep mutations out of conditions
 
-Conditions should evaluate state, not change it. Do not use assignments or increment/decrement expressions in `if`, `while`, `do…while`, or `for` conditions. Perform mutations in separate statements.
+Do not put assignments, `++` or `--` in an `if`, `while`, `do…while` or `for` condition.
+Update values in separate statements.
 
 ```ts
 // Avoid
@@ -25,15 +51,16 @@ if (owners++ === 0) {
 
 // Prefer
 owners++;
-
 if (owners === 1) {
 	startWorker();
 }
 ```
 
-Preserve the original behavior when separating a mutation from a condition: postfix and prefix updates evaluate differently.
+Preserve the original order of operations when making this change.
+A postfix increment compares the old value. A prefix increment compares the new value.
 
-Increment and decrement operators are allowed outside conditions, including the update clause of a `for` loop:
+Increment and decrement expressions are allowed outside conditions.
+For example, they may appear in a `for` loop's update clause:
 
 ```ts
 for (let index = 0; index < count; index++) {
@@ -41,11 +68,14 @@ for (let index = 0; index < count; index++) {
 }
 ```
 
-Ordinary predicate calls such as `if (isReady())` are fine. Avoid hiding mutations in predicate functions; linting cannot generally determine whether a function call has side effects.
+Ordinary predicate calls such as `if (isReady())` are allowed.
+Do not hide mutations in a predicate helper to avoid this rule.
+Linting cannot generally detect that behavior.
 
 ### Always use braces for control flow
 
-Use brace bodies for every `if`, `else`, `for`, `for…of`, `for…in`, `while`, and `do…while`, even when the body contains only one statement. Ordinary `else if` chains are allowed.
+Use braces for `if`, `else`, `for`, `for…of`, `for…in`, `while` and `do…while` bodies.
+This includes single statements. Ordinary `else if` chains are allowed.
 
 ```ts
 // Avoid
@@ -65,31 +95,54 @@ for (const job of jobs) {
 
 ### Formatting and linting
 
-Use the repository's Oxfmt (`.oxfmtrc.json`) and Oxlint (`.oxlintrc.json`) configuration rather than introducing personal formatting rules. Oxfmt formats code, including Svelte components and Tailwind CSS classes; it does not replace semantic lint rules or the conventions above.
+Use the existing Oxfmt and Oxlint configuration.
+Oxfmt formats code, including Svelte components and Tailwind classes.
+Oxlint checks code rules. Formatting does not replace those checks.
 
 ```sh
 pnpm lint
 pnpm lint:fix
 ```
 
-`lint` checks formatting and lint rules. `lint:fix` applies safe lint fixes, then formats the result.
+`lint` checks formatting and lint rules.
+`lint:fix` applies safe lint fixes, then formats the files.
 
-For a focused change, check only the files you touched:
+For a focused change, check the files you touched:
 
 ```sh
 pnpm exec oxfmt --check path/to/file.ts
 pnpm exec oxlint path/to/file.ts
 ```
 
-Oxlint preserves the supported rules from the previous ESLint configuration, including the underscore-prefixed unused-variable exemptions. It lints Svelte `<script>` blocks, not templates, so it does not replace `eslint-plugin-svelte`'s template rules. Continue to run `pnpm check` for Svelte and TypeScript diagnostics.
+Oxlint preserves the supported rules from the previous ESLint configuration.
+This includes the underscore-prefix exception for unused variables.
+It checks Svelte `<script>` blocks, not templates.
+It therefore does not replace every `eslint-plugin-svelte` check.
+Use `pnpm check` for Svelte and TypeScript diagnostics.
 
-The brace and mutation conventions above still apply even where lint rules do not enforce them. Do not replace the condition-specific increment/decrement restriction with a blanket ban on `++` and `--`.
+Do not assume either tool adds braces or removes mutations from conditions.
+The project rules still apply when a tool does not enforce them.
+They do not prohibit all uses of `++` or `--`.
 
-Oxfmt and Oxlint's own Node.js minimum is lower than the project's toolchain requirement above; use the project requirement when installing dependencies.
+Use the project's toolchain requirements above, even if an individual tool supports an older Node.js version.
+
+## Writing documentation
+
+These five rules apply to all documentation, including READMEs, examples and design guides. Review all five before finishing a documentation change.
+
+1. **Use simple sentences.** Include only necessary clauses. Split a sentence when it tries to explain several things. More short sentences can be clearer than one dense sentence.
+2. **Choose clarity over cleverness.** Minimize metaphor. Use jargon only when it is the best term. Explain unfamiliar terms before relying on them.
+3. **Assume little or no project context.** Write for someone who does not know the repository, surrounding conversation or implementation history. Start with the document's purpose and what the reader needs to know.
+4. **Explain API-specific context.** Assume JavaScript knowledge, not knowledge of this project's API design. Explain where an example belongs, who calls it, when it runs and how its inputs are supplied. Make it understandable on its own, or link directly to the prerequisite explanation. For example, explain that the plugin host calls `activate(context)` when enabling a registered plugin. Do not expect readers to infer that lifecycle from a code fragment.
+5. **Keep discarded designs out of current guides.** Describe current behavior and genuinely planned work. Remove ideas rejected during discussion and APIs replaced before release. Keep that history only in changelogs. There is no need for migration commentary about unreleased designs that nobody has used. Preserve warnings about real current limitations.
+
+Separate current behavior, approved plans and open decisions. Put detailed history and verified test results in changelogs. Do not make readers decode branch names or phase numbers before understanding a feature.
+
+Keep examples accurate and supply their prerequisites. Link to exact sections rather than asking the reader to search another guide.
 
 ## Validation
 
-Start with tests covering the changed behavior, then run broader checks as appropriate:
+Start with tests for the changed behavior. Then run broader checks as needed:
 
 ```sh
 pnpm check
@@ -99,6 +152,8 @@ pnpm build
 ```
 
 ### Cross-engine browser smoke tests
+
+Browser tests use Chromium and WebKit. Run these commands from the repository root:
 
 ```sh
 pnpm test:smoke
@@ -110,10 +165,47 @@ pnpm test:e2e
 pnpm exec playwright show-report browser-report
 ```
 
-`test:smoke` runs the built app in Chromium and WebKit. It checks startup/runtime errors, font readiness, typing and selection, keyboard formatting/undo, dropdown keyboard navigation and focus restoration, visible-page geometry and marker preservation, locale fallback, and the host-owned plugin manager's keyboard/focus and disable/re-enable behavior. It replaces the obsolete starter `<h1>` test and includes the dedicated pagination-selection regressions for caret preservation through new-page creation and forward/reversed ranges through formatting reflow and undo. `test:e2e` also runs the existing pagination and stylesheet compatibility checks across both engines. Tests assert fitting content and preservation, not identical page breaks across engines.
+The suites have different purposes:
 
-`test:tasks` uses a separate production-built fixture and Playwright configuration for shared task ownership and real bundled-worker result/transfer/cancellation/error coverage in Chromium/WebKit. `test:plugins` uses another production-built fixture (`playwright.plugins.config.ts`) to check real provider/consumer integration, dependency metadata/errors, cascade consent and protected dependents, revocation, and confirmation focus in Chromium/WebKit. `test:word-processing` uses `playwright.word-processing.config.ts` for the public editor API, an independent formatting consumer, real ProseMirror/history and worker-result validation. It also includes `word-processing-behaviors.test.ts`: real upstream input rules, mapped decorations, bounded worker analysis, lifecycle reconfiguration and attributed failure quarantine. The main app e2e configuration excludes these three fixtures' tests; run their dedicated commands alongside app regressions. Browser Smoke CI runs each fixture for its selected engine.
+| Command                | Coverage                                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `test:smoke`           | Startup, fonts, typing, selection, formatting, undo, menus, focus, visible page geometry, locale fallback and plugin management |
+| `test:tasks`           | Shared task ownership, emitted worker modules, buffer transfers, cancellation and worker errors                                 |
+| `test:plugins`         | Provider dependencies, API removal, error messages and confirmation before dependent plugins are disabled                       |
+| `test:word-processing` | Public editor access, independent formatting, history, worker results, input rules, mapped decorations and behavior failures    |
+| `test:e2e`             | The full app suite, including pagination, docking and stylesheet compatibility                                                  |
 
-The Browser Smoke CI workflow runs Chromium on Windows and WebKit on macOS 15 and Linux, matching Tauri's Chromium-based WebView2 and WebKit engine families. Firefox/Gecko is not a Tauri runtime and is outside this test matrix. Failures retain traces, screenshots, and an HTML report as artifacts. These are Playwright browser-engine checks against the static frontend, not tests of Tauri IPC, production asset protocols, the installed WebView2/WKWebView/WebKitGTK runtimes, or macOS 13.3 specifically. A packaged-app smoke test on each supported platform, including the oldest supported macOS, is still needed before a release.
+`test:smoke` includes the dedicated pagination-selection regressions.
+They check carets through page creation and forward/reversed ranges through formatting, reflow and undo.
+The suite replaced the old starter `<h1>` test.
 
-DOM layout and pagination geometry require real-browser tests; jsdom does not provide a layout engine. Report any checks you could not run or existing failures separately from failures introduced by your change.
+The task, plugin and word-processing suites each build a separate small test application.
+The main app e2e configuration excludes their test files.
+Run their dedicated commands alongside app tests.
+Browser Smoke CI runs each dedicated suite for its selected engine.
+
+Tests check that content fits and is preserved.
+They do not require identical page breaks across browser engines.
+Use real-browser tests for DOM layout; jsdom has no layout engine.
+
+### What CI does and does not verify
+
+Browser Smoke CI uses:
+
+| Operating system | Engine   |
+| ---------------- | -------- |
+| Windows          | Chromium |
+| macOS 15         | WebKit   |
+| Linux            | WebKit   |
+
+These represent the engine families used by Tauri's WebView2, WKWebView and WebKitGTK runtimes.
+They are not tests of those installed runtimes themselves.
+Firefox/Gecko is outside the Tauri matrix.
+
+Failures retain traces, screenshots and an HTML report.
+The tests run against built frontend code.
+They do not verify Tauri IPC, production asset protocols, packaged-app startup or macOS 13.3 specifically.
+Before release, test the packaged app on each supported platform, including the oldest supported macOS.
+
+For every change, report which checks passed, failed or could not run.
+Do not present an old test result as validation of a new change.

@@ -1,74 +1,246 @@
 # Pagination PR change log
 
-See [current context](context.md) for today's contracts and limitations. Start one consolidated PR entry under `In progress` when work begins and update it with every commit, keeping cumulative changes, rationale, outcomes, verified validation, and follow-ups complete before merge. Mark it **In progress / unmerged** and link the PR or use its branch name; never invent merge metadata or append a commit/session diary.
+Read [current context](context.md) for today's contracts and limitations. Start one cumulative entry per PR under `In progress`. Update that entry as work changes. Keep the changes, reasons, tests and limits ready to read before merge. Do not append commit logs or session diaries.
 
-After confirmed merge, move the completed entry into `Merged PRs` in chronological merge order and finalize status/date/link metadata. Dates use GitHub's UTC `merged_at`, not local commit dates. Existing historical entries retain their authoritative API evidence.
+After a confirmed merge, move the entry to `Merged PRs` in chronological merge order. Finalize only verified status, date and link metadata. Dates use GitHub's UTC `merged_at`, not local commit dates. Historical entries retain their API evidence. Never invent a PR or merge date.
 
 ## In progress
 
 ### `bh/phase-2-plugin-transition` — Stage 2 baseline readiness, formatting boundary and shared tasks
 
-**Status: In progress / unmerged.** Branch: `bh/phase-2-plugin-transition`. PR identity is not yet known; no merge date is assigned.
+**Status: In progress / unmerged.** Branch: `bh/phase-2-plugin-transition`. No PR identity or merge date is known.
 
-- Makes the first page visible and waits for fitting content before capturing the initial split in formatting/reflow/undo range tests. A smoke trace showed an unpaginated offscreen first page with all 4,340 characters being recorded as the baseline, then compared with the correctly paginated 1,792-character split after undo. No assertions, selection helpers, or production pagination algorithms are weakened or changed.
-- Moves formatting contracts and the ProseMirror bridge into `src/lib/editor/prosemirror/menu/basic/`, with feature-local `scope-formatting-service.ts` owning cloned data/requests, subscriptions through `context.own`, and revocation through `context.signal`. The general plugin host no longer requires formatting; the subsequent approved Part 3A migration replaces route injection with `createFormattingPlugin()` resolving a required word-processing provider and creating `FormattingService(provider)` per activation. Stale active-view/revision checks, safe peer traversal, lazy bridge resources, cleanup/error isolation, and the full bridge regression suite are preserved at their new feature-local paths. This correction changes feature responsibility boundaries, not production pagination, geometry, history or selection helpers; source-owned editor views remain outside provider teardown. No generic service bus or external permission model is introduced.
-- Implements owner-authorized task Part 1: private `@writers-ide/tasks` now owns generic `WorkQueue` mechanics and managed iteration/generator/async/bundled-worker helpers, without a library singleton or editor dependency. The app facade retains compatibility exports and the same singleton; `createApplicationPluginHost` shares it by default, while generic standalone hosts accept optional `workQueue` and otherwise create independent queues. Pagination invalidation, revision tracking, catch-up UI, budget/fairness and model-mutating algorithms remain unchanged.
-- Adds activation-owned `context.tasks` without new capabilities. Services namespace replacement keys, manage cooperative queue leases, expose reactive handles/progress/errors and nonrejecting outcomes, and cancel only owned work on unload. Async/worker tasks acquire no scheduler lease. Task-phase manager errors do not disable plugins or fail otherwise successful deactivation; activation/host cleanup failures still do. Short commands/hooks remain immediate; the soft budget cannot preempt a step. Editor results require synchronous current-state validation/application after yields. Parts 1–2 and the subsequent Parts 3A–3B are implemented / unmerged; Parts 3C/4 retain separate approval gates and no pagination redesign is authorized. See the [plugin entry](../plugins/change-log.md) and [task guide](../../packages-js/tasks/README.md).
-- Retains queue regressions at the compatibility path and adds library/host task coverage. A separate production-built browser fixture (`e2e/tasks.test.ts`, `e2e/fixtures/tasks/`, `playwright.tasks.config.ts`) checks real emitted module workers, transfers, started-worker cancellation, errors/recovery and shared queue ownership. `pnpm test:tasks` runs independently of app smoke/e2e; Browser Smoke CI adds a task step per selected engine. The worker-only helper imports no Svelte or app/DOM runtime code.
-- Implements explicitly owner-approved Part 3A live synchronous `EditorState`/`EditorView` callbacks with provider-owned edits. Private `@writers-ide/word-processing` has no app imports; `createWordProcessingPlugin(sources = defaultWordProcessingSources)` adapts existing app views/active-tab/update sources. The route registers provider plus formatting and activates formatting through required dependency resolution; provider cascade teardown revokes API resources/dependents, not source-owned views. Source-owned views, history, fixed schema and model-mutating pagination remain intact; the separately approved Part 3B below adds in-place reconfiguration and accepted-transaction dispatch integration.
-- Adds exact `{ viewId, documentId, revision }` targets and module-wide monotonic tokens across service restarts. Editor-state revisions are distinct from layout revisions: selection-only updates stale targets without invalidating layout. `inspect`/`edit`/`runCommand`, connection-owned command registration/execution/listing and `applyResult` check freshness, signals, lifetime, editability and optional active view. Stale worker/task results are discarded without mapping/retargeting; commands capture at most one transaction and apply only after synchronous boolean success/revalidation. These are editor commands, not ProseMirror plugin registrations. Nested inspection is allowed, while nested edits and edits during notifications return `busy`; lazy source/effect and connection callback/registry resources are cleaned up.
-- Documents trusted callback limits: thenable errors cannot undo already-started async work or direct raw dispatch. Transactions/live objects must not be retained; `tr.before` checks document identity, not originating state, so a retained old transaction against the same document and a fresh target can pass while violating the contract. Basic Menu keeps feature-owned caret no-op, exclusivity and continuation-aware policies. Independent opt-in QuickFormat uses only the public provider plus upstream `toggleMark` (`bold`/`strong`, including caret stored marks); only its browser fixture registers it, not the default app.
-- Adds dedicated `test:word-processing` config/fixture using the actual app adapter, generic host, real ProseMirror views/history and a bundled worker, without Basic Menu import/registration. Six scenarios cover formatting/focus/orientation remount/undo, stale/cancelled/closed-view results, independent same-document views, cascade revocation and fresh reactivation. All 12 Chromium/WebKit cases passed, including the fixture build. The actual app manager regression also verifies that provider cascade preserves manuscript content/formatting and undo history while disabling and re-enabling API resources. See [plugin context](../plugins/context.md), [plan](../plugins/implementation-plan.md) and the same cumulative [plugin branch entry](../plugins/change-log.md). Parts 3A–3B are not all of Part 3; 3C schema/custom content and 4 external loading/native enforcement still require approval.
-- Implements owner-approved Part 3B in-place `EditorState.reconfigure` using the same schema, preserving document, selection, stored marks, history and surviving keyed state without a transaction/undo entry or view recreation. Public connection-owned behaviors use per-view factories/signals and optional view-ID allowlists, priority descending/insertion ties, and managed-before-current-baseline ordering without altering baseline identity/order. Original generated keys (including unkeyed upstream plugins) and surviving factories/wrapped Plugins persist; ProseMirror may recreate plugin-view resources. `nodeViews`/`markViews` remain rejected pending 3C.
-- Changes app dispatch to `applyTransaction`, honoring root filters and appended transactions. Filtered roots emit no `PreUpdate` and cause no DOM update. Each accepted root/append emits `PreUpdate` before one final DOM update, so PageObserver sees appended changes in each transaction's own `before`/`doc` coordinates rather than incorrectly reusing root coordinates. Extracts unchanged `normalizePageIndexes` into `view/page-indexes.ts`. Optional synchronous library `sources.prepareTransaction` prepares managed appends before ProseMirror application/current-document checking; the app provider composes it with page-index/stored-mark normalization. No schema migration or unrelated pagination redesign.
-- Source-driven behavior reconciliation is microtask-deferred outside baseline/managed hooks, including arrivals without ordinary subscribers. Multi-view staging guards source/lifecycle/input-state mutations and preserves dispatches during plugin-view setup/update. A 16-pass stabilization bound conservatively quarantines all still-active registrations on pathological mutation. Runtime failures disable a registration's callbacks across views immediately and defer physical detach; first failing filters reject then inactive filters allow, append returns null and state apply retains previous state transiently. Safe prop fallbacks and plugin-view cleanup containment do not roll back arbitrary callback side effects or preempt CPU loops/unbounded ProseMirror append cycles.
-- Independently reports behavior failures to optional source observers and generic connection `reportError(error)`; the host attributes only to the exact live consumer activation, ignores late/revoked reports and uses phase `provider` without disabling the plugin. These are shared official/third-party APIs, not privileged built-in raw access or a sandbox. See [plugin contracts](../plugins/context.md#lifecycle-owned-behaviors-part-3b-implemented--unmerged) for full ordering, failure and ownership rules.
-- Adds opt-in input-rule, decoration and bounded worker proof consumers with [public command IDs](../../src/lib/editor/prosemirror/behaviors/README.md). Real upstream ellipsis/em-dash input rules plus `undoInputRule` test original unkeyed state identity; keyed selection metadata maps decorations without authored marks. Worker capture is limited to 32,768 selection model positions/1,024 chunks, with no full-manuscript scan or cross-node tokens; per-view signals and exact-target fresh metadata application reject stale output. `BehaviorFixture.svelte` extends the existing fixture behind an explicit opt-in, not the default app route. Six new scenarios/twelve cases join existing twelve for `test:word-processing`'s 24 Chromium/WebKit cases; existing CI includes both files and main app e2e excludes the new file. The fixture's structural split is not pagination geometry verification.
-- Current cumulative validation: 1,111 unit tests in 49 files passed, including 79 behavior cases, 53 existing service cases and five actual-dispatch regressions. Final Chromium/WebKit app and smoke suites passed 116/22 cases, retaining pagination geometry, caret/reflow/undo, docking, stylesheet and provider lifecycle coverage. Dedicated word-processing/provider/task fixtures passed 24/8/8 cases with production builds. `pnpm check` reports only the existing Modal type error and five old DnD warnings, with no changed-file diagnostics. Lint, local Markdown target checks and whitespace checks passed; no native checks were run. See the [plugin entry](../plugins/change-log.md) for cumulative validation/limits and [docking](../dnd/change-log.md) for layout work.
-- Initial app validation and a focused repeat hit an intermittent Chromium collapsed-selection timeout while establishing the existing caret regression's range. Pre-3B and current dispatch each passed five isolated caret runs, and final full/smoke suites passed with no helper/assertion changes. This comparison does not establish the cause or prove selection timing fixed. Updates retain the same cumulative branch entry and preserve merged history/unknown PR metadata.
+#### Context
+
+This branch separates feature services and reusable tasks from the general plugin host. Owner-approved Parts 3A–3B also add word-processing APIs and behaviors. A behavior is a ProseMirror plugin installed through that API. Its connection owns it and removes it when the connection closes. The existing page model and reflow algorithms remain in place. See [current context](context.md) for the editing and pagination terms used below.
+
+#### What changed and why
+
+**Reliable undo baselines.** Formatting/reflow range tests now show the first page and wait for fitting content before recording its split. A smoke trace had recorded an unpaginated offscreen page containing all 4,340 characters. Undo then correctly produced a 1,792-character split, which did not match that baseline. This test correction does not weaken assertions or change selection helpers or production pagination algorithms.
+
+**Feature-owned formatting.** Formatting contracts and the code that connects formatting to ProseMirror moved to `src/lib/editor/prosemirror/menu/basic/`. The general host no longer requires formatting.
+
+The feature-local `scope-formatting-service.ts` handles ownership:
+
+- It copies data and requests.
+- It registers subscription cleanup through `context.own`.
+- It uses `context.signal` to stop access when the plugin stops.
+
+The approved Part 3A then replaces service injection from the route. `createFormattingPlugin()` resolves a required word-processing provider. A provider exposes an API to consuming plugins. Formatting creates `FormattingService(provider)` for each activation, meaning each enabled lifetime of the plugin.
+
+The move preserves existing behavior:
+
+- Requests still check the active view and revision to reject stale work.
+- Peer-paragraph traversal remains safe. Resources are still acquired only when needed.
+- Cleanup, error isolation and the full bridge test suite remain.
+- Basic Menu still owns commands that do nothing at a caret, mutually exclusive marks and commands that account for paragraph continuations.
+
+Stopping the provider does not destroy editor views owned by its sources. No generic service bus or external permission model is introduced.
+
+**Shared tasks, Part 1.** Private `@writers-ide/tasks` owns generic `WorkQueue` mechanics. It provides iteration, generator, async and bundled-worker helpers. The library has no shared global queue or editor dependency.
+
+Queue ownership stays explicit:
+
+- The app keeps its queue instance and compatibility exports. `createApplicationPluginHost` shares that instance by default.
+- Standalone hosts can receive `workQueue`. Otherwise they create independent queues.
+- Pagination invalidation, layout revisions, catch-up UI, budget, fairness and model-mutating algorithms are unchanged.
+
+`context.tasks` belongs to one plugin activation. It adds no contribution capabilities. Its ownership rules are:
+
+- Task replacement keys stay within that activation. They cannot replace another activation's work.
+- Cooperative tasks yield between small steps. Their helpers acquire and release queue leases. A lease keeps the queue running until released.
+- Async and worker tasks need no lease.
+- Handles expose progress and errors as they change. Outcome promises do not reject.
+- Unloading a plugin cancels only its work.
+
+Task errors appear in management. They do not disable plugins or fail an otherwise successful deactivation. Activation and host-cleanup failures still affect lifecycle success.
+
+Short commands and hooks stay immediate. The soft budget cannot interrupt a running step. Editor results require synchronous current-state validation and application after yielding. Parts 1–2 and 3A–3B are implemented but unmerged. Part 3C custom content/schema work and Part 4 external loading/native enforcement retain separate approval gates. No pagination redesign is authorized. See the [plugin entry](../plugins/change-log.md) and [task guide](../../packages-js/tasks/README.md).
+
+**Word-processing provider, Part 3A.** The owner approved callbacks that use live `EditorState` and `EditorView` objects synchronously. Edits go through the provider. Private `@writers-ide/word-processing` has no app imports.
+
+`createWordProcessingPlugin(sources = defaultWordProcessingSources)` connects the API to existing views, active tabs and editor updates. These inputs are called sources. The route registers provider and formatting. Formatting's required dependency activates the provider.
+
+Stopping the provider also stops its dependents and revokes their API resources. It does not destroy views owned by the sources. History, the fixed schema and model-mutating pagination stay intact.
+
+Exact result targets contain `{ viewId, documentId, revision }`. Revision tokens increase across service restarts within the module. These editor-state revisions differ from layout revisions. A selection-only change makes an editor target stale without invalidating layout.
+
+The editor API checks requests before using them:
+
+- `inspect`, `edit`, `runCommand`, command registration/execution/listing and `applyResult` check that the target is current. They also check cancellation signals, lifetime, editability and any active-view requirement.
+- Stale task/worker results are discarded. They are not mapped to new positions or redirected to another view.
+- Commands capture at most one transaction. They apply only after returning boolean `true` synchronously and passing another validation.
+- These commands belong to the editor service. They are not ProseMirror plugin registrations.
+- Nested inspection is allowed. Nested edits and edits during notifications return `busy`.
+
+Cleanup releases subscriptions to editor sources and reactive updates. It also releases connection callbacks and registry resources.
+
+Callbacks remain trusted code. Rejecting a Promise-like return cannot undo an already-started async body or raw dispatch. Do not retain transactions or live objects. `tr.before` checks document identity, not the originating state. An old same-document transaction with a fresh target can pass that check while violating the contract.
+
+Independent opt-in QuickFormat uses the public provider and upstream `toggleMark`. It supports `bold`/`strong`, including stored marks for future typing. Only its browser fixture registers it; the default app does not. See [plugin context](../plugins/context.md), the [plan](../plugins/implementation-plan.md) and the same cumulative [plugin branch entry](../plugins/change-log.md).
+
+**Behavior reconfiguration, Part 3B.** Owner-approved `EditorState.reconfigure` changes the installed plugins without recreating the editor view. It keeps the same schema, document, selection, stored marks and history. It creates no transaction or undo entry.
+
+Each connection owns its behaviors. A factory creates a behavior for a view. Factories and cancellation signals are per view. An optional list of view IDs restricts where a behavior is installed.
+
+Ordering stays predictable:
+
+- Managed plugins run before the baseline, meaning the plugins already installed by the editor.
+- Higher priority runs first. Equal priorities keep insertion order.
+- Baseline plugin objects and their order remain unchanged.
+
+Plugin state is associated with a key. Surviving plugins keep that key and their state. This includes generated keys from upstream plugins that did not declare an explicit key. Surviving factories and wrapped Plugin objects also remain the same objects. ProseMirror may still recreate resources attached to plugin views.
+
+`nodeViews` and `markViews`, which customize node and mark rendering, remain rejected pending Part 3C.
+
+**Accepted transaction events.** App dispatch now uses `applyTransaction`. The root is the transaction sent to dispatch. A filter can reject it. Plugins can also append transactions after accepted changes.
+
+Events follow this order:
+
+1. ProseMirror calculates the accepted transactions. If the root is rejected, there is no `PreUpdate` event or DOM update.
+2. Every accepted root or append emits `PreUpdate`. PageObserver reads each transaction's own before/after documents and positions. It must not interpret appended positions against the root's starting document.
+3. One final update changes the rendered DOM.
+
+The unchanged `normalizePageIndexes` helper moved to `view/page-indexes.ts`. Optional synchronous `sources.prepareTransaction` prepares managed appended transactions. Preparation happens before application and the check against the current document. The app combines it with page-index and stored-mark normalization. This is not schema migration or a pagination redesign.
+
+**Behavior lifetime and failures.** Reconciliation brings installed behaviors into line with current registrations and editor sources. It runs in a microtask, after the current synchronous work finishes. It runs outside plugin hooks. This also happens when sources arrive without ordinary subscribers.
+
+Before applying changes across views, staging checks whether sources, lifecycle or input state changed. It preserves transactions dispatched during plugin-view setup or update. If reconciliation does not settle within 16 passes, it quarantines all still-active registrations. Quarantine stops their callbacks immediately. Removal of the installed plugins happens later.
+
+Runtime failures also stop a registration's callbacks immediately across views. The temporary fallback behavior is specific:
+
+- A filter that fails first rejects the transaction. Later calls through the inactive filter allow it.
+- An inactive append hook returns null, adding no transaction.
+- Plugin state application temporarily retains its previous value.
+- Guarded plugin properties use safe fallback values. Plugin-view cleanup failures are contained.
+
+These measures cannot roll back arbitrary callback effects. They cannot interrupt CPU loops or unlimited ProseMirror append cycles.
+
+Failure reporting stays separate from removal:
+
+- Optional source observers and connection `reportError(error)` receive independent reports.
+- The host attributes a report only to the exact consuming plugin activation while it is live.
+- Late reports and reports from revoked connections are ignored.
+- Reports use phase `provider`. Reporting does not disable the plugin.
+
+Official and third-party features use the same APIs. They do not provide privileged built-in access or a security sandbox. See [behavior contracts](../plugins/context.md#lifecycle-owned-behaviors-part-3b-implemented--unmerged).
+
+**Editorial clarity.** The pagination and docking guides now explain their terms and event flow in shorter sentences. This documentation revision changes no runtime behavior.
+
+#### Tests and recorded validation
+
+Queue regressions remain at the compatibility path. Added library and host tests cover task ownership. A separate production-built fixture uses `e2e/tasks.test.ts`, `e2e/fixtures/tasks/` and `playwright.tasks.config.ts`. It checks emitted module workers, transfers, cancellation after startup, errors/recovery and shared queue ownership. `pnpm test:tasks` is separate from app smoke/e2e. Browser Smoke CI runs it for the selected engine. The worker helper imports no Svelte, app or DOM runtime code.
+
+The Part 3A fixture uses the actual app adapter, generic host, real ProseMirror views/history and a bundled worker. It does not import or register Basic Menu. Its six scenarios cover formatting, focus, orientation remounting, undo, stale/cancelled/closed-view results, independent same-document views, cascade revocation and reactivation. The initial 12 Chromium/WebKit cases passed with the fixture build. The app manager regression also verifies manuscript, formatting and undo preservation through provider disable/re-enable.
+
+Part 3B adds three [opt-in proof consumers](../../src/lib/editor/prosemirror/behaviors/README.md) with public command IDs:
+
+- Upstream ellipsis/em-dash input rules and `undoInputRule` test that plugins without explicit keys keep their original state identity.
+- A selection example uses transaction metadata associated with a plugin key. It maps visual decorations to new document positions without adding authored marks.
+- A worker example captures at most 32,768 selection model positions and 1,024 chunks. It does not scan the full manuscript or join tokens across nodes. Per-view cancellation signals and exact targets reject stale output. Accepted output is applied through fresh transaction metadata.
+
+`BehaviorFixture.svelte` extends the existing fixture behind explicit opt-in, not on the default route. Six new scenarios/twelve cases join the existing twelve for 24 word-processing cases across Chromium/WebKit. Existing CI includes both files; main app e2e excludes the new file.
+
+Recorded cumulative validation passed:
+
+- 1,111 unit tests in 49 files. These include 79 behavior cases, 53 existing service cases and five actual-dispatch regressions.
+- Final Chromium/WebKit app and smoke suites: 116 and 22 cases. They retain pagination geometry, caret/reflow/undo, docking, stylesheet and provider lifecycle coverage.
+- Dedicated word-processing, provider and task fixtures: 24, 8 and 8 cases, with production builds.
+- Lint, local Markdown target checks and whitespace checks.
+
+`pnpm check` reported only the existing Modal type error and five old DnD warnings. There were no changed-file diagnostics. See the [plugin entry](../plugins/change-log.md) for cumulative outcomes and [docking](../dnd/change-log.md) for layout work. These results were verified during implementation. They were not rerun for the editorial revision.
+
+Editorial validation passed Oxfmt, preserved heading-anchor checks, local file-link and fragment checks, and whitespace checks. No runtime tests were rerun.
+
+#### Limits and follow-up
+
+Initial app validation and a focused repeat hit an intermittent Chromium collapsed-selection timeout while establishing the caret regression's range. Pre-3B dispatch and current dispatch each passed five isolated caret runs. Final full and smoke suites passed without helper or assertion changes. This does not establish the cause or prove selection timing fixed.
+
+The behavior fixture's structural split is not pagination geometry verification. No native checks were run. Trusted callback guards are not security isolation. Parts 3C/4 remain separately gated, and no PR or merge date is assigned.
 
 ## Merged PRs
 
 ### 2026-11-08 — [#64: Break prose mirror into pages](https://github.com/benyakirten/writers-ide/pull/64)
 
-- Introduced model-mutating pagination (`doc → page+ → block+`): overflow/underflow moves content between pages, explicit breaks constrain movement, and estimated line counts enforce widow/orphan settings. Peer paragraphs retain continuity across page boundaries and are reunited before reflow; formatting commands account for those fragments.
-- Added per-view observation and a revision-aware valid prefix through the furthest visible page plus one. Edits invalidate from the predecessor to allow backward flow; document/view identity is separate, but synchronized same-document editing was not implemented.
-- Added the shared cooperative generator work queue, scoped cancellation, priorities/progress, and dismissible catch-up UI. DOM measurement stays on the main thread, so yielding between steps does not make an individual measurement preemptible or guarantee the soft frame budget.
-- Added numbered sample cases, mocked-geometry unit coverage, and real-browser geometry/content-marker checks at standard and Retina pixel densities, including independently scrolled panes. This did not establish complete selection/undo fidelity, general non-text layout, footnotes, headers/footers, collaboration, or whole-document virtualization.
-- The owner described model page mutation as the quickest straightforward starting point. Automatic reflow is excluded from user history; this is not evidence that all user undo mappings were already correct (see #76 below).
+#### Context
+
+The owner described document page mutation as the quickest straightforward starting point. This PR established that initial pagination implementation.
+
+#### What changed and why
+
+Pagination changed the model using `doc → page+ → block+`. Each document held pages containing blocks. Overflow and underflow moved content between pages. Explicit breaks constrained movement. Estimated line counts enforced widow/orphan settings. Peer paragraphs represented one paragraph across page boundaries. They were reunited before reflow, and formatting commands accounted for the fragments.
+
+Per-view observation tracked a valid prefix through the furthest visible page plus one. A layout revision identified obsolete work. Edits invalidated from the preceding page so content could flow backward. Document and view IDs were separate. Same-document views did not synchronize their edits.
+
+A shared cooperative generator queue added scoped cancellation, priorities, progress and a dismissible catch-up dialog. DOM measurement stayed on the main thread. Automatic reflow did not enter user history.
+
+#### Tests and limits
+
+Numbered sample cases, mocked-geometry unit tests and real-browser checks covered geometry and content markers. Browser cases used standard and Retina pixel densities and independently scrolled panes.
+
+Yielding between steps could not interrupt an individual measurement or guarantee the soft frame budget. History exclusion did not establish correct undo mappings in every case; #76 later addressed mappings. This PR did not establish complete selection/undo fidelity, general non-text layout, footnotes, headers/footers, collaboration or whole-document virtualization.
 
 Merge evidence: [GitHub API](https://api.github.com/repos/benyakirten/writers-ide/pulls/64), `merged_at: 2026-11-08T13:23:10Z`, merge commit `b11d0d6`.
 
 ### 2026-11-12 — [#74: Add docs, remove custom editor attempt](https://github.com/benyakirten/writers-ide/pull/74)
 
-- Established the pagination guide's source/test map, transaction and scheduling contracts, limitations, and explicit distinction between current implementation and accepted future direction; removed the abandoned custom-editor attempt.
-- Recorded ProseMirror-based rich text as the live model and retained the existing model-mutating pagination engine. Derived per-view boundaries remain a research/prototype direction requiring owner approval, not an implemented migration or authorization to rewrite pagination.
-- Recorded that footnotes should reduce available body height rather than physical sheet size, and that future collaborative views should default to nonpaginated mode with an override. Neither feature shipped in this documentation PR; print fidelity and the 8 GB responsiveness baseline remained goals rather than verified guarantees.
+#### Context and changes
+
+This PR established the pagination source/test map and explained transaction flow, scheduling and limitations. It separated current implementation from accepted future direction. It also removed the abandoned custom-editor attempt.
+
+The guide recorded ProseMirror rich text as the live model and retained model-mutating pagination. Derived per-view boundaries remained a research/prototype direction requiring owner approval. They were not an implemented migration or permission to rewrite pagination.
+
+Footnotes were to reduce body height, not sheet size. Future collaborative views were to default to pagination off, with an override.
+
+#### Validation and limits
+
+Neither footnotes nor collaboration shipped in this documentation PR. Print fidelity and responsiveness on an 8 GB baseline remained goals, not verified guarantees. This entry records no runtime test result.
 
 Merge evidence: [GitHub API](https://api.github.com/repos/benyakirten/writers-ide/pulls/74), `merged_at: 2026-11-12T04:03:49Z`, merge commit `46ff1b3`.
 
 ### 2026-11-12 — [#75: Use binary search to detect where pages overflow](https://github.com/benyakirten/writers-ide/pull/75)
 
-- Replaced exhaustive character probing in production text splitting with hybrid search: probe the first ten UTF-16 offsets sequentially, binary-narrow the remaining range to at most ten offsets, then finish sequentially. A shared DOM text-node/range mapper supports production and benchmark measurement.
-- Preserved the rounded line-count predicate and unmeasured exclusive end sentinel, relying on a monotonic predicate. Bounded predicate probes reduce measurement work but do not bound DOM collection, mapper construction, or browser layout time within a synchronous step.
-- Added a focused real-Chromium comparison against sequential search and an independent old-loop baseline, with correctness/probe-bound gates and diagnostic timing rather than wall-clock thresholds. This does not substitute for page-geometry tests or demonstrate end-to-end editor responsiveness; see the [browser-performance context](../browser-performance/context.md) for benchmark contracts and limitations.
+#### Context and changes
+
+Production text splitting previously probed every character. Hybrid search tested the first ten UTF-16 offsets in order, used binary search to narrow the rest to at most ten offsets, then finished in order. UTF-16 offsets are JavaScript string positions. Production and benchmarks shared a DOM text-node/range mapper.
+
+The change preserved the rounded line-count test and an exclusive end marker that was not measured. It relied on a monotonic fit test: once an offset failed, later offsets could not fit.
+
+#### Tests and limits
+
+A focused real-Chromium benchmark compared sequential and hybrid searches with an independent old-loop baseline. Correctness and probe bounds gated changes. Timings were diagnostic, with no wall-clock thresholds.
+
+Bounding probes did not bound DOM collection, mapper construction or browser layout time inside a synchronous step. This was not a replacement for page-geometry tests or evidence of end-to-end responsiveness. See [browser-performance context](../browser-performance/context.md).
 
 Merge evidence: [GitHub API](https://api.github.com/repos/benyakirten/writers-ide/pulls/75), `merged_at: 2026-11-12T05:23:49Z`, merge commit `e842b17`.
 
 ### 2026-11-12 — [#76: Update dependencies](https://github.com/benyakirten/writers-ide/pull/76)
 
-- Changed pagination reflow from whole-page replacement/text delete-and-reinsert to structural splits and joins so ProseMirror step maps retain logical selections and user undo/redo mappings. Peer reunion crosses page/paragraph boundaries and restores the page boundary; a temporary empty paragraph keeps sole-peer pages valid under the production `block+` schema.
-- Preserved explicit stored typing marks through reflow and dispatch-time index normalization. Selection mapping stays inside synchronous transactions rather than restoring a stale selection across cooperative yields.
-- Added production-schema selection/history regressions with mocked geometry and Chromium/WebKit regressions for typing carets through new-page overflow and forward/reversed ranges through formatting reflow, reunion, and undo, including exact text/marked-text preservation. Browser helpers wait for `selectionchange` before formatting to respect ProseMirror's event processing.
-- Extended app smoke and existing pagination/stylesheet checks across Chromium and WebKit. The goal is fitting/preserved content in each engine, not identical breaks. These are browser-engine checks, not native Tauri/WebView or minimum-macOS validation. Structural selections whose selected node is itself split/merged still use ProseMirror's normal fallback; non-text layout and print fidelity are not exhaustively covered.
-- The model-mutating pagination architecture remained intact. General dependency/toolchain policy stays in [dependencies.md](../dependencies.md); benchmark-specific context stays in [browser performance](../browser-performance/context.md).
+#### Context and changes
+
+Reflow had replaced whole pages or deleted and reinserted text. It changed to structural splits and joins. ProseMirror step maps could then preserve logical selection positions and user undo/redo mappings.
+
+Peer reunion joined page and paragraph boundaries, then restored the page boundary. A temporary empty paragraph kept a sole-peer page valid under the one-or-more-block schema rule. Reflow and dispatch-time index normalization preserved stored typing marks. Selection mapped inside synchronous transactions rather than being restored from a stale value after a cooperative yield.
+
+#### Tests and limits
+
+Production-schema tests used mocked geometry for selection/history regressions. Chromium/WebKit tests covered carets through overflow and new pages. They also covered forward/reversed ranges through formatting reflow, reunion and undo, with exact text and marked-text preservation. Browser helpers waited for `selectionchange` before formatting so ProseMirror could process it.
+
+App smoke and existing pagination/stylesheet checks expanded to both engines. They required fitting, preserved content in each engine, not identical breaks. They were not native Tauri/WebView or minimum-macOS validation. Structural selections still used ProseMirror's fallback when their selected node was split or merged. Non-text layout and print fidelity were not exhaustively covered.
+
+The model-mutating architecture stayed intact. Dependency/toolchain policy remains in [dependencies.md](../dependencies.md). Benchmark details remain in [browser performance](../browser-performance/context.md).
 
 Merge evidence: [GitHub API](https://api.github.com/repos/benyakirten/writers-ide/pulls/76), `merged_at: 2026-11-12T13:44:11Z`, merge commit `16b722a`.
 
 ### 2026-11-12 — [#77: Upgrade macos runner](https://github.com/benyakirten/writers-ide/pull/77)
 
-- Moved the macOS WebKit smoke CI job from macOS 14 to macOS 15, keeping browser-engine smoke coverage (including pagination selection regressions) on the updated runner. Pagination behavior and the application's macOS 13.3 minimum did not change.
-- Runner coverage is not packaged-app validation or proof of layout compatibility on the oldest supported native WKWebView. The Windows Chromium and Linux WebKit smoke jobs remain part of the engine-family matrix.
+#### Context and changes
+
+The macOS WebKit smoke CI job moved from macOS 14 to macOS 15. It kept browser-engine smoke coverage, including pagination selection regressions, on the updated runner. Pagination behavior and the app's macOS 13.3 minimum did not change.
+
+#### Validation and limits
+
+Runner coverage was not packaged-app validation or proof of compatibility with the oldest supported native WKWebView. Windows Chromium and Linux WebKit remained in the engine-family matrix. This entry records no additional test-run count.
 
 Merge evidence: [GitHub API](https://api.github.com/repos/benyakirten/writers-ide/pulls/77), `merged_at: 2026-11-12T13:54:56Z`, merge commit `87b67fa`.
 
@@ -76,9 +248,22 @@ Merge evidence: [GitHub API](https://api.github.com/repos/benyakirten/writers-id
 
 **Status: Merged 2026-11-14.** Branch: `bh/add-plugin-interface-js`.
 
-- Reuses existing peer-paragraph rules in the host formatting bridge to calculate command availability without speculative document edits. Removes the peer-group helper's unconditional document-node console log because the helper now runs during ordinary formatting-state refreshes.
-- Fixes structural peer lookup during ordinary selection updates: traverse adjacent blocks and page wrappers explicitly, resolve blocks using actual depth, and exclude a nonempty selection's end boundary. Document-end and leaf `pageEnd` positions must not be treated as textblock interiors. Identifies a page's last block by index, not equality with another identical node. The previous fixed traversal offset could cause `Index … out of range` exceptions from formatting snapshots and interrupt reflow/undo updates.
-- Adds production-schema model and service regressions for multi-page forward/reversed ranges, peer pairs, final paragraphs, full-document selection, final `pageEnd`, document-end lookup, and identical blocks. Large-selection snapshots also assert no document-node logging. The model-mutating pagination architecture, geometry rules, and history policy are unchanged.
-- Validation: 759 unit tests passed. The exact `CI=true pnpm test:smoke` command passed all 16 cases, plus three full repeats passed across Chromium/WebKit (48 cases), including pagination-selection reflow/undo regressions and production builds. A one-off Chromium caret-range assertion did not recur in five focused and three full repeats; the selection helper remains unchanged. See the [plugin PR entry](../plugins/change-log.md) for cumulative validation and remaining limits. This is not a new pagination geometry benchmark or native-runtime validation.
+#### Context and changes
 
-Merge evidence: [GitHub PR metadata](https://api.github.com/repos/benyakirten/writers-ide/pulls/80), verified by the parent agent: `merged: true`, `merged_at: 2026-11-14T19:08:58Z`, merge commit `4b39895c5218498fd1c0e79c99b1ea8012f1b67a` (matches current `main` HEAD).
+The host formatting bridge reused peer-paragraph rules to calculate command availability without trial edits. The helper now ran during ordinary state refreshes, so its unconditional document-node console log was removed.
+
+Peer lookup was corrected for ordinary selection updates. It traversed adjacent blocks and page wrappers explicitly and resolved blocks at their actual depth. Nonempty selections excluded the end boundary. Document-end positions and leaf `pageEnd` nodes were not treated as textblock interiors. A page's last block was identified by index, not equality with an identical node.
+
+The previous fixed traversal offset could throw `Index … out of range` during formatting snapshots. Those exceptions could interrupt reflow and undo updates. The fixes did not change the page model, geometry rules or history policy.
+
+#### Tests and recorded validation
+
+Production-schema model and service regressions covered multi-page forward/reversed ranges, peer pairs, final paragraphs, full-document selection, final `pageEnd`, document-end lookup and identical blocks. Large-selection snapshots also checked that document nodes were not logged.
+
+759 unit tests passed. The exact `CI=true pnpm test:smoke` command passed all 16 cases. Three full repeats passed across Chromium/WebKit for 48 cases, including reflow/undo selection regressions and production builds.
+
+#### Limits
+
+A one-off Chromium caret-range assertion did not recur in five focused and three full repeats. The selection helper stayed unchanged. This did not establish a new geometry benchmark or native-runtime validation. See the [plugin PR entry](../plugins/change-log.md) for cumulative outcomes and limits. These historical results were not rerun for this editorial revision.
+
+Merge evidence: [GitHub PR metadata](https://api.github.com/repos/benyakirten/writers-ide/pulls/80), verified by the parent agent: `merged: true`, `merged_at: 2026-11-14T19:08:58Z`, merge commit `4b39895c5218498fd1c0e79c99b1ea8012f1b67a` (recorded as matching `main` HEAD at verification).

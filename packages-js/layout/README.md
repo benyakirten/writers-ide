@@ -1,18 +1,30 @@
 # Workbench layout
 
-`@writers-ide/layout` is a private, source-exported Svelte 5 library for movable toolbars. It owns ordered dock collections, item capacity, validated transfers and in-application floating geometry. It does not own your feature controls, editor, plugin system or application services.
+`@writers-ide/layout` helps a Svelte 5 host arrange movable toolbars around its main content. Create a workbench, register the tools it can display, and render its bar collections. Use its transfer API to validate and commit moves.
 
-The goal is to reuse the existing docking engine, not to introduce a different layout model. One bar groups ordered item IDs. Top/bottom docks use horizontal presentations; side docks use vertical presentations. Floaters retain either orientation. Each bar has three logical capacity units, not three guaranteed pixel-sized slots.
+A **bar item** is one tool's presentation. A **bar** groups ordered item IDs. A **dock** holds bars at a workbench edge. Top and bottom docks use horizontal presentations. Side docks use vertical presentations. A floating bar stays inside the application and can use either orientation.
+
+Each bar has three logical capacity units. These describe item cost, not guaranteed pixel-sized slots. For example, a tool can cost one unit horizontally and two vertically. Moving its bar to a side dock must use the vertical cost.
+
+This library provides the docking engine. It owns ordered dock collections, capacity checks, validated transfers, and floating geometry. Your host still owns rendering, feature controls, editor integration, plugin activation, and application services. A feature plugin may contribute a toolbar; this library arranges it but is not itself a feature plugin.
 
 ## Using it
 
-The package is included in this repository's private pnpm workspace and consumed by name as `@writers-ide/layout`. Use a Svelte-aware TypeScript bundler with Svelte 5 and `@dnd-kit-svelte/core` installed as peers. Source files containing runes must be compiled by Svelte; this is not a precompiled JavaScript distribution. The package is MIT licensed and has no publication/build step or stable external SDK guarantee.
+Import the package by name as `@writers-ide/layout` from this repository's private pnpm workspace. Use a Svelte-aware TypeScript bundler. Install Svelte 5 and `@dnd-kit-svelte/core` as peer dependencies.
 
-Create a workbench explicitly, usually during a host component's initialization. Every call gets independent collections, transfer-session state, floating root and, unless supplied explicitly, registry. There is no default/global workbench or implicit Svelte context. Keep separate workbenches under separate DnD providers; primitive IDs are scoped by their provider, not globally namespaced by the library.
+The package exports source, not precompiled JavaScript. Runes are Svelte's compiler syntax for reactive state, such as `$state`. Svelte must compile files that contain them.
+
+The package is MIT licensed. It has no publication or build step and does not promise a stable external SDK.
+
+Create a workbench explicitly, usually during a host component's initialization. Each call gets independent collections, transfer-session state, and a floating root. It also gets an independent registry unless you supply one.
+
+There is no default or global workbench and no implicit Svelte context. Put separate workbenches under separate drag-and-drop (DnD) providers. Primitive IDs belong to their provider; the library does not add a global namespace.
 
 ### Minimal independent host
 
-This deliberately small host uses buttons to relocate a toolbar. It needs no Writer's IDE services, ProseMirror objects, plugin contexts or feature components. Here `Component` is just a string selected by the host's renderer; a real application can use typed Svelte components or another presentation descriptor instead.
+This complete Svelte component uses buttons to move a toolbar. It needs no Writer's IDE services, ProseMirror objects, plugin contexts, or feature components.
+
+Here, `Component` is a string displayed by the host's renderer. A larger host can instead store typed Svelte components or another presentation descriptor.
 
 ```svelte
 <script lang="ts">
@@ -101,7 +113,11 @@ This deliberately small host uses buttons to relocate a toolbar. It needs no Wri
 </style>
 ```
 
-The host owns the DOM root's lifetime. Assign `floating.root`, observe size changes and call `fitToRoot()`; clear it and release observers on teardown. Collections and their derived items are Svelte-reactive. Label callbacks can read reactive locale state. Floating geometry methods accept browser elements/events; DOM measurements and resize methods require a browser, not an SSR layout engine.
+The host owns the DOM root's lifetime. Assign `floating.root`, observe size changes, and call `fitToRoot()`. On teardown, clear the root and disconnect observers, as above.
+
+Collections and their derived items are Svelte-reactive, so Svelte can track their changes. Label callbacks can read reactive locale state.
+
+Floating geometry methods accept browser elements and events. DOM measurements and resize methods require a browser. Server-side rendering cannot measure the layout.
 
 ## Main APIs
 
@@ -116,19 +132,29 @@ The host owns the DOM root's lifetime. Assign `floating.root`, observe size chan
 | `BarTransferHandler<S>(transferServices, deleteBarIfEmpty?)`        | Typed, capacity-validated docking plus existing relocation/nudge helpers.                                                                           |
 | `getDockColor(target)`                                              | Destination category independent of a workbench instance.                                                                                           |
 
-`createWorkbench` requires `generateId`, `unknownItemTitle` and `newBarTitle` callbacks. IDs must be stable and unique within the host workbench. An optional `registry` intentionally shares registry metadata; an optional `createItems` adapts item construction (for example, preserving an existing application subclass). The injected item factory must use the same registry as the transfer services. These advanced options do not create a new security boundary.
+### Construction and dependencies
 
-`LayoutServices` contains `generateId`, `createItems` and `newBarTitle`. `TransferServices` contains the registry and the three collection instances plus `newBarTitle`. Direct class construction also requires explicit services; there are no hidden service defaults.
+`createWorkbench` requires `generateId`, `unknownItemTitle`, and `newBarTitle` callbacks. IDs must be stable and unique within the host workbench. Its registry maps item IDs to their titles, orientation costs, and presentations.
 
-Presentation data is opaque to the engine. `items` resolves `{ id, title, size, Component }`, where `Component` has the host's section type (or is `null` when unavailable); additional section metadata remains accessible through `registry.items`. No Svelte component prop contract or plugin contract is imposed. Meaningful feature state belongs outside a presentation instance: preserving IDs and bar identity does not preserve component-local state across remounts.
+Supply `registry` only when you intend to share registry metadata. Supply `createItems` to customize item construction, for example to preserve an existing application subclass. That factory must use the same registry as the transfer services. These options let the host supply the objects the engine uses. They do not create security isolation.
+
+`LayoutServices` contains `generateId`, `createItems`, and `newBarTitle`. `TransferServices` contains the registry, the three collection instances, and `newBarTitle`. If you construct the classes directly, pass their services explicitly. There are no hidden service defaults.
+
+### Presentation and feature state
+
+The engine does not interpret presentation data. `items` resolves `{ id, title, size, Component }`. `Component` has the host's section type, or is `null` when unavailable. Additional section metadata remains available through `registry.items`. The engine imposes no Svelte component prop contract or plugin contract.
+
+Keep meaningful feature state outside a presentation instance. A move can remount a component. Preserving item IDs and bar identity does not preserve arbitrary component-local state. The host owns presentation mounting and cleanup. Layout transfers do not define how arbitrary feature state moves between component instances. They also do not save data for later sessions.
 
 ### Capacity and missing items
 
-- Unrecognized IDs cost one unit and resolve to the supplied fallback title and a null presentation.
-- `registry.deregister(id, true)` releases presentations but retains both declared orientation costs. Repeated preservation does not lose retained metadata. Re-registering restores presentations and current costs; `clear()` releases both live and retained data.
-- Duplicate registry IDs can appear in different bars but not within one bar.
-- Whole-bar moves and orientation changes validate the destination total against three units (and any smaller item limit). Invalid changes never silently split or omit contents.
-- The optional legacy `BarItems.maxSize` constructor parameter and low-level mutable collections are retained for compatibility; ordinary workbench bars use three units. Do not bypass transfer validation to implement host drag operations.
+Unknown item IDs cost one unit. They resolve to the supplied fallback title and a null presentation. The same registry ID can appear in different bars, but not twice within one bar.
+
+`registry.deregister(id, true)` releases presentations while retaining both declared orientation costs. For example, disabling a tool that costs two vertical units does not free those units for another tool. Repeated preservation keeps the metadata. Re-registering restores the presentations and current costs. `clear()` releases both live and retained data; it is not a persistence API.
+
+Whole-bar moves and orientation changes check the destination total against three units and any smaller item limit. Invalid changes never silently split a bar or omit its contents.
+
+`BarItems` accepts a `maxSize` constructor parameter, and its low-level collections are mutable. Ordinary workbench bars use three units. Host drag operations must use transfer validation rather than bypassing it.
 
 ### Transfers
 
@@ -138,17 +164,33 @@ A `DockDragSource` identifies `kind: 'bar' | 'item'`, `location`, stable `barId`
 - `{ kind: 'dock', location, index }`: an explicit collection gap, including an empty dock;
 - `{ kind: 'floating', left, top }`: floating coordinates relative to the workbench root.
 
-`canDrop(source, target)` is nonmutating. `drop(source, target)` revalidates before committing and returns success. Insertion indices are boundaries **before** source removal; same-container moves adjust them. Interior overflow is an invalid destination, never an implicit new bar or floater. Whole-bar transfers preserve bar/`BarItems` identity, grouping, order, title and remembered geometry. Extracting the last item removes the source container. Detaching retains orientation. Floating placement is bounded by the assigned root.
+### Validate, then commit
 
-`moveMenu`, `relocateItem`, `nudge`, `swap`, and other compatibility methods retain their existing behavior. In particular relocation menus may choose the fitting last bar or create a bar, unlike pointer drops. `deleteBarIfEmpty` controls legacy `remove()`, not successful pointer/drop transfers.
+`canDrop(source, target)` checks a move without changing state. `drop(source, target)` checks again before committing and returns whether it succeeded. Hover feedback must not change the collections that store the actual layout.
+
+Insertion indices name boundaries before source removal. Same-container moves adjust those indices. For example, moving an item to a later boundary in its own bar accounts for the slot removed at its old position.
+
+A bar interior without enough capacity is an invalid destination. It does not implicitly create another bar or floater. Use an explicit dock gap to request a new bar.
+
+### What a move preserves
+
+Whole-bar transfers preserve bar and `BarItems` identity, grouping, order, title, and remembered geometry. Moving the last item out removes the source container. Detaching a bar keeps its orientation. Floating placement stays within the assigned root.
+
+These are in-memory layout guarantees. They do not save layout or feature data, and they do not guarantee that mounted component instances survive.
+
+`moveMenu`, `relocateItem`, `nudge`, and `swap` support relocation menus and direct layout operations. A relocation menu may choose the last fitting bar or create a bar. Pointer drops instead need an explicit destination. `deleteBarIfEmpty` controls `remove()`. It does not control successful pointer/drop transfers.
 
 ## Optional drag primitives
 
-`DockDraggable` wraps content and renders a separate button handle. Its `source` prop is typed metadata; `children` receives a handle snippet. It preserves handle-only activation, source data attributes and drag opacity. Supply `label` for an accessible/localized handle name.
+`DockDraggable` wraps content and renders a separate button handle. Pass typed source metadata through `source`. Its `children` snippet receives a handle snippet to render. Only the handle starts a drag. Source data attributes and drag opacity are preserved. Supply `label` for an accessible, localized handle name.
 
-`DockTarget` registers a typed `target`/`id` and takes an explicit `controller` with `canDrop(source, target)` and `isVertical(location, barId?)`; pass `layout.transfer` directly. It supports `children`, `class`, `style`, `disabled` and an optional localized `label`. Invalid item destinations stay registered so they cannot fall through to a different target. Stationary insertion slots grow their hit area with proximity without reflow. The primitive imports its palette CSS; `@writers-ide/layout/dock-colors.css` is also exported for host overlays.
+`DockTarget` registers a typed `target` and `id`. It needs a `controller` with `canDrop(source, target)` and `isVertical(location, barId?)`. Pass `layout.transfer` directly. Supported props include `children`, `class`, `style`, `disabled`, and an optional localized `label`.
 
-Inside a host-owned `DndContext`, the basic composition is:
+Invalid item destinations stay registered. This prevents a rejected destination from falling through to a different target behind it. Insertion slots stay in place while their hit areas grow as the pointer approaches. That growth does not reflow the layout.
+
+The primitive imports its palette CSS. Hosts can also import `@writers-ide/layout/dock-colors.css` for overlays.
+
+The following is a template excerpt, not a complete drag host. Add `DockTarget` and `DockDraggable` to the earlier component's imports from `@writers-ide/layout`. Place this inside your host-owned `DndContext`. The draggable belongs inside the top-bar loop, where `bar` is defined. The target belongs at the end of that dock:
 
 ```svelte
 <DockTarget
@@ -169,23 +211,34 @@ Inside a host-owned `DndContext`, the basic composition is:
 </DockDraggable>
 ```
 
-The host must supply nonzero insertion-slot sizes and compose its DnD provider, sensors, collision detection and commit/cancel callbacks. Read `event.active.data.source` and `event.over?.data.target`, then call `transfer.drop()` on release if a target exists. Do not mutate authoritative collections during hover. Full-workbench floating targets require host-calculated workbench-relative coordinates. The library does not choose a host's collision policy, previews or focus targets.
+The host must give insertion slots nonzero sizes. It also supplies the DnD provider and input sensors, which recognize mouse, touch, or keyboard drag gestures. Collision detection chooses the destination under a drag. The host supplies that policy and the commit/cancel callbacks too.
+
+On release, read `event.active.data.source` and `event.over?.data.target`. If a target exists, call `layout.transfer.drop()`.
+
+For a full-workbench floating target, the host calculates coordinates relative to the workbench root. The library does not choose collision policy, drag previews, or focus targets. Those choices belong to the host, not the feature being moved.
 
 ## Writer's IDE adapter and integration
 
-The app state modules are compatibility facades over this implementation. `src/lib/editor/state/workbench.svelte.ts` supplies the app ID service, fallback label, default bar title, registry and `BarItems` constructor. The app registry extends generic metadata with its trusted plugin presentation and legacy component types; none of that flows back into the package. `src/lib/dnd/DockTarget.svelte` injects the app transfer controller; the other DnD facades forward the primitive and palette.
+The app state modules delegate layout operations to this library. `src/lib/editor/state/workbench.svelte.ts` supplies the app ID service, fallback label, default bar title, registry, and `BarItems` constructor.
+
+The app registry adds trusted plugin presentations and application component types to the generic metadata. The package does not import those app types. `src/lib/dnd/DockTarget.svelte` supplies the app transfer controller. The other DnD facades forward the primitive and palette.
 
 Remaining application adapters intentionally include:
 
 - bar rendering, feature controls, relocation menus and rendering of unavailable items;
-- `Editor.svelte` workbench composition, sensors, visible-surface collision policy, overlay, release descriptions/live announcements, keyboard focus restoration and tooltip suppression;
+- `Editor.svelte` workbench composition and input sensors;
+- collision rules that choose visible destinations rather than hidden surfaces behind them;
+- drag overlays, release descriptions, and live announcements for assistive technology;
+- keyboard focus restoration and tooltip suppression;
 - translation, plugin activation and presentation lifecycle.
 
-This extraction does not add persistence, layout undo, central tabs/splits, native floating windows, minimized-floater restore UI, scheduling, shortcuts, pagination or external plugin loading/isolation. Trusted in-process Svelte components remain trusted; packaging is not a sandbox.
+The library does not provide persistence or layout undo. It also does not provide central tabs/splits, native floating windows, minimized-floater restore UI, scheduling, shortcuts, pagination, or external plugin loading and isolation. Svelte components run as trusted in-process code. Putting them in a package does not create a sandbox.
 
-The application facades and independent-host tests import `@writers-ide/layout` through the workspace dependency. The app palette adapter imports `@writers-ide/layout/dock-colors.css`. Consumers must preserve Svelte compilation of the package's source exports. The primitives use plain CSS, not Tailwind utility classes, so **no extra Tailwind scan source is currently required**.
+Application facades and independent-host tests import `@writers-ide/layout` through the workspace dependency. The app palette adapter imports `@writers-ide/layout/dock-colors.css`.
 
-The compatibility facades preserve the existing imports used by `Editor.svelte`, host contribution adapters and bar renderers. Those consumers do not need to construct a second workbench or change their rendering contracts.
+Consumers must compile the package's source exports with Svelte. The primitives use plain CSS rather than Tailwind utility classes. No extra Tailwind scan source is currently required.
+
+`Editor.svelte`, host contribution adapters, and bar renderers share the application workbench through the app state modules.
 
 ## Validation
 
@@ -197,4 +250,6 @@ pnpm exec vitest run src/lib/editor/state/ src/lib/dnd/dock-feedback.test.ts
 pnpm exec playwright test docking.test.ts docking-feedback.test.ts docking-destinations.test.ts --workers=2
 ```
 
-The independent-host tests import only this package and Svelte/Vitest. Existing application state assertions remain unchanged. Real-browser docking tests cover gesture/geometry behavior; jsdom state tests cannot establish hit geometry, native WebView behavior, real touch hardware or complete accessibility.
+Independent-host tests import only this package and Svelte/Vitest.
+
+Real-browser docking tests cover gestures and geometry. jsdom state tests cannot establish hit geometry. Neither these state tests nor the browser suite establish native WebView behavior, real touch-hardware behavior, or complete accessibility.
