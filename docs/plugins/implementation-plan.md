@@ -252,15 +252,86 @@ The paginated fixture uses the production schema, `createView`, and `Paginator`.
 
 Part 4 implements frontend package loading. The manifest model must allow multiple components and leave room for frontend-only, backend-only and mixed packages. Executable backend components and their restricted runtime will be designed later. Do not implement backend execution or select a runtime as part of this phase.
 
-Installation identity is separate from execution identity. Each executing component needs an identifiable lifetime. Independent enablement, startup ordering and sibling failure policies still need decisions. Do not infer those policies from support for multiple components.
+Installation identity is separate from execution identity. Packages install and update as a unit, while components activate independently with their own identities and lifetimes. A component's activation failure must not stop unrelated healthy siblings. Required dependencies determine which other components are affected. Keep package-level enable/disable controls as a convenience over component lifecycle management. Authors declare initial component defaults; user selection and dependencies determine activation.
+
+Every component still requires all applicable mandatory permissions before activation. Independent activation does not authorize a partial grant. Existing task or renderer-registration failures do not automatically disable the whole component. Exact component dependency declarations, package-level plan composition and detailed management APIs still need design approval. Component dependency-impact consent follows the approved policy below.
+
+### Component defaults and required dependencies
+
+**Approved policy:** each component may declare `default_enabled`, which defaults to `false` when omitted. Defaults apply on first configuration only. Persist user selections and restore them when the package is disabled and re-enabled. Updates must not silently override saved choices or enable newly added components. New components require explicit enablement or a dependency activation the user approves. Defaults never bypass mandatory permission acknowledgement.
+
+Authors can declare required component dependencies. A dependent cannot activate or remain active without its required components. If the user disables component A, a component B that requires A cannot run while A remains disabled. Sharing a package is not itself a dependency. Exact reference syntax still needs approval. Do not silently undo an explicit user disable choice.
+
+**Approved consent policy:** enabling a component with disabled required dependencies offers a reviewed activation plan. Show the full affected set, including explicitly disabled dependencies, and obtain consent before changing their selection. Complete required permission acknowledgement before activation. Recheck dependencies and permissions before execution and require renewed review if the plan changed. Successful unrelated components need not stop if the requested consumer subsequently fails.
+
+Disabling a requirement offers a reviewed plan containing all affected required dependents. Obtain explicit cascade consent, then stop dependents before their requirements. Do not leave dependents running or silently stop them. Reject required dependency cycles before activation. Low-level API signatures and the exact review interface remain open.
+
+### Package and component identity
+
+**Approved manifest fields:** `[package]` contains optional `namespace`, stable machine-readable `name`, human-readable `display_name` and separate `version`. Derive the canonical package ID as `@namespace/name` when a namespace is present, or `name` when it is absent. Do not store a second independently editable package ID.
+
+For example, this identity belongs to package `@org1/query`:
+
+```toml
+[package]
+namespace = "org1"
+name = "query"
+display_name = "Query Tools"
+version = "0.1.0"
+
+[[components]]
+id = "toolbar"
+```
+
+This is a partial manifest, not the complete schema. Component IDs are stable and local to their package. Identify an executing component by the package ID and local component ID, with its activation identity separate. `query`, `@org1/query` and `@org2/query` are distinct packages and can be installed independently.
+
+Display names can change without changing identity. Changing a namespace or machine name changes identity and must not silently inherit the former package's grants or saved associations. Versions remain separate from stable identity so future multiple-version installation is not unnecessarily blocked. A shared namespace neither grants permissions across packages nor establishes verified publisher ownership. Replacing an installed identity still requires the explicit update/replacement flow. Exact identifier grammar and remaining manifest fields need approval.
+
+### Frontend entry-point contract
+
+**Approved direction:** each frontend component entry module exports a named `activate(context)` function. The host imports the verified entry module after compatibility, permission and dependency checks, then calls this function once per activation. Keep metadata in `manifest.toml`, not duplicated in executable component definitions.
+
+Retain synchronous activation for short setup and provider API publication. The context supplies contribution, provider, task, cancellation and ownership APIs. Use managed tasks for continuing asynchronous work. Cleanup uses `context.own`, cancellation signals and an optional returned synchronous disposer. Module loading can be asynchronous without making `activate` asynchronous.
+
+Authors must put feature setup in activation and keep activation-specific state scoped to that lifetime. Module evaluation executes top-level JavaScript and is not an activation callback; its state is not guaranteed to be recreated on re-enable. The trusted-frontend contract prohibits unmanaged startup work during import, but this is not a sandbox guarantee. Entry-path field syntax, loading/import resolution and exact runtime-profile definitions still need decisions.
+
+### Frontend runtime compatibility
+
+**Approved direction:** prebuilt components target a host-defined frontend runtime profile. A profile describes supported shared SDK modules, the Svelte compiler/runtime expectations, core ProseMirror dependencies and exposed module interfaces. Initially provide one supported profile. The host rejects unsupported profiles before module import.
+
+Build tooling selects the supported compiler/shared dependency combination and emits the profile requirement in the built manifest. Keep profile identity separate from application version, package version and provider API majors. Compatible app releases can retain a profile; incompatible runtime changes require a new target and may require plugin rebuilds. Supporting an older profile must be tested and explicit, not inferred from its identifier or broad dependency ranges.
+
+Authors continue to write ordinary TypeScript/Svelte and can bundle ordinary private dependencies. Shared runtime imports must resolve to the host's supported instances. Provide a template, build tooling and a test harness using the actual profile. Recommend this tooling without requiring it: document the output contract so alternative build systems can comply. Frontend authors need no Rust toolchain, and users need no frontend compiler to install packages.
+
+Profile IDs, manifest field names, exact dependency versions and concrete module URLs still need design. The profile is a compatibility contract, not publisher authentication or security isolation. Workers have separate execution environments; their assets and shared-helper build rules need explicit treatment rather than assuming the main window's module mapping applies.
 
 ### Frontend builds and shared dependencies
 
-Provide build tooling with an explicit set of host-supplied dependencies. Control sharing of Svelte and identity-sensitive ProseMirror packages. Authors may bundle ordinary private dependencies. Exact versions, import resolution and the asset/worker loading protocol still need design approval.
+Provide build tooling with an explicit set of host-supplied dependencies. Control sharing of Svelte and identity-sensitive ProseMirror packages. Authors may bundle ordinary private dependencies. Frontend output uses native ES modules with a host-managed import map for the runtime profile's shared modules. Build output preserves supported shared imports so they resolve to the same actual module instances used by the host. Install the map before importing modules that use it. Private dependencies may be bundled or emitted as package-local modules, loaded only through the verified-resource path. Authors need no custom module-registration or dependency-injection API.
 
-Frontend build output means executable JavaScript, CSS and assets produced from the author's source. Svelte components are compiled before they run in the application. Normal distribution is approved as self-contained and prebuilt; its archive format and entry-point schema are not selected yet. Do not run package installation scripts or compile arbitrary plugin source during normal installation.
+Exact shared versions/exports, import-map URLs and concrete verified resource routes still need design approval. The virtual-resource delivery direction below is approved. Test native ES module/import-map behavior in supported packaged Tauri WebViews. Import maps are resolution contracts, not security isolation. Workers do not inherit the window's import map. Their single-bundle output policy is approved below; concrete loading still requires packaged-runtime validation.
+
+Frontend build output means executable JavaScript, CSS and assets produced from the author's source. Svelte components are compiled before they run in the application. Normal distribution uses a self-contained, prebuilt ZIP archive with `manifest.toml` at the archive root. Do not require an enclosing package-name directory. Ordinary files and directories are allowed; symlinks, special entries and installation scripts are not. The identity fields are approved above; remaining manifest fields, component entry paths and loading details still need decisions. Do not run package installation scripts or compile arbitrary plugin source during normal installation.
+
+ZIP extraction must validate paths, reject duplicate or ambiguous entries, and bound entry counts, expanded sizes and extraction work. Validate in a staging location before accepting or replacing an installation. SHA-256 records describe extracted file contents, not ZIP timestamps or compression metadata. The archive filename does not establish package identity or authenticate a publisher. Detailed extraction APIs and policies remain to be designed.
 
 Developer directory mode is a separate proposal, not an approved installation mechanism. It would let an author explicitly load a local directory containing the manifest and built output. The author's build tool would rebuild that output during development. Whether the app supports this mode, and whether reload is manual or watched, still needs approval.
+
+### Worker build output
+
+**Approved for Part 4:** emit one self-contained ES-module bundle per frontend Web Worker. Authors can organize source across multiple files, but bundle worker dependencies and worker-side SDK helpers into the output. Workers must not depend on the window's import map or shared module instances. Package-local worker module graphs/code splitting are deferred.
+
+Keep the existing managed-task ownership, cancellation, dedicated-worker lifecycle and synchronous result-application contracts. Workers exchange copied/transferred data; construct and validate editor operations in the frontend against current state. A Web Worker is not an executable backend component and gains no native authority from this build policy.
+
+This trades duplicated helper code and potentially larger worker files for simpler resource loading and compatibility tests. Normal bundle/file size limits still apply. The actual verified worker creation path, optional Blob bootstrap, SDK helper compatibility and asset handling require packaged Tauri tests and implementation design. Do not infer that a virtual resource URL satisfies Worker origin rules.
+
+### Verified resource delivery
+
+**Approved direction; not implemented.** Serve package modules, CSS, workers and assets through host-controlled virtual resource URLs backed only by verified package bytes. A native resource handler looks up files in an immutable verified snapshot, not arbitrary filesystem paths. There is no unchecked filesystem fallback. These URLs identify content; they are not native-operation permission tokens or publisher authentication.
+
+Preserve package-relative module and asset references where supported, including standard `import.meta.url` usage. Different accepted snapshots need distinct resource identities so one URL does not silently change contents. Bound snapshot/resource storage and caching rather than retaining every installed package indefinitely. This does not by itself provide module unloading or safe live updates.
+
+Prototype the actual scheme/origin and URL encoding in supported packaged Tauri runtimes. Validate MIME types, traversal rejection, relative imports, styles, fonts/images and worker constraints. A virtual URL does not automatically satisfy Worker origin rules. Blob URLs may support specific worker/bootstrap cases without becoming the primary package resource abstraction. If a platform prevents the approved behavior, seek a design decision rather than weakening verification. Exact URL layout, cache lifecycle, worker delivery and implementation APIs remain open.
 
 ### Package integrity verification
 
@@ -270,7 +341,7 @@ Developer directory mode is a separate proposal, not an approved installation me
 
 Record version 1 is a JSON object with `format_version: 1` and a `files` map. Each portable relative path maps to `byte_length` and a lowercase hexadecimal SHA-256 digest. Duplicate paths/fields, unknown fields, malformed digests and unsupported versions are rejected. All files are included regardless of extension, including manifest, executable modules, workers, styles and other assets. This record format does not select the plugin manifest schema or archive format.
 
-Verify installed contents before use. The loading design must prevent a file being replaced between verification and consumption. Do not execute an entry point or load an unchecked worker or asset after only checking the manifest. The per-file record format and owned-byte result are implemented. Archive handling, accepted-record storage and delivery of verified resources to the browser still need design approval and integration. A later loader must consume `VerifiedPackage` bytes rather than reopening filesystem paths.
+Verify installed contents before use. The loading design must prevent a file being replaced between verification and consumption. Do not execute an entry point or load an unchecked worker or asset after only checking the manifest. The per-file record format and owned-byte result are implemented. Archive handling, accepted-record storage and the concrete virtual-resource handler still need design approval and integration. A later loader must consume `VerifiedPackage` bytes rather than reopening filesystem paths.
 
 Reject unexpected changes and require an explicit reinstall or update. Do not silently accept changed files by recomputing their expected digests. Accepted replacement records must follow the update-validation policy and retain the previous version until acceptance.
 
@@ -288,17 +359,21 @@ Optional developer directory mode will need an explicit policy for rebuilt outpu
 
 ### Permissions and acknowledgement
 
-Permissions may be declared at package level, component level or both in `manifest.toml`. All applicable declared permissions are mandatory for activation. Do not activate with only a subset of the required grants.
+Permissions may be declared at package level, component level or both in `manifest.toml`. A component's effective requirements are the union of common package requirements and its own component requirements. Components cannot subtract package requirements and must not inherit a sibling's component-specific authority. Authors should declare permissions per component unless they are genuinely common requirements.
+
+All effective requirements are mandatory before activation. Refusing a common package requirement blocks all components that inherit it. Refusing a component-specific requirement blocks that component and any required consumers, not unrelated siblings. Adding a package-level requirement affects every component. Do not activate with only a subset of the required grants.
 
 Users must explicitly acknowledge permissions for each project unless they choose an application-wide grant. Application-wide approval is an explicit alternative, not the default scope. New authority requested by an update requires renewed approval. Prefer resource-scoped native operations to broad filesystem or process authority.
 
-Detailed manifest fields, effective grant composition, project identity, persistence, revocation and acknowledgement UI still need design approval. Declared frontend permissions are not a sandbox for browser activity; keep the trusted-frontend warning explicit.
+The additive composition rule is approved. Detailed manifest fields, permission vocabulary/resource scopes, project identity, persistence, revocation and acknowledgement UI still need design approval. Declared frontend permissions are not a sandbox for browser activity; keep the trusted-frontend warning explicit.
 
 ### Installation, updates, versions and defaults
 
-Start with explicit local package installation and manual updates. Validate a replacement before switching versions and retain the previous version until the replacement is accepted. Preserve plugin-owned saved data on uninstall unless the user explicitly requests its deletion. Automatic updates and a public catalog are later work.
+Start with explicit local package installation and manual updates. Validate and stage accepted updates for the next application start. The running session continues using the old version; do not hot-replace its modules. Keep running and staged artifacts separate and retain the previous version until the replacement is accepted. Recheck compatibility, dependencies and required approvals before the replacement activates.
 
-Initially support one active version per package identity. Keep identity and version separate in the design. Do not build unnecessary assumptions that prevent multiple installed versions later; support for that workflow is deferred. Check compatibility before executing code. Report missing dependencies instead of automatically downloading or executing them. Exact compatibility fields, update/restart behavior and rollback UI remain open.
+Show that restart is required, but never restart automatically or discard writing state. Component enable/disable within the loaded version remains available without restart. Exact startup promotion, recovery and rollback UI still need design approval. Preserve plugin-owned saved data on uninstall unless the user explicitly requests its deletion. Automatic updates and a public catalog are later work.
+
+Initially support one active version per package identity. Keep identity and version separate in the design. Do not build unnecessary assumptions that prevent multiple installed versions later; support for that workflow is deferred. Check compatibility before executing code. Report missing dependencies instead of automatically downloading or executing them. Exact compatibility fields, startup promotion/recovery and rollback UI remain open. Restart-required updates are approved.
 
 Installation and management must show package identity, version, components, requested native authority and frontend trust risks. Fresh application installations will include default feature packages. Basic Menu, undo functionality, and word-count/data features are intended examples of that default set. This does not make unfinished features implemented or require an undo-tree/history redesign in Part 4. The exact initial roster, enablement defaults and permission onboarding still need refinement. Example test packages need not be enabled by default.
 
@@ -355,6 +430,29 @@ Reuse the existing examples where practical. Their purpose is to verify public A
 
 This requirement does not include extracting the entire word-processing editor, independently packaging pagination, or implementing history plumbing for an undo-tree plugin.
 
+## Deferred work and future candidates
+
+This list keeps later possibilities visible without making them Part 4 deliverables. **Deferred** means deliberately outside the initial scope. **Candidate** means useful to revisit if a concrete need justifies it, not a promised feature or release date. Update the list when scope changes. Move implemented capabilities into current guidance. Keep rejected alternatives only in changelogs.
+
+| Area                                     | Initial scope                                                            | Later work or decision                                                                                       |
+| ---------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Backend components — deferred            | Frontend execution only; package model leaves room for backends.         | Select a restricted backend runtime, lifecycle and communication contract.                                   |
+| Live package updates — deferred          | Stage validated updates for the next app start.                          | Design safe replacement of running components, dependencies and resources.                                   |
+| Developer directory mode — candidate     | Normal installation uses prebuilt ZIPs.                                  | Explicit local build-directory loading and manual or watched reload.                                         |
+| Multiple installed versions — deferred   | One active version per package identity; keep identity/version separate. | User-facing installation and selection of multiple versions. Simultaneous activation is a separate decision. |
+| Worker code splitting — deferred         | One self-contained module per worker.                                    | Verified package-local worker module graphs and shared chunks.                                               |
+| Automatic updates — deferred             | Explicit manual updates and acknowledgement of new authority.            | Update discovery, consent, scheduling and recovery policies.                                                 |
+| Public catalog — deferred                | Local package installation.                                              | Discovery, distribution and publisher/namespace policies.                                                    |
+| Publisher signatures — separate decision | SHA-256 against host-accepted records, without publisher authentication. | Trusted keys, signing, key replacement and revocation.                                                       |
+| Logging — deferred                       | Native-request attribution contract only.                                | Logging scope, privacy, retention and diagnostics. No tamper-proof frontend provenance claim.                |
+| Additional runtime profiles — candidate  | One supported frontend profile.                                          | Explicitly tested compatibility for additional targets if needed.                                            |
+| Richer task/worker helpers — candidates  | Existing dedicated workers and task utilities.                           | Pooling, worker progress, timeouts, quotas and slow-step diagnostics when justified.                         |
+| Frontend isolation research — candidate  | Trusted shared frontend environment.                                     | Reconsider only through separate design approval; no current sandbox guarantee.                              |
+
+New node/mark registration, schema lifecycle and missing-content preservation remain the separate Part 3C design gate. Full editor extraction, independently replaceable pagination and undo-tree history plumbing remain outside Part 4. They are not silently included in package-loading work.
+
+**Not deferrable for convenience:** Rust-side native authorization, trusted token issuance, mandatory grant handling, verified-byte delivery, safe extraction and required packaged-runtime validation must be addressed before external loading is enabled. Open details needed for the agreed Part 4 scope remain in [Decisions needed before implementation](#decisions-needed-before-implementation), not in this deferred list.
+
 ## Validation and documentation
 
 Implementation changes must update current context and the same cumulative in-progress changelog entry. Keep proposed behavior, implemented behavior, and verified guarantees distinct. See [CONTRIBUTING.md](../../CONTRIBUTING.md) for checks.
@@ -370,5 +468,5 @@ The task/provider policies and current synchronous editor access, provider-owned
 Remaining gates are:
 
 1. **New custom content, Part 3C:** approve new node/mark registration, schema lifecycle, and missing-content preservation. Existing-type rendering does not need a new approval decision.
-2. **External loading, Part 4:** frontend-only execution for this phase, shared-dependency build tooling, component execution identity, mandatory project-scoped grants with an application-wide option, local/manual installation and updates, one initially active package version, default packages and token enforcement are approved direction. Approve the exact manifest/loading APIs, component lifecycle policies, grant composition/storage, issuance protocol, narrow native operations and installation UI. Prebuilt distribution and SHA-256 verification against host-managed records are approved. The internal per-file record format and verified-byte result are implemented. Archive format, accepted-record persistence, browser delivery of verified resources and optional developer directory mode remain to be decided. Publisher signing is a separate future decision. Verify enforcement before external loading.
+2. **External loading, Part 4:** frontend-only execution for this phase, shared-dependency build tooling, component execution identity, mandatory project-scoped grants with an application-wide option, local/manual installation and updates, one initially active package version, default packages and token enforcement are approved direction. Approve the exact manifest/loading APIs, component lifecycle policies, grant composition/storage, issuance protocol, narrow native operations and installation UI. Prebuilt distribution and SHA-256 verification against host-managed records are approved. The internal per-file record format and verified-byte result are implemented. ZIP is the approved archive format. Its extraction implementation, accepted-record persistence, browser delivery of verified resources and optional developer directory mode remain to be decided. Publisher signing is a separate future decision. Verify enforcement before external loading.
 3. **Broader work:** separately justify and approve extraction or features beyond the implemented scope. API publication, stability, universal upstream compatibility, and performance targets are not established.
