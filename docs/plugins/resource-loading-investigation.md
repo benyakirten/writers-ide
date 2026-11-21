@@ -72,7 +72,7 @@ Load owned styles before calling the component's synchronous `activate(context)`
 
 Rust must own authoritative identities, grants, token validity and operation validation.
 Do not expose a general command that issues credentials for a caller-selected component ID.
-Issuance, delivery and revocation details still require approval.
+The owner approved exact Rust-authorized pending activations with one-use attachment tickets bound to their target WebView. Redemption rechecks native authorization; successful synchronous setup confirmation releases the native gate. This is not implemented. Exact IPC/confirmation envelopes, expiry, response-loss handling and cleanup still need specification and tests.
 See [native request identity and limits](context.md#native-request-identity-and-token-enforcement).
 
 This bootstrap is an ordering boundary, not hostile same-realm isolation.
