@@ -2,9 +2,9 @@
 
 **Status: consolidated draft for owner review.** The policy decisions identified as approved below are accepted direction. Schema and TypeScript contracts are recommendations unless explicitly marked approved. The [shared command shape](command-contract.md) is approved, but no new external-package APIs are implemented. Approval to prepare this draft is not approval to implement its unresolved contracts.
 
-Writer's IDE currently supports trusted, explicitly registered bundled plugins. It does not install or load external packages. Its Rust integrity module can verify files and return immutable owned bytes. Installation, resource delivery, native authorization and project-scoped component hosting still need implementation.
+Writer's IDE currently supports trusted, explicitly registered bundled plugins. It does not install or load external packages. Its Rust integrity module can verify files and return immutable owned bytes. Its internal resource route and snapshot pool are exercised by a separate packaged fixture. Application resource registration, installation, native authorization and project-scoped component hosting remain unimplemented.
 
-This draft describes the first external package format and the interfaces authors would use. Read [the implementation plan](implementation-plan.md#part-4--external-packages-and-user-facing-trust) for scope. Use [the current plugin guide](../../packages-js/plugins/README.md) for APIs available today. The [resource-loading investigation](resource-loading-investigation.md) separates source findings from platform behavior that still needs a prototype.
+This draft describes the first external package format and the interfaces authors would use. Read [the implementation plan](implementation-plan.md#part-4--external-packages-and-user-facing-trust) for scope. Use [the current plugin guide](../../packages-js/plugins/README.md) for APIs available today. The [resource-loading investigation](resource-loading-investigation.md) records the implemented fixture and measured macOS behavior, with other supported runtimes still unverified.
 
 ## 1. What is already approved?
 
@@ -44,6 +44,7 @@ description = "Text formatting controls for the document editor."
 [[components]]
 id = "toolbar"
 display_name = "Formatting toolbar"
+description = "Adds text formatting controls to the document editor."
 kind = "frontend"
 entry = "dist/toolbar.js"
 styles = ["dist/toolbar.css"]
@@ -76,30 +77,62 @@ Basic Menu needs no native permissions. That is not a privacy guarantee: trusted
 
 ### Proposed field rules
 
-`manifest_version` is the integer `1`. Reject unknown keys in every table, duplicate TOML keys and invalid types. Do not coerce strings to booleans or integers. Return field paths and useful validation messages. Reject unsupported component kinds before importing code.
+**Approved format version:** require the top-level integer `manifest_version = 1`. Reject missing values, string values such as `"1"` and unsupported integers before importing code. There is no implicit default or coercion. This is separate from the package release version. Future format support requires an explicit parser.
 
-| Table                 | Required fields                                                                              | Optional fields and defaults                                                                                           |
-| --------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Root                  | `manifest_version`, nonempty `components` array                                              | None                                                                                                                   |
-| `package`             | `name`, `display_name`, `version`, `description`                                             | `namespace`; `permissions = []`                                                                                        |
-| Component             | `id`, `display_name`, `kind`, `entry`, `runtime_profile`, `activation_scope`, `capabilities` | `styles = []`, `default_enabled = false`, `provides = []`, `commands = []`, `dependencies = []`, `permissions = []`    |
-| Dependency            | `alias`, `package`, `component`                                                              | `version` absent means no package constraint; `optional = false`; `binding = "instance"`; `apis = []`; `commands = []` |
-| Provided/required API | `id`, `major`                                                                                | None                                                                                                                   |
-| Declared command      | `id`, `contract`, `major`                                                                    | None                                                                                                                   |
-| Required command      | `alias`, `id`, `contract`, `major`                                                           | None                                                                                                                   |
-| Permission            | `operation`, `resource`                                                                      | None                                                                                                                   |
+**Approved component list:** require a nonempty `components` array. Each TOML `[[components]]` block adds a component record. Reject a missing or empty list. A component may provide APIs or background functionality without UI. This does not add component-free library or asset packages. Maximum counts and remaining component fields are not approved by this requirement.
+
+**Approved frontend entry:** each frontend component requires `entry`, naming an exact package-root-relative `.js` or `.mjs` file. Require it in the verified snapshot. No extension guessing or directory-index search is allowed. Reject external URLs, host filesystem paths and traversal. Authors choose their build-output layout. The host imports the verified module after checks and calls its named synchronous `activate` export with the activation context.
+
+**Approved component kind:** require `kind = "frontend"` on every component. Reject missing or unsupported values during whole-manifest validation, before importing any component. A mixed package with an unsupported kind is rejected rather than partially interpreted. Frontend components need not display UI. They may own workers and use verified WebAssembly through their JavaScript entry. Other kinds require an explicitly supported future runtime; declaring them grants no native execution authority.
+
+**Approved frontend compatibility field:** every frontend component requires `runtime_profile`. It names the host-defined frontend environment the component was built for. No package-level inheritance or implicit default is allowed. Build tooling can emit the value. The host checks support before import; unsupported components cannot run. This is not a dependency download or permission grant. The example ID `writers-ide.frontend/1` and the profile's exact inventory remain draft. Simultaneous incompatible profiles in one WebView are not approved by this field-placement decision.
+
+**Approved compatibility handling:** an otherwise valid package may install or update with unsupported-profile components visibly blocked. Do not import or activate them. Block required dependents and treat optional integrations as unavailable; compatible components remain eligible. Show affected components and required profiles before acceptance. A package with no runnable components may still install if that limitation is clear. Normal enablement and native permissions remain mandatory. Unlike an unsupported kind, an unsupported profile on a known frontend declaration does not invalidate the whole manifest.
+
+**Approved contribution capabilities:** every component requires a `capabilities` array. An empty array is valid for a component that does not register host contributions. Supported values are `contributions.toolbar`, `contributions.view` and `contributions.command`. Reject missing arrays, unknown values and duplicates before activation. Registering a contribution without its declared capability fails. Capabilities describe access to supported contribution APIs; they do not grant native permissions or restrict ordinary browser JavaScript. Numerical list limits remain unapproved.
+
+**Approved stylesheet field:** frontend components may declare `styles`, an optional array defaulting to `[]`. Entries name exact package-relative `.css` files that must exist in the verified snapshot. External URLs and inline CSS text are not valid entries. This does not restrict ordinary dynamic inline styles in component UI. Host-managed loading, shared ownership and cleanup are already approved. Shared stylesheets use the [approved reuse-and-append ordering](#stylesheet-loading-and-ordering). Numerical list limits are not approved here.
+
+**Approved unknown-field handling:** reject unknown fields in every manifest table before importing plugin code. Report the field path and explain that the field is unsupported. For example, `components[0].default_enable` is an error, not an ignored setting. New fields require explicit host support. This does not change unsupported-profile handling: `runtime_profile` is a recognized field whose unsupported value blocks the affected component rather than invalidating an otherwise valid package.
+
+**Approved value types:** require the correct types throughout the manifest. Reject invalid types before importing plugin code; do not convert values automatically. For example, `default_enabled = "false"` and `major = "1"` are errors, not a boolean and an integer. Report the field path and expected type. An optional field's default applies only when the field is absent, never when its value is invalid.
+
+Other field rules below remain proposed unless separately marked approved. Reject duplicate TOML keys. Return field paths and useful validation messages. Reject unsupported component kinds before importing code.
+
+| Table                 | Required fields                                                                                             | Optional fields and defaults                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Root                  | `manifest_version`, nonempty `components` array                                                             | None                                                                                                                   |
+| `package`             | `name`, `display_name`, `version`, `description`                                                            | `namespace`; `permissions = []`                                                                                        |
+| Component             | `id`, `display_name`, `description`, `kind`, `entry`, `runtime_profile`, `activation_scope`, `capabilities` | `styles = []`, `default_enabled = false`, `provides = []`, `commands = []`, `dependencies = []`, `permissions = []`    |
+| Dependency            | `alias`, `package`, `component`                                                                             | `version` absent means no package constraint; `optional = false`; `binding = "instance"`; `apis = []`; `commands = []` |
+| Provided/required API | `id`, `major`                                                                                               | None                                                                                                                   |
+| Declared command      | `id`, `contract`, `major`                                                                                   | None                                                                                                                   |
+| Required command      | `alias`, `id`, `contract`, `major`                                                                          | None                                                                                                                   |
+| Permission            | `operation`, `resource`                                                                                     | None                                                                                                                   |
 
 The root also requires the `package` table. Arrays use TOML arrays of tables as shown in the examples. `kind` initially accepts only `frontend`. `activation_scope` accepts only `project` or `application`. Supported capabilities remain `contributions.toolbar`, `contributions.view` and `contributions.command`. An empty capability array is valid. Capabilities describe supported contribution APIs, not browser isolation or native grants.
 
-**Recommended identifiers:** lowercase ASCII matching `[a-z0-9]+(?:-[a-z0-9]+)*` for namespace, machine name, component ID and alias. Limit each to 64 bytes. A canonical package reference is either `name` or `@namespace/name`. It is derived, not a second editable identity field. Display names are nonempty and at most 256 UTF-8 bytes; descriptions are nonempty and at most 4 KiB. Do not impose the identifier grammar on human names.
+**Approved identifier characters:** namespace, package machine name, component ID and dependency alias must match `[a-z0-9]+(?:-[a-z0-9]+)*`. Use lowercase ASCII letter/digit groups separated by single hyphens. Reject other forms rather than silently lowercasing or normalizing them. A canonical package reference is derived as `name` or `@namespace/name`, not a second editable field. This grammar does not apply to display names, portable filenames, API IDs or command IDs.
 
-Keep API IDs under the existing nonempty-string rule, with a 256-byte manifest limit. Majors are positive safe integers. Reject duplicate component IDs, capabilities, API IDs within one declaration list, and dependency aliases. Initially allow one dependency declaration per target package/component/binding; combine its required APIs in that record. Reject self-dependencies and required cycles.
+**Approved package display metadata:** `[package].display_name` and `[package].description` are required, nonempty plain text. They may use any language. The host reads them before activation for installation and management UI. They are not publisher authentication, identity or permission declarations. Text changes do not change package identity. Component display metadata has its own approval below.
 
-Paths are literal portable package-relative filenames under the existing integrity rules, not pre-encoded URLs. Entry paths end in `.js`; style paths end in `.css`. Reject empty, absolute, URL and parent-traversal forms. URL-encode filename characters when constructing resource URLs. A filename's encoded percent or hash character is not a query or fragment. Resource queries are rejected; browser fragments are handled separately. Require every declared file in the accepted snapshot. Do not open a host filesystem path supplied by a component.
+**Approved component display metadata:** every component requires nonempty plain-text `display_name` and `description`. Both support any language and explain the independently managed feature before activation. This includes background and API-provider components. They do not replace native permission disclosures or establish identity. Changing the text does not change component identity. No numerical bounds are approved by this decision.
+
+**Proposed limits, not approved:** 64 bytes per machine identifier, 256 UTF-8 bytes per display name and 4 KiB per description. Numerical bounds still need review; neither the character-grammar nor display-metadata approval approves these limits.
+
+**Approved component ID uniqueness:** component IDs must be unique within a package. Reject the whole manifest before importing any plugin code if two components have the same ID. Report the duplicate ID and the conflicting declarations. Neither declaration overrides the other. Different packages may use the same component ID; their package identities distinguish them.
+
+**Approved dependency alias uniqueness:** aliases must be unique within the component declaring the dependencies. Reject the whole manifest before importing any plugin code if that component repeats an alias. Report the duplicate alias and conflicting declarations. Each alias identifies exactly one dependency; lookup does not disambiguate duplicate aliases using provider identity or API contract. Other components may reuse the same alias.
+
+Keep API IDs under the existing nonempty-string rule, with a 256-byte manifest limit. Majors are positive safe integers. Reject duplicate capabilities and API IDs within one declaration list. One dependency declaration per target package/component/binding is approved as described below. Reject self-dependencies and required cycles.
+
+Paths are literal portable package-relative filenames under the existing integrity rules, not pre-encoded URLs. Frontend entry paths end in `.js` or `.mjs`; style paths end in `.css`. Reject empty, absolute, URL and parent-traversal forms. URL-encode filename characters when constructing resource URLs. A filename's encoded percent or hash character is not a query or fragment. Resource queries are rejected; browser fragments are handled separately. Require every declared file in the accepted snapshot. Do not open a host filesystem path supplied by a component.
 
 **Initial parser budgets:** at most 64 KiB of manifest bytes, 32 components, 64 dependencies per component, 32 APIs per provides/dependency list and 16 styles per component. Native permissions have only three supported pairs. These are proposed host-controlled engineering defaults, not permissions authors can raise. Test their interaction with the integrity module's file/path limits.
 
 An unsupported backend kind is an installation compatibility error, not permission to load native code. Backend-only or mixed executable packages need a later format/runtime revision.
+
+**Approved dependency target uniqueness:** allow one dependency declaration per target package, component and binding within each consumer component. Combine its required APIs and commands in that record. A second declaration for the same target and binding rejects the whole manifest before any plugin code is imported, even if its alias differs. Report the conflicting declarations. Different bindings remain distinct, and dependencies on different providers remain allowed. Independently optional API groups from one provider are a future candidate, not part of this initial format.
 
 ## 3. Dependencies and API publication
 
@@ -326,6 +359,7 @@ description = "Reads saved project research and opens reference links."
 [[components]]
 id = "reader"
 display_name = "Research reader"
+description = "Provides approved project-file reads and opens reference links."
 kind = "frontend"
 entry = "dist/research.js"
 runtime_profile = "writers-ide.frontend/1"
@@ -490,7 +524,23 @@ dist/workers/analyze.js
 
 Frontend modules are native ES modules. The host installs its runtime profile's import map before any dependent module executes. Both the host and plugins must consume the same actual shared runtime artifacts. Building a second bundle that merely re-exports another copy does not establish identity.
 
-`styles` lists component entry stylesheets. The host loads verified CSS before activation, shares ownership by immutable snapshot/path and window, and releases ownership on failure or teardown. Keep styles while any activation owns them. Preserve list order within one component. Do not promise cross-plugin cascade ordering; authors must scope selectors and avoid relying on another plugin's private CSS. CSS is not sandboxed. Relative font/image loading must use verified snapshot resources.
+### Stylesheet loading and ordering
+
+**Approved direction; production loading is not implemented.** `styles` lists component entry stylesheets. The host loads verified CSS before calling the component's `activate` function. It shares stylesheet ownership by immutable snapshot/path within each window. Activation failure or teardown releases that activation's ownership. A stylesheet stays loaded until its last owner releases it.
+
+The host processes each component's list in order. It appends a stylesheet only if it is not already loaded. It reuses existing links without moving them.
+
+**The `styles` list does not guarantee CSS order when files are already shared.** For example, suppose another active component in the same package snapshot already loaded `shared.css`. Your component declares:
+
+```toml
+styles = ["toolbar.css", "shared.css"]
+```
+
+The existing `shared.css` stays in place. The host appends `toolbar.css` after it. The resulting order is `shared.css`, then `toolbar.css`, despite your list's order. If both files were unloaded, they would be appended in your declared order. The host does not resolve ordering conflicts or rearrange existing links for a new activation. There is no global cascade-order guarantee between activations.
+
+Bundle CSS into one file when its internal order matters. Scope selectors to your UI and avoid relying on another plugin's private CSS. This policy manages shared resources; it does not isolate CSS or prevent it from affecting other UI. Relative font/image loading must use verified snapshot resources.
+
+### Workers and verified resources
 
 Each worker is one self-contained ES-module bundle with its own dependencies, including worker SDK helpers. It neither inherits the window import map nor shares runtime objects. For managed package workers, authors supply a package-relative URL from their frontend module, such as `new URL('./workers/analyze.js', import.meta.url)`, to the managed task API. The approved host path obtains verified bytes and always creates a Blob worker. Task cleanup terminates the worker and revokes the Blob URL, including startup failure and cancellation. Inside the worker, `import.meta.url` is the Blob URL, not the frontend module's package URL. Relative worker imports and package-relative assets are unsupported. Pass needed data through messages or transfers. Exact SDK signatures and production integration remain unimplemented.
 

@@ -283,6 +283,14 @@ Management subscriptions immediately deliver frozen metadata snapshots, then sub
 
 Task and provider errors do not independently disable plugins. Activation, dependency, and host-cleanup failures affect lifecycle status. Connections become unusable before an endpoint's own cleanup runs. Teardown must use owned cleanup handles rather than call through an old API object. For bulk teardown, use a deactivation plan and cascade; registration order need not match dependency order.
 
+## Planned external package stylesheets
+
+External package loading is not implemented. The approved design lets each frontend component declare a `styles` array in `manifest.toml`. The host will load those CSS files before calling the component's `activate` function. Omitting `styles` means `[]`.
+
+**Do not rely on that list to guarantee CSS order.** The host will append unloaded stylesheets in list order, but it will reuse already loaded links without moving them. If another component already uses `shared.css`, declaring `["toolbar.css", "shared.css"]` will leave `shared.css` before the newly appended `toolbar.css`.
+
+Bundle order-sensitive CSS into one file. Scope selectors to your UI. Shared stylesheets are not isolated from application or other plugin UI. See the [stylesheet loading and ordering specification](../../docs/plugins/package-api-proposal.md#stylesheet-loading-and-ordering) for ownership and cleanup rules.
+
 ## Boundaries and next steps
 
 Official and third-party features must use the same public extension APIs. There is no approved privileged path for built-in features to bypass them.
