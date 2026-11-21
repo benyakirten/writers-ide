@@ -168,9 +168,21 @@ impl IntegrityRecord {
 #[derive(Debug)]
 pub(crate) struct VerifiedPackage {
     files: BTreeMap<String, Vec<u8>>,
+    fingerprint: [u8; 32],
+    byte_length: u64,
 }
 
 impl VerifiedPackage {
+    /// Content identity includes the complete, canonically ordered verified record.
+    pub(crate) fn fingerprint(&self) -> [u8; 32] {
+        self.fingerprint
+    }
+
+    /// File payload bytes only; this does not measure allocation or runtime overhead.
+    pub(crate) fn byte_length(&self) -> u64 {
+        self.byte_length
+    }
+
     pub(crate) fn file(&self, path: &str) -> Option<&[u8]> {
         self.files.get(path).map(Vec::as_slice)
     }
@@ -224,6 +236,7 @@ pub(crate) fn verify_package(
             return Err(IntegrityError::UnexpectedFile(path.clone()));
         }
     }
+    let mut byte_length = 0_u64;
     for (path, bytes) in &files {
         let expected = &record.files[path];
         let actual_length = bytes.len() as u64;
@@ -237,8 +250,22 @@ pub(crate) fn verify_package(
         if sha256(bytes) != expected.sha256 {
             return Err(IntegrityError::DigestMismatch(path.clone()));
         }
+        byte_length = byte_length
+            .checked_add(actual_length)
+            .ok_or_else(|| limit(path, "max_total_bytes"))?;
     }
-    Ok(VerifiedPackage { files })
+    // Hash the checked record, not caller-chosen package names or versions. BTreeMap
+    // ordering and typed serialization make equivalent parsed records identical.
+    let fingerprint = Sha256::new()
+        .chain_update(b"writers-ide.verified-package.v1\0")
+        .chain_update(record.to_json()?)
+        .finalize()
+        .into();
+    Ok(VerifiedPackage {
+        files,
+        fingerprint,
+        byte_length,
+    })
 }
 
 fn sha256(bytes: &[u8]) -> String {

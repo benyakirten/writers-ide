@@ -2,6 +2,10 @@
 #[allow(dead_code)]
 mod plugin_integrity;
 
+// No runtime owner or resource routes are connected in this internal slice.
+#[allow(dead_code)]
+mod plugin_resources;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {

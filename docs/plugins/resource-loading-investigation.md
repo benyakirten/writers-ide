@@ -21,21 +21,22 @@ See [builds, assets and activation checks](package-api-proposal.md#7-builds-asse
 
 Paths below link to the inspected source. Installed dependency source was also inspected locally.
 
-| Entry point                                                                                  | Current behavior                                                                                                                   |
-| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| [Native entry](../../src-tauri/src/main.rs) and [builder](../../src-tauri/src/lib.rs)        | Start Tauri, register opener and expose the `greet` command. No bootstrap gate, token registry or package resource handler exists. |
-| [Cargo configuration](../../src-tauri/Cargo.toml)                                            | Tauri 2.12.5 and opener 2.7.3. Explicit Tauri features are empty, but default features remain enabled.                             |
-| [Build script](../../src-tauri/build.rs)                                                     | Calls `tauri_build::build()` without custom loading setup.                                                                         |
-| [Tauri configuration](../../src-tauri/tauri.conf.json)                                       | Development uses `http://localhost:1420`. Production builds run `pnpm build` and embed `../build`. CSP is `null`.                  |
-| [Default capability](../../src-tauri/capabilities/default.json)                              | Grants `core:default` and `opener:default` to window `main`. No explicit remote-origin capability is configured.                   |
-| [Integrity module](../../src-tauri/src/plugin_integrity/mod.rs)                              | Verifies the complete file set, lengths and SHA-256 hashes. Returns owned bytes through `VerifiedPackage::file`.                   |
-| [Filesystem reader](../../src-tauri/src/plugin_integrity/filesystem.rs)                      | Performs bounded no-follow collection. Verification is synchronous and is not an atomic filesystem snapshot.                       |
-| [HTML shell](../../src/app.html)                                                             | Has no import map or pre-module package bootstrap.                                                                                 |
-| [Layout settings](../../src/routes/+layout.ts) and [layout](../../src/routes/+layout.svelte) | Use static client-only rendering, global CSS and frontend services.                                                                |
-| [Main route](../../src/routes/+page.svelte)                                                  | Statically imports editor and feature modules, then registers and activates bundled plugins during initialization.                 |
-| [Application host](../../src/lib/plugins/application-plugin-host.ts)                         | Adapts in-process contributions to workspace registries. It is not an installer or native authorization boundary.                  |
-| [Demo route](../../src/routes/demo/+page.svelte)                                             | Calls `invoke('greet', ...)` directly.                                                                                             |
-| [Vite configuration](../../vite.config.ts)                                                   | Has no runtime-profile export build or shared-module externalization for external packages.                                        |
+| Entry point                                                                                  | Current behavior                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Native entry](../../src-tauri/src/main.rs) and [builder](../../src-tauri/src/lib.rs)        | Start Tauri, register opener and expose the `greet` command. No bootstrap gate, token registry or package resource handler exists.                                                 |
+| [Cargo configuration](../../src-tauri/Cargo.toml)                                            | Tauri 2.12.5 and opener 2.7.3. Explicit Tauri features are empty, but default features remain enabled.                                                                             |
+| [Build script](../../src-tauri/build.rs)                                                     | Calls `tauri_build::build()` without custom loading setup.                                                                                                                         |
+| [Tauri configuration](../../src-tauri/tauri.conf.json)                                       | Development uses `http://localhost:1420`. Production builds run `pnpm build` and embed `../build`. CSP is `null`.                                                                  |
+| [Default capability](../../src-tauri/capabilities/default.json)                              | Grants `core:default` and `opener:default` to window `main`. No explicit remote-origin capability is configured.                                                                   |
+| [Integrity module](../../src-tauri/src/plugin_integrity/mod.rs)                              | Verifies the complete file set, lengths and SHA-256 hashes. Returns owned bytes through `VerifiedPackage::file`.                                                                   |
+| [Snapshot pool](../../src-tauri/src/plugin_resources/mod.rs)                                 | Internal verified-buffer sharing, supplied budgets and opaque WebView-lifetime associations. No runtime owner, production resource route or actual-requester adapter is connected. |
+| [Filesystem reader](../../src-tauri/src/plugin_integrity/filesystem.rs)                      | Performs bounded no-follow collection. Verification is synchronous and is not an atomic filesystem snapshot.                                                                       |
+| [HTML shell](../../src/app.html)                                                             | Has no import map or pre-module package bootstrap.                                                                                                                                 |
+| [Layout settings](../../src/routes/+layout.ts) and [layout](../../src/routes/+layout.svelte) | Use static client-only rendering, global CSS and frontend services.                                                                                                                |
+| [Main route](../../src/routes/+page.svelte)                                                  | Statically imports editor and feature modules, then registers and activates bundled plugins during initialization.                                                                 |
+| [Application host](../../src/lib/plugins/application-plugin-host.ts)                         | Adapts in-process contributions to workspace registries. It is not an installer or native authorization boundary.                                                                  |
+| [Demo route](../../src/routes/demo/+page.svelte)                                             | Calls `invoke('greet', ...)` directly.                                                                                                                                             |
+| [Vite configuration](../../vite.config.ts)                                                   | Has no runtime-profile export build or shared-module externalization for external packages.                                                                                        |
 
 Tauri's enabled defaults include Wry and dynamic ACL support.
 Neither `protocol-asset` nor `custom-protocol` is explicitly configured in this manifest.
@@ -55,7 +56,7 @@ Use the Tauri packaging path to test production asset loading, not ordinary `car
 - Window capabilities do not distinguish components sharing that window.
   Audit `core:default`, plugin commands, link handling and other native routes before enabling external code.
 - CSP is disabled. A successful test under that configuration would not prove a restrictive policy works.
-- There is no accepted-record persistence, snapshot registry, resource URL parser or browser delivery layer.
+- The internal snapshot pool has no runtime owner or Tauri adapter. Accepted-record persistence, production resource URL parsing and browser delivery remain unimplemented.
   Integrity records must remain outside package-controlled files. Never regenerate them to accept a mismatch.
 - The current route cannot provide recovery-before-import by adding a late activation check.
   Its static imports already evaluate feature modules.
