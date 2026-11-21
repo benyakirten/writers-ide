@@ -1,3 +1,5 @@
+import { assertResponsePair, canonicalSnapshotBase } from './response-checks.js';
+
 const MAX_PROBE_MS = 2400;
 const errorDetail = (error) => String(error instanceof Error ? error.message : error).slice(0, 400);
 
@@ -35,7 +37,7 @@ export function createResourceProbe(config, role) {
 					/^[a-f0-9]{64}$/.test(config.expectedSha256),
 					'Missing accepted build-record SHA-256',
 				);
-				const url = new URL('fixture/plugin.js', config.baseUrl);
+				const url = new URL('fixture/plugin.js', canonicalSnapshotBase(config.baseUrl));
 				assert(!url.search && !url.hash, 'Probe URL must not contain query or fragment');
 				const headers = role === 'denied' ? { 'X-Resource-WebView': 'main' } : {};
 				const response = await fetch(url, {
@@ -44,7 +46,18 @@ export function createResourceProbe(config, role) {
 					headers,
 				});
 				const bytes = await response.arrayBuffer();
+				const head = await fetch(url, {
+					signal: controller.signal,
+					cache: 'no-store',
+					headers,
+					method: 'HEAD',
+				});
+				const headBytes = await head.arrayBuffer();
 				const observations = {
+					headStatus: head.status,
+					headByteLength: headBytes.byteLength,
+					headContentLength: head.headers.get('content-length'),
+					getContentLength: response.headers.get('content-length'),
 					status: response.status,
 					byteLength: bytes.byteLength,
 					spoofedWebViewHeader: role === 'denied' ? 'main' : null,
@@ -52,10 +65,22 @@ export function createResourceProbe(config, role) {
 				if (role === 'denied') {
 					return {
 						observations,
-						ok: response.status === 403 && bytes.byteLength === 0,
-						expectation: 'Expected 403 with an empty body despite spoofed WebView header',
+						ok:
+							response.status === 403 &&
+							bytes.byteLength === 0 &&
+							response.headers.get('content-length') === '0' &&
+							head.status === 403 &&
+							headBytes.byteLength === 0 &&
+							head.headers.get('content-length') === '0',
+						expectation:
+							'Expected GET/HEAD 403 with an empty body and no package length despite spoofed WebView header',
 					};
 				}
+				assertResponsePair(response, head, bytes.byteLength, headBytes.byteLength, location.origin);
+				assert(
+					/^(?:text|application)\/javascript\b/i.test(response.headers.get('content-type')),
+					'Expected JavaScript Content-Type',
+				);
 				const digest = await crypto.subtle.digest('SHA-256', bytes);
 				const sha256 = [...new Uint8Array(digest)]
 					.map((byte) => byte.toString(16).padStart(2, '0'))

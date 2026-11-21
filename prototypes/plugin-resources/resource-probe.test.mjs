@@ -5,10 +5,16 @@ import { createResourceProbe } from './frontend/resource-probe.js';
 
 const fixtureBytes = new TextEncoder().encode('export const fixture = true;');
 const expectedSha256 = createHash('sha256').update(fixtureBytes).digest('hex');
-const baseUrl = 'https://fixture-resource.localhost/snapshot-a/';
+const baseUrl = `https://fixture-resource.localhost/snapshots/${'a'.repeat(64)}/`;
+const hostOrigin = 'tauri://localhost';
 
 function setup(t) {
 	const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+	const originalLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
+	Object.defineProperty(globalThis, 'location', {
+		configurable: true,
+		value: { origin: hostOrigin },
+	});
 	const sent = [];
 	Object.defineProperty(globalThis, 'window', {
 		configurable: true,
@@ -21,6 +27,11 @@ function setup(t) {
 		},
 	});
 	t.after(() => {
+		if (originalLocation) {
+			Object.defineProperty(globalThis, 'location', originalLocation);
+		} else {
+			delete globalThis.location;
+		}
 		if (originalWindow) {
 			Object.defineProperty(globalThis, 'window', originalWindow);
 		} else {
@@ -28,13 +39,25 @@ function setup(t) {
 		}
 	});
 	t.mock.timers.enable({ apis: ['setTimeout'] });
-	const fetch = t.mock.method(globalThis, 'fetch', async () => response(200, fixtureBytes));
+	const fetch = t.mock.method(globalThis, 'fetch', async (_url, options) =>
+		response(200, options.method === 'HEAD' ? [] : fixtureBytes, {
+			'content-length': String(fixtureBytes.byteLength),
+		}),
+	);
 	return { sent, fetch };
 }
 
-function response(status, bytes) {
+function response(status, bytes, headers = {}) {
 	return {
 		status,
+		headers: new Headers({
+			'content-type': 'text/javascript',
+			'content-length': String(bytes.length),
+			'cache-control': 'no-store',
+			'x-content-type-options': 'nosniff',
+			'access-control-allow-origin': hostOrigin,
+			...headers,
+		}),
 		async arrayBuffer() {
 			return Uint8Array.from(bytes).buffer;
 		},
@@ -61,11 +84,19 @@ function assertSent(sent, report, { role, stage, ok }) {
 }
 
 function requestOptions(fetch) {
-	assert.equal(fetch.mock.callCount(), 1);
+	assert.ok(fetch.mock.callCount() >= 1 && fetch.mock.callCount() <= 2);
 	const [url, options] = fetch.mock.calls[0].arguments;
 	assert.equal(String(url), `${baseUrl}fixture/plugin.js`);
 	assert.equal(options.cache, 'no-store');
 	assert.ok(options.signal instanceof AbortSignal);
+	if (fetch.mock.callCount() === 2) {
+		const [headUrl, headOptions] = fetch.mock.calls[1].arguments;
+		assert.equal(String(headUrl), String(url));
+		assert.equal(headOptions.method, 'HEAD');
+		assert.equal(headOptions.cache, 'no-store');
+		assert.strictEqual(headOptions.signal, options.signal);
+		assert.deepEqual(headOptions.headers, options.headers);
+	}
 	return options;
 }
 
@@ -84,6 +115,13 @@ describe('host-owned resource probe reports', { concurrency: false }, () => {
 			}
 			const report = await probe(role)(stage);
 			assertSent(sent, report, { role, stage, ok: true });
+			assert.equal(fetch.mock.callCount(), 2);
+			assert.equal(report.observations.headStatus, role === 'denied' ? 403 : 200);
+			assert.equal(report.observations.headByteLength, 0);
+			assert.equal(
+				report.observations.headContentLength,
+				role === 'denied' ? '0' : String(fixtureBytes.byteLength),
+			);
 			const options = requestOptions(fetch);
 			assert.equal(options.signal.aborted, true);
 			assert.equal(report.observations.status, role === 'denied' ? 403 : 200);
@@ -102,7 +140,9 @@ describe('host-owned resource probe reports', { concurrency: false }, () => {
 
 	test('200 with the wrong digest reports failure through finish', async (t) => {
 		const { sent, fetch } = setup(t);
-		fetch.mock.mockImplementation(async () => response(200, [0]));
+		fetch.mock.mockImplementation(async (_url, options) =>
+			response(200, options.method === 'HEAD' ? [] : [0], { 'content-length': '1' }),
+		);
 		const report = await probe('main')('after-peer-close');
 		assertSent(sent, report, { role: 'main', stage: 'after-peer-close', ok: false });
 		assert.equal(report.observations.status, 200);
@@ -121,6 +161,20 @@ describe('host-owned resource probe reports', { concurrency: false }, () => {
 		assert.equal(report.observations.byteLength, 1);
 		assert.match(report.cases[0].detail, /empty body/);
 		assert.deepEqual(requestOptions(fetch).headers, { 'X-Resource-WebView': 'main' });
+	});
+
+	test('GET denial cannot reveal the package length while HEAD correctly reports zero', async (t) => {
+		const { sent, fetch } = setup(t);
+		fetch.mock.mockImplementation(async (_url, options) =>
+			response(403, [], {
+				'content-length': options.method === 'HEAD' ? '0' : String(fixtureBytes.byteLength),
+			}),
+		);
+		const report = await probe('denied')('initial');
+		assertSent(sent, report, { role: 'denied', stage: 'initial', ok: false });
+		assert.equal(report.observations.byteLength, 0);
+		assert.equal(report.observations.headContentLength, '0');
+		assert.equal(report.observations.getContentLength, String(fixtureBytes.byteLength));
 	});
 
 	for (const failure of ['request', 'body', 'digest']) {
@@ -200,6 +254,109 @@ describe('host-owned resource probe reports', { concurrency: false }, () => {
 		assert.equal(options.signal.aborted, true);
 		assert.match(report.cases[0].detail, /exceeded 2400ms request\/body\/digest budget/);
 	});
+
+	for (const fault of [
+		'status',
+		'body',
+		'length',
+		'type',
+		'cache',
+		'nosniff',
+		'cors',
+		'request-rejection',
+		'body-rejection',
+	]) {
+		test(`authorized HEAD ${fault} fails the single stage case`, async (t) => {
+			const { sent, fetch } = setup(t);
+			fetch.mock.mockImplementation(async (_url, options) => {
+				if (options.method !== 'HEAD') {
+					return response(200, fixtureBytes);
+				}
+				if (fault === 'request-rejection') {
+					throw new Error('HEAD request rejected');
+				}
+				if (fault === 'body-rejection') {
+					return {
+						async arrayBuffer() {
+							throw new Error('HEAD body rejected');
+						},
+					};
+				}
+				const headers = { 'content-length': String(fixtureBytes.byteLength) };
+				if (fault === 'length') {
+					headers['content-length'] = '0';
+				}
+				if (fault === 'type') {
+					headers['content-type'] = 'application/octet-stream';
+				}
+				if (fault === 'cache') {
+					headers['cache-control'] = 'public';
+				}
+				if (fault === 'nosniff') {
+					headers['x-content-type-options'] = '';
+				}
+				if (fault === 'cors') {
+					headers['access-control-allow-origin'] = '*';
+				}
+				return response(fault === 'status' ? 403 : 200, fault === 'body' ? [1] : [], headers);
+			});
+			const report = await probe('main')('after-peer-close');
+			assertSent(sent, report, { role: 'main', stage: 'after-peer-close', ok: false });
+			assert.equal(fetch.mock.callCount(), 2);
+			assert.equal(requestOptions(fetch).signal.aborted, true);
+		});
+	}
+
+	for (const fault of ['status', 'body', 'metadata']) {
+		test(`unassociated HEAD cannot expose ${fault}`, async (t) => {
+			const { sent, fetch } = setup(t);
+			fetch.mock.mockImplementation(async (_url, options) => {
+				if (options.method !== 'HEAD') {
+					return response(403, []);
+				}
+				return response(fault === 'status' ? 200 : 403, fault === 'body' ? [1] : [], {
+					'content-length': fault === 'metadata' ? String(fixtureBytes.byteLength) : '0',
+				});
+			});
+			const report = await probe('denied')('after-last-close');
+			assertSent(sent, report, { role: 'denied', stage: 'after-last-close', ok: false });
+			assert.equal(fetch.mock.callCount(), 2);
+			assert.deepEqual(requestOptions(fetch).headers, { 'X-Resource-WebView': 'main' });
+		});
+	}
+
+	for (const stalled of ['HEAD request', 'HEAD body']) {
+		test(`${stalled} shares the original 2400ms GET/HEAD/digest budget`, async (t) => {
+			const { sent, fetch } = setup(t);
+			let headStarted;
+			const enteredHead = new Promise((resolve) => {
+				headStarted = resolve;
+			});
+			fetch.mock.mockImplementation((_url, options) => {
+				if (options.method !== 'HEAD') {
+					return new Promise((resolve) => {
+						setTimeout(() => resolve(response(200, fixtureBytes)), 900);
+					});
+				}
+				headStarted();
+				return stalled === 'HEAD request'
+					? new Promise(() => {})
+					: Promise.resolve({ arrayBuffer: () => new Promise(() => {}) });
+			});
+			const pending = probe('peer')('initial');
+			t.mock.timers.tick(900);
+			await enteredHead;
+			const options = requestOptions(fetch);
+			t.mock.timers.tick(1499);
+			assert.equal(options.signal.aborted, false);
+			assert.equal(sent.length, 0);
+			t.mock.timers.tick(1);
+			const report = await pending;
+			assertSent(sent, report, { role: 'peer', stage: 'initial', ok: false });
+			assert.equal(options.signal.aborted, true);
+			assert.match(report.cases[0].detail, /exceeded 2400ms/);
+		});
+	}
 
 	for (const [role, stage] of [
 		['main', 'initial'],

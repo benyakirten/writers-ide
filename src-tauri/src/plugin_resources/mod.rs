@@ -12,6 +12,11 @@ use std::sync::Arc;
 
 use crate::plugin_integrity::VerifiedPackage;
 
+pub(crate) mod route;
+
+#[cfg(test)]
+mod route_tests;
+
 /// Host-supplied limits. Production defaults have not been selected.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SnapshotLimits {
@@ -29,6 +34,32 @@ pub(crate) struct SnapshotUsage {
 /// A content identity, not a resource URL contract or permission credential.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct SnapshotId([u8; 32]);
+
+impl SnapshotId {
+    pub(crate) fn to_hex(self) -> String {
+        use std::fmt::Write;
+        let mut result = String::with_capacity(64);
+        for byte in self.0 {
+            write!(result, "{byte:02x}").expect("writing to a String");
+        }
+        result
+    }
+
+    pub(crate) fn from_hex(value: &str) -> Option<Self> {
+        if value.len() != 64
+            || !value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return None;
+        }
+        let mut bytes = [0; 32];
+        for (index, byte) in bytes.iter_mut().enumerate() {
+            *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16).ok()?;
+        }
+        Some(Self(bytes))
+    }
+}
 
 /// One host-established WebView lifetime. Handles cannot be deserialized or
 /// constructed from window labels. A reopened WebView must get a new handle.

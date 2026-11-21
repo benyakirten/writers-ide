@@ -1,16 +1,12 @@
 pub(crate) const MAX_PATH: usize = 1024;
 
-// Reject aliases instead of decoding or normalizing a resource identity.
+// Build-time filesystem paths are literal names, not encoded resource URLs.
 pub(crate) fn portable_path(path: &str) -> bool {
     if path.is_empty()
         || path.len() > MAX_PATH
-        || path.chars().any(|c| {
-            c.is_control()
-                || matches!(
-                    c,
-                    '\\' | '%' | '<' | '>' | ':' | '"' | '|' | '?' | '*' | '#'
-                )
-        })
+        || path
+            .chars()
+            .any(|c| c.is_control() || matches!(c, '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*'))
     {
         return false;
     }

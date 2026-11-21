@@ -10,7 +10,7 @@
   "app": {
     "windows": [],
     "security": {
-      "csp": "default-src 'none'; script-src 'self' 'nonce-resource-prototype' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; worker-src 'self' blob: fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; style-src 'self' 'unsafe-inline' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; font-src 'self' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; img-src 'self' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; connect-src 'self' ipc: http://ipc.localhost fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'",
+      "csp": "default-src 'none'; script-src 'self' 'nonce-resource-prototype' 'wasm-unsafe-eval' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; worker-src 'self' blob: fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; style-src 'self' 'unsafe-inline' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; font-src 'self' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; img-src 'self' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; connect-src 'self' ipc: http://ipc.localhost fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'",
       "capabilities": [
         {
           "identifier": "harness-only",

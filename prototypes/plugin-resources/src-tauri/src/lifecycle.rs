@@ -37,16 +37,20 @@ struct Run {
 pub(crate) struct Harness {
     pub resources: Arc<Resources>,
     recovery: bool,
-    expected_bytes: u64,
+    expected_usage: SnapshotUsage,
     run: Mutex<Run>,
 }
 
 impl Harness {
-    pub(crate) fn new(resources: Arc<Resources>, recovery: bool, expected_bytes: u64) -> Self {
+    pub(crate) fn new(
+        resources: Arc<Resources>,
+        recovery: bool,
+        expected_usage: SnapshotUsage,
+    ) -> Self {
         Self {
             resources,
             recovery,
-            expected_bytes,
+            expected_usage,
             run: Mutex::new(Run {
                 phase: Phase::Initial,
                 reports: BTreeMap::new(),
@@ -83,7 +87,7 @@ impl Harness {
         }
         match (&run.phase, label, stage) {
             (Phase::Initial, "main", "initial") => {
-                let expected_cases = if self.recovery { 4 } else { 14 };
+                let expected_cases = if self.recovery { 6 } else { 20 };
                 if cases.len() != expected_cases {
                     return Err("incomplete main fixture report".into());
                 }
@@ -107,9 +111,9 @@ impl Harness {
             {
                 self.check_usage(
                     &mut run,
-                    "associated WebViews share one retained snapshot",
-                    1,
-                    self.expected_bytes,
+                    "associated WebViews deduplicate shared verified snapshots",
+                    self.expected_usage.snapshots,
+                    self.expected_usage.retained_bytes,
                 )?;
                 run.phase = Phase::ClosingPeer;
                 return Ok(Action::Close("peer"));
@@ -134,9 +138,9 @@ impl Harness {
             (Phase::ClosingPeer, "peer") => {
                 self.check_usage(
                     &mut run,
-                    "first actual WebView closure preserves shared snapshot",
-                    1,
-                    self.expected_bytes,
+                    "first actual WebView closure preserves retained snapshots",
+                    self.expected_usage.snapshots,
+                    self.expected_usage.retained_bytes,
                 )?;
                 run.phase = Phase::CheckingMain;
                 Ok(Action::Probe("main", "after-peer-close"))
@@ -206,6 +210,7 @@ fn aggregate(run: &Run, recovery: bool) -> Result<Value, String> {
     report["poolIntegration"] = json!({
         "complete": run.phase == Phase::Complete,
         "implementation": "production SnapshotPool",
+                "routeImplementation": "production ResourceRoute",
         "recovery": recovery,
         "usage": run.usage,
         "probes": probes,
@@ -239,15 +244,22 @@ mod tests {
                     .unwrap();
             }
         }
-        Harness::new(resources, recovery, 3)
+        Harness::new(
+            resources,
+            recovery,
+            SnapshotUsage {
+                snapshots: 1,
+                retained_bytes: 3,
+            },
+        )
     }
 
     fn report(label: &str, stage: &str, recovery: bool) -> Value {
         let count = if label == "main" && stage == "initial" {
             if recovery {
-                4
+                6
             } else {
-                14
+                20
             }
         } else {
             1
@@ -309,7 +321,7 @@ mod tests {
         else {
             panic!("expected final aggregate")
         };
-        assert_eq!(report["cases"].as_array().unwrap().len(), 21);
+        assert_eq!(report["cases"].as_array().unwrap().len(), 27);
         assert_eq!(report["poolIntegration"]["complete"], true);
         assert_eq!(report["poolIntegration"]["usage"][2]["retainedBytes"], 0);
         assert!(harness.report("denied", report.clone()).is_err());
@@ -382,7 +394,7 @@ mod tests {
         else {
             panic!("expected recovery aggregate")
         };
-        assert_eq!(report["cases"].as_array().unwrap().len(), 5);
+        assert_eq!(report["cases"].as_array().unwrap().len(), 7);
         assert_eq!(report["poolIntegration"]["recovery"], true);
         assert_eq!(report["poolIntegration"]["usage"][0]["snapshots"], 0);
     }

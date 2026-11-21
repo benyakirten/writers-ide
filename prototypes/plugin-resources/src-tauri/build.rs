@@ -45,18 +45,17 @@ fn collect(
     }
 }
 
-fn main() {
-    println!("cargo:rerun-if-changed=../dist/package");
-    println!("cargo:rerun-if-changed=../dist/fixture-record.json");
-    let crate_root = env::current_dir().expect("crate directory");
-    let root = crate_root.join("../dist/package");
+fn embed(crate_root: &Path, directory: &str, record_name: &str, prefix: &str) -> String {
+    println!("cargo:rerun-if-changed=../dist/{directory}");
+    println!("cargo:rerun-if-changed=../dist/{record_name}");
+    let root = crate_root.join("../dist").join(directory);
     assert!(
         fs::symlink_metadata(&root)
             .expect("missing dist/package; run frontend build first")
             .is_dir(),
         "fixture root must be a real directory"
     );
-    let record = crate_root.join("../dist/fixture-record.json");
+    let record = crate_root.join("../dist").join(record_name);
     let metadata =
         fs::symlink_metadata(&record).expect("missing frontend dist/fixture-record.json");
     assert!(
@@ -74,7 +73,7 @@ fn main() {
         files.iter().any(|path| path == "runtime-map.json"),
         "missing runtime map"
     );
-    let mut generated = format!("const ACCEPTED_RECORD: &[u8] = include_bytes!({:?});\nconst EMBEDDED_FILES: &[(&str, &[u8])] = &[\n", record);
+    let mut generated = format!("const {prefix}ACCEPTED_RECORD: &[u8] = include_bytes!({:?});\nconst {prefix}EMBEDDED_FILES: &[(&str, &[u8])] = &[\n", record);
     for relative in files {
         generated.push_str(&format!(
             "({relative:?}, include_bytes!({:?})),\n",
@@ -82,6 +81,18 @@ fn main() {
         ));
     }
     generated.push_str("];\n");
+    generated
+}
+
+fn main() {
+    let crate_root = env::current_dir().expect("crate directory");
+    let mut generated = embed(&crate_root, "package", "fixture-record.json", "");
+    generated.push_str(&embed(
+        &crate_root,
+        "package-second",
+        "fixture-record-second.json",
+        "SECOND_",
+    ));
     let output = env::var_os("OUT_DIR").expect("Cargo OUT_DIR");
     fs::write(Path::new(&output).join("fixture_manifest.rs"), generated)
         .expect("write fixture manifest");

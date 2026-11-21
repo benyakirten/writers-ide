@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import { compile } from 'svelte/compiler';
+import { encodedFixtures, unknownBytes } from './frontend/fixture-data.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const frontend = resolve(root, 'frontend');
@@ -136,6 +137,25 @@ if (
 	throw new Error('Worker must be a single self-contained ES module');
 }
 collect(worker);
+for (const [name, content] of encodedFixtures) {
+	files.set(`fixture/${name}`, Buffer.from(content));
+}
+files.set('fixture/unknown.dat', Buffer.from(unknownBytes));
+files.set(
+	'fixture/script.dat',
+	Buffer.from(
+		'globalThis.__RESOURCE_DAT_EXECUTED__ = true;\nexport const validJavaScript = true;\n',
+	),
+);
+// (module (func (export "add") (param i32 i32) (result i32) local.get 0 local.get 1 i32.add))
+// Fixed precompiled Wasm bytes; no compiler dependency or runtime source generation.
+files.set(
+	'fixture/add.wasm',
+	Buffer.from([
+		0, 97, 115, 109, 1, 0, 0, 0, 1, 7, 1, 96, 2, 127, 127, 1, 127, 3, 2, 1, 0, 7, 7, 1, 3, 97, 100,
+		100, 0, 0, 10, 9, 1, 7, 0, 32, 0, 32, 1, 106, 11,
+	]),
+);
 for (const name of ['plugin.css', 'icon.svg']) {
 	files.set(`fixture/${name}`, await readFile(resolve(frontend, name)));
 }
@@ -190,36 +210,81 @@ if (
 }
 const html = await readFile(resolve(frontend, 'index.html'));
 const probeHtml = await readFile(resolve(frontend, 'probe.html'));
-const sorted = [...files].sort(([a], [b]) => a.localeCompare(b, 'en'));
-const maxFileBytes = 1024 * 1024;
-const total = sorted.reduce((sum, [, bytes]) => sum + bytes.length, 0);
-if (
-	sorted.length > 64 ||
-	total > 4 * 1024 * 1024 ||
-	sorted.some(
-		([path, bytes]) =>
-			bytes.length > maxFileBytes ||
-			!/^(runtime|fixture)\/[a-zA-Z0-9_./-]+$|^runtime-map\.json$/.test(path) ||
-			path.includes('..'),
-	)
-) {
-	throw new Error('Fixture exceeds its portable file/count/byte budgets');
+
+const secondFiles = new Map(files);
+secondFiles.set(
+	'fixture/plugin.js',
+	Buffer.concat([
+		Buffer.from('// Second accepted fixture snapshot.\n'),
+		files.get('fixture/plugin.js'),
+	]),
+);
+function prepareSnapshot(contents) {
+	const sorted = [...contents].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+	const maxFileBytes = 1024 * 1024;
+	const total = sorted.reduce((sum, [, bytes]) => sum + bytes.length, 0);
+	if (
+		sorted.length > 64 ||
+		total > 4 * 1024 * 1024 ||
+		sorted.some(
+			([path, bytes]) =>
+				bytes.length > maxFileBytes ||
+				!(
+					path === 'runtime-map.json' ||
+					path.startsWith('runtime/') ||
+					path.startsWith('fixture/')
+				) ||
+				Buffer.byteLength(path) > 512 ||
+				path
+					.split('/')
+					.some(
+						(segment) =>
+							!segment ||
+							segment === '.' ||
+							segment === '..' ||
+							/[<>:"\\\\|?*]/u.test(segment) ||
+							[...segment].some(
+								(character) => character.codePointAt(0) < 32 || character.codePointAt(0) === 127,
+							) ||
+							/[. ]$/.test(segment) ||
+							/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(segment),
+					),
+		)
+	) {
+		throw new Error('Fixture exceeds its portable file/count/byte budgets');
+	}
+	const record = {
+		format_version: 1,
+		files: Object.fromEntries(
+			sorted.map(([path, bytes]) => [
+				path,
+				{ byte_length: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') },
+			]),
+		),
+	};
+	return { sorted, record, total };
 }
-const record = {
-	format_version: 1,
-	files: Object.fromEntries(
-		sorted.map(([path, bytes]) => [
-			path,
-			{ byte_length: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') },
-		]),
-	),
-};
-// Acceptance is explicit at BUILD TIME. Loading must never regenerate this trusted record.
+// Validate BOTH snapshots before writing any output. Paths originate only in this build's internal map.
+const snapshots = [
+	{ directory: 'package', recordName: 'fixture-record.json', ...prepareSnapshot(files) },
+	{
+		directory: 'package-second',
+		recordName: 'fixture-record-second.json',
+		...prepareSnapshot(secondFiles),
+	},
+];
+// Acceptance is explicit at BUILD TIME. Loading must never regenerate these trusted records.
 await rm(dist, { recursive: true, force: true });
-for (const [path, bytes] of sorted) {
-	const destination = resolve(dist, 'package', path);
-	await mkdir(dirname(destination), { recursive: true });
-	await writeFile(destination, bytes);
+for (const snapshot of snapshots) {
+	for (const [path, bytes] of snapshot.sorted) {
+		const destination = resolve(dist, snapshot.directory, path);
+		await mkdir(dirname(destination), { recursive: true });
+		await writeFile(destination, bytes);
+	}
+	await writeFile(
+		resolve(dist, snapshot.recordName),
+		JSON.stringify(snapshot.record, null, 2) + '\n',
+	);
 }
 await writeFile(resolve(dist, '.gitignore'), '*\n');
 await mkdir(resolve(dist, 'host'), { recursive: true });
@@ -228,7 +293,12 @@ await writeFile(resolve(dist, 'host/OFL.txt'), fontLicense);
 await writeFile(resolve(dist, 'host/bootstrap.js'), host[0].code);
 await writeFile(resolve(dist, 'host/probe.html'), probeHtml);
 await writeFile(resolve(dist, 'host/probe.js'), probe[0].code);
-await writeFile(resolve(dist, 'fixture-record.json'), JSON.stringify(record, null, 2) + '\n');
+
+for (const snapshot of snapshots) {
+	console.log(
+		`Built ${snapshot.directory}: ${snapshot.sorted.length} verified files, ${snapshot.total} bytes.`,
+	);
+}
 console.log(
-	`Built fixture: ${sorted.length} verified files, ${total} bytes; host bootstrap has no static runtime imports.`,
+	'Host bootstrap and probe are standalone; trusted records were generated only at build time.',
 );

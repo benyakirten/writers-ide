@@ -1,5 +1,8 @@
 import { Lifetime, Styles } from './lifetimes.js';
 import { createResourceProbe } from './resource-probe.js';
+import { encodedFixtures, unknownBytes } from './fixture-data.js';
+import { assertResponsePair, canonicalSnapshotBase } from './response-checks.js';
+import { checkJavaScriptEvaluation } from './evaluation-probe.js';
 
 const config = window.__RESOURCE_PROTOTYPE__ ?? {};
 // Post-close probes own their request lifetime and remain usable after initial cleanup.
@@ -143,7 +146,7 @@ function enforcedCspViolation(owner, directive, matchesBlockedUri) {
 async function negativeCspProbes() {
 	report.observations.cspNegativeProbes = {};
 	report.observations.cspViolationNote =
-		'The nonce-less inline script and data image intentionally produce enforced violations. Neither probe uses an outside URL.';
+		'Expected enforced violations include local negative probes, JavaScript string evaluation and reserved-origin executable sources.';
 	await test('CSP blocks harmless inline script without nonce', async () => {
 		const owner = new Lifetime();
 		const release = resources.own(() => owner.close());
@@ -185,6 +188,67 @@ async function negativeCspProbes() {
 				...evidence,
 				loadFailed: true,
 				naturalWidth: image.naturalWidth,
+			};
+		} finally {
+			release();
+		}
+	});
+}
+
+async function executableSourceProbes() {
+	await test('CSP blocks JavaScript eval and new Function', async () => {
+		const owner = new Lifetime();
+		const release = resources.own(() => owner.close());
+		try {
+			const violation = enforcedCspViolation(owner, 'script-src', (uri) => uri === 'eval');
+			const evaluation = checkJavaScriptEvaluation();
+			assert(
+				evaluation.eval.blocked && evaluation.newFunction.blocked,
+				'JavaScript string evaluation was not CSP-blocked',
+			);
+			report.observations.javaScriptEvaluation = {
+				...evaluation,
+				violation: await bounded(violation, 1200),
+			};
+		} finally {
+			release();
+		}
+	});
+	await test('CSP blocks reserved remote script and module import', async () => {
+		const owner = new Lifetime();
+		const release = resources.own(() => owner.close());
+		const remote = 'https://resource-prototype.invalid';
+		const matchesRemote = (uri) => uri === remote || uri.startsWith(`${remote}/`);
+		const script = document.createElement('script');
+		owner.own(() => script.remove());
+		try {
+			const scriptViolation = enforcedCspViolation(owner, 'script-src', matchesRemote);
+			const scriptFailed = new Promise((resolve) => {
+				script.onload = () => resolve(false);
+				script.onerror = () => resolve(true);
+			});
+			script.src = `${remote}/blocked-script.js`;
+			document.head.append(script);
+			const [scriptEvidence, failed] = await bounded(
+				Promise.all([scriptViolation, scriptFailed]),
+				1000,
+			);
+			assert(failed, 'Reserved remote script unexpectedly loaded');
+			const importViolation = enforcedCspViolation(owner, 'script-src', matchesRemote);
+			const imported = import(/* @vite-ignore */ `${remote}/blocked-module.js`).then(
+				() => false,
+				() => true,
+			);
+			const [importEvidence, rejected] = await bounded(
+				Promise.all([importViolation, imported]),
+				1000,
+			);
+			assert(rejected, 'Reserved remote module unexpectedly imported');
+			report.observations.remoteJavaScript = {
+				script: scriptEvidence,
+				module: importEvidence,
+				evidence:
+					'Enforced CSP violations for a remote script and a direct dynamic import from the actual bootstrap module graph, not network failure alone.',
 			};
 		} finally {
 			release();
@@ -257,7 +321,7 @@ async function recovery() {
 	});
 }
 
-async function exchangeWorker(url, owner) {
+async function exchangeWorker(url, owner, wasmBytes) {
 	const worker = new Worker(url, { type: 'module', name: 'resource-prototype' });
 	const release = owner.own(() => {
 		worker.terminate();
@@ -294,6 +358,18 @@ async function exchangeWorker(url, owner) {
 			new Uint8Array(result.buffer).join(',') === '42,7,9',
 			'Worker buffer mutation/return failed',
 		);
+		if (wasmBytes) {
+			const wasm = await request({ kind: 'wasm', buffer: wasmBytes }, [wasmBytes]);
+			assert(
+				wasm.kind === 'wasm' && wasm.sum === 42 && wasm.url === url,
+				`Blob worker Wasm compilation/execution failed: ${wasm.error ?? 'wrong result'}`,
+			);
+			assert(
+				wasm.evaluation?.eval.blocked && wasm.evaluation?.newFunction.blocked,
+				'Blob worker permitted JavaScript string evaluation',
+			);
+			report.observations.blobWorkerWasm = { sum: wasm.sum, evaluation: wasm.evaluation };
+		}
 		return echo.url;
 	} finally {
 		worker.onmessage = null;
@@ -312,7 +388,8 @@ async function normal() {
 	let host;
 	await test('install import map before runtime/fixture imports', async () => {
 		assert(
-			base.endsWith('/snapshot-a/') && second.endsWith('/snapshot-b/'),
+			canonicalSnapshotBase(base).pathname !== canonicalSnapshotBase(second).pathname &&
+				canonicalSnapshotBase(base).origin === canonicalSnapshotBase(second).origin,
 			'Native snapshot URLs missing or unexpected',
 		);
 		assert(HTMLScriptElement.supports?.('importmap'), 'Native import maps unsupported');
@@ -372,6 +449,84 @@ async function normal() {
 			checkedBytes(`${base}fixture/plugin.css`, /text\/css/i),
 			checkedBytes(`${base}fixture/font.woff2`, /font\/woff2|application\/font-woff/i),
 		]);
+	});
+	await test('encoded portable filenames decode exactly once', async () => {
+		await Promise.all(
+			encodedFixtures.map(async ([name, expected]) => {
+				const response = await fetchResource(`${base}fixture/${encodeURIComponent(name)}`);
+				assert(
+					response.status === 200 && (await response.text()) === expected,
+					`Encoded filename lookup failed: ${name}`,
+				);
+			}),
+		);
+		report.observations.encodedFilenames = encodedFixtures.map(([name]) => name);
+	});
+	await test('GET and HEAD preserve exact resource response metadata', async () => {
+		const [get, head] = await Promise.all([
+			fetchResource(`${base}fixture/plugin.js`),
+			fetchResource(`${base}fixture/plugin.js`, { method: 'HEAD' }),
+		]);
+		const getBytes = await get.arrayBuffer();
+		const headBytes = await head.arrayBuffer();
+		assertResponsePair(get, head, getBytes.byteLength, headBytes.byteLength, location.origin);
+		report.observations.responseMetadata = {
+			getLength: getBytes.byteLength,
+			headBodyLength: headBytes.byteLength,
+			contentType: get.headers.get('content-type'),
+			contentLength: head.headers.get('content-length'),
+			allowOrigin: get.headers.get('access-control-allow-origin'),
+			cacheControl: get.headers.get('cache-control'),
+			nosniff: get.headers.get('x-content-type-options'),
+		};
+	});
+	await test('unknown binary MIME and nosniff reject valid JavaScript in dat', async () => {
+		const binary = await checkedBytes(
+			`${base}fixture/unknown.dat`,
+			/^application\/octet-stream\b/i,
+		);
+		assert(
+			[...new Uint8Array(binary)].join(',') === unknownBytes.join(','),
+			'Unknown-extension binary bytes changed',
+		);
+		const response = await fetchResource(`${base}fixture/script.dat`);
+		assert(
+			response.status === 200 &&
+				/^application\/octet-stream\b/i.test(response.headers.get('content-type') ?? '') &&
+				response.headers.get('x-content-type-options') === 'nosniff',
+			'JavaScript dat file lacks octet-stream/nosniff response',
+		);
+		assert(
+			(await response.text()) ===
+				'globalThis.__RESOURCE_DAT_EXECUTED__ = true;\nexport const validJavaScript = true;\n',
+			'Dat fixture is not the expected syntactically valid JavaScript',
+		);
+		assert(!globalThis.__RESOURCE_DAT_EXECUTED__, 'Dat module marker already set');
+		let rejected = false;
+		try {
+			await import(/* @vite-ignore */ `${base}fixture/script.dat`);
+		} catch (error) {
+			rejected = error instanceof TypeError;
+		}
+		assert(
+			rejected && !globalThis.__RESOURCE_DAT_EXECUTED__,
+			'Octet-stream JavaScript module was not blocked before execution',
+		);
+		report.observations.datModule = {
+			status: response.status,
+			type: response.headers.get('content-type'),
+			rejected: true,
+			executed: false,
+		};
+	});
+	await test('verified package WebAssembly compiles and executes under selective CSP', async () => {
+		const bytes = await checkedBytes(`${base}fixture/add.wasm`, /^application\/wasm\b/i);
+		const { instance } = await WebAssembly.instantiate(bytes);
+		assert(instance.exports.add(19, 23) === 42, 'Wasm add returned the wrong value');
+		report.observations.webAssembly = {
+			sum: instance.exports.add(19, 23),
+			byteLength: bytes.byteLength,
+		};
 	});
 	await test('same host/fixture Svelte and PM identity; real Transaction', () => {
 		assert(fixture && host, 'Shared runtime/fixture unavailable');
@@ -575,7 +730,8 @@ async function normal() {
 				report.observations.blobRevoked = true;
 			});
 			try {
-				const workerUrl = await exchangeWorker(blobUrl, owner);
+				const wasmBytes = await checkedBytes(`${base}fixture/add.wasm`, /application\/wasm/i);
+				const workerUrl = await exchangeWorker(blobUrl, owner, wasmBytes);
 				report.observations.blobWorker = {
 					ok: true,
 					importMetaUrl: workerUrl,
@@ -617,6 +773,20 @@ async function normal() {
 			new TextDecoder().decode(a) === new TextDecoder().decode(b),
 			'Snapshots did not retain the same verified child bytes',
 		);
+		const [primaryPlugin, secondaryPlugin] = await Promise.all([
+			checkedBytes(`${base}fixture/plugin.js`, /javascript/i),
+			checkedBytes(`${second}fixture/plugin.js`, /javascript/i),
+		]);
+		const primaryText = new TextDecoder().decode(primaryPlugin);
+		const secondaryText = new TextDecoder().decode(secondaryPlugin);
+		assert(
+			secondaryText === `// Second accepted fixture snapshot.\n${primaryText}`,
+			'Second accepted snapshot must differ only by its fixed build comment',
+		);
+		report.observations.snapshotIds = [
+			canonicalSnapshotBase(base).pathname.split('/')[2],
+			canonicalSnapshotBase(second).pathname.split('/')[2],
+		];
 		const cached = await import(/* @vite-ignore */ `${base}fixture/plugin.js`);
 		assert(
 			cached === fixture && cached.identity === fixture.identity,
@@ -629,17 +799,22 @@ async function normal() {
 		);
 	});
 	await test('invalid routes reject without application HTML fallback', async () => {
-		const origin = base.slice(0, base.indexOf('/snapshot-a/'));
+		const baseUrl = canonicalSnapshotBase(base);
+		const origin = base.slice(0, -baseUrl.pathname.length);
+		const unknownId = `${baseUrl.pathname.split('/')[2][0] === '0' ? '1' : '0'}${baseUrl.pathname.split('/')[2].slice(1)}`;
 		const paths = [
-			'/unknown-snapshot/fixture/plugin.js',
-			'/snapshot-a/missing.js',
-			'/snapshot-a/fixture/%2e%2e/%2e%2e/index.html',
-			'/snapshot-a/fixture/%2fplugin.js',
-			'/snapshot-a/fixture/%5cplugin.js',
-			'/snapshot-a/fixture/%252e%252e/plugin.js',
-			'/snapshot-a//etc/passwd',
-			'/snapshot-a/C:/windows/system.ini',
-			'/snapshot-a/fixture/plugin.js?extra=1',
+			`/snapshots/${unknownId}/fixture/plugin.js`,
+			...[
+				'missing.js',
+				'fixture/%2e%2e/%2e%2e/index.html',
+				'fixture/%2fplugin.js',
+				'fixture/%5cplugin.js',
+				'fixture/%252e%252e/plugin.js',
+				'/etc/passwd',
+				'C:/windows/system.ini',
+				'fixture/plugin.js?extra=1',
+				'fixture/bad%escape',
+			].map((path) => `${baseUrl.pathname}${path}`),
 		];
 		const results = await Promise.all(
 			paths.map(async (path) => {
@@ -666,7 +841,9 @@ async function normal() {
 			body: 'reject',
 		});
 		assert(
-			!post.ok && !/text\/html/i.test(post.headers.get('content-type') ?? ''),
+			post.status === 405 &&
+				post.headers.get('allow') === 'GET, HEAD' &&
+				!/text\/html/i.test(post.headers.get('content-type') ?? ''),
 			'Unsupported method accepted or HTML fallback',
 		);
 		report.observations.invalidRoutes = results;
@@ -677,6 +854,7 @@ async function normal() {
 
 async function main() {
 	await negativeCspProbes();
+	await executableSourceProbes();
 	await nativeOpenerAvailability();
 	if (config.recovery === true) {
 		await recovery();

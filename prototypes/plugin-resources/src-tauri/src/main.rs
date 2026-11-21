@@ -11,14 +11,14 @@ mod plugin_integrity;
 #[allow(dead_code)]
 #[path = "../../../../src-tauri/src/plugin_resources/mod.rs"]
 mod plugin_resources;
-mod portable;
+
 mod reporting;
 mod resources;
 
 use lifecycle::{Action, Harness};
 use plugin_integrity::{verify_package, IntegrityLimits, IntegrityRecord, VerifiedPackage};
-use plugin_resources::SnapshotLimits;
-use resources::{Resources, BASE_ORIGIN};
+use plugin_resources::{SnapshotLimits, SnapshotUsage};
+use resources::Resources;
 
 include!(concat!(env!("OUT_DIR"), "/fixture_manifest.rs"));
 
@@ -27,19 +27,24 @@ fn limits() -> IntegrityLimits {
         max_files: 512,
         max_file_bytes: 8 * 1024 * 1024,
         max_total_bytes: 32 * 1024 * 1024,
-        max_path_bytes: portable::MAX_PATH,
+        max_path_bytes: 1024,
         max_depth: 16,
     }
 }
 
 fn extract_and_verify() -> Result<VerifiedPackage, Box<dyn std::error::Error>> {
+    extract_verified(ACCEPTED_RECORD, EMBEDDED_FILES)
+}
+
+fn extract_verified(
+    accepted: &[u8],
+    files: &[(&str, &[u8])],
+) -> Result<VerifiedPackage, Box<dyn std::error::Error>> {
     let limits = limits();
-    let record = IntegrityRecord::from_json(ACCEPTED_RECORD, &limits)?;
+    let record = IntegrityRecord::from_json(accepted, &limits)?;
     let source = tempfile::tempdir()?;
-    for (path, bytes) in EMBEDDED_FILES {
-        if !portable::portable_path(path) {
-            return Err("invalid embedded fixture path".into());
-        }
+    for (path, bytes) in files {
+        plugin_integrity::validate_path(path, &limits)?;
         let destination = source.path().join(path);
         std::fs::create_dir_all(destination.parent().ok_or("missing parent")?)?;
         std::fs::write(destination, bytes)?;
@@ -121,23 +126,49 @@ fn main() {
     let recovery = std::env::args().any(|arg| arg == "--recovery");
     // These are explicit fixture budgets, not production defaults.
     let resources = Arc::new(Resources::new(SnapshotLimits {
-        max_snapshots: 1,
+        max_snapshots: 2,
         max_retained_bytes: 32 * 1024 * 1024,
     }));
-    let mut expected_bytes = 0;
+    let mut expected_usage = SnapshotUsage {
+        snapshots: 0,
+        retained_bytes: 0,
+    };
+    let mut base_url = String::new();
+    let mut second_base_url = String::new();
     if !recovery {
-        // Each extraction verifies against the embedded accepted record. The
-        // second admission must share the first allocation, even at capacity.
+        // Primary admissions independently verify against the fixed record and
+        // share one allocation. A second accepted artifact has its own identity.
         for label in ["main", "peer"] {
             let package = extract_and_verify().unwrap_or_else(|error| fail(error));
-            expected_bytes = package.byte_length();
+            expected_usage.retained_bytes = package.byte_length();
             resources
                 .register_view(label)
                 .unwrap_or_else(|error| fail(error));
-            resources
+            let id = resources
                 .admit(label, package)
                 .unwrap_or_else(|error| fail(error));
+            let entry = resources
+                .file_url(id, "fixture/plugin.js")
+                .unwrap_or_else(|error| fail(error));
+            base_url = entry
+                .strip_suffix("fixture/plugin.js")
+                .expect("entry suffix")
+                .to_owned();
         }
+        let second = extract_verified(SECOND_ACCEPTED_RECORD, SECOND_EMBEDDED_FILES)
+            .unwrap_or_else(|error| fail(error));
+        expected_usage.retained_bytes += second.byte_length();
+        expected_usage.snapshots = 2;
+        let id = resources
+            .admit("main", second)
+            .unwrap_or_else(|error| fail(error));
+        let entry = resources
+            .file_url(id, "fixture/plugin.js")
+            .unwrap_or_else(|error| fail(error));
+        second_base_url = entry
+            .strip_suffix("fixture/plugin.js")
+            .expect("entry suffix")
+            .to_owned();
     }
     // This expected probe digest comes from the fixed BUILD-TIME record. It is
     // never regenerated from extracted candidate files during loading.
@@ -149,7 +180,7 @@ fn main() {
     let harness = Arc::new(Harness::new(
         Arc::clone(&resources),
         recovery,
-        expected_bytes,
+        expected_usage,
     ));
     let lifecycle = Arc::clone(&harness);
     let app = tauri::Builder::default()
@@ -187,8 +218,8 @@ fn main() {
                 let initialization = format!(
                     "window.__RESOURCE_PROTOTYPE__ = {};",
                     json!({
-                        "baseUrl": format!("{BASE_ORIGIN}/snapshot-a/"),
-                        "secondBaseUrl": format!("{BASE_ORIGIN}/snapshot-b/"),
+                        "baseUrl": base_url,
+                        "secondBaseUrl": second_base_url,
                         "role": label,
                         "expectedSha256": expected_sha256,
                         "recovery": recovery,
@@ -246,6 +277,22 @@ mod tests {
             assert_eq!(package.file(path).unwrap(), *bytes);
         }
         assert_eq!(package.paths().count(), EMBEDDED_FILES.len());
+    }
+
+    #[test]
+    fn second_build_time_record_has_distinct_identity_and_shared_child_contents() {
+        let primary = extract_and_verify().unwrap();
+        let second = extract_verified(SECOND_ACCEPTED_RECORD, SECOND_EMBEDDED_FILES).unwrap();
+        assert_ne!(primary.fingerprint(), second.fingerprint());
+        assert_ne!(
+            primary.file("fixture/plugin.js"),
+            second.file("fixture/plugin.js")
+        );
+        assert_eq!(
+            primary.file("fixture/child.js"),
+            second.file("fixture/child.js")
+        );
+        assert_eq!(primary.paths().count(), second.paths().count());
     }
 
     #[test]

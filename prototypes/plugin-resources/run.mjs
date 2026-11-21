@@ -102,6 +102,7 @@ async function main() {
 				report.stage !== 'complete' ||
 				report.poolIntegration?.complete !== true ||
 				report.poolIntegration?.implementation !== 'production SnapshotPool' ||
+				report.poolIntegration?.routeImplementation !== 'production ResourceRoute' ||
 				report.poolIntegration?.recovery !== (mode === 'recovery') ||
 				!Array.isArray(report.cases) ||
 				report.cases.length === 0 ||

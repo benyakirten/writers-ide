@@ -273,7 +273,7 @@ fn sha256(bytes: &[u8]) -> String {
 }
 
 /// Portable slash-separated paths only. Never normalize an untrusted alias.
-fn validate_path(path: &str, limits: &IntegrityLimits) -> Result<(), IntegrityError> {
+pub(crate) fn validate_path(path: &str, limits: &IntegrityLimits) -> Result<(), IntegrityError> {
     let invalid = |reason| IntegrityError::InvalidPath {
         path: path.to_owned(),
         reason,
