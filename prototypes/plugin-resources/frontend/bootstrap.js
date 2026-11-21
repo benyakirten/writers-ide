@@ -1,8 +1,13 @@
 import { Lifetime, Styles } from './lifetimes.js';
+import { createResourceProbe } from './resource-probe.js';
 
 const config = window.__RESOURCE_PROTOTYPE__ ?? {};
+// Post-close probes own their request lifetime and remain usable after initial cleanup.
+window.__RESOURCE_PROTOTYPE_PROBE__ = createResourceProbe(config, 'main');
 const report = {
 	ok: false,
+	role: 'main',
+	stage: 'initial',
 	mode: String(config.mode ?? 'unknown').slice(0, 80),
 	observations: {
 		documentOrigin: location.origin,

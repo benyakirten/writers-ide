@@ -1,17 +1,23 @@
 use std::{io::Write, sync::Arc, time::Duration};
 
 use serde_json::{json, Value};
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 // Keep the internal integrity API in this crate; no production visibility change.
+mod lifecycle;
 #[allow(dead_code)]
 #[path = "../../../../src-tauri/src/plugin_integrity/mod.rs"]
 mod plugin_integrity;
+#[allow(dead_code)]
+#[path = "../../../../src-tauri/src/plugin_resources/mod.rs"]
+mod plugin_resources;
 mod portable;
 mod reporting;
 mod resources;
 
+use lifecycle::{Action, Harness};
 use plugin_integrity::{verify_package, IntegrityLimits, IntegrityRecord, VerifiedPackage};
+use plugin_resources::SnapshotLimits;
 use resources::{Resources, BASE_ORIGIN};
 
 include!(concat!(env!("OUT_DIR"), "/fixture_manifest.rs"));
@@ -44,12 +50,52 @@ fn extract_and_verify() -> Result<VerifiedPackage, Box<dyn std::error::Error>> {
 }
 
 #[tauri::command]
-fn finish(window: tauri::WebviewWindow, report: Value) -> Result<(), String> {
-    reporting::validate(window.label(), &report)?;
-    emit_and_exit(report)
+fn finish(
+    window: tauri::WebviewWindow,
+    harness: tauri::State<'_, Arc<Harness>>,
+    report: Value,
+) -> Result<(), String> {
+    let action = reporting::validate(window.label(), &report)
+        .and_then(|()| harness.report(window.label(), report));
+    match action.and_then(|action| run_action(window.app_handle(), action)) {
+        Ok(()) => Ok(()),
+        Err(error) => fail(error),
+    }
+}
+
+fn run_action(app: &tauri::AppHandle, action: Action) -> Result<(), String> {
+    match action {
+        Action::Wait => Ok(()),
+        Action::Close(label) => app
+            .get_webview_window(label)
+            .ok_or("fixture window missing")?
+            .close()
+            .map_err(|error| error.to_string()),
+        Action::Probe(label, stage) => app
+            .get_webview_window(label)
+            .ok_or("probe window missing")?
+            .eval(format!(
+                "void window.__RESOURCE_PROTOTYPE_PROBE__('{stage}');"
+            ))
+            .map_err(|error| error.to_string()),
+        Action::Complete(report) => emit_and_exit(report),
+    }
+}
+
+fn fail(error: impl std::fmt::Display) -> ! {
+    emit_and_exit(json!({
+        "ok": false,
+        "mode": if std::env::args().any(|arg| arg == "--recovery") { "recovery" } else { "normal" },
+        "error": error.to_string().chars().take(4096).collect::<String>(),
+    }))
 }
 
 fn emit_and_exit(report: Value) -> ! {
+    let report = if reporting::validate("main", &report).is_ok() {
+        report
+    } else {
+        json!({"ok": false, "error": "native-final-report-exceeded-limits"})
+    };
     if reporting::claim_completion() {
         let code = if report.get("ok").and_then(Value::as_bool) == Some(true) {
             0
@@ -73,49 +119,103 @@ fn main() {
         emit_and_exit(json!({"ok": false, "error": "native-watchdog-timeout"}));
     });
     let recovery = std::env::args().any(|arg| arg == "--recovery");
-    // Verification is synchronous before the event loop and WebView exist.
-    let package = match extract_and_verify() {
-        Ok(package) => package,
-        Err(_) => {
-            emit_and_exit(json!({"ok": false, "error": "embedded-fixture-verification-failed"}))
+    // These are explicit fixture budgets, not production defaults.
+    let resources = Arc::new(Resources::new(SnapshotLimits {
+        max_snapshots: 1,
+        max_retained_bytes: 32 * 1024 * 1024,
+    }));
+    let mut expected_bytes = 0;
+    if !recovery {
+        // Each extraction verifies against the embedded accepted record. The
+        // second admission must share the first allocation, even at capacity.
+        for label in ["main", "peer"] {
+            let package = extract_and_verify().unwrap_or_else(|error| fail(error));
+            expected_bytes = package.byte_length();
+            resources
+                .register_view(label)
+                .unwrap_or_else(|error| fail(error));
+            resources
+                .admit(label, package)
+                .unwrap_or_else(|error| fail(error));
         }
-    };
-    let resources = Arc::new(Resources::new(package));
-    let initialization = format!(
-        "window.__RESOURCE_PROTOTYPE__ = {};",
-        json!({
-            "baseUrl": format!("{BASE_ORIGIN}/snapshot-a/"),
-            "secondBaseUrl": format!("{BASE_ORIGIN}/snapshot-b/"),
-            "recovery": recovery,
-            "sourceRemoved": true,
-            "mode": if recovery { "recovery" } else { "normal" }
-        })
-    );
+    }
+    // This expected probe digest comes from the fixed BUILD-TIME record. It is
+    // never regenerated from extracted candidate files during loading.
+    let record: Value = serde_json::from_slice(ACCEPTED_RECORD).unwrap_or_else(|error| fail(error));
+    let expected_sha256 = record["files"]["fixture/plugin.js"]["sha256"]
+        .as_str()
+        .unwrap_or_else(|| fail("missing accepted fixture entry digest"))
+        .to_owned();
+    let harness = Arc::new(Harness::new(
+        Arc::clone(&resources),
+        recovery,
+        expected_bytes,
+    ));
+    let lifecycle = Arc::clone(&harness);
     let app = tauri::Builder::default()
+        .manage(harness)
         .register_uri_scheme_protocol("fixture-resource", move |context, request| {
             resources.respond(context.webview_label(), &request)
         })
         .invoke_handler(tauri::generate_handler![finish])
+        .on_window_event(move |window, event| {
+            if matches!(event, WindowEvent::Destroyed) {
+                let label = window.label();
+                let action = lifecycle
+                    .resources
+                    .close_view(label)
+                    .and_then(|removed| lifecycle.destroyed(label, removed));
+                if let Err(error) =
+                    action.and_then(|action| run_action(window.app_handle(), action))
+                {
+                    fail(error);
+                }
+            }
+        })
         .setup(move |app| {
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("Plugin Resource Prototype")
-                .inner_size(900.0, 700.0)
-                .initialization_script(initialization)
-                .on_page_load(|_, payload| {
-                    eprintln!("RESOURCE_PROTOTYPE_PAGE {:?}", payload.event());
-                })
-                .on_navigation(|url| {
-                    eprintln!("RESOURCE_PROTOTYPE_NAVIGATION {}", url);
-                    let host = if cfg!(target_os = "windows") {
-                        "http://tauri.localhost"
-                    } else {
-                        "tauri://localhost"
-                    };
-                    url.as_str() == host
-                        || url.as_str() == format!("{host}/index.html")
-                        || url.as_str() == format!("{host}/")
-                })
-                .build()?;
+            let labels: &[&str] = if recovery {
+                &["main"]
+            } else {
+                &["main", "peer", "denied"]
+            };
+            for &label in labels {
+                let entry = if label == "main" {
+                    "index.html"
+                } else {
+                    "probe.html"
+                };
+                let initialization = format!(
+                    "window.__RESOURCE_PROTOTYPE__ = {};",
+                    json!({
+                        "baseUrl": format!("{BASE_ORIGIN}/snapshot-a/"),
+                        "secondBaseUrl": format!("{BASE_ORIGIN}/snapshot-b/"),
+                        "role": label,
+                        "expectedSha256": expected_sha256,
+                        "recovery": recovery,
+                        "sourceRemoved": !recovery,
+                        "mode": if recovery { "recovery" } else { "normal" }
+                    })
+                );
+                WebviewWindowBuilder::new(app, label, WebviewUrl::App(entry.into()))
+                    .title(format!("Plugin Resource Prototype — {label}"))
+                    .inner_size(900.0, 700.0)
+                    .visible(label == "main")
+                    .initialization_script(initialization)
+                    .on_page_load(move |_, payload| {
+                        eprintln!("RESOURCE_PROTOTYPE_PAGE {label} {:?}", payload.event());
+                    })
+                    .on_navigation(move |url| {
+                        let host = if cfg!(target_os = "windows") {
+                            "http://tauri.localhost"
+                        } else {
+                            "tauri://localhost"
+                        };
+                        url.as_str() == host
+                            || url.as_str() == format!("{host}/{entry}")
+                            || url.as_str() == format!("{host}/")
+                    })
+                    .build()?;
+            }
             Ok(())
         })
         .build(tauri::generate_context!());

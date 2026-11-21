@@ -171,7 +171,25 @@ const host = await bundle({
 if (host.length !== 1 || host[0].type !== 'chunk' || host[0].imports.length !== 0) {
 	throw new Error('Host bootstrap must remain standalone with no static runtime imports');
 }
+const probe = await bundle({
+	build: {
+		rolldownOptions: {
+			input: resolve(frontend, 'probe.js'),
+			external: Object.keys(runtime),
+			output: { format: 'es', entryFileNames: 'probe.js', codeSplitting: false },
+		},
+	},
+});
+if (
+	probe.length !== 1 ||
+	probe[0].type !== 'chunk' ||
+	probe[0].imports.length !== 0 ||
+	probe[0].dynamicImports.length !== 0
+) {
+	throw new Error('Host probe must remain standalone with no runtime or fixture imports');
+}
 const html = await readFile(resolve(frontend, 'index.html'));
+const probeHtml = await readFile(resolve(frontend, 'probe.html'));
 const sorted = [...files].sort(([a], [b]) => a.localeCompare(b, 'en'));
 const maxFileBytes = 1024 * 1024;
 const total = sorted.reduce((sum, [, bytes]) => sum + bytes.length, 0);
@@ -208,6 +226,8 @@ await mkdir(resolve(dist, 'host'), { recursive: true });
 await writeFile(resolve(dist, 'host/index.html'), html);
 await writeFile(resolve(dist, 'host/OFL.txt'), fontLicense);
 await writeFile(resolve(dist, 'host/bootstrap.js'), host[0].code);
+await writeFile(resolve(dist, 'host/probe.html'), probeHtml);
+await writeFile(resolve(dist, 'host/probe.js'), probe[0].code);
 await writeFile(resolve(dist, 'fixture-record.json'), JSON.stringify(record, null, 2) + '\n');
 console.log(
 	`Built fixture: ${sorted.length} verified files, ${total} bytes; host bootstrap has no static runtime imports.`,

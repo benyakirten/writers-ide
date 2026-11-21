@@ -10,8 +10,8 @@ pub(crate) fn claim_completion() -> bool {
 }
 
 pub(crate) fn validate(label: &str, report: &Value) -> Result<(), String> {
-    if label != "main" {
-        return Err("finish requires the fixed harness window".into());
+    if !matches!(label, "main" | "peer" | "denied") {
+        return Err("finish requires a fixed harness window".into());
     }
     if !report.is_object() || report.get("ok").and_then(Value::as_bool).is_none() {
         return Err("report must be an object with boolean ok".into());
@@ -60,6 +60,9 @@ mod tests {
             assert!(validate("main", &value).is_err());
         }
         assert!(validate("foreign", &json!({"ok": true})).is_err());
+        for label in ["peer", "denied"] {
+            assert!(validate(label, &json!({"ok": true})).is_ok());
+        }
     }
 
     #[test]

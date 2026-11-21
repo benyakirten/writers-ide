@@ -99,6 +99,10 @@ async function main() {
 			if (
 				report.mode !== mode ||
 				report.ok !== true ||
+				report.stage !== 'complete' ||
+				report.poolIntegration?.complete !== true ||
+				report.poolIntegration?.implementation !== 'production SnapshotPool' ||
+				report.poolIntegration?.recovery !== (mode === 'recovery') ||
 				!Array.isArray(report.cases) ||
 				report.cases.length === 0 ||
 				!report.cases.every((item) => item.ok === true)

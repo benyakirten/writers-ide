@@ -15,7 +15,7 @@
         {
           "identifier": "harness-only",
           "description": "No core or plugin native permissions. Only the Rust-validated application finish command is registered.",
-          "windows": ["main"],
+          "windows": ["main", "peer", "denied"],
           "permissions": ["allow-finish"]
         }
       ]
