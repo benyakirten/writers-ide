@@ -26,6 +26,12 @@ export const countWords = definePluginCommand({
 
 The example accepts an object containing a bounded string and returns a nonnegative integer. Argument-free commands remain supported. Commands producing no value declare a `void` result. The exact no-argument convenience overloads are implementation work.
 
+## Declaration-count limits
+
+**Approved limits; enforcement is not implemented:** a component may declare at most 32 shared commands in its `commands` list. A consumer may request at most 32 commands in each dependency's `commands` list. Exceeding either limit rejects the whole manifest before plugin code is imported. These are host-owned engineering starting points that a plugin cannot raise. The 64 KiB whole-manifest limit also applies.
+
+Internal event handlers and individual methods on a provider API do not count toward these command limits. A toolbar does not need to expose each button handler as a shared application command. Choose shared commands for named actions that other components should invoke. Use provider APIs for service contracts, not merely to avoid a command-count limit.
+
 ## Declare and implement the provider
 
 This TOML fragment belongs under the provider's component record in `manifest.toml`:
@@ -38,6 +44,8 @@ major = 1
 ```
 
 Here, `count-words` is local to the component. The contract identity and major describe the operation's public inputs/results. Different components can reuse the same local command ID.
+
+**Approved identifier rules; enforcement is not implemented:** command IDs, contract IDs and consumer command aliases must each be nonempty strings that are not whitespace-only, with at most 256 UTF-8 bytes. This is a byte limit, not JavaScript string length. All three allow flexible characters and match exactly, including case. The host will reject invalid values rather than trim, normalize or truncate them. These rules apply to manifest fields and their corresponding runtime definitions, registrations and lookups. They do not make command IDs globally unique. Consumer command aliases are scoped to a dependency, as explained below.
 
 The provider's entry module exports the following function. The host calls it synchronously when enabling the component. Its component must declare the `contributions.command` capability.
 

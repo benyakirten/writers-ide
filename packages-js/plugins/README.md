@@ -2,7 +2,7 @@
 
 `@writers-ide/plugins` lets you add a feature to Writer's IDE without building your own activation or cleanup system. You can add a toolbar, register an action, or share an API with another feature. The workbench places and renders your UI. The plugin host enables your feature and releases its resources when it stops.
 
-This guide is for authors of trusted plugins bundled with the application. The package is private to this workspace, and its API is still evolving. External installation is not implemented. The [safety section](#boundaries-and-next-steps) explains what the current host does and does not protect.
+This guide is for authors of trusted plugins bundled with the application. The package is private to this workspace, and its API is still evolving. External installation is not implemented. The planned external SDK will expose a reviewed set of author-facing exports, not automatically every export in these workspace packages. Application setup APIs will remain separate. The exact export list and entry-point names still need review; this does not yet change the imports shown in this guide. See the [runtime profile proposal](../../docs/plugins/package-api-proposal.md#candidate-runtime-profile-inventory). The [safety section](#boundaries-and-next-steps) explains what the current host does and does not protect.
 
 ## What can a plugin do today?
 
