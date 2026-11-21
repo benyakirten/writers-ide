@@ -110,7 +110,7 @@ Reports are bounded to 65,536 serialized bytes, 2,048 JSON nodes, depth 12, 8,19
 Recovery skips native extraction and admission. It creates only the main shell, with no package resources or fixture/runtime imports.
 It does not provide an installer, developer directory loader or production activation lifecycle.
 Snapshot, retained-byte and request limits are fixture mechanisms, not approved production budgets.
-Exact URL layout, scheme/origin, headers, cache policy and worker creation remain experimental.
+The fixture's concrete URLs and headers are not a production implementation. The owner has separately approved snapshot-addressed paths, a dedicated resource origin and initial response policies. See [verified resource delivery](implementation-plan.md#verified-resource-delivery) for current decisions and remaining validation.
 
 ### Packaged observations
 
