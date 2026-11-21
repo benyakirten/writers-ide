@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Fixture resource prototype</title>
+	</head>
+	<body>
+		<h1>Fixture-only resource loading</h1>
+		<p id="status">Waiting for the host bootstrap.</p>
+		<main id="fixture"></main>
+		<p>Cleanup releases owned resources. It does not unload ES modules or reset their state.</p>
+		<script type="module" src="./bootstrap.js" nonce="resource-prototype"></script>
+	</body>
+</html>

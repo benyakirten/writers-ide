@@ -1,0 +1,21 @@
+[package]
+name = "plugin-resource-prototype"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.90"
+default-run = "plugin-resource-prototype"
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.5", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10.9"
+cap-std = "3.4.5"
+cap-fs-ext = "3.4.5"
+tempfile = "3.27.0"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

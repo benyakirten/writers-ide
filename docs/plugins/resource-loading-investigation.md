@@ -2,11 +2,13 @@
 
 ## Status and purpose
 
-**Source investigation: verified. Platform feasibility: unverified.**
-This supporting plugin document records the current loading paths and proposes a bounded experiment.
-It does not approve a resource URL contract, token issuance protocol or security architecture.
-No runtime prototype was implemented. Tests and packaged runtime checks were not executed.
-No production code changed as part of this investigation.
+**Fixture prototype implemented; packaged macOS results reported. Production feasibility remains open.**
+This document records production loading paths and a separate fixture experiment in
+[`prototypes/plugin-resources`](../../prototypes/plugin-resources/).
+The packaged run passed 14 normal and four recovery cases in an unsigned debug macOS app.
+The prototype is a standalone Tauri crate. It changes no production loading or CSP configuration.
+It installs no arbitrary code and implements no activation tokens or native authorization.
+The experiment does not approve a resource URL contract or production security architecture.
 
 Approved direction includes trusted shared frontend code, Rust permission tokens, immutable verified URLs,
 native ESM import maps, single-bundle workers, host-owned CSS and restrictive native operations.
@@ -81,15 +83,35 @@ Private closures, import maps, CSP and virtual URLs do not prove which JavaScrip
 Tokens identify the activation credential exercised, not an authenticated JavaScript caller.
 Stronger hostile-caller guarantees would require a separately approved isolation design.
 
-## Candidate fixture-only prototype
+## Implemented fixture-only prototype
 
-Use a separate nonproduction test harness with application-owned fixtures only.
-Do not add external installation, directory loading, permission issuance or production plugin activation.
-Fixture records must be fixed trusted inputs supplied by the harness, not generated from candidate files during loading.
-Run `verify_package` with bounded work off the UI-sensitive path and retain its `VerifiedPackage` owned bytes.
-The candidate native handler must serve those bytes only. Never reopen source paths or fall back to app HTML.
-Keep snapshot count, total retained bytes, requests and concurrency bounded.
+The standalone harness uses application-owned fixtures and fixed trusted records.
+It verifies a native temporary extraction and retains the checked bytes for resource responses.
+The extraction is removed after verification; generated `dist/` build output remains.
+It does not provide an installer, developer directory loader or production activation lifecycle.
+Snapshot, retained-byte and request limits are fixture mechanisms, not approved production budgets.
 Exact URL layout, scheme/origin, headers, cache policy and worker creation remain experimental.
+
+### Packaged observations
+
+The run used macOS **27.0.1, build 26A434, arm64** and WKWebView.
+The user agent reported **AppleWebKit/605.1.15**. Its `10_15_7` OS text is misleading;
+it is not the measured operating-system version.
+
+| Area                       | Observed result                                                                                                                                                                                                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Origins                    | Document URL `tauri://localhost`; `secureContext` was `true`. Fixture bases were `fixture-resource://localhost/snapshot-a/` and `fixture-resource://localhost/snapshot-b/`. Request `Origin` headers were not measured.                                                                     |
+| Modules and shared runtime | ESM relative imports and import-map resolution worked. Host and fixture used the same actual Svelte and identity-sensitive ProseMirror module instances. A ProseMirror transaction worked.                                                                                                  |
+| UI and CSS                 | A compiled Svelte fixture mounted after CSS readiness, updated reactively and unmounted. Shared stylesheet owners and failure-path CSS cleanup passed. This is not a full activation-failure test.                                                                                          |
+| Assets                     | Images loaded. Font checks included actual rendering metrics, not only response success or font readiness.                                                                                                                                                                                  |
+| Retained snapshots         | Resources remained available after native temporary extraction removal. Distinct snapshot URLs produced distinct module instances from the same retained bytes. This does not prove unloading or reset-on-enable behavior.                                                                  |
+| Workers                    | Direct verified-URL module worker loading failed with `Worker module load failed`. A self-contained Blob worker built from verified bytes passed copy/transfer checks, termination and Blob URL revocation. Blob loading changes `import.meta.url`; relative worker assets are unsupported. |
+| CSP                        | Negative `inline-no-nonce` and `data-image` probes confirmed blocking under the unchanged fixture policy. No null-CSP native comparison was run. Production CSP remains unchanged.                                                                                                          |
+| Raw opener                 | The call returned command-unavailable: `opener.open_url not allowed. Plugin not found`. This is not proof of ACL denial for a registered plugin. Automatic click-listener absence was not established.                                                                                      |
+| Invalid routes             | Actual requests returned 400/404 without application HTML. Raw parser validation has separate Rust test coverage; browser-normalized requests do not establish every raw-parser case.                                                                                                       |
+| Recovery                   | Four cases passed without a fixture/runtime import map or imports. An application-owned host button remained usable. This does not implement the production management/recovery WebView or registry recovery.                                                                               |
+
+The following matrix remains the broader validation checklist. The observations above cover only part of it.
 
 | Test area           | Required observations and assertions                                                                                                                                                                             |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -119,40 +141,39 @@ See [worker output](implementation-plan.md#worker-build-output) and
 
 Installed Tauri source documents custom schemes as `<scheme>://localhost/...` on macOS/Linux.
 Windows normally uses `http://<scheme>.localhost/...`, with an HTTPS option.
-These are framework expectations, not measured origins for this application or an approved URL contract.
-Measure document/resource origins, `Origin` headers, CORS, secure-context status and request normalization.
+These are framework expectations, not an approved URL contract.
+The fixture's measured macOS URLs and secure-context result are recorded above.
+Request `Origin` headers remain unmeasured. CORS and request normalization still need broader platform validation.
 A separate resource scheme may be cross-origin. Fetch success does not prove Worker construction is allowed.
 Workers do not inherit the window import map. Blob workers may change relative URL behavior.
 
-| Platform           | Required packaged evidence                                                                    | Current evidence                                           |
-| ------------------ | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Current macOS      | WKWebView ESM/maps, assets/fonts, direct/Blob workers, CSP, denied native routes and recovery | Source/tool inspection only; local OS is 27.0.1.           |
-| macOS 13.3 minimum | Repeat the complete fixture matrix on the oldest supported OS                                 | Not measured. Current macOS results cannot establish this. |
-| Windows            | Repeat in installed WebView2; record HTTP/HTTPS virtual-host behavior                         | Not measured.                                              |
-| Linux              | Repeat in installed WebKitGTK; record scheme and worker behavior                              | Not measured.                                              |
+| Platform           | Required packaged evidence                                                             | Current evidence                                                                                                                                                     |
+| ------------------ | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Current macOS      | WKWebView ESM/maps, assets/fonts, direct/Blob workers, CSP, native routes and recovery | 14 normal and four recovery cases passed on macOS 27.0.1 arm64. Direct worker failed; verified-byte Blob fallback passed. Native ACL enforcement is not established. |
+| macOS 13.3 minimum | Repeat the complete fixture matrix on the oldest supported OS                          | Not measured. Current macOS results cannot establish this.                                                                                                           |
+| Windows            | Repeat in installed WebView2; record HTTP/HTTPS virtual-host behavior                  | Not measured.                                                                                                                                                        |
+| Linux              | Repeat in installed WebKitGTK; record scheme and worker behavior                       | Not measured.                                                                                                                                                        |
 
 Playwright Chromium/WebKit tests do not replace these installed-runtime tests.
 A platform failure requires review of the mechanism, not weaker verification or broader native access.
 
-## Local tools and bounded execution plan
+## Runner and remaining validation
 
-Observed tools: pnpm 12.4.1, Tauri CLI 2.12.4, Rust/Cargo 1.99.1 and Apple Command Line Tools.
-Default Node 24.6.0 is below the repository requirement.
-Installed `/opt/homebrew/opt/node@26/bin/node` is Node 26.8.1 and satisfies it.
-An older debug `.app` exists, but `build/` was empty. Neither proves a fresh prototype works.
-Offline locked Cargo metadata without dependencies succeeded. Full offline build completeness is unverified.
+[`run.mjs`](../../prototypes/plugin-resources/run.mjs) builds the standalone prototype with
+`tauri build --debug --bundles app --no-sign --ci`, then executes normal and recovery modes.
+It bounds build/runtime duration and output, terminates process groups on deadline,
+and writes logs and a JSON result under the prototype's `reports/` directory.
+See the [prototype README](../../prototypes/plugin-resources/README.md) for prerequisites and commands.
+Do not use the production app build as a substitute for this fixture.
 
-After a harness is separately approved and implemented, build an unsigned `.app` rather than a DMG.
-The existing root build command below uses the supported Node via a literal PATH and disables Cargo network access.
-It builds the current application; it does not select a fixture harness that does not yet exist.
-Run it from the repository root with an external time limit:
+Initial packaged attempts reached the watchdog because the navigation allowlist did not accept
+exactly `tauri://localhost` without a trailing slash. The implementation narrowly added that URL;
+it did not broaden the policy to arbitrary navigation. Subsequent packaged runs passed all 18 cases.
 
-```sh
-env PATH=/opt/homebrew/opt/node@26/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin CARGO_NET_OFFLINE=true pnpm exec tauri build --bundles app --no-sign --ci
-```
-
-Design the future native harness to emit bounded stdout JSON with engine/OS, observed origins and per-case results.
-Exit with a success/failure code after completion. Add a watchdog and an external deadline that terminate the app and workers.
-Cap diagnostic output and avoid credentials, manuscript data and absolute private paths.
-Do not rely on an indefinitely running server, file watcher, manual window closure or an unbounded GUI launch.
-No runnable harness script is introduced here. Builds, runtime tests and packaged verification remain unexecuted.
+All 40 native tests passed with `cargo test --offline --locked --features custom-protocol`.
+Cargo formatting and Clippy checks passed. Focused Oxfmt, Oxlint and JavaScript syntax checks also passed.
+Raw parser tests are separate from packaged browser observations.
+Full activation-failure and managed-task cancellation tests remain outstanding.
+So do request-header measurements, a null-CSP native comparison, Windows, Linux and macOS 13.3 runs.
+The experiment supports further design work. It does not establish production loading feasibility,
+native permission enforcement, arbitrary package compatibility or complete platform support.

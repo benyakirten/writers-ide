@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Plugin Resource Prototype",
+  "version": "0.1.0",
+  "identifier": "com.writerside.pluginresources.prototype",
+  "build": {
+    "beforeBuildCommand": "node build.mjs",
+    "frontendDist": "../dist/host"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'none'; script-src 'self' 'nonce-resource-prototype' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; worker-src 'self' blob: fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; style-src 'self' 'unsafe-inline' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; font-src 'self' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; img-src 'self' fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; connect-src 'self' ipc: http://ipc.localhost fixture-resource: http://fixture-resource.localhost https://fixture-resource.localhost; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'",
+      "capabilities": [
+        {
+          "identifier": "harness-only",
+          "description": "No core or plugin native permissions. Only the Rust-validated application finish command is registered.",
+          "windows": ["main"],
+          "permissions": ["allow-finish"]
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app"],
+    "icon": ["icons/icon.png"],
+    "macOS": { "minimumSystemVersion": "13.3" }
+  }
+}
