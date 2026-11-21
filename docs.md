@@ -18,7 +18,7 @@ Start with the guide that matches your goal:
 
 A topic's `context.md` explains its current design, rules, reasons, and limitations. It links to the relevant source and tests. Its `change-log.md` records what each pull request changed and how it was checked.
 
-For plugin implementation work, see the [implementation plan](docs/plugins/implementation-plan.md). The [external package manifest and API proposal](docs/plugins/package-api-proposal.md) is for design review; its new contracts are not implemented. For current API usage, start with these package guides:
+For plugin implementation work, see the [implementation plan](docs/plugins/implementation-plan.md). The [external package specification draft](docs/plugins/package-api-proposal.md) is for consolidated design review; its new contracts are not implemented. The [resource-loading investigation](docs/plugins/resource-loading-investigation.md) records source findings and the packaged prototype still needed. For current API usage, start with these package guides:
 
 - [Plugins](packages-js/plugins/README.md): add features, manage their lifetime, and connect plugins through declared APIs.
 - [Word processing](packages-js/word-processing/README.md): read and edit documents, register commands, and add editor behaviors.
