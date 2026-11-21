@@ -283,7 +283,7 @@ interface FrontendEntry<Presentation> {
 }
 ```
 
-The host imports a verified entry module and calls its named `activate` export once per activation after compatibility, dependency and consent checks. A returned disposer must be synchronous. The host cancels managed work and releases owned resources on teardown or activation failure. Retained services remain revoked after re-enable; re-enable creates new services and identity.
+The host imports a verified entry module and calls its named `activate` export once per activation after compatibility, dependency and consent checks. A returned disposer must be synchronous. The owner reaffirmed that successful activation means synchronous setup is complete, not that background data is ready. Activation may start managed loads and retain or pass their task handles to feature state/UI. The handles keep settled outcomes available after `activate` returns; task keys identify replaceable work, not a result lookup store. A feature may instead load lazily when its UI needs the data. The host cancels managed work and releases owned resources on teardown or activation failure. Retained services remain revoked after re-enable; re-enable creates new services and identity.
 
 `identity` is read-only diagnostic data, not a credential. No token appears in the public context. Existing `PluginApiConnection.consumerId` remains an opaque runtime owner key for provider diagnostics. Authors use the proposed `consumer`/`provider` metadata for readable identities and must not infer package or project identity by parsing that key.
 
@@ -532,6 +532,8 @@ For Svelte, use production client compilation with async and tracing compiler fe
 The sequence is not a token issuance protocol. The native authority design below remains a gate. Existing editor transactions, behaviors, renderers and pagination remain unchanged.
 
 ## 8. Native bootstrap, persistence and recovery
+
+**Activation-gate proposal; not approved:** native calls started during synchronous setup could return pending promises while a native activation record remains pending. Only successful setup confirmation would allow the operations to execute; failure would revoke the record and reject pending calls. This would require bounded pending requests and a defined failure/confirmation protocol. Approval of synchronous `activate` and managed initial loading does not approve this additional native gate. Current task callbacks run immediately; the proposed gate would belong to native service delivery, not task scheduling.
 
 The separate management/recovery WebView responsibility boundary is approved. The exact native control and credential-delivery protocol is not yet specified. The current app exposes `greet` and opener commands, with `core:default`, `opener:default` and `csp: null`. Opener includes native routes outside the proposed credential service. A manifest declaration does not fix those routes. Audit and restrict them before external loading.
 
