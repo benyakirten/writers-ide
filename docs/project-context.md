@@ -182,7 +182,7 @@ Developer tooling priorities are:
 
 The optional shared UI library should provide useful components without forcing every author to use it. Grafana's plugin workflow is a reference, not a dependency decision.
 
-Translation support belongs to the core platform. Approved direction is for the host to supply selected locale, text direction and change notifications through the same public API for official and third-party plugins. Plugins own their messages and fallbacks, but may reuse supported translation libraries or provider APIs. Exact locale signatures remain open. An optional shared translation provider service is a future candidate, not a Part 4 requirement; its API and catalog behavior are undecided. Paraglide is connected to the app; its private generated messages are not the plugin API. The plugin locale service is not implemented.
+Translation support belongs to the core platform. Approved direction is for the host to supply selected locale, text direction and change notifications through the same public API for official and third-party plugins. Plugins own their messages and fallbacks, but may reuse supported translation libraries or provider APIs. The [`context.locale` snapshot/subscription contract](plugins/package-api-proposal.md#4-the-activation-context) is approved but not implemented. An optional shared translation provider service is a future candidate, not a Part 4 requirement; its API and catalog behavior are undecided. Paraglide is connected to the app; its private generated messages are not the plugin API. The plugin locale service is not implemented.
 
 ## History and collaboration
 

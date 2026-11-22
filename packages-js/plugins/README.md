@@ -283,6 +283,161 @@ Management subscriptions immediately deliver frozen metadata snapshots, then sub
 
 Task and provider errors do not independently disable plugins. Activation, dependency, and host-cleanup failures affect lifecycle status. Connections become unusable before an endpoint's own cleanup runs. Teardown must use owned cleanup handles rather than call through an old API object. For bulk teardown, use a deactivation plan and cascade; registration order need not match dependency order.
 
+## Planned alias-based provider API
+
+**Approved external contract; not implemented or exported yet:** `ComponentApis` will be exported from `@writers-ide/plugins` and supplied at `context.apis`. It keeps three operations: `provide(contract, factory)`, `get(alias, contract)` and `subscribe(alias, contract, listener)`.
+
+A provider calls `provide()` during its synchronous activation to publish a manifest-declared contract. The host calls its factory with a consumer-scoped `ComponentApiConnection`. The factory returns the actual implementation. Provider and consumer import the contract from a shared library; the identity contains no implementation.
+
+A consumer uses its manifest dependency alias, not a constructed activation ID or global service name. This differs from the current bundled examples above, which use an exact provider plugin ID. The imported contract selects an exact API ID and major. Declared optional integrations can return `null`; undeclared aliases/contracts and incorrect binding routes are author errors.
+
+`subscribe()` delivers immediately, then when availability changes. It belongs to activation lifetime and returns an idempotent early-release handle. Releasing it stops those notifications without revoking connections still used elsewhere. Required providers resolve before activation; lookup does not activate providers on demand. Selected-project integrations must use an explicit project connection. See the [exact interface](../../docs/plugins/package-api-proposal.md#4-the-activation-context).
+
+## Planned application project connections
+
+**Approved external contract; not implemented or exported yet:** application-scoped components receive `context.projects`. Its planned `ProjectConnections` interface has `subscribeSelected(listener): Dispose` and `connect(project): ProjectApiConnection`. Both interfaces will be exported from `@writers-ide/plugins`.
+
+The host calls the selection listener immediately, then on changes, with a host-issued project reference or `null`. The subscription is activation-owned. A connection remains fixed to its project opening; selection changes do not retarget it.
+
+For example, import the planned `ProjectApiConnection` type at module scope and place this code inside the application-scoped component's `activate(context)` function, which the host calls when enabling it. It follows selection by explicitly releasing the previous lease. It does not read a document or enable a provider:
+
+```ts
+let connection: ProjectApiConnection | undefined;
+
+context.projects.subscribeSelected((project) => {
+	connection?.dispose();
+	connection = undefined;
+
+	if (project) {
+		connection = context.projects.connect(project);
+		console.info('Connected to:', connection.project.name);
+	}
+});
+
+context.own(() => connection?.dispose());
+```
+
+The connection supplies `project`, `signal`, shared application `commands`, provider `get()`/`subscribe()` methods and idempotent `dispose()`. Feature calls must match declared project integrations. Connecting does not activate missing providers or grant native access. Each call creates an independent lease, not another provider activation.
+
+Disposal revokes that lease's facades and subscriptions and aborts its signal. Project closure and consumer teardown do the same. Provider absence alone leaves the connection available for later provider arrival. The explicit switching above is author code, not a built-in switching helper. Project-scoped components receive `context.projects = null` and use their fixed `context.project` plus ordinary declared dependencies. Application components receive `context.project = null` and this connection service. Project-to-other-project connections are future work, not an implicit consequence of this API. See the [context contract](../../docs/plugins/package-api-proposal.md#4-the-activation-context).
+
+## Planned project context
+
+The approved external context keeps scope explicit:
+
+| Activation scope | `context.project`           | `context.projects`                                            |
+| ---------------- | --------------------------- | ------------------------------------------------------------- |
+| Project          | Its fixed project reference | `null`                                                        |
+| Application      | `null`                      | Selected-project subscription and explicit connection service |
+
+**Approved external contract; not implemented or exported yet:** project-scoped activations receive `context.project` as a host-issued `ProjectReference`. Application-scoped activations receive `null`. The planned type is an author export from `@writers-ide/plugins` with read-only string fields:
+
+- `id`: the host's registered local project identity, retained when that registration reopens.
+- `openingId`: an opaque identifier for this live opening, replaced on close/reopen.
+- `name`: a human-facing label, not an identity or permission key.
+
+The reference stays bound to the activation's project opening. Selecting another project does not retarget it. Its opening ID matches `context.identity.projectOpeningId`. It exposes no filesystem path and grants no file or manuscript access. Use declared provider APIs or approved native services for those operations.
+
+Do not reconstruct references from saved fields. APIs accepting project references validate the host-issued object and live opening; matching strings alone do not grant access. Application components use the approved project-connection API described above rather than treating `context.project` as the currently selected project.
+
+## Planned connection endpoint metadata
+
+**Approved external contract; not implemented or exported yet:** provider API factories will receive `ComponentApiConnection`, an extension of the current `PluginApiConnection`. It keeps the current `consumerId`, `signal`, `own`, `guard` and `reportError` operations and adds read-only `consumer` and `provider` activation identities.
+
+Each identity contains stable `packageId`/`componentId`, temporary `activationId` and `projectOpeningId`. The latter is `null` for an application-scoped endpoint, even when its peer belongs to a project. The planned `ComponentIdentity` and `ActivationIdentity` data types will also be author exports from `@writers-ide/plugins`.
+
+Providers can use these identities for diagnostics and connection-owned resource association. Activation/opening IDs are opaque, temporary and unsuitable as durable settings keys. Endpoint metadata is not a native credential, permission grant or proof of which JavaScript initiated a call. Validate feature inputs and use approved native services; Rust checks those operations under the provider's actual authority. See the [context contract](../../docs/plugins/package-api-proposal.md#4-the-activation-context).
+
+## Planned native project-file reads
+
+**Approved contract; not implemented:** `context.native.projectFiles.read(path, options?)` will return a `Promise<Uint8Array>` of saved file bytes. The shared `NativeRequestOptions` type accepts an optional read-only cancellation signal. It does not select file encoding or return unsaved editor state.
+
+This example belongs inside a project-scoped component's synchronous `activate(context)` function. The component must declare the `project.files.read` operation with resource `project` and receive user approval before activation. The host supplies `context`; the author supplies the project-relative path:
+
+```ts
+const files = context.native.projectFiles;
+if (!files) {
+	throw new Error('This feature requires project-file access');
+}
+
+const task = context.tasks.async({
+	key: 'read-reference',
+	label: 'Read saved reference',
+	run: async ({ signal }) => {
+		const bytes = await files.read('research/reference.txt', { signal });
+		return new TextDecoder().decode(bytes);
+	},
+});
+```
+
+The task result can later supply the decoded text to the feature's state or UI. Native work started during activation waits for successful setup confirmation; activation itself stays synchronous. For binary files, use the bytes directly instead of decoding them.
+
+The host attaches native credentials and checks each operation. A non-null service can also belong to a list-only component; that does not authorize reading. Arbitrary filesystem paths and URLs are not accepted. Native failures reject, cancellation and host resource limits apply, and no write operation or unlimited-size read is provided. Directory listing is approved below. Numerical budgets remain separate reviews. See the [native service proposal](../../docs/plugins/package-api-proposal.md#5-native-permissions-and-a-research-component).
+
+## Planned native directory listing
+
+**Approved contract; not implemented:** the project-file service will expose `list(path, options?)`, accepting an optional cancellation signal and continuation cursor. The component must declare `project.files.list` with resource `project`; read permission does not imply listing permission.
+
+A `DirectoryPage` contains read-only `entries` and `nextCursor: string | null`. Each `ProjectDirectoryEntry` contains a project-relative `path` and a `kind`: `file`, `directory` or `unsupported`. Returned paths are relative to the project root, so an entry such as `research/notes.txt` can be passed directly to `read()` when the component has read permission.
+
+Inside a managed async task callback, with `files` obtained from `context.native.projectFiles` and `signal` supplied by the task, the author can request one page and then its continuation:
+
+```ts
+const page = await files.list('research', { signal });
+
+for (const entry of page.entries) {
+	console.info(entry.path, entry.kind);
+}
+
+if (page.nextCursor !== null) {
+	const nextPage = await files.list('research', {
+		signal,
+		cursor: page.nextCursor,
+	});
+	// Process the returned page before requesting another continuation.
+	console.info(nextPage.entries);
+}
+```
+
+This lists only immediate children, not an entire directory tree. A null next cursor means completion. Cursors are opaque and bound to the activation, project opening and directory. Each accepted continuation consumes its input cursor; success returns a fresh cursor or null. On accepted-request failure/cancellation, restart rather than reusing the consumed cursor.
+
+Identified links and special files use `unsupported`, without exposing their targets or contents. The host never traverses them. Concurrent filesystem changes can cause omissions or duplicates between pages; this is not a snapshot. Use `files.list('.', { signal })` to list the activation's registered project root. It never means the process working directory. Empty or missing paths are errors rather than implicit root requests. Absolute paths and parent traversal are prohibited. This exposes no absolute root location and does not make the root readable through `read()`. Each page contains at most 256 entries, and may contain fewer. Only `nextCursor === null` means completion. There is no initial `pageSize` option, and plugins cannot raise the host limit. Smaller requested pages are a future candidate; virtualized UI can buffer a page and render only visible rows. Native work and memory still need separate bounds. Cursor expiry remains under review. No recursive traversal or size/modification-time metadata is added. See the [native contract](../../docs/plugins/package-api-proposal.md#5-native-permissions-and-a-research-component).
+
+## Planned UI locale API
+
+**Approved contract; not implemented or exported yet:** the external host will supply `context.locale` with `snapshot()` and `subscribe(listener)`. The planned `LocaleSnapshot` type contains read-only `languageTag: string` and `direction: 'ltr' | 'rtl'`. The planned `PluginLocale` interface describes the service. Both types will be exported from `@writers-ide/plugins`.
+
+This is the application UI locale, not the language of a document or selection. Plugins own their translations and fallback choices. They may use their own catalogs, `Intl`, supported libraries or declared provider services. The host does not expose its private generated message functions.
+
+For example, during activation an author can pass the service to their own `LocaleInfo.svelte` presentation with `defineSveltePresentation(LocaleInfo, { locale: context.locale })`. The host later renders that component. Its component code could be:
+
+```svelte
+<script lang="ts">
+	import type { PluginLocale } from '@writers-ide/plugins';
+
+	let { locale }: { locale: PluginLocale } = $props();
+	let current = $state(locale.snapshot());
+
+	$effect(() =>
+		locale.subscribe((next) => {
+			current = next;
+		}),
+	);
+</script>
+
+<div lang={current.languageTag} dir={current.direction}>
+	UI language: {current.languageTag}
+</div>
+```
+
+`subscribe()` delivers the current snapshot immediately, then on changes. Its cleanup function is safe to repeat. Returning it from the Svelte effect releases the subscription when that effect ends. The host also stops activation-owned subscriptions when the plugin stops. One listener's failure does not prevent others from receiving updates. This example shows observation, not a translation catalog.
+
+## Planned Svelte build compatibility
+
+The initial external runtime profile will not support Svelte's experimental async compilation mode. Recommended builds will leave `experimental.async` disabled. Authors can still use ordinary async functions and `{#await promise}` blocks, including for data loaded through managed tasks or workers. Direct template `await`, top-level component `await` and `$derived(await ...)` under that experimental mode are outside the initial supported build configuration.
+
+This is a compatibility policy, not a security mechanism that inspects or prevents author syntax. External loading is not implemented. Support for the async compilation mode is [future work](../../docs/plugins/implementation-plan.md#deferred-work-and-future-candidates) once it is non-experimental and passes shared-runtime, lifecycle and editor-layout compatibility tests. A Svelte dependency upgrade alone will not automatically enable profile support.
+
 ## Planned external package stylesheets
 
 External package loading is not implemented. The approved design lets each frontend component declare a `styles` array in `manifest.toml`. The host will load those CSS files before calling the component's `activate` function. Omitting `styles` means `[]`.

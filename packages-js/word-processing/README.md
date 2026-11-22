@@ -475,9 +475,11 @@ The [fixture guide](../../e2e/fixtures/word-processing/README.md) explains opt-i
 
 ## Provider wiring
 
-This section is for host integrations, not ordinary feature consumers. The package supplies a standalone service and connection-scoped API objects. It imports no application singleton and does not register the provider, create editors, intercept their dispatch, or destroy them. The application integrates the provider and its consumers, including formatting.
+This section is for advanced provider authors and host integrations. Ordinary feature consumers should obtain their declared word-processing dependency instead of constructing another service. `createWordProcessingService`, `createWordProcessingConnection`, `WordProcessingSources`, `WordProcessingService` and `EditorBehaviorFailure` are approved advanced external SDK exports; production external loading remains unimplemented.
 
-A **source adapter** implements `WordProcessingSources` to connect the service to the application's existing views and notifications. With that adapter available as `sources`, setup inside the provider's activation function looks like this:
+The package supplies a standalone service and connection-scoped API objects. It imports no application singleton and does not register the provider, create editors, intercept their dispatch, or destroy them. A provider author supplies views they own and the source adapter that observes them. These constructors do not provide the application's view registry, a schema or native authority. Do not use a second service to bypass the application's existing editor lifecycle or document invariants.
+
+A **source adapter** implements `WordProcessingSources` to connect the service to the provider's owned views and notifications. With that adapter available as `sources`, setup inside the provider's activation function looks like this:
 
 ```ts
 import {
@@ -487,14 +489,16 @@ import {
 } from '@writers-ide/word-processing';
 
 const service = createWordProcessingService(sources);
+context.own(() => service.dispose());
 
-// The provider manifest ID must be WORD_PROCESSING_PLUGIN_ID and declare:
-// provides: [{ id: wordProcessingApi.id, major: wordProcessingApi.major }]
 context.apis.provide(wordProcessingApi, (connection) =>
 	createWordProcessingConnection(service, connection),
 );
-context.own(() => service.dispose());
 ```
+
+The provider must declare this API ID and major in its manifest. In the current bundled definition, use `provides: [{ id: wordProcessingApi.id, major: wordProcessingApi.major }]`. The planned external manifest uses `[[components.provides]]` with that ID and major. Provider identity is separate: consumers declare the actual provider they need, rather than every provider taking the built-in plugin's ID.
+
+The service and connection facades own their managed resources, not the editor views themselves. Arrange destruction of owned views separately and after removing their service integration. A provider's source adapter is responsible for dispatch notifications and any required layout/invariant integration. Exporting these helpers does not supply those adapters automatically.
 
 The returned API object has only methods, as required by `context.apis.provide`. For exact signatures, see [`WordProcessingApi`, `WordProcessingService`, and related types](src/contracts.ts). The [application adapter](../../src/lib/editor/prosemirror/word-processing.svelte.ts) is a concrete integration example.
 

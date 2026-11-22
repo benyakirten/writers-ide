@@ -17,9 +17,19 @@ Svelte is the only peer dependency. You do not need application aliases, an app 
 
 ## Tooltips in plugin presentations
 
-**Approved external-plugin direction; production loading is not implemented:** registered Svelte toolbar and workspace-view presentations receive tooltip context from the host. Ordinary plugin UI should inherit it rather than create its own manager or mount another `Pointer`. The host owns shared tooltip rendering, overlay placement/stacking, suppression during docking and the manager's lifetime. `IconButton`, `Tooltip` and `TooltipData` are approved author-facing exports. Advanced manager/provider exports still need review.
+**Approved external-plugin direction; production loading is not implemented:** registered Svelte toolbar and workspace-view presentations receive tooltip context from the host. Ordinary plugin UI should inherit it rather than create its own manager or mount another `Pointer`. The host owns shared tooltip rendering, overlay placement/stacking, suppression during docking and the manager's lifetime. `IconButton`, `Tooltip` and `TooltipData` are approved author-facing exports. The five advanced composition exports are also approved, as described below.
 
-An independently mounted Svelte root does not inherit context just because its DOM is inside the application. Independent UI trees can use explicitly owned local scopes. The current library supports those scopes as shown below; their advanced external SDK exports still need review. Do not use a locally mounted renderer to take ownership of the host's shared manager.
+An independently mounted Svelte root does not inherit context just because its DOM is inside the application. Independent UI trees can use explicitly owned local scopes. The current library supports those scopes as shown below; their advanced external SDK exports are approved, though production external loading is not implemented. Do not use a locally mounted renderer to take ownership of the host's shared manager.
+
+## Advanced tooltip composition
+
+`TooltipProvider`, `TooltipState`, `Pointer`, `getTooltipManager` and `provideTooltipManager` are approved advanced author exports alongside the ordinary controls. Use host-supplied context for normal plugin presentations. Use these tools when intentionally owning an independent scope, implementing a custom trigger/provider or composing a local renderer separately.
+
+This approval includes the current reachable `TooltipState` API, not just its constructor. It exposes mutable `open`, `tooltip` and `tooltipEl` state; `tooltipDebouncer`; ID, timing, retry and margin fields; and `set()`, `show()`, `dismiss()`, `clear()`, `suppress()`, `attemptCalibration()` and `calibratePosition()`. Low-level callers must preserve the manager's rendering and lifetime invariants. These fields are not a restricted handle to application state.
+
+Call the context helpers during Svelte component initialization. They select or provide a manager but do not transfer ownership. A provider owns a manager it creates. A supplied manager remains caller-owned. Each scope needs one mounted `Pointer`. Do not mount a disposable pointer or a provider with its own renderer over the host's shared manager: pointer teardown clears the manager and can affect other controls. Use a local manager for independently owned renderers.
+
+The examples and lifetime sections below show the current library behavior. Production external-profile integration is still outstanding.
 
 ## Minimal use
 

@@ -8,6 +8,14 @@ Each bar has three logical capacity units. These describe item cost, not guarant
 
 This library provides the docking engine. It owns ordered dock collections, capacity checks, validated transfers, and floating geometry. Your host still owns rendering, feature controls, editor integration, plugin activation, and application services. A feature plugin may contribute a toolbar; this library arranges it but is not itself a feature plugin.
 
+## Advanced use in a plugin
+
+**Approved external SDK direction; production integration is not implemented:** the library's public root exports and supporting types will be available as advanced shared plugin APIs. This includes `createWorkbench`, registry/bar/floating/transfer classes, drag components and feedback helpers. It does not supply Writer's IDE's application workbench instance.
+
+For an ordinary toolbar, use the plugin host's contribution API instead of creating another workbench. Use this library when intentionally building an independent layout inside your own feature, such as movable research tools. `createWorkbench()` constructs reactive state and transfer machinery, not a rendered workspace or central tabs. Each new workbench has independent state unless you deliberately supply shared dependencies.
+
+The plugin owns rendering, geometry/observers, drag context, focus policy and cleanup for its independent layout. The application still owns placement of application-level contributions. The drag peer's shared runtime/context requirements and stylesheet delivery must be verified before external integration ships; this decision does not make every dependency a public author import.
+
 ## Using it
 
 Import the package by name as `@writers-ide/layout` from this repository's private pnpm workspace. Use a Svelte-aware TypeScript bundler. Install Svelte 5 and `@dnd-kit-svelte/core` as peer dependencies.

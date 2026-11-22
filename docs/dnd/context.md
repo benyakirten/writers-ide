@@ -10,6 +10,8 @@ Stage 2 library extraction and feature-neutral presentation props are implemente
 
 This topic covers feature bars, item grouping, edge docking, floating overlays and dragging. It does not cover central tabs or split views. These components are trusted Svelte code running inside the app. They are not an isolated third-party plugin platform. The bundled formatting plugin uses the [plugin host](../plugins/context.md).
 
+**Approved external SDK direction; production integration outstanding:** expose `@writers-ide/layout`'s existing public root exports and supporting types as advanced shared library APIs. Plugins may build independent dockable-bar layouts inside their own features. This does not expose the application workbench instance or replace application contribution APIs. Authors own local rendering, geometry, drag context, focus and cleanup. Verify drag-peer module/context identity and stylesheet delivery before shipping. See the [SDK review](../plugins/sdk-export-review.md#5-layout-library) and [advanced-use guide](../../packages-js/layout/README.md#advanced-use-in-a-plugin).
+
 ## Philosophy and approved behavior
 
 A **bar item** is one feature's presentation, such as a set of formatting controls. A **bar** holds an ordered group of items. A **dock** holds bars along one edge of the **workbench**, the whole workspace around the central views. Docking is relative to that whole workspace, not one central view.
