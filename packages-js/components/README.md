@@ -15,7 +15,15 @@ This is a private workspace library that exports source files. It is not a publi
 
 Svelte is the only peer dependency. You do not need application aliases, an app singleton, plugin contracts, ProseMirror, an icon library, Tailwind, network access, or a native service.
 
+## Tooltips in plugin presentations
+
+**Approved external-plugin direction; production loading is not implemented:** registered Svelte toolbar and workspace-view presentations receive tooltip context from the host. Ordinary plugin UI should inherit it rather than create its own manager or mount another `Pointer`. The host owns shared tooltip rendering, overlay placement/stacking, suppression during docking and the manager's lifetime. `IconButton`, `Tooltip` and `TooltipData` are approved author-facing exports. Advanced manager/provider exports still need review.
+
+An independently mounted Svelte root does not inherit context just because its DOM is inside the application. Independent UI trees can use explicitly owned local scopes. The current library supports those scopes as shown below; their advanced external SDK exports still need review. Do not use a locally mounted renderer to take ownership of the host's shared manager.
+
 ## Minimal use
+
+This standalone example creates its own tooltip scope. It is not the setup required inside a host-provided plugin presentation.
 
 ```svelte
 <script lang="ts">
@@ -43,6 +51,37 @@ This button toggles local state; it does not format an editor. The provider crea
 There is no hidden global or default service. A button or tooltip outside a provider must receive `manager`. Otherwise, initialization throws a descriptive error.
 
 Svelte component context passes a manager from an ancestor to its descendants. It does not create an application-wide global. Custom providers can call `provideTooltipManager(manager)` and `getTooltipManager()` during component initialization.
+
+## Rich tooltip content
+
+`Tooltip` accepts a string or a Svelte snippet. A snippet can render markup or other Svelte components. In the general-purpose wrapper, ordinary children are the trigger and the named `tooltip` snippet is the content displayed by the tooltip renderer.
+
+Place this example in a component below a `TooltipProvider`. The current application's presentation tree supplies that context. For standalone use, provide a scope as in the minimal example above. The button element is passed explicitly so positioning and its accessibility description refer to the actual trigger:
+
+```svelte
+<script lang="ts">
+	import { Tooltip } from '@writers-ide/components';
+
+	let trigger = $state<HTMLButtonElement>();
+</script>
+
+<Tooltip target={trigger} calibrateFor="vertical">
+	{#snippet tooltip()}
+		<strong>Word statistics</strong>
+		<span>Show counts for the current document.</span>
+	{/snippet}
+
+	<button type="button" bind:this={trigger}>Statistics</button>
+</Tooltip>
+```
+
+Authors can replace the snippet's markup with their own Svelte components. A custom button component must expose its trigger element when explicit association is needed. Do not infer that an arbitrary parent component is the trigger.
+
+`IconButton` already includes tooltip wiring to its own button. Its optional `tooltip` prop accepts a string or named snippet. Without custom content it uses the accessible `label`. Rich visual content is supported; interactive buttons, links and forms need a popover with deliberate focus and dismissal behavior, not an ordinary tooltip.
+
+## Planned shared controls
+
+The library is intended to grow beyond buttons and tooltips. Selects, comboboxes and virtual lists are approved future-work direction, not implemented exports or Part 4 prerequisites. Their APIs, accessibility, keyboard/focus behavior and data contracts need review before implementation. Virtual lists also need bounded rendering and real-browser validation. Shared controls remain optional; plugin authors may use their own components.
 
 ## System design and lifetime
 

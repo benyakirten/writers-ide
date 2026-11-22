@@ -18,7 +18,7 @@ A **contribution** is something your feature adds to the workspace. A **capabili
 
 - Toolbars supply presentations for horizontal and vertical bars.
 - View contributions register a view type. They do not supply instance metadata or an “open view” operation for plugins.
-- Commands register actions the host can invoke. They do not automatically create keyboard bindings, menu items, or command-palette entries.
+- Commands register actions the host can invoke. They do not automatically create keyboard bindings, menu items, or command-palette entries. Application commands are separate from synchronous ProseMirror commands in the word-processing provider. See [which command API to use](../../docs/plugins/command-contract.md#choose-an-editor-command-or-an-application-command) for examples and the distinction between current editor commands and planned typed shared application commands.
 
 When your plugin starts, it receives a context with `contributions`, a cancellation `signal`, `own(dispose)` for cleanup, `tasks` for managed work, and `apis` for declared connections to other plugins. Editor access comes from the separate [word-processing provider](../word-processing/README.md). The common context has no built-in storage, history, or native-execution API.
 

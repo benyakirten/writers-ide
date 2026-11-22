@@ -55,6 +55,45 @@ Submitting another task with key `scan` during the same activation replaces this
 
 A presentation can receive `context.tasks` as an explicit prop. If a task belongs only to that presentation, cancel it when the presentation unmounts. Keep the returned handle if your UI needs its status or outcome. The host does not retain completed handles.
 
+## Advanced use: create an independent queue
+
+**Use `context.tasks` for ordinary plugin work.** It already shares scheduling with pagination and other plugins and owns activation cleanup. `WorkQueue`, `WorkOptions`, `WorkHandle`, `createTaskService`, `TaskServiceOptions` and `TaskFailure` are advanced exports for authors intentionally constructing their own queue or task service. Their inclusion in the external SDK is approved; production external loading is not implemented.
+
+An independent queue can be useful for an embedded tool that also runs in a standalone application or test harness. It does not share the host queue's scheduling decisions or frame budget. It does not run cooperative callbacks on another thread. Authors must wire cancellation, disposal and error reporting themselves.
+
+Import the constructors at the top of the plugin module:
+
+```ts
+import { WorkQueue, createTaskService } from '@writers-ide/tasks';
+```
+
+Place the following inside the bundled plugin's `activate(context)` callback described above. The host supplies that context. This example owns a private queue and uses sample text rather than reading an editor:
+
+```ts
+const queue = new WorkQueue();
+const independentTasks = createTaskService({
+	queue,
+	ownerId: 'example.embedded-tool',
+	signal: context.signal,
+	onError: ({ error }) => console.error('Independent task failed', error),
+});
+
+context.own(() => independentTasks.dispose());
+
+independentTasks.forEach({
+	key: 'paragraph-lengths',
+	label: 'Measure sample paragraph lengths',
+	items: ['The story begins.', 'Another paragraph follows.'],
+	run(text) {
+		console.info(text.length);
+	},
+});
+```
+
+The service acquires and releases scheduling leases for its cooperative work; this example does not need `queue.start()`. Aborting the activation signal or disposing the service cancels its tasks. Supplying an `ownerId` labels this service's work; it does not grant native authority. Its error callback is explicit rather than automatically connected to the plugin manager.
+
+If you use `queue.enqueue()` directly instead, you own the raw job handles and must cancel them during teardown. Acquire a scheduling lease with `queue.start()` and release it when done. Releasing the final lease suspends queued work; it does not cancel jobs. Do not treat lease release as task cleanup.
+
 ## Host integration
 
 If you are building a host, create one shared application queue. Include pagination in that queue so tasks share its main-thread budget. Create one task service per activation:
@@ -218,11 +257,15 @@ const download = tasks.async({
 
 `run` starts immediately. It can return a plain value or a promise, and it may throw synchronously. It still runs on the main thread. Use a worker for suitable CPU-heavy computation.
 
+The example's `fetch()` uses browser networking. This wrapper does not bypass browser connection scheduling or CORS rules and does not route the request through Rust. An [optional native HTTP service](../../docs/plugins/implementation-plan.md#future-native-http-service) is future work. Its transport would be explicitly chosen and subject to native permission checks; no such API is implemented yet.
+
 Cancellation immediately resolves the managed task's result with a cancelled outcome and aborts its signal. The underlying operation must honor that signal to stop. If it later resolves or rejects, the service handles that result but ignores it.
 
 The service cannot undo side effects inside `run`. After an `await`, check cancellation and the current application target before changing state.
 
 ## Bundled one-shot workers
+
+The examples below use the current standalone/bundled library API, which accepts `createWorker()`. The approved external-package API will instead accept `module: URL`, such as `new URL('./count.worker.js', import.meta.url)` relative to the caller's frontend module. That future call selects a prebuilt worker file in the caller activation's verified package snapshot. The host will create a verified-byte Blob worker and own its cleanup. External loading is not implemented, and the current `WorkerTaskOptions` type still describes the construction callback. See [package-worker selection](../../docs/plugins/implementation-plan.md#package-worker-selection-api) for the approved contract and validation requirements.
 
 Use a dedicated, fresh worker for each invocation. Do not return an already-running or shared worker.
 

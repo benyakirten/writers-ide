@@ -4,6 +4,41 @@
 
 An application command is a named action owned by a component. Another component can invoke it through a declared dependency. It is not a ProseMirror command or a live provider service. Registration does not create a button, shortcut or command-picker entry. See the [package specification](package-api-proposal.md) for component lifetimes and package installation.
 
+## Choose an editor command or an application command
+
+Writer's IDE has two command APIs. They serve different purposes. Synchronous editor commands are implemented today. The typed shared application command API described in this guide is approved but not implemented.
+
+| Need                                                                                 | Use                                                                     | Why                                                                                                      |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Perform a short edit against the current ProseMirror state                           | An editor command through the word-processing provider                  | It receives editor state and can build one transaction synchronously.                                    |
+| Call a ProseMirror command already held by your plugin                               | `editor.runCommand(target, command)`                                    | No named registration is needed.                                                                         |
+| Make a synchronous editing action available by ID through the editor provider        | `editor.registerCommand(...)`, then `editor.executeCommand(target, id)` | The provider owns the registration and validates the target at execution.                                |
+| Expose a feature action with typed arguments and a typed result to another component | A shared application command                                            | The manifest declares the integration and the host validates the invocation contract.                    |
+| Run an asynchronous workflow or coordinate worker/native work                        | A shared application command using managed tasks and approved services  | The caller can await its result and cancel the invocation. Native permissions still apply independently. |
+| Offer ongoing service methods and subscriptions                                      | A provider API                                                          | A live service connection is a better fit than a single command invocation.                              |
+
+### Use an editor command for a synchronous editing operation
+
+Examples include inserting a date, toggling a mark or changing paragraph attributes. The author implements a ProseMirror command with the signature `(state, dispatch, view) => boolean`. The word-processing provider invokes it against a validated editor target. The callback must return synchronously and may dispatch at most one transaction through this API. Its boolean says whether it handled the action; it is not an arbitrary feature result.
+
+For a button that already holds its editing implementation, call `runCommand()` directly. Register the command only when it needs a reusable editor-registry ID. Not every button needs a named command. Registration does not add a shortcut, button or palette entry. See the [editor command examples and dispatch rules](../../packages-js/word-processing/README.md#commands-and-ownership).
+
+`EditorCommandRegistration` describes the registration. `EditorCommandSnapshot` describes copied command metadata returned by `editor.commands()`. Editor command IDs currently belong to the word-processing service's registry. They are not shared application command references and are not resolved through the application command manifest declarations.
+
+### Use an application command for a shared feature action
+
+Examples include counting words and returning the count, analyzing a chapter in a worker, or running a feature workflow that eventually edits the document. An application command has a shared, versioned argument/result contract. Consumers declare the provider component and requested command in their manifest. They invoke it through the host's application command API, not `editor.executeCommand()`.
+
+Application commands may complete immediately or asynchronously; callers await the invocation either way. They need not edit a document or use ProseMirror. Arguments and results are copied data, not live editor, DOM or service objects. Their implementation can use provider APIs to obtain live services when needed. This guide's remaining sections explain definition, publication and invocation.
+
+### The two APIs can work together
+
+A shared analysis command can run a managed worker, check that its captured editor target is still valid, then perform a short synchronous edit through the word-processing provider. It can use `edit()`, `runCommand()` or an existing registered editor command for that final operation. It does not need to register a new editor command just because it edits text.
+
+Do not keep an unfinished transaction, live editor callback context or dispatch callback across `await` or a cooperative yield. If the target is stale, discard or deliberately recompute the result. Do not apply old document positions to a newly acquired state without validating or mapping them under a separately supported policy. Awaiting an application command does not make ProseMirror command callbacks asynchronous.
+
+The two APIs have separate lifetimes and error contracts. Editor operations return `EditorResult`; a successful editor-command operation contains its handled boolean. Shared application command invocations return promises with their declared results and reject on failure or cancellation. Cancelling a workflow does not undo edits already dispatched.
+
 ## Define the shared contract
 
 The provider and consumer import this contract from a small shared library. The library defines types and validation, not the action's implementation. Importing it does not activate the provider.

@@ -102,6 +102,10 @@ A returned transaction must have `tr.before === current.state.doc`. This proves 
 
 ## Commands and ownership
 
+These are synchronous ProseMirror editor commands. Use them for short editing operations such as inserting text or changing formatting. Call `runCommand()` when your plugin already holds the implementation. Use the editor registry only when an editing action needs to be invoked by ID.
+
+For a cross-component feature action with typed arguments/results, or an asynchronous workflow, use the planned shared application command API instead. It can call the editor provider for a final synchronous edit. That API is approved but not implemented; it is separate from this editor registry. See [Choose an editor command or an application command](../../docs/plugins/command-contract.md#choose-an-editor-command-or-an-application-command) for examples, lifetime differences and when to use a provider API rather than either command type.
+
 Use `runCommand` for a standard ProseMirror command. A command has the signature `(state, dispatch, view) => boolean`. Without a dispatch callback, commands can probe whether an action is available:
 
 ```ts
