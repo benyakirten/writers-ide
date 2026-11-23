@@ -39,6 +39,8 @@ The move preserves existing behavior:
 
 Stopping the provider does not destroy editor views owned by its sources. No generic service bus or external permission model is introduced.
 
+**Approved grouping-library extraction; not implemented.** The owner approved `@writers-ide/word-processing/structure` with `groupSelectedBlocks`, `identifyBlockGroup`, `BlockReference` and `SelectedBlockGroup`. Extract current read-only grouping from PageLayout without DOM measurement, dispatch, reflow scheduling or singleton access. Results identify state-specific single blocks or head/continuation pairs under the current page/block model. Preserve selection/page-boundary behavior and keep formatting decisions in Basic Menu. Pagination/app commands can reuse the helper implementation. This does not extract/redesign pagination or add arbitrary-schema support. The [plugin topic entry](../plugins/change-log.md) records the package boundary; current context and the word-processing guide record exact contracts and planned regression coverage. No runtime extraction or tests are claimed by this approval.
+
 **Shared tasks, Part 1.** Private `@writers-ide/tasks` owns generic `WorkQueue` mechanics. It provides iteration, generator, async and bundled-worker helpers. The library has no shared global queue or editor dependency.
 
 Queue ownership stays explicit:

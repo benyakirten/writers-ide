@@ -14,6 +14,14 @@ for contribution and lifecycle basics.
 
 **Approved future work:** by the end of Part 4, Basic Menu must become a separate plugin package. It must use the same supported loading mechanism and public APIs as third-party plugins. Packaging is not implemented yet. See the [Part 4 deliverable](../../../../../../docs/plugins/implementation-plan.md#required-outcome-separately-packaged-basic-menu) for requirements and open design decisions.
 
+## Approved separate-package boundary
+
+**Planned; not implemented:** Basic Menu will import read-only grouping helpers from `@writers-ide/word-processing/structure`: `groupSelectedBlocks`, `identifyBlockGroup`, `BlockReference` and `SelectedBlockGroup`. See the [exact API and usage rules](../../../../../../packages-js/word-processing/README.md#planned-read-only-document-structure-helpers). These understand the current page/block and paragraph-continuation model without accessing the pagination singleton, measuring DOM or dispatching transactions.
+
+Basic Menu keeps mark coverage, mark toggles, indentation/alignment rules, availability calculations and summaries. The broader application action class and paginator do not become feature dependencies. The menu owns translations and reads the public locale service. It bundles icons and small feature-local utilities, or uses already-supported shared components.
+
+The packaged feature must use the declared word-processing dependency and external activation API, with no private `$lib` imports or separate privileged app-registered copy. Structural extraction and packaging must preserve current caret, continuation, stale-target, focus, orientation-cost and undo behavior. The source below still describes today's bundled implementation.
+
 ## Composition and ownership
 
 ### Provider dependency

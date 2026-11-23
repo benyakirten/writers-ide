@@ -14,7 +14,9 @@ This library provides the docking engine. It owns ordered dock collections, capa
 
 For an ordinary toolbar, use the plugin host's contribution API instead of creating another workbench. Use this library when intentionally building an independent layout inside your own feature, such as movable research tools. `createWorkbench()` constructs reactive state and transfer machinery, not a rendered workspace or central tabs. Each new workbench has independent state unless you deliberately supply shared dependencies.
 
-The plugin owns rendering, geometry/observers, drag context, focus policy and cleanup for its independent layout. The application still owns placement of application-level contributions. The drag peer's shared runtime/context requirements and stylesheet delivery must be verified before external integration ships; this decision does not make every dependency a public author import.
+The plugin owns rendering, geometry/observers, drag context, focus policy and cleanup for its independent layout. The application still owns placement of application-level contributions. In the approved `writers-ide.frontend/1` profile, `@dnd-kit-svelte/core`'s public root is an advanced shared author import, initially version `0.0.11`. Your drag provider and the shared layout components must resolve the same module instance so their Svelte contexts match. Other DnD packages/internal paths are not automatically shared imports. This supplies no application workbench handle or authority over another feature's contributions.
+
+If you use `@writers-ide/layout/dock-colors.css`, include it as a build-time stylesheet input. Tooling must bundle it into your emitted plugin CSS and list that verified output in the component's manifest `styles`. The CSS path is not a runtime JavaScript module, and no special runtime CSS API is needed. External build/profile integration and browser/packaged tests remain outstanding.
 
 ## Using it
 

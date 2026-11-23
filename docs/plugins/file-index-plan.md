@@ -57,7 +57,7 @@ The directory is project-relative, with explicit `'.'` for the root. Return imme
 
 `status` describes the index state used for this page. A null `nextToken` means no further indexed entries after this position at query time. It does not establish filesystem completeness; inspect the status, especially during initialization or uncertainty. Entries and status must describe a coherent query-visible state. Different pages may have different revisions.
 
-The method uses the existing metadata permission, cancellation and native error policies. Final native export grouping, error mapping and implementation remain under review.
+The method uses the existing metadata permission, cancellation and native error policies. Author types belong to the approved `@writers-ide/plugins/native` entry point. Build/profile integration, concrete error mapping and implementation remain outstanding.
 
 ## Query pagination
 
@@ -110,13 +110,15 @@ Run reconciliation on a timer to repair missed changes. Allow at most one reconc
 
 **Approved watcher-gap response; not implemented:** when the watcher reports an overflow or another known event gap, set `needsReconciliation: true` and notify subscribers after that status becomes query-visible. Request reconciliation without waiting for the periodic timer. Keep scheduling/resource limits and bounded failure retries. If a scan is already running, combine the request into the single pending pass. Continue serving usable indexed results with their uncertainty status. A completed scan must not clear uncertainty from a newer, unresolved gap.
 
-The interval, bounded scanning strategy and detailed interruption/recovery policy remain open. Reconciliation is host-controlled initially. Repeating a plugin query reads the current index; it does not request a filesystem scan. A host-owned user refresh action remains a candidate whose UI and behavior need design. Plugin-requested reconciliation is future work, not an initial API.
+**Approved watcher-failure fallback; not implemented:** if the watcher cannot start or stops working, keep usable records available and continue periodic reconciliation. Report watcher failure through status and diagnostics. Set `needsReconciliation: true` when observations are known to need checking. Retry watcher setup with increasing delay after repeated failures, not a continuous retry loop. Reconcile after restoration to cover the notification gap. A later watcher failure does not undo initialization that already succeeded. A successful scan does not prove notifications are working and must not hide an unresolved watcher failure.
+
+Use the same off-frontend-thread work, bounded scan/database batches, single active reconciliation and cancellation checkpoints as normal indexing. Project closure stops scans, timers and watcher retries. Exact intervals, batch sizes, retry/backoff defaults and interruption mechanics remain implementation work. Reconciliation is host-controlled initially. Repeating a plugin query reads the current index; it does not request a filesystem scan. A host-owned user refresh action remains a candidate whose UI and behavior need design. Plugin-requested reconciliation is future work, not an initial API.
 
 Reconciliation compares filesystem observations with indexed metadata and updates the index. It must not treat an unreadable directory or incomplete scan as proof that all its previous entries were deleted. **Approved directory-failure policy; not implemented:** continue scanning accessible directories after a directory-specific failure. Preserve previous records for the failed area. Update successfully observed areas and track scan coverage before confirming deletions. Report the failure through `lastError` and keep `needsReconciliation: true`. During initial reconciliation, keep `initialized: false` until initialization fully succeeds. If initialization already succeeded in this opening, retain `initialized: true`; the error and uncertainty fields describe the later failure. A partial pass does not advance the last successful full-reconciliation time. Retry through bounded host scheduling. Cancellation, project closure or an unusable database can still stop the entire pass.
 
 A stored file can change or disappear between a query and a read. SQLite transactions do not make filesystem observations atomic.
 
-Keep indexing work off the frontend UI thread. Use bounded scanning and database updates. Apply the approved watcher-gap response. Finish scan-error, watcher-recovery and interruption mechanics before selecting timer defaults or promising freshness.
+Keep indexing work off the frontend UI thread. Use bounded scanning and database updates. Apply the approved watcher-gap response. Implement the approved scan-error and watcher-recovery policies. Specify interruption mechanics and measure work before selecting timer defaults or promising freshness.
 
 ## Readiness and freshness
 
@@ -142,9 +144,9 @@ type FileIndexStatus = {
 - `reconciling` means reconciliation is running. It can be true while initialized data remains usable.
 - `needsReconciliation` means the host knows observations need checking, such as after watcher overflow or a failed scan. False does not prove that every filesystem change is observed.
 - `lastReconciledAt` is the last known successful full reconciliation time in milliseconds since the Unix epoch. It may come from a previous opening. Null means no successful time is known.
-- `lastError` is a display-only summary of background indexing failure, cleared after successful reconciliation. Do not parse it as an error code or expose credentials/absolute paths in it.
+- `lastError` is a display-only summary of background indexing failure. Clear resolved scan failures after successful reconciliation, but do not hide an unresolved watcher failure merely because a scan succeeded. Do not parse it as an error code or expose credentials/absolute paths in it.
 
-A query that cannot run still rejects under the native error model. A background scan error can instead coexist with useful indexed results and status. The type and field meanings are approved. The subscription signature is approved below; the query API is approved above, while native export grouping still needs review.
+A query that cannot run still rejects under the native error model. A background scan error can instead coexist with useful indexed results and status. The type and field meanings are approved. The subscription signature is approved below; the query API is approved above, with author types exported through `@writers-ide/plugins/native`. Build/profile and production integration remain outstanding.
 
 Ready means the required index initialization has completed. It does not promise a frozen filesystem, immediate watcher processing or a consistent snapshot across separate page requests. Reads of known paths remain separately authorized filesystem operations and do not wait for index readiness.
 
@@ -171,14 +173,14 @@ This method belongs to the project-file service and requires `project.files.list
 
 The subscription remains activation-owned even if its caller drops the cleanup handle. Cancellation, access revocation and project closure end it. Cancellation during setup must release resources even if native setup finishes late. Isolate listener failures and report them through plugin diagnostics.
 
-Setup started during activation waits behind the native activation gate. Activation remains synchronous; perform the await inside managed async work or an asynchronous UI handler, not directly in `activate()`. The returned cleanup handle supports early unsubscribe. Exact native export grouping and production transport integration remain outstanding.
+Setup started during activation waits behind the native activation gate. Activation remains synchronous; perform the await inside managed async work or an asynchronous UI handler, not directly in `activate()`. The returned cleanup handle supports early unsubscribe. The approved author entry point is `@writers-ide/plugins/native`; build/profile and production transport integration remain outstanding.
 
 Subscriptions do not make the index immediately consistent with the filesystem. Query and notification contracts must explain initialization, staleness, errors and shutdown.
 
 ## Decisions before implementation
 
-1. **Reconciliation:** timer policy, bounded scans, handling incomplete observations, interruption and any host-owned user refresh action.
-2. **Resources and native integration:** apply the approved permission grouping and bound queries, subscriptions, watcher work, queued reconciliation and memory. Finish native error/validation integration and export grouping. Keep plugin scan requests out of the initial API. Internal token encoding is not a public contract.
+1. **Reconciliation:** concrete timer/batch/retry defaults, bounded scan mechanics and interruption under the approved policies. Any host-owned user refresh action still needs separate UI/behavior design.
+2. **Resources and native integration:** apply the approved permission grouping and bound queries, subscriptions, watcher work, queued reconciliation and memory. Finish native error/validation integration and build/profile delivery for the approved `@writers-ide/plugins/native` exports. Keep plugin scan requests out of the initial API. Internal token encoding is not a public contract.
 3. **Persistence:** index schema, compatibility checks, replacement mechanics and bounded retry policy for approved automatic recovery within application-managed local storage. Keep rebuildable observations separate from permission grants and content ownership.
 
 Native credentials, project containment and authorization remain required. This plan does not authorize file writes, general native networking or executable backend plugins.
@@ -192,6 +194,7 @@ Native credentials, project containment and authorization remain required. This 
 - Metadata permission covers queries, status and invalidation but not contents. Read-only permission covers known-path reads but not metadata queries/status/subscriptions. Check denial and revocation independently of service-object availability.
 - Opening a project starts its watcher and initial reconciliation without a plugin consumer. Periodic work continues after the last subscription ends or a plugin is disabled. Closure stops the watcher/timer and cancels pending indexing work; reopening requires fresh initialization.
 - Reconciliations do not overlap within one open project. Requests during a scan combine into one pending pass, with no per-request backlog. Closure cancels active and pending work.
+- Watcher setup/runtime failures leave usable records available and periodic reconciliation active. Test delayed retries with increasing failure backoff, reconciliation after restoration, retained initialization history, visible unresolved failure after a successful scan and cleanup of retries/scans/timers on closure.
 - Watcher events and reconciliation converge after missed events, overflow and reopen. Known gaps publish uncertainty and request reconciliation without waiting for the timer, within scheduling/resource limits and bounded failure retries. Requests during a scan combine into one pending pass. Scan completion does not clear uncertainty from a newer unresolved gap.
 - Directory-specific failures preserve records for failed areas while accessible areas continue updating. Confirm deletions only with sufficient successful observations. Report error/uncertainty, retain the correct initialization state and do not advance the successful full-reconciliation time for a partial pass. Retry within host limits; cancellation, closure and unusable databases can stop the entire pass.
 - Partial scans and permission errors do not cause false deletion records; incomplete empty results do not claim empty directories.

@@ -32,6 +32,43 @@ if (!editor) {
 
 The examples below use this `editor` API object and activation `context`. Both the provider ID and API ID are `writers-ide.word-processing`; the API major is `1`. Dependencies match the exact provider ID, API ID, and major, not a package-version range. Required dependencies activate their registered providers first. An optional dependency uses `optional: true`, never auto-activates its provider, and must handle absence. See the [plugin guide](../plugins/README.md#share-a-versioned-api-with-another-plugin) for availability subscriptions and connection rules.
 
+## Planned read-only document structure helpers
+
+**Approved author API; not implemented:** expose `groupSelectedBlocks`, `identifyBlockGroup`, `BlockReference` and `SelectedBlockGroup` from `@writers-ide/word-processing/structure`. Include this subpath in `writers-ide.frontend/1`. The following declarations describe planned exports, not imports available today:
+
+```ts
+import type { Node as ProseMirrorNode } from 'prosemirror-model';
+import type { EditorState } from 'prosemirror-state';
+
+type BlockReference = {
+	readonly node: ProseMirrorNode;
+	readonly position: number;
+};
+
+type SelectedBlockGroup =
+	| { readonly kind: 'single'; readonly block: BlockReference }
+	| {
+			readonly kind: 'continuation';
+			readonly head: BlockReference;
+			readonly continuation: BlockReference;
+	  };
+
+declare function groupSelectedBlocks(state: EditorState): readonly SelectedBlockGroup[];
+
+declare function identifyBlockGroup(
+	state: EditorState,
+	position: number,
+): SelectedBlockGroup | null;
+```
+
+Pagination currently stores pages in the ProseMirror document as `doc → page → block`. It can split a paragraph across adjacent pages. A continuation group identifies its head and continuation pieces so a feature can apply its own rules consistently. A single group identifies one unpaired block. These helpers understand the current page/block and continuation model; they are not universal helpers for arbitrary schemas.
+
+Call them with the state supplied inside a synchronous word-processing `inspect`, `edit` or command callback. `groupSelectedBlocks` groups the current selection. `identifyBlockGroup` identifies the group at a supplied ProseMirror document position, or returns null when no group is identified under the current behavior. Returned nodes/positions belong to that state. Do not reuse old positions after edits without separately validating or mapping them. Do not retain callback editor objects across asynchronous work; copy needed data and preserve the exact editor target instead.
+
+The helpers are read-only. They perform no DOM measurement, transaction dispatch, pagination scheduling or application-singleton access. Synchronous traversal can still cost time on large selections; it is not offloaded or automatically cooperative.
+
+Extract the existing grouping logic rather than duplicate or redesign it. Preserve caret/range, page-boundary and continuation behavior with regression tests, including reversed ranges, leaf blocks and document ends. Application pagination/commands and feature plugins can reuse the implementation. Formatting rules, mark coverage, indentation/alignment policy and availability summaries remain owned by Basic Menu, not this entry point. Package extraction, runtime exports and tests remain outstanding.
+
 ## Choose an editor
 
 An editor **view** is one live ProseMirror editor instance. A document can have several views, but this service does not synchronize their states.

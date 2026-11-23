@@ -39,6 +39,14 @@ The [route](../../src/routes/+page.svelte) registers the provider and formatting
 
 Formatting remains feature-owned in [contracts.ts](../../src/lib/editor/prosemirror/menu/basic/contracts.ts), [formatting-service.svelte.ts](../../src/lib/editor/prosemirror/menu/basic/formatting-service.svelte.ts) and [scope-formatting-service.ts](../../src/lib/editor/prosemirror/menu/basic/scope-formatting-service.ts). This includes copied summaries, stale-request checks, peer traversal, caret no-ops, mutually exclusive marks and cleanup. Provider-owned edits use the real `view.dispatch` path. Part 3B adds behavior reconfiguration and transaction handling described next. Neither part extracts the whole editor or redesigns pagination. Part 3C custom content/schema work and Part 4 external loading/native enforcement still need separate approval. See [plugin context](../plugins/context.md) and the [formatting guide](../../src/lib/editor/prosemirror/menu/basic/README.md).
 
+## Approved read-only grouping extraction
+
+**Approved API; not implemented:** extract the current peer-group identification/traversal into `@writers-ide/word-processing/structure`. Export `groupSelectedBlocks`, `identifyBlockGroup`, `BlockReference` and `SelectedBlockGroup`. The [word-processing guide](../../packages-js/word-processing/README.md#planned-read-only-document-structure-helpers) defines signatures and single-block/head-continuation results.
+
+Helpers read supplied ProseMirror state for the current `doc → page → block` model. They must not measure DOM, dispatch, schedule reflow or access the PageLayout singleton. Preserve current caret/range, reversed-selection, leaf-block, page-boundary and document-end behavior. Returned nodes/positions belong to the supplied state; validate/map before reuse after edits and do not retain callback editor objects across asynchronous work.
+
+Pagination and app commands can reuse the implementation while Basic Menu owns formatting policy. This does not extract the paginator, change its model-mutating behavior, add schemas or make traversal automatically cooperative. Source extraction and regression/profile validation remain outstanding.
+
 ## Current transaction and layout flow
 
 A **transaction** describes a change to editor state. The **root transaction** is the one sent to dispatch. ProseMirror plugins may reject it with a filter. They may also produce **appended transactions**, which follow accepted changes.
