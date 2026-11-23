@@ -4,9 +4,9 @@ The dispatcher executes a typed application command on behalf of a component. It
 
 ## Implementation boundary
 
-[`command-dispatcher.ts`](../../packages-js/plugins/command-dispatcher.ts) is an internal module. It has no package export and is not connected to the bundled plugin host. Tests supply trusted dependency declarations, provider registrations and lifetime signals directly.
+[`command-dispatcher.ts`](../../packages-js/plugins/command-dispatcher.ts) is an internal module. It has no package export and is not connected to the bundled plugin host. Tests can supply trusted dependency declarations, provider registrations and lifetime signals directly. The [component lifecycle harness](#component-lifecycle-harness) now constructs these bindings from host-selected command component descriptors.
 
-This slice implements execution and availability. It does not implement manifest-to-runtime assembly, activation publication checks, required-consumer activation planning, project selection or leases, external loading, native authorization, settings persistence or a settings menu. Creating a dispatcher does not authorize a component or make a registration valid against its manifest.
+The dispatcher implements execution and availability. The internal harness adds synchronous activation, command publication checks and required-consumer lifecycle planning. Neither implements manifest-to-runtime assembly, project selection or leases, external loading, native authorization, settings persistence or a settings menu. Creating a dispatcher or harness does not grant permission to run external code.
 
 ## What the host supplies
 
@@ -77,8 +77,52 @@ Observer failures are isolated. Observer-triggered teardown still ends invocatio
 
 The dispatcher warns when a validator's initial synchronous call exceeds 16 ms. It records promise-based validation's total elapsed time separately. Neither measurement times out or rejects work. The initial measurement does not capture every synchronous segment after an asynchronous validator resumes.
 
+## Component lifecycle harness
+
+[`CommandComponentHost`](../../packages-js/plugins/command-component-host.ts) connects the dispatcher to a small command-only component lifecycle. It is internal test/implementation infrastructure, not the application's current bundled host or a public SDK constructor. [`command-component-model.ts`](../../packages-js/plugins/command-component-model.ts) contains descriptor capture and iterative dependency planning.
+
+A host slot identifies a component instance that the host has already selected. For example, two project openings can have separate slots for the same component. This harness does not decide which project or package a slot represents. Future application assembly must supply that mapping from validated declarations and live scope.
+
+Host code calls `register(descriptor)` with a slot ID, declared commands, exact provider-slot dependencies, command capability and synchronous activation callback. The harness copies and freezes declaration data. It checks applicable identifier, list-size, duplicate and self-dependency rules. This is not parsing `manifest.toml`, matching package versions or implementing general provider APIs. Planning is iterative but synchronous and can scan the full slot catalogue. The harness does not yet provide catalogue budgets or cooperative scheduling.
+
+### Activation and publication
+
+Host code calls `activate(slotId)` to enable a registered component. The harness checks the complete required dependency closure before calling any activation function. Missing/incompatible providers and required cycles fail this check. Required providers activate first. Optional providers are never enabled by lookup or consumer activation. A failed component does not stop unrelated active siblings or already-successful providers.
+
+Each activation gets a fresh host-generated instance ID. The harness calls the descriptor's activation callback with only:
+
+- `signal`: ends with this activation.
+- `own(dispose)`: activation-owned, idempotent cleanup.
+- `commands`: the dispatcher-backed consumer invoker.
+- `contributions.command(registration)`: the generic SDK command-registration signature.
+
+This is deliberately not a complete `FrontendContext`. It supplies no toolbar/view registration, tasks, provider APIs, native services, locale service or project connection.
+
+Command registration is allowed only during synchronous setup and requires `contributions.command`. Each declared command must be published exactly once, with the exact ID/contract/major. Undeclared, duplicate, mismatched or missing publications fail activation. Catching an invalid registration inside author code does not make setup valid. Registrations are staged and invisible to consumers until setup succeeds. Promise/thenable activation results are rejected and their late failures are observed. Later publication attempts are rejected.
+
+A failed activation aborts its signal and publications, then releases owned cleanup in reverse order. The optional returned disposer is owned too. Cleanup errors do not prevent remaining cleanup. Retained old contexts never become current after reactivation. Their late `own()` cleanup runs immediately, and its failure cannot be attributed to a replacement activation.
+
+### Bindings and removal
+
+Consumer invokers resolve exact slot/dependency/command identities. Registration bindings stay stable while live. Reactivation creates fresh bindings. Old consumer handles remain revoked; old pending calls cannot switch to new providers.
+
+Optional command availability is per command. Removing command A does not hide a surviving command B or cancel B's pending calls merely because the consumer requests both through one dependency. Static compatibility still checks the dependency's declared requirements together.
+
+`planDeactivation(slotId)` returns a frozen required-consumer-first plan. `deactivate` and `unregister` require explicit `{ cascade: true }` when active required consumers would also stop. Optional consumers remain active and receive availability changes.
+
+An author can release its own command registration early. This is publication loss, not a user disable request. It revokes that registration and stops consumers that require the missing command, including their required dependents. It does not stop the provider or unrelated optional work. The command cannot be republished later in that activation.
+
+The complete teardown plan is revoked before owned cleanup runs. Pending dispatcher calls reject promptly, but unfinished implementation work still retains capacity until it settles. `dispose()` revokes the harness's activations and dispatcher without claiming to terminate arbitrary code.
+
+### Management and callback boundaries
+
+`get` and `list` return frozen status snapshots. `subscribe` immediately delivers snapshots and returns an early disposer. Activation and cleanup failures use simple host-owned codes. This is not the production plugin-management UI or its persistence model.
+
+Lifecycle changes during activation, notifications, diagnostics or cleanup are guarded. Callers must defer those changes until the callback returns. This includes disposing staged publications from an immediate availability callback. Ordinary direct disposal during setup is allowed, but leaves setup invalid because the promised publication is missing.
+
 ## Validation entry points
 
+- [`command-component-host.test.ts`](../../packages-js/plugins/command-component-host.test.ts) and [`command-component-regressions.test.ts`](../../packages-js/plugins/command-component-regressions.test.ts): publication checks, required/optional activation, cascade consent, rollback, stale contexts, independent commands and guarded cleanup/notifications. [`command-component-fixture.ts`](../../packages-js/plugins/command-component-fixture.ts) contains shared test setup, not runtime discovery.
 - [`command-dispatcher.test.ts`](../../packages-js/plugins/command-dispatcher.test.ts): execution, schemas, availability, aliases, cancellation, replacement, reentrant callbacks, diagnostics, timing and copy-admission regressions.
 - [`command-payload.test.ts`](../../packages-js/plugins/command-payload.test.ts): permitted data, graph snapshots, independent copying, binary relationships and inspection limits.
 - [`command-reservations.test.ts`](../../packages-js/plugins/command-reservations.test.ts): capacity, retained representations, provisional copies, release and settings capture.
