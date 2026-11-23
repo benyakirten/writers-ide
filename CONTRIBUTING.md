@@ -182,6 +182,8 @@ pnpm test:e2e
 pnpm build
 ```
 
+`pnpm test:unit:ci` runs the application unit suite, SDK runtime tests and SDK compile-time checks. For focused SDK work, optionally run `pnpm --filter @writers-ide/plugins test` and `pnpm --filter @writers-ide/plugins check` directly.
+
 ### Cross-engine browser smoke tests
 
 Browser tests use Chromium and WebKit. Run these commands from the repository root:

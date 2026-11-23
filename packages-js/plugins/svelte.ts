@@ -1,6 +1,8 @@
 import type { Component } from 'svelte';
 import type {
 	BundledPlugin,
+	FrontendContext,
+	FrontendEntry,
 	PluginContext,
 	PluginRegistries,
 	ToolbarContribution,
@@ -24,6 +26,9 @@ export function defineSveltePresentation<Props extends object>(
 		props: props as Readonly<Record<string, unknown>>,
 	};
 }
+
+export type SvelteFrontendContext = FrontendContext<SveltePresentation>;
+export type SvelteFrontendEntry = FrontendEntry<SveltePresentation>;
 
 export type SveltePlugin = BundledPlugin<SveltePresentation>;
 export type SveltePluginContext = PluginContext<SveltePresentation>;

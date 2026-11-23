@@ -12,11 +12,10 @@ import type {
 } from '@writers-ide/word-processing';
 import { untrack } from 'svelte';
 
-import { ActionUtilities } from '$lib/editor/prosemirror/view/actions';
-import { SelectionUtilities } from '$lib/editor/prosemirror/view/selection';
-import PageLayout, { PeerSelection } from '$lib/editor/state/page-layout.svelte';
-import { INDENT_MAX, INDENT_MIN } from '$lib/editor/prosemirror/view/constants';
-import { clamp } from '$lib/utils/numbers';
+import { groupSelectedBlocks } from '@writers-ide/word-processing/structure';
+import { dent, setTextAlignment, toggleTextMark } from './formatting-actions';
+import { findTextMarks, getIndentRatio, getBlockAttributeRatio } from './selection-coverage';
+import { clampIndent, INDENT_MIN } from './formatting-policy';
 
 const marks = [
 	'bold',
@@ -42,15 +41,15 @@ function run(command: FormattingCommand): Command {
 		switch (command) {
 			case 'indent':
 			case 'dedent':
-				return ActionUtilities.dent(command, state, dispatch);
+				return dent(command, state, dispatch);
 			case 'align-left':
-				return ActionUtilities.setTextAlignment('left', state, dispatch);
+				return setTextAlignment('left', state, dispatch);
 			case 'align-center':
-				return ActionUtilities.setTextAlignment('center', state, dispatch);
+				return setTextAlignment('center', state, dispatch);
 			case 'align-right':
-				return ActionUtilities.setTextAlignment('right', state, dispatch);
+				return setTextAlignment('right', state, dispatch);
 			case 'align-justify':
-				return ActionUtilities.setTextAlignment('justify', state, dispatch);
+				return setTextAlignment('justify', state, dispatch);
 			default: {
 				if (!state.schema.marks[command]) {
 					return false;
@@ -61,7 +60,7 @@ function run(command: FormattingCommand): Command {
 						: command === 'subscript'
 							? 'superscript'
 							: undefined;
-				return ActionUtilities.toggleTextMark(command, state, dispatch, view, exclusive);
+				return toggleTextMark(command, state, dispatch, view, exclusive);
 			}
 		}
 	};
@@ -92,16 +91,16 @@ function availability(current: EditorContext): FormattingSnapshot['enabled'] {
 		});
 	}
 
-	// Match ActionUtilities: indentation changes only a peer group's head, whereas
+	// Indentation changes only a continuation group's head, whereas
 	// alignment changes both halves and resets their indentation.
-	for (const group of PageLayout.groupPeerParagraphs(state)) {
-		const head = group.type === PeerSelection.Peered ? group.head.node : group.details.node;
+	for (const group of groupSelectedBlocks(state)) {
+		const head = group.kind === 'continuation' ? group.head.node : group.block.node;
 		if (head.type.name === 'paragraph') {
 			const indent = head.attrs.indent;
-			result.indent ||= clamp((indent || INDENT_MIN) + 1, INDENT_MIN, INDENT_MAX) !== indent;
-			result.dedent ||= clamp((indent || 0) - 1, INDENT_MIN, INDENT_MAX) !== indent;
+			result.indent ||= clampIndent((indent || INDENT_MIN) + 1) !== indent;
+			result.dedent ||= clampIndent((indent || 0) - 1) !== indent;
 		}
-		const nodes = group.type === PeerSelection.Peered ? [head, group.peer.node] : [head];
+		const nodes = group.kind === 'continuation' ? [head, group.continuation.node] : [head];
 		for (const node of nodes) {
 			if (node.type.name !== 'paragraph') {
 				continue;
@@ -117,10 +116,10 @@ function availability(current: EditorContext): FormattingSnapshot['enabled'] {
 
 function snapshot(current: EditorContext, revision: number): FormattingSnapshot {
 	const { selection, doc } = current.state;
-	const presence = SelectionUtilities.findTextMarks(selection, doc);
-	const indent = SelectionUtilities.getIndentRatio(selection, doc);
+	const presence = findTextMarks(selection, doc);
+	const indent = getIndentRatio(selection, doc);
 	const alignment = (value: string | ((value: string) => boolean)) =>
-		SelectionUtilities.getBlockAttributeRatio(
+		getBlockAttributeRatio(
 			selection,
 			doc,
 			'align',

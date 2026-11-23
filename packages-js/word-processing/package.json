@@ -11,6 +11,10 @@
 			"svelte": "./index.ts",
 			"default": "./index.ts"
 		},
+		"./structure": {
+			"types": "./structure.ts",
+			"default": "./structure.ts"
+		},
 		"./svelte": {
 			"types": "./svelte.ts",
 			"svelte": "./svelte.ts",
@@ -21,6 +25,7 @@
 		"@writers-ide/plugins": "workspace:*"
 	},
 	"peerDependencies": {
+		"prosemirror-model": "^1.25.13",
 		"prosemirror-state": "^1.4.4",
 		"prosemirror-view": "^1.42.9",
 		"svelte": "^5.57.3"

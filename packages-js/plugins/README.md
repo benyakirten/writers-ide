@@ -2,7 +2,7 @@
 
 `@writers-ide/plugins` lets you add a feature to Writer's IDE without building your own activation or cleanup system. You can add a toolbar, register an action, or share an API with another feature. The workbench places and renders your UI. The plugin host enables your feature and releases its resources when it stops.
 
-This guide is for authors of trusted plugins bundled with the application. The package is private to this workspace, and its API is still evolving. External installation is not implemented. The planned external SDK will expose a reviewed set of author-facing exports, not automatically every export in these workspace packages. Application setup APIs will remain separate. The [author SDK assembly](../../docs/plugins/sdk-export-review.md#approved-sdk-assembly) approves root frontend/command contracts, `/svelte` presentation and context/entry types, and `/native` service contracts. Host construction remains internal. These planned exports are not implemented and do not change the current bundled imports shown in this guide. See the [runtime profile proposal](../../docs/plugins/package-api-proposal.md#runtime-profile-inventory). The [safety section](#boundaries-and-next-steps) explains what the current host does and does not protect.
+This guide is for authors of trusted plugins bundled with the application. The package is private to this workspace, and its API is still evolving. External installation is not implemented. The planned external SDK will expose a reviewed set of author-facing exports, not automatically every export in these workspace packages. Application setup APIs will remain separate. The [author SDK assembly](../../docs/plugins/sdk-export-review.md#approved-sdk-assembly) approves root frontend/command contracts, `/svelte` presentation and context/entry types, and `/native` service contracts. Host construction remains internal. These author types and helpers are now source-exported alongside legacy bundled types. The current host and bundled imports shown below are unchanged: it does not supply `FrontendContext` or implement its locale, native, project or typed command-invocation services. The curated external profile is not shipped. See the [runtime profile proposal](../../docs/plugins/package-api-proposal.md#runtime-profile-inventory). The [safety section](#boundaries-and-next-steps) explains what the current host does and does not protect.
 
 ## What can a plugin do today?
 
@@ -30,10 +30,11 @@ When your plugin starts, it receives a context with `contributions`, a cancellat
 
 Keep feature-specific services out of the common context. A feature can receive an explicit dependency from application setup, or use a declared provider API as shown below. Passing a dependency to trusted code is not a security permission grant.
 
-The package exposes two entry points:
+The package exposes three entry points:
 
 - [`@writers-ide/plugins`](index.ts): framework-independent lifecycle, manifest, contribution, registry, and management contracts, plus the `Dispose` cleanup type.
-- [`@writers-ide/plugins/svelte`](svelte.ts): trusted Svelte presentation descriptors and `defineSveltePresentation(Component, props)`.
+- [`@writers-ide/plugins/svelte`](svelte.ts): trusted Svelte presentation descriptors, `defineSveltePresentation(Component, props)`, `SvelteFrontendContext` and `SvelteFrontendEntry`.
+- [`@writers-ide/plugins/native`](native.ts): approved native service/data/error types and `isNativeServiceError`. It supplies no service instances or authority.
 
 There are two meanings of “plugin” in editor code. A **feature plugin** is a Writer's IDE feature with a manifest and activation function. A **ProseMirror `Plugin`** adds editor behavior, such as input rules or decorations. One feature plugin can register several ProseMirror plugins through the word-processing API.
 
@@ -283,9 +284,17 @@ Management subscriptions immediately deliver frozen metadata snapshots, then sub
 
 Task and provider errors do not independently disable plugins. Activation, dependency, and host-cleanup failures affect lifecycle status. Connections become unusable before an endpoint's own cleanup runs. Teardown must use owned cleanup handles rather than call through an old API object. For bulk teardown, use a deactivation plan and cascade; registration order need not match dependency order.
 
+## Exported author contracts and helpers
+
+The root exports `FrontendContext`, `FrontendEntry`, `FrontendContributions`, `ComponentApis`, `ComponentApiConnection`, identity/project/locale types, `CommandInvoker`, `PluginCommand`, `CommandRegistration`, `definePluginCommand` and command error types/guard. `PluginCommand` and `CommandRegistration` preserve four schema roles: argument input/output and result input/output.
+
+`definePluginCommand` checks a non-whitespace-only contract ID of at most 256 UTF-8 bytes and a positive safe-integer major. It freezes the descriptor without registering an implementation, executing a command or validating payloads. `isCommandInvocationError` and `/native`'s `isNativeServiceError` are nonthrowing Error-representation and known-code checks. They support other JavaScript realms, but authenticate neither origin nor authority.
+
+Only the contracts and helpers are implemented. The examples in the planned-service sections below describe future host behavior. They cannot run against today's bundled `PluginContext`.
+
 ## Planned alias-based provider API
 
-**Approved external contract; not implemented or exported yet:** `ComponentApis` will be exported from `@writers-ide/plugins` and supplied at `context.apis`. It keeps three operations: `provide(contract, factory)`, `get(alias, contract)` and `subscribe(alias, contract, listener)`.
+**Exported contract; runtime integration not implemented:** `ComponentApis` is exported from `@writers-ide/plugins` for the future `FrontendContext.apis`. It keeps three operations: `provide(contract, factory)`, `get(alias, contract)` and `subscribe(alias, contract, listener)`.
 
 A provider calls `provide()` during its synchronous activation to publish a manifest-declared contract. The host calls its factory with a consumer-scoped `ComponentApiConnection`. The factory returns the actual implementation. Provider and consumer import the contract from a shared library; the identity contains no implementation.
 
@@ -295,11 +304,11 @@ A consumer uses its manifest dependency alias, not a constructed activation ID o
 
 ## Planned application project connections
 
-**Approved external contract; not implemented or exported yet:** application-scoped components receive `context.projects`. Its planned `ProjectConnections` interface has `subscribeSelected(listener): Dispose` and `connect(project): ProjectApiConnection`. Both interfaces will be exported from `@writers-ide/plugins`.
+**Exported contracts; services not implemented:** future application-scoped components receive `context.projects`. The `ProjectConnections` interface has `subscribeSelected(listener): Dispose` and `connect(project): ProjectApiConnection`. Both interfaces are exported from `@writers-ide/plugins`.
 
 The host calls the selection listener immediately, then on changes, with a host-issued project reference or `null`. The subscription is activation-owned. A connection remains fixed to its project opening; selection changes do not retarget it.
 
-For example, import the planned `ProjectApiConnection` type at module scope and place this code inside the application-scoped component's `activate(context)` function, which the host calls when enabling it. It follows selection by explicitly releasing the previous lease. It does not read a document or enable a provider:
+For example, import the exported `ProjectApiConnection` type at module scope and place this code inside the application-scoped component's `activate(context)` function, which the host calls when enabling it. It follows selection by explicitly releasing the previous lease. It does not read a document or enable a provider:
 
 ```ts
 let connection: ProjectApiConnection | undefined;
@@ -330,7 +339,7 @@ The approved external context keeps scope explicit:
 | Project          | Its fixed project reference | `null`                                                        |
 | Application      | `null`                      | Selected-project subscription and explicit connection service |
 
-**Approved external contract; not implemented or exported yet:** project-scoped activations receive `context.project` as a host-issued `ProjectReference`. Application-scoped activations receive `null`. The planned type is an author export from `@writers-ide/plugins` with read-only string fields:
+**Exported type; host integration not implemented:** future project-scoped activations receive `context.project` as a host-issued `ProjectReference`. Application-scoped activations receive `null`. The type is an author export from `@writers-ide/plugins` with read-only string fields:
 
 - `id`: the host's registered local project identity, retained when that registration reopens.
 - `openingId`: an opaque identifier for this live opening, replaced on close/reopen.
@@ -342,9 +351,9 @@ Do not reconstruct references from saved fields. APIs accepting project referenc
 
 ## Planned connection endpoint metadata
 
-**Approved external contract; not implemented or exported yet:** provider API factories will receive `ComponentApiConnection`, an extension of the current `PluginApiConnection`. It keeps the current `consumerId`, `signal`, `own`, `guard` and `reportError` operations and adds read-only `consumer` and `provider` activation identities.
+**Exported contract; host integration not implemented:** future provider API factories will receive `ComponentApiConnection`, an extension of the current `PluginApiConnection`. It keeps the current `consumerId`, `signal`, `own`, `guard` and `reportError` operations and adds read-only `consumer` and `provider` activation identities.
 
-Each identity contains stable `packageId`/`componentId`, temporary `activationId` and `projectOpeningId`. The latter is `null` for an application-scoped endpoint, even when its peer belongs to a project. The planned `ComponentIdentity` and `ActivationIdentity` data types will also be author exports from `@writers-ide/plugins`.
+Each identity contains stable `packageId`/`componentId`, temporary `activationId` and `projectOpeningId`. The latter is `null` for an application-scoped endpoint, even when its peer belongs to a project. The `ComponentIdentity` and `ActivationIdentity` data types are also author exports from `@writers-ide/plugins`.
 
 Providers can use these identities for diagnostics and connection-owned resource association. Activation/opening IDs are opaque, temporary and unsuitable as durable settings keys. Endpoint metadata is not a native credential, permission grant or proof of which JavaScript initiated a call. Validate feature inputs and use approved native services; Rust checks those operations under the provider's actual authority. See the [context contract](../../docs/plugins/package-api-proposal.md#4-the-activation-context).
 
@@ -469,7 +478,7 @@ The host also owns the subscription for the activation lifetime. Cancellation, a
 
 ## Planned UI locale API
 
-**Approved contract; not implemented or exported yet:** the external host will supply `context.locale` with `snapshot()` and `subscribe(listener)`. The planned `LocaleSnapshot` type contains read-only `languageTag: string` and `direction: 'ltr' | 'rtl'`. The planned `PluginLocale` interface describes the service. Both types will be exported from `@writers-ide/plugins`.
+**Exported contracts; locale service not implemented:** the future external host will supply `context.locale` with `snapshot()` and `subscribe(listener)`. The `LocaleSnapshot` type contains read-only `languageTag: string` and `direction: 'ltr' | 'rtl'`. The `PluginLocale` interface describes the service. Both types are exported from `@writers-ide/plugins`.
 
 This is the application UI locale, not the language of a document or selection. Plugins own their translations and fallback choices. They may use their own catalogs, `Intl`, supported libraries or declared provider services. The host does not expose its private generated message functions.
 

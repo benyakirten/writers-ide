@@ -20,7 +20,7 @@ Links here are relative to this file.
 - [editor.ts](../../src/lib/editor/prosemirror/view/editor.ts) creates the editor state and view. It installs undo history and keyboard bindings. It also applies transactions and sends events before the DOM update. The DOM is the browser's rendered element tree.
 - [prose-mirror-editor.svelte.ts](../../src/lib/editor/prosemirror/prose-mirror-editor.svelte.ts) registers views and observers. It cancels their work and destroys views on teardown.
 - [schema.ts](../../src/lib/editor/prosemirror/view/schema.ts), [nodes.ts](../../src/lib/editor/prosemirror/view/nodes.ts), [marks.ts](../../src/lib/editor/prosemirror/view/marks.ts) and [constants.ts](../../src/lib/editor/prosemirror/view/constants.ts) define document structure, formatting marks, DOM conversion and units. Marks describe inline formatting, such as bold.
-- [actions.ts](../../src/lib/editor/prosemirror/view/actions.ts) and [selection.ts](../../src/lib/editor/prosemirror/view/selection.ts) implement formatting and selection helpers.
+- [actions.ts](../../src/lib/editor/prosemirror/view/actions.ts) and [selection.ts](../../src/lib/editor/prosemirror/view/selection.ts) retain interim compatibility wrappers that delegate formatting and selection coverage to Basic Menu's feature-owned helpers. `splitParagraph` remains application-owned.
 - [event-bus.svelte.ts](../../src/lib/editor/state/event-bus.svelte.ts) and [event-bus.plugin.ts](../../src/lib/editor/prosemirror/plugins/event-bus.plugin.ts) send document-keyed editor events.
 - [page-layout.svelte.ts](../../src/lib/editor/state/page-layout.svelte.ts) measures pages and moves content. It handles explicit breaks, paragraph continuation, affected ranges and reflow transactions.
 - [page-observer.svelte.ts](../../src/lib/editor/state/page-observer.svelte.ts) tracks visible pages and which pages need reflow in each view.
@@ -39,13 +39,15 @@ The [route](../../src/routes/+page.svelte) registers the provider and formatting
 
 Formatting remains feature-owned in [contracts.ts](../../src/lib/editor/prosemirror/menu/basic/contracts.ts), [formatting-service.svelte.ts](../../src/lib/editor/prosemirror/menu/basic/formatting-service.svelte.ts) and [scope-formatting-service.ts](../../src/lib/editor/prosemirror/menu/basic/scope-formatting-service.ts). This includes copied summaries, stale-request checks, peer traversal, caret no-ops, mutually exclusive marks and cleanup. Provider-owned edits use the real `view.dispatch` path. Part 3B adds behavior reconfiguration and transaction handling described next. Neither part extracts the whole editor or redesigns pagination. Part 3C custom content/schema work and Part 4 external loading/native enforcement still need separate approval. See [plugin context](../plugins/context.md) and the [formatting guide](../../src/lib/editor/prosemirror/menu/basic/README.md).
 
-## Approved read-only grouping extraction
+## Read-only grouping library
 
-**Approved API; not implemented:** extract the current peer-group identification/traversal into `@writers-ide/word-processing/structure`. Export `groupSelectedBlocks`, `identifyBlockGroup`, `BlockReference` and `SelectedBlockGroup`. The [word-processing guide](../../packages-js/word-processing/README.md#planned-read-only-document-structure-helpers) defines signatures and single-block/head-continuation results.
+**Implemented public workspace API:** `@writers-ide/word-processing/structure` exports `groupSelectedBlocks`, `identifyBlockGroup`, `BlockReference` and `SelectedBlockGroup`. The [word-processing guide](../../packages-js/word-processing/README.md#read-only-document-structure-helpers) defines signatures and single-block/head-continuation results. The module uses type-only ProseMirror imports and no DOM, Svelte or application imports.
 
 Helpers read supplied ProseMirror state for the current `doc → page → block` model. They must not measure DOM, dispatch, schedule reflow or access the PageLayout singleton. Preserve current caret/range, reversed-selection, leaf-block, page-boundary and document-end behavior. Returned nodes/positions belong to the supplied state; validate/map before reuse after edits and do not retain callback editor objects across asynchronous work.
 
-Pagination and app commands can reuse the implementation while Basic Menu owns formatting policy. This does not extract the paginator, change its model-mutating behavior, add schemas or make traversal automatically cooperative. Source extraction and regression/profile validation remain outstanding.
+The grouping algorithm was extracted unchanged from PageLayout. Its existing grouping methods map and delegate to the same library while preserving their API. Basic Menu's `FormattingService` uses the public structure entry and feature-local `formatting-actions.ts`, `selection-coverage.ts` and `formatting-policy.ts`. It no longer imports private actions, selection helpers, PageLayout, constants or clamp. Application compatibility wrappers delegate to the feature-owned helpers; `splitParagraph` remains application-owned.
+
+Node-environment tests cover grouping without DOM access, positions, selections and continuations. Existing pagination tests preserve behavior. This does not extract the paginator, change its model-mutating behavior, add schemas or make traversal automatically cooperative. Basic Menu still has private UI translation, icon and string-utility imports. Separate packaging, locale migration and external-profile validation remain outstanding.
 
 ## Current transaction and layout flow
 

@@ -353,6 +353,9 @@ importers:
       '@writers-ide/plugins':
         specifier: workspace:*
         version: link:../plugins
+      prosemirror-model:
+        specifier: ^1.25.13
+        version: 1.25.13
       prosemirror-state:
         specifier: ^1.4.4
         version: 1.4.4

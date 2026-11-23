@@ -11,7 +11,7 @@ import {
 	type WordProcessingSources,
 } from '@writers-ide/word-processing';
 import { INDENT_MAX } from '$lib/editor/prosemirror/view/constants';
-import PageLayout from '$lib/editor/state/page-layout.svelte';
+import * as structure from '@writers-ide/word-processing/structure';
 import { ActionUtilities } from '$lib/editor/prosemirror/view/actions';
 import { schema as productionSchema } from '$lib/editor/prosemirror/view/schema';
 import TabState from '$lib/editor/state/tab-state.svelte';
@@ -506,7 +506,7 @@ describe('read-only availability queries', () => {
 		);
 		const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 		const transactions = vi.spyOn(EditorState.prototype, 'tr', 'get');
-		const groups = vi.spyOn(PageLayout, 'groupPeerParagraphs');
+		const groups = vi.spyOn(structure, 'groupSelectedBlocks');
 		const f = fixture(view);
 		f.listen();
 		flushSync();

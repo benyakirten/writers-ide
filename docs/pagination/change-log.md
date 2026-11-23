@@ -39,7 +39,9 @@ The move preserves existing behavior:
 
 Stopping the provider does not destroy editor views owned by its sources. No generic service bus or external permission model is introduced.
 
-**Approved grouping-library extraction; not implemented.** The owner approved `@writers-ide/word-processing/structure` with `groupSelectedBlocks`, `identifyBlockGroup`, `BlockReference` and `SelectedBlockGroup`. Extract current read-only grouping from PageLayout without DOM measurement, dispatch, reflow scheduling or singleton access. Results identify state-specific single blocks or head/continuation pairs under the current page/block model. Preserve selection/page-boundary behavior and keep formatting decisions in Basic Menu. Pagination/app commands can reuse the helper implementation. This does not extract/redesign pagination or add arbitrary-schema support. The [plugin topic entry](../plugins/change-log.md) records the package boundary; current context and the word-processing guide record exact contracts and planned regression coverage. No runtime extraction or tests are claimed by this approval.
+**Implemented read-only grouping extraction.** The public `@writers-ide/word-processing/structure` entry exports exactly `groupSelectedBlocks`, `identifyBlockGroup`, `BlockReference` and `SelectedBlockGroup`. The algorithm was extracted unchanged from PageLayout. Its old grouping methods map/delegate to the same library while preserving the old API. The module uses type-only ProseMirror imports and has no DOM, Svelte or app imports. State-specific nodes/positions describe single blocks or head/continuation pairs under the existing page/block model. This does not extract/redesign pagination, change continuation semantics or add arbitrary-schema support.
+
+Basic Menu's `FormattingService` uses the public structure API and feature-local `formatting-actions.ts`, `selection-coverage.ts` and `formatting-policy.ts`. It no longer imports private actions/selection helpers, PageLayout, constants or clamp. Legacy app `ActionUtilities`/`SelectionUtilities` delegate to feature-owned code as interim source-compatibility wrappers; `splitParagraph` remains app-owned. Formatting rules remain in Basic Menu. It is not separately packaged: private UI translations/icons/string utilities, locale migration and bundled registration remain unchanged. The [plugin entry](../plugins/change-log.md#implemented-sdk-and-formatting-foundation-slice) records the SDK outcome and remaining runtime gates.
 
 **Shared tasks, Part 1.** Private `@writers-ide/tasks` owns generic `WorkQueue` mechanics. It provides iteration, generator, async and bundled-worker helpers. The library has no shared global queue or editor dependency.
 
@@ -149,7 +151,7 @@ Part 3B adds three [opt-in proof consumers](../../src/lib/editor/prosemirror/beh
 
 `BehaviorFixture.svelte` extends the existing fixture behind explicit opt-in, not on the default route. Six new scenarios/twelve cases join the existing twelve for 24 word-processing cases across Chromium/WebKit. Existing CI includes both files; main app e2e excludes the new file.
 
-Latest cumulative validation passed:
+Earlier cumulative renderer validation passed:
 
 - 1,191 unit tests in 52 files. These include 79 behavior cases, 53 existing service cases and five actual-dispatch regressions.
 - Final Chromium/WebKit app and smoke suites: 116 and 22 cases. They retain pagination geometry, caret/reflow/undo, docking, stylesheet and provider lifecycle coverage.
@@ -159,6 +161,18 @@ Latest cumulative validation passed:
 `pnpm check` reported only the existing Modal type error and five old DnD warnings. There were no changed-file diagnostics. See the [plugin entry](../plugins/change-log.md) for cumulative outcomes and [docking](../dnd/change-log.md) for layout work. These results were verified during implementation. The earlier editorial revision did not rerun runtime tests. The Part 3C rendering work reran these suites.
 
 The earlier editorial-only validation passed Oxfmt, heading-anchor, local file-link, fragment and whitespace checks without rerunning runtime tests.
+
+Latest foundation validation (Node 26.8.1):
+
+- `pnpm test:unit:ci` passed 1,207 app tests in 54 files, 35 SDK tests in two files and package-local TypeScript checking. The root CI script now runs all three.
+- 160 focused extraction regressions passed. A Node-environment structure test verifies no DOM dependency, positions, selections and continuations. Existing pagination tests preserve behavior.
+- `pnpm build` passed with existing alias/chunk warnings. Chromium and WebKit smoke each passed all 11 tests (22 total).
+- Repository formatting and Oxlint passed through `pnpm lint`, with zero warnings/errors. Focused changed-code lint also passed.
+- `pnpm check` failed on the existing Modal `$props` generic error (`Expected 0 type arguments`) and five preexisting DnD warnings, not changes from this slice.
+- Offline lockfile-only installation succeeded for the `prosemirror-model` peer declaration; no new runtime dependency was downloaded.
+- Local Markdown file-target checks and staged/unstaged whitespace checks passed. Heading fragments were not all checked.
+
+These results validate the source extraction and existing application, not external-profile or packaged-plugin integration. The earlier cross-engine totals above remain historical evidence for their own changes.
 
 #### Limits and follow-up
 

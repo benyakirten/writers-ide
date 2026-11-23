@@ -1,12 +1,12 @@
 # Shared application commands
 
-**Status: contract shape approved; not implemented.** This page records the external-package command design. Today's `CommandContribution` takes no arguments and returns a synchronous boolean. There is no current plugin-facing command-invocation service or user-facing command routing.
+**Status: source contracts/helpers implemented; invocation runtime not implemented.** This page records the external-package command design. Today's `CommandContribution` takes no arguments and returns a synchronous boolean. There is no current plugin-facing command-invocation service or user-facing command routing.
 
 An application command is a named action owned by a component. Another component can invoke it through a declared dependency. It is not a ProseMirror command or a live provider service. Registration does not create a button, shortcut or command-picker entry. See the [package specification](package-api-proposal.md) for component lifetimes and package installation.
 
 ## Choose an editor command or an application command
 
-Writer's IDE has two command APIs. They serve different purposes. Synchronous editor commands are implemented today. The typed shared application command API described in this guide is approved but not implemented.
+Writer's IDE has two command APIs. They serve different purposes. Synchronous editor commands are implemented today. The typed shared application command contracts and definition/error helpers are exported. Their invocation runtime is not implemented.
 
 | Need                                                                                 | Use                                                                     | Why                                                                                                      |
 | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -57,9 +57,9 @@ export const countWords = definePluginCommand({
 });
 ```
 
-`definePluginCommand` is an approved future SDK helper, not an export available today. It infers argument-schema input/output and result-schema input/output separately from Standard Schema-compatible validators. `PluginCommand` and `CommandRegistration` preserve all four roles. Consumer invocation takes argument input and resolves result output; the implementation receives argument output and returns result input. Standard Schema is an interoperability format for validation libraries. Zod is one author choice, not a mandatory host dependency. Other compatible validators can be used. No validation package is added by this design document.
+`definePluginCommand` is now exported from the workspace SDK. It validates a non-whitespace-only contract ID of at most 256 UTF-8 bytes and a positive safe-integer major, then freezes the descriptor. It does not register an implementation, execute commands or validate payloads. It infers argument-schema input/output and result-schema input/output separately from Standard Schema-compatible validators. `PluginCommand` and `CommandRegistration` preserve all four roles. Consumer invocation takes argument input and resolves result output; the implementation receives argument output and returns result input. Standard Schema is an interoperability format for validation libraries. Zod is one author choice, not a mandatory host dependency. Other compatible validators can be used. No validation package is added by this design document.
 
-The example accepts an object containing a bounded string and returns a nonnegative integer. Argument-free commands remain supported. Commands producing no value declare a `void` result. The exact no-argument convenience overloads are implementation work.
+The example accepts an object containing a bounded string and returns a nonnegative integer. Argument-free commands remain supported. Commands producing no value declare a `void` result. The current helper requires explicit `args` and `result` schemas, including schemas for `undefined` or `void` when appropriate.
 
 ## Declaration-count limits
 
@@ -80,7 +80,7 @@ major = 1
 
 Here, `count-words` is local to the component. The contract identity and major describe the operation's public inputs/results. Different components can reuse the same local command ID.
 
-**Approved identifier rules; enforcement is not implemented:** command IDs, contract IDs and consumer command aliases must each be nonempty strings that are not whitespace-only, with at most 256 UTF-8 bytes. This is a byte limit, not JavaScript string length. All three allow flexible characters and match exactly, including case. The host will reject invalid values rather than trim, normalize or truncate them. These rules apply to manifest fields and their corresponding runtime definitions, registrations and lookups. They do not make command IDs globally unique. Consumer command aliases are scoped to a dependency, as explained below.
+**Approved identifier rules; contract helper checks implemented, manifest/host checks pending:** command IDs, contract IDs and consumer command aliases must each be nonempty strings that are not whitespace-only, with at most 256 UTF-8 bytes. This is a byte limit, not JavaScript string length. All three allow flexible characters and match exactly, including case. The host will reject invalid values rather than trim, normalize or truncate them. These rules apply to manifest fields and their corresponding runtime definitions, registrations and lookups. They do not make command IDs globally unique. Consumer command aliases are scoped to a dependency, as explained below.
 
 The provider's entry module exports the following function. The host calls it synchronously when enabling the component. Its component must declare the `contributions.command` capability.
 
@@ -239,7 +239,7 @@ Tests must cover immediate and promise-based argument/result validation, cancell
 
 ## Invocation errors
 
-**Approved error contract; not implemented:** normalize shared-command invocation failures into typed errors. The public names are `CommandInvocationErrorCode`, `CommandInvocationError` and `isCommandInvocationError`. These are separate from native-service errors and synchronous editor results.
+**Error types/guard exported; runtime normalization not implemented:** normalize shared-command invocation failures into typed errors. The public names are `CommandInvocationErrorCode`, `CommandInvocationError` and `isCommandInvocationError`. These are separate from native-service errors and synchronous editor results.
 
 ```ts
 type CommandInvocationErrorCode =
@@ -274,7 +274,7 @@ declare function isCommandInvocationError(value: unknown): value is CommandInvoc
 
 A schema's reported validation failure uses `invalid-arguments` or `invalid-result`, depending on the phase. An unexpected validator exception uses `execution-failed`. Keep original exceptions available to host diagnostics. Callers do not need to understand a provider's private thrown values. Recognizing an error establishes neither origin nor authority.
 
-Use typed command results for expected domain outcomes, such as no matching records. Do not turn every domain outcome into an invocation error. The contract does not change errors outside command invocation. Root SDK exports are approved in the [SDK assembly](sdk-export-review.md#approved-sdk-assembly). Helper validation mechanics and detailed failure precedence still need specification. Tests must cover the codes, validator failures versus exceptions, implementation throws/rejections and lifecycle races.
+Use typed command results for expected domain outcomes, such as no matching records. Do not turn every domain outcome into an invocation error. The contract does not change errors outside command invocation. Root SDK exports are approved in the [SDK assembly](sdk-export-review.md#approved-sdk-assembly). The guard is a nonthrowing Error-representation and known-code check. It supports other JavaScript realms without authenticating origin or granting authority. Detailed failure precedence and runtime normalization still need specification and implementation. Tests must cover the codes, validator failures versus exceptions, implementation throws/rejections and lifecycle races.
 
 ## Concurrency overload
 
@@ -308,6 +308,6 @@ Tests must cover byte/depth/object/entry limits, aggregate reservations, large b
 
 ## Implementation details still requiring specification
 
-The approved shape does not settle numerical concurrency/payload limits, detailed accounting mechanics, slow-validator thresholds, detailed error precedence and concrete SDK/helper implementation. Define these before implementing behavior that authors could depend on. Schema validation is not frontend isolation. Host code must also preserve the approved declaration, project-targeting and revocation rules.
+The approved shape does not settle numerical concurrency/payload limits, detailed accounting mechanics, slow-validator thresholds, detailed error precedence and invocation-runtime implementation. Define these before implementing behavior that authors could depend on. Schema validation is not frontend isolation. Host code must also preserve the approved declaration, project-targeting and revocation rules.
 
 The [implementation plan](implementation-plan.md#part-4--external-packages-and-user-facing-trust) tracks the remaining native security, persistence and packaged-runtime work. This contract approval does not approve a command picker, shortcut system or external loading before those prerequisites are met.

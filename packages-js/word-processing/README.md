@@ -32,9 +32,9 @@ if (!editor) {
 
 The examples below use this `editor` API object and activation `context`. Both the provider ID and API ID are `writers-ide.word-processing`; the API major is `1`. Dependencies match the exact provider ID, API ID, and major, not a package-version range. Required dependencies activate their registered providers first. An optional dependency uses `optional: true`, never auto-activates its provider, and must handle absence. See the [plugin guide](../plugins/README.md#share-a-versioned-api-with-another-plugin) for availability subscriptions and connection rules.
 
-## Planned read-only document structure helpers
+## Read-only document structure helpers
 
-**Approved author API; not implemented:** expose `groupSelectedBlocks`, `identifyBlockGroup`, `BlockReference` and `SelectedBlockGroup` from `@writers-ide/word-processing/structure`. Include this subpath in `writers-ide.frontend/1`. The following declarations describe planned exports, not imports available today:
+**Implemented public workspace API:** `@writers-ide/word-processing/structure` exports exactly `groupSelectedBlocks`, `identifyBlockGroup`, `BlockReference` and `SelectedBlockGroup`. Inclusion in `writers-ide.frontend/1` is approved, but that external profile artifact is not implemented. The exported API has these signatures:
 
 ```ts
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
@@ -67,7 +67,7 @@ Call them with the state supplied inside a synchronous word-processing `inspect`
 
 The helpers are read-only. They perform no DOM measurement, transaction dispatch, pagination scheduling or application-singleton access. Synchronous traversal can still cost time on large selections; it is not offloaded or automatically cooperative.
 
-Extract the existing grouping logic rather than duplicate or redesign it. Preserve caret/range, page-boundary and continuation behavior with regression tests, including reversed ranges, leaf blocks and document ends. Application pagination/commands and feature plugins can reuse the implementation. Formatting rules, mark coverage, indentation/alignment policy and availability summaries remain owned by Basic Menu, not this entry point. Package extraction, runtime exports and tests remain outstanding.
+The implementation extracts the existing PageLayout grouping algorithm without changing it. PageLayout's old grouping methods map and delegate to the same library, preserving their API. The module uses type-only ProseMirror imports and has no DOM, Svelte or application imports. Node-environment regressions cover positions, selections and continuations without a DOM. Application pagination/commands and feature plugins reuse this implementation. Formatting rules, mark coverage, indentation/alignment policy and availability summaries remain owned by Basic Menu, not this entry point. External-profile and packaged-plugin validation remain outstanding.
 
 ## Choose an editor
 

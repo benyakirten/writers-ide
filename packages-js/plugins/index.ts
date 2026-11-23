@@ -1,5 +1,29 @@
 import type { TaskService } from '@writers-ide/tasks';
 
+export {
+	definePluginCommand,
+	isCommandInvocationError,
+	type PluginCommand,
+	type CommandRegistration,
+	type CommandInvoker,
+	type CommandInvocationErrorCode,
+	type CommandInvocationError,
+} from './commands';
+export type {
+	FrontendContext,
+	FrontendEntry,
+	FrontendContributions,
+	ComponentIdentity,
+	ActivationIdentity,
+	ProjectReference,
+	ProjectConnections,
+	ProjectApiConnection,
+	ComponentApis,
+	ComponentApiConnection,
+	LocaleSnapshot,
+	PluginLocale,
+} from './frontend';
+
 export interface Dispose {
 	(): void;
 }
