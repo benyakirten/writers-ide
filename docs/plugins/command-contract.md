@@ -165,7 +165,7 @@ Tests must cover initial delivery, availability transitions, activation/connecti
 
 ## Values, compatibility and lifetime
 
-- Arguments and results are data-only and copied. Use the explicit supported-value list below, not every value the runtime can clone. Resource defaults are approved below; detailed accounting remains open. Use provider APIs for ongoing behavioral connections.
+- Arguments and results are data-only and copied. Use the explicit supported-value list below, not every value the runtime can clone. Resource defaults and accounting rules are approved below. Use provider APIs for ongoing behavioral connections.
 - Failures reject the promise. The result is not a universal handled/success boolean; a boolean can still be an explicitly declared result. Invocation settles when the action finishes, not merely when it starts a background task.
 - Contract majors match exactly, independently of package-version ranges. Breaking argument/result changes require a new major. A provider can offer separate command registrations for older contracts. Validators and compatibility tests must enforce the documented promises; matching numbers alone do not prove compatible schemas.
 - Each invocation receives a signal tied to caller cancellation, caller/provider teardown, command removal and its project connection. Cancellation rejects the pending invocation, suppresses late success and observes late failures. It does not stop unrelated provider work or revoke the provider credential.
@@ -194,13 +194,13 @@ Validation must cover every allowed type and rejection of unsupported values at 
 
 Copy buffers and views at the command boundary. Preserve the buffer/view type and view range. The recipient's copy must not alias the sender's memory. Do not transfer ownership or detach the sender's buffer. Exclude `SharedArrayBuffer` and views backed by shared memory. Binary support does not approve every structured-clone type. The payload limits below also apply to binary data.
 
-Validation must cover buffer and view types, nonzero view offsets/ranges, sender/recipient mutation independence, undetached sender buffers and rejection of shared memory. Bound copy work and memory under the resource policy below. Detailed accounting remains open.
+Validation must cover buffer and view types, nonzero view offsets/ranges, sender/recipient mutation independence, undetached sender buffers and rejection of shared memory. Bound copy work and memory under the resource policy below. Use the approved accounting rules below.
 
 ## Dates, maps and sets
 
 **Approved payload support; not implemented:** shared commands accept `Date`, `Map` and `Set` in declared arguments and results. Copy these values with their standard type behavior preserved. Recipient mutations must not affect sender containers or nested mutable data. Map keys, map values and set members must themselves be permitted command data. Shared contracts must validate the declared types and their contents. Resource accounting must include nested contents, not just the outer container.
 
-Command payloads do not need to be JSON-serializable. An individual contract can choose JSON-compatible representations when its feature needs them. Supporting these three types does not approve arbitrary class instances or every structured-clone type. Cycles are rejected under the policy below. The supported-value list above is explicit; resource defaults are approved below, while detailed accounting remains open.
+Command payloads do not need to be JSON-serializable. An individual contract can choose JSON-compatible representations when its feature needs them. Supporting these three types does not approve arbitrary class instances or every structured-clone type. Cycles are rejected under the policy below. The supported-value list above is explicit; resource defaults and accounting rules are approved below.
 
 Validation must cover retained types, nested permitted/disallowed values, date values under the declared schema and mutation independence for maps, sets and their nested data.
 
@@ -225,7 +225,7 @@ Infer these input and output types separately from the Standard Schema-compatibl
 
 For arguments, copy the caller's permitted data before validation/transformation, then pass the successful output to the implementation. For results, validate/transform the implementation's result, then copy the successful output for delivery. Check permitted-payload and resource rules before and after transformation. A transform cannot introduce functions, live handles, shared memory or cycles. Schema validation failure prevents argument execution or result delivery, respectively.
 
-Transforms may construct new objects or change repeated-reference relationships. The copying step preserves the relationships present at that step; it does not undo a schema's deliberate reconstruction. Tests must cover distinct input/output inference, successful conversions/defaults, validation failures, copy independence and rejection of prohibited or over-budget transformed values. Budget defaults and validator diagnostics are approved below. Detailed accounting mechanics remain undecided.
+Transforms may construct new objects or change repeated-reference relationships. The copying step preserves the relationships present at that step; it does not undo a schema's deliberate reconstruction. Tests must cover distinct input/output inference, successful conversions/defaults, validation failures, copy independence and rejection of prohibited or over-budget transformed values. Budget defaults, accounting rules and validator diagnostics are approved below.
 
 ## Synchronous and asynchronous validation
 
@@ -235,7 +235,7 @@ After argument validation, recheck invocation cancellation and command availabil
 
 Awaiting validation does not offload CPU work. Standard Schema's validation method does not receive the host invocation's `AbortSignal`. The host cannot forcibly stop arbitrary validator code or promise work. Preserve cooperative cancellation semantics without claiming that rejecting an invocation stops the validator itself. Activation, ProseMirror hooks and editor transactions remain synchronous.
 
-Tests must cover immediate and promise-based argument/result validation, cancellation during either phase, command removal or provider teardown during validation, late success/failure and prevention of implementation execution or result delivery after cancellation. Budget defaults and validator diagnostics are approved below. Detailed accounting mechanics remain undecided.
+Tests must cover immediate and promise-based argument/result validation, cancellation during either phase, command removal or provider teardown during validation, late success/failure and prevention of implementation execution or result delivery after cancellation. Budget defaults, accounting rules and validator diagnostics are approved below.
 
 ## Invocation errors
 
@@ -286,7 +286,7 @@ Use typed command results for expected domain outcomes, such as no matching reco
 4. Admission limits.
 5. Permitted payload and argument-schema validation.
 
-A failed check prevents later checks and execution. In particular, unavailable or over-capacity calls do not run schema validators. Recheck cancellation and connection lifetimes across asynchronous boundaries. Once admitted, the first terminal outcome the host processes settles the invocation. Later cancellation, teardown, success or failure cannot replace that outcome. This is processing order, not a guarantee about the timing of independent events. Precedence within the first check when both revocation and cancellation already apply still needs specification.
+A failed check prevents later checks and execution. In particular, unavailable or over-capacity calls do not run schema validators. Recheck cancellation and connection lifetimes across asynchronous boundaries. Once admitted, the first terminal outcome the host processes settles the invocation. Later cancellation, teardown, success or failure cannot replace that outcome. This is processing order, not a guarantee about the timing of independent events. Within the first check, test caller revocation before caller cancellation. If both already apply, return `revoked`. This initial precedence does not change the first-terminal-outcome rule after admission.
 
 ### Safe diagnostics
 
@@ -338,20 +338,67 @@ Approved initial defaults, applied separately to arguments and results and also 
 | Nesting depth                           |               64 levels |
 | Distinct objects and collection entries |        100,000 combined |
 
-These are initial engineering defaults, not measured performance guarantees. Users can change payload and pending-call limits through a host-owned settings menu. Plugins cannot raise their own limits. The menu should explain the memory and responsiveness risks of higher values and offer a reset to defaults. Menu location, application/project scope, persistence, allowed setting ranges and changes affecting in-flight calls remain undecided.
+These are initial engineering defaults, not measured performance guarantees. The aggregate reservations, accounting formula and settings behavior below are also approved plans, not implemented behavior.
 
-Aggregate reserved-payload limits and detailed byte/depth/object/entry accounting still require approval. The defaults above do not settle how each supported value contributes to those counters.
+### Aggregate reservations
 
-Check inputs before copying or schema validation. Check transformed outputs and command results as well. Exceeding a host budget rejects with `CommandInvocationError` code `limit-exceeded`. Account for memory actually retained or copied, including backing buffers rather than only a view's visible byte length. Aggregate reservations prevent many individually acceptable payloads from bypassing the overall memory policy. Detailed accounting and reservation mechanics still need implementation design.
+A reservation accounts for payload memory the host retains while handling a call. It is not memory allocated in advance.
+
+| Scope                                                  | Default reserved payload allowance |
+| ------------------------------------------------------ | ---------------------------------: |
+| Component instance, across incoming and outgoing calls |          32 MiB (33,554,432 bytes) |
+| Host runtime in one workspace window                   |        128 MiB (134,217,728 bytes) |
+
+A call's reservation counts against its caller and provider. The window counts that reservation once, not twice. An 8 MiB reservation between different components uses 8 MiB of each component's allowance and 8 MiB of the window allowance. Reject admission or continuation with `limit-exceeded` if its reservation would exceed an applicable limit.
+
+Count distinct retained payload representations. If the host still needs a 4 MiB argument copy while validation produces a separate 6 MiB replacement, reserve 10 MiB until the earlier representation is released. Count shared objects and backing buffers once per distinct allocation retained by the invocation. Independent copies count separately. Include the full backing buffer behind a view.
+
+Release reservations when the host drops its references to the corresponding data. This does not mean garbage collection runs immediately. Cancellation alone cannot release accounting for data still retained by running work. A transformation can allocate its output before returning; the host cannot prevent that allocation. Check the output before passing it to the next phase.
+
+### Byte accounting
+
+JavaScript does not expose exact object memory sizes. Use these runtime-independent accounting charges instead:
+
+| Value                                  | Accounted bytes                             |
+| -------------------------------------- | ------------------------------------------- |
+| `null`, `undefined`, boolean or number | 8                                           |
+| String                                 | 16 plus 2 per UTF-16 code unit              |
+| `bigint`                               | 16 plus its magnitude in whole bytes        |
+| Object or supported container          | 64 plus its contents                        |
+| Property or collection slot            | 16 plus its key/value contents              |
+| `ArrayBuffer`                          | 64 plus the full backing-buffer byte length |
+| Typed array or `DataView`              | 64 for the view, plus its backing buffer    |
+
+Use the buffer/view rows instead of adding another generic object charge. A record property includes its string key and value. An array element or set member has one slot. A map pair has two slots, one for its key and one for its value. Array slot accounting includes holes, so declared sparse-array length cannot bypass limits. Count shared objects and buffers once per distinct allocation retained by the invocation. Count independent copies separately. Stop inspection as soon as a limit is exceeded.
+
+These charges estimate host-accounted payload size. They do not measure actual heap usage or guarantee that an allocation will succeed.
+
+### Depth and object/entry counting
+
+A primitive has depth 0. A root object or container has depth 1. Each nested object/container adds one level. Map keys, map values and set members participate in nesting. A view's backing buffer contributes bytes and an object count, but does not add a nesting level. Repeated references must satisfy the depth limit on every path; a shallow reference cannot hide a later deep path.
+
+Each distinct object, container, view or backing buffer counts as one object. Each record property, array position or set member counts as one entry. Each map pair counts as two entries. Include array holes. Repeated references do not recount the object, but their containing slots still count.
+
+For example, an array containing the same `{ title: 'Chapter one' }` record twice has a combined count of five: two distinct objects, two array positions and one record property.
+
+### User settings and changes
+
+Save one application-wide configuration for payload, pending-call and aggregate reservation limits. Provide controls in application settings under a clearly named section such as Plugins → Resource limits. Plugins cannot raise their own limits. Each workspace window applies the configured values to its own counters. A 128 MiB window limit is not a shared application-wide pool. Component counters remain separate per instance. Project overrides are not part of the initial version. The exact menu location and persistence mechanism are not specified here.
+
+Require positive, finite whole numbers within JavaScript's safe-integer range. Reject zero, negatives, fractions and unsafe values. Check unit conversions for overflow. Do not offer unlimited mode or add further fixed upper bounds initially. Warn when a setting exceeds its default. Explain the memory and responsiveness risks, and allow each setting to reset to its default. A valid high setting is not a guarantee that the computer can support it; handle allocation and execution failures.
+
+Apply settings changes to new invocations. An admitted invocation retains its original limits through later phases, including payload checks. Existing work still counts toward shared capacity. Lowering a pending-call limit from 32 to 16 with 24 calls running does not cancel them; admit no new calls for that caller until its pending count falls below 16. Lowering an aggregate allowance likewise does not cancel existing work or discard its data. New invocations must fit the updated allowance. No restart is required.
+
+Check inputs before copying or schema validation. Check transformed outputs and command results as well. Exceeding a host budget rejects with `CommandInvocationError` code `limit-exceeded`. Account for memory actually retained or copied, including backing buffers rather than only a view's visible byte length. Aggregate reservations prevent many individually acceptable payloads from bypassing the overall memory policy. Implement the approved accounting and reservation rules above.
 
 Measure validator duration and report slow validation through diagnostics. Preserve cancellation and lifetime checks around asynchronous boundaries. Do not require validators to be generators or run in workers. No new timeout API or numerical duration threshold is selected.
 
 These budgets bound host-managed processing, not arbitrary trusted frontend execution. A timer cannot interrupt a synchronous validator. The host cannot prevent plugin code from allocating memory or blocking its thread, and a transform can allocate a large output before the host rejects it. Do not describe payload reservations as a hard bound on process memory or total validator work.
 
-Tests must cover byte/depth/object/entry limits, aggregate reservations, large backing buffers behind small views, transformed outputs and results exceeding budgets, and bounded host inspection. Verify slow-validator diagnostics without claiming forced interruption. Aggregate reservation limits, detailed accounting, slow-validator thresholds and responsiveness measurements remain outstanding.
+Tests must cover byte/depth/object/entry limits, aggregate reservations, large backing buffers behind small views, transformed outputs and results exceeding budgets, and bounded host inspection. Verify slow-validator diagnostics without claiming forced interruption. Tests must also cover overlapping retained representations, shared-allocation deduplication, byte charges, sparse arrays, depth on every reference path, object/entry counts, initial revocation precedence and settings changes with work in flight. Slow-validator thresholds and responsiveness measurements remain outstanding.
 
 ## Implementation details still requiring specification
 
-Pending-call and per-payload defaults, user configuration, immediate overload rejection, cancellation accounting, initial check order, single settlement and safe diagnostics are approved above. Aggregate reservation limits, detailed accounting mechanics, slow-validator thresholds, settings scope/behavior and the diagnostic-ID field shape remain open. Precedence between an already-revoked caller and an already-cancelled request within the first check also remains open. Resolve these details before implementing dependent behavior. The invocation runtime remains unimplemented. Schema validation is not frontend isolation. Host code must also preserve the approved declaration, project-targeting and revocation rules.
+Pending-call, per-payload and aggregate defaults are approved above. So are retained-representation accounting, byte/depth/object/entry rules, application-wide settings, validation of setting values, changes applying to new invocations, overload rejection, cancellation accounting, failure precedence and safe diagnostics. Slow-validator thresholds, the diagnostic-ID field shape and the settings persistence/integration mechanism remain unspecified. Resolve open details before implementing behavior that depends on them. The invocation runtime remains unimplemented. Schema validation is not frontend isolation. Host code must also preserve the approved declaration, project-targeting and revocation rules.
 
 The [implementation plan](implementation-plan.md#part-4--external-packages-and-user-facing-trust) tracks the remaining native security, persistence and packaged-runtime work. This contract approval does not approve a command picker, shortcut system or external loading before those prerequisites are met.
