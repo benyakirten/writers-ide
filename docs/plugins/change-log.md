@@ -14,6 +14,18 @@ It also lets plugins use one another's APIs and extend the existing editor.
 The work includes Parts 1–2, 3A–3B and Part 3C's first rendering slice in the [implementation plan](implementation-plan.md).
 New content types and schema lifecycle remain separately gated within Part 3C. Part 4 now has source SDK/helper and read-only structure foundations alongside internal native integrity, snapshot-pool and pure manifest/parser/resolver foundations. External installation/loading and context service implementations remain unimplemented.
 
+#### Approved dispatcher defaults and failure handling
+
+The owner approved these initial command-dispatcher defaults: 8 MiB of accounted data per arguments/results payload, 64 nesting levels and 100,000 combined distinct objects and collection entries. Check transformed values too. Pending-call defaults are 32 per calling component instance, 64 per providing component instance and 256 per workspace-window host runtime. All three counters apply. Users can configure payload and pending-call limits through a host-owned settings menu; plugins cannot raise their own limits. Explain higher-limit risks and provide reset to defaults. These are engineering starting values, not measured performance guarantees.
+
+Over-capacity calls reject immediately with `limit-exceeded`, without schema validation, implementation execution or a waiting queue. The owner considered an explicit waiting helper and chose not to add it. Cancellation rejects promptly and signals cooperative work. Running validators/implementations retain capacity until settlement and cleanup; cancellation cannot undo completed effects.
+
+Initial checks run in this order: caller lifetime/cancellation, declared access/contract, provider availability, admission limits, then payload/schema validation. Recheck lifetime across asynchronous boundaries. The first terminal outcome processed settles the admitted invocation once. Caller errors contain a stable code, host-written message and diagnostic ID. Ordinary diagnostics contain invocation identities, contract/phase, timing and relevant limit measurements, not payloads or raw validator/plugin messages. Original exceptions remain available for explicit developer inspection, not automatic printing or persistence. Frontend attribution identifies the connection, not tamper-proof JavaScript provenance.
+
+These approvals update the command guide, context, specification, implementation checklist and SDK error review. No runtime, exported error type or settings UI changed. Aggregate reservation limits, detailed accounting, slow-validator thresholds, settings scope/behavior, diagnostic-ID field shape and precedence within the first combined lifetime/cancellation check remain open. Logging storage/retention and inspection UI are separate work. Earlier decision descriptions below are superseded where these approvals select defaults or check order. PR identity and merge date remain unverified.
+
+Validation for this documentation-only update: focused Oxfmt formatting and Git whitespace checks passed. No runtime tests were run because no code changed.
+
 #### Pure manifest/parser/resolver implementation
 
 The internal `src-tauri/src/plugin_manifest/` module now implements the approved manifest rules and deterministic static dependency analysis. `lib.rs` declares it with `#[allow(dead_code)]`; no application commands or runtime calls were added. This separates declaration validation from future installation, enablement and authorization rather than treating source SDK types as enforcement.
