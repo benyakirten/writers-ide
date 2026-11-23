@@ -310,9 +310,30 @@ interface PluginLocale {
 
 type NativeRequestOptions = { readonly signal?: AbortSignal };
 
+// Approved data shapes; native API integration is not implemented.
+type FileIndexEntry = {
+	readonly path: string;
+	readonly kind: 'file' | 'directory' | 'unsupported';
+	readonly sizeBytes: number | null;
+	readonly modifiedAt: number | null;
+};
+
+type FileIndexStatus = {
+	readonly revision: string;
+	readonly initialized: boolean;
+	readonly reconciling: boolean;
+	readonly needsReconciliation: boolean;
+	readonly lastReconciledAt: number | null;
+	readonly lastError: string | null;
+};
+
 interface ProjectFiles {
 	read(path: string, options?: NativeRequestOptions): Promise<Uint8Array>;
-	// File-index query and change-subscription contracts still need review.
+	subscribeIndex(
+		listener: (status: FileIndexStatus) => void,
+		options?: NativeRequestOptions,
+	): Promise<Dispose>;
+	// The indexed query contract still needs review.
 }
 
 interface ExternalLinks {
@@ -416,7 +437,7 @@ operation = "external.open"
 resource = "http-https"
 ```
 
-The three operation/resource pairs are approved. Listing and reading are separate requirements; neither implies the other. Reject unknown values and unsupported combinations. `project` means this activation's registered project location, not a path chosen in the manifest. `http-https` permits opening validated HTTP/HTTPS links, not shell execution or other protocol handling.
+The three operation/resource pairs are approved. `project.files.list` covers indexed metadata queries, reading index status and coalesced invalidation subscriptions. `project.files.read` covers saved contents separately; neither implies the other. A read-only component can read a known permitted path but cannot enumerate metadata, obtain index status or subscribe to changes. Check each operation even when the file-service group exists. This grants neither raw OS events nor manual rescans; manual-refresh authority remains under review. Reject unknown values and unsupported combinations. `project` means this activation's registered project location, not a path chosen in the manifest. `http-https` permits opening validated HTTP/HTTPS links, not shell execution or other protocol handling.
 
 Common requirements use `[[package.permissions]]`. Effective requirements are the union of package and component records.
 
@@ -426,13 +447,15 @@ Project-file requirements are only valid on project components, including inheri
 
 **Approved service availability; not implemented:** unavailable native service groups are `null`. The host exposes `native.projectFiles` only if the activation has at least one file permission; otherwise it is `null`. Each method still checks its own operation. A list-only component receives the file service, but a read attempt rejects with `permission-denied`. `native.externalLinks` is non-null only with its grant. A component with no native requirements receives both groups as `null`. Missing grants do not produce implicit permission prompts from method calls. Rust authorizes every operation independently of frontend object availability.
 
-**Approved saved-file read API; not implemented:** `ProjectFiles.read(path: string, options?: NativeRequestOptions): Promise<Uint8Array>` returns saved bytes. `NativeRequestOptions` is a shared author-facing data type with optional read-only `signal?: AbortSignal`. Authors decode text with `TextDecoder` or parse binary data themselves. Paths are relative to the activation's registered project, not arbitrary filesystem paths or URLs. The host attaches credentials and checks the specific read permission independently of service availability. This is not unsaved editor access, a write API or an unlimited-size read. Cancellation and host resource limits apply; failures reject under the native error model. File discovery uses the index direction below; its query/subscription signatures and numerical work budgets still need review.
+**Approved saved-file read API; not implemented:** `ProjectFiles.read(path: string, options?: NativeRequestOptions): Promise<Uint8Array>` returns saved bytes. `NativeRequestOptions` is a shared author-facing data type with optional read-only `signal?: AbortSignal`. Authors decode text with `TextDecoder` or parse binary data themselves. Paths are relative to the activation's registered project, not arbitrary filesystem paths or URLs. The host attaches credentials and checks the specific read permission independently of service availability. This is not unsaved editor access, a write API or an unlimited-size read. Cancellation and host resource limits apply; failures reject under the native error model. File discovery uses the index direction below; its indexed query signature and numerical work budgets still need review. The index subscription signature is approved below.
 
 **Approved file-index direction; not implemented:** use a project-scoped SQLite index of files and filesystem metadata, not file contents or an authoritative application-document catalog. The filesystem remains the source of truth. Plugins query bounded metadata pages through the host. Finish statements/read transactions before returning each page; retain no filesystem iterator, directory handle, SQLite statement or read transaction between pagination requests.
 
-Use filesystem notifications and periodic reconciliation to maintain the index. Watchers are hints and can miss events. Reconciliation scheduling, freshness/readiness, schema/location, query/continuation and subscription contracts still need review. A manually requested refresh is proposed, not a selected API. Changes do not define project content storage or require the host-management database to hold the index. See the [file-index plan](file-index-plan.md).
+Use filesystem notifications and periodic reconciliation to maintain the index. Watchers are hints and can miss events. Subscribers receive coalesced invalidation after committed index updates, not raw filesystem events or per-file change batches. Multiple commits may share one notice. Refresh relevant queries rather than the entire index. Subscriptions are activation-owned and stop on access revocation or project closure.
 
-Directory views retain project-relative paths, separate metadata/read authorization, no-follow unsupported-entry handling, explicit `'.'` root notation and the approved maximum of 256 entries per page without a caller-selected page size. These constraints do not finalize the new query/result types. Indexing does not guarantee a consistent multi-page filesystem snapshot. Saved-file reads must still validate actual targets and grants; cached metadata is not authority.
+Queries may return available cached/partial metadata before initialization or reconciliation finishes, with explicit readiness/freshness information and the index revision used. Incomplete empty results do not prove emptiness, and failed/partial observations do not confirm deletions. Ready means required initialization completed, not instantaneous filesystem consistency. Readiness changes also invalidate subscribers when no file rows changed, after the new state becomes query-visible. Saved reads of known paths do not wait for index readiness. The six-field `FileIndexStatus` shape is approved in the context draft. Its revision is opaque; initialization is for this opening; active reconciliation and known uncertainty are independent facts. Last successful full reconciliation time uses Unix-epoch milliseconds and may be retained from an earlier opening. Background `lastError` is display-only and clears on successful reconciliation; query failures still reject. See the [field meanings](file-index-plan.md#approved-status-shape). `ProjectFiles.subscribeIndex(listener, options?): Promise<Dispose>` is approved. It establishes an authorized native subscription, delivers initial `FileIndexStatus`, then resolves to idempotent early cleanup. Setup failures reject. Later notifications contain coalesced status updates, not every revision. Keep activation ownership, cancellation-safe setup, access/project cleanup and isolated listener diagnostics. Await only in managed async work or async UI handlers; native setup remains gated during synchronous activation. See the [subscription contract](file-index-plan.md#approved-asynchronous-subscription). Opaque reusable keyset continuation is approved: order initially by deterministic non-locale-aware path, validate the live project opening and directory/query, and recheck authorization. Tokens contain position data, own no native resources, need no resource timeout and query current state on each use. Each page has its own status/revision; no historical snapshot is implied. Deleting the last row does not prevent continuation, while new earlier entries or renames may require refresh or affect membership. Exact query method/page envelope, reconciliation scheduling and schema/location remain open. See the [pagination contract](file-index-plan.md#query-pagination). A manually requested refresh is proposed, not a selected API. Changes do not define project content storage or require the host-management database to hold the index. See the [file-index plan](file-index-plan.md).
+
+Directory views retain project-relative paths, separate metadata/read authorization, no-follow unsupported-entry handling, explicit `'.'` root notation and the approved maximum of 256 entries per page without a caller-selected page size. `FileIndexEntry` is approved with project-relative path, file/directory/unsupported kind, nullable observed file size and nullable observed modification time. Size is null for directories, unsupported or unavailable values. Modification time is Unix-epoch milliseconds for files/directories or null when unavailable/unsupported. Never replace unknowns with zero. Inspection failures remain visible as uncertainty/error. These are cached observations, not proof of unchanged contents or stable document identity. See the [entry contract](file-index-plan.md#indexed-entry-metadata). Query method, page envelope and continuation contracts remain open. Indexing does not guarantee a consistent multi-page filesystem snapshot. Saved-file reads must still validate actual targets and grants; cached metadata is not authority.
 
 For example, this proposed entry starts one managed read during activation. The host supplies `context`; the example supplies the file path. A real feature could start the same task from a user command. `FrontendContext` is a proposed future export; managed `tasks.async` already exists.
 
@@ -492,7 +515,7 @@ The SDK converts native error envelopes to `Error` objects. Messages are human-r
 - **Approved root notation; not implemented:** `'.'` explicitly selects the activation's registered project root, not the process working directory. Reject empty or missing paths; there is no implicit default. Other directories use portable project-relative paths. Reject absolute paths and parent traversal. Returned paths remain project-relative and expose no absolute root location. This does not make the root readable as a file.
 - **Approved page-entry maximum; not implemented:** return at most 256 entries per page, possibly fewer, with no caller `pageSize` option initially. The host owns this engineering starting limit; plugins cannot raise it. Smaller caller-requested pages remain a future candidate. Completion signaling, ordering and continuation behavior need indexed-query design. Bound query work and payloads independently of response count.
 - **Approved unsupported-entry representation; not implemented:** entries identified as links, reparse points or special files use `kind = 'unsupported'`, alongside `file` and `directory`. Report the project-relative path but no target or contents, and never traverse them. Encountering an identified unsupported entry does not itself fail the directory listing. Attempts to read or traverse it fail. Failed inspection must remain visible as uncertainty/error under the index freshness policy, not silently become deletion or an unsupported classification.
-- Query continuations must not own live native resources between requests. Validate each query's activation, live project opening and metadata permission. Continuation representation, retry behavior and consistency across index updates remain open.
+- Use opaque reusable keyset tokens for live index pages with deterministic path ordering. Validate the live project opening and directory/query plus the caller's active metadata permission. Tokens own no native resources and do not lock pages to a historical revision. Internal encoding is not a public API; malformed/mismatched tokens fail validation. Exact query inputs, page envelope and completion signaling remain under review.
 - Bound active index scans, watchers, queries and database work. They still need native resource cleanup even though pagination retains no iterator. Timer cadence, notifications and optional manual refresh remain under review.
 
 **Recommended read/work budgets:** at most 16 MiB returned per read, two concurrent saved-file reads per activation, four per window, and 32 MiB of reserved in-flight read payload per window. Reject excess work with `limit-exceeded` instead of accumulating an unbounded queue. Bound link opening separately to two outstanding requests per activation and eight per window; reject URLs over 8 KiB before OS handoff. These are proposed starting defaults for tests and measurement, not a guarantee about total process memory or IPC-copy overhead. Index query, scanning and watcher budgets need separate design. Callers cannot raise them. Streaming and recursive traversal are later work.
