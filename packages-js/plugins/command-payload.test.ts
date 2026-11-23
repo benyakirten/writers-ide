@@ -329,7 +329,6 @@ describe('command payload inspection and copying', () => {
 			new Map(),
 			new Set(),
 			new ArrayBuffer(8),
-			new Uint8Array(4),
 			new DataView(new ArrayBuffer(4)),
 		]) {
 			const accessor = Object.defineProperty(value, 'secret', { get, enumerable: true });
@@ -344,6 +343,72 @@ describe('command payload inspection and copying', () => {
 		const tag = Object.defineProperty({}, Symbol.toStringTag, { get });
 		rejects(tag);
 		expect(get).not.toHaveBeenCalled();
+	});
+
+	it('treats typed arrays as binary state without reading or copying custom properties', () => {
+		const getter = vi.fn(() => {
+			throw new Error('must not read');
+		});
+		const view = new Uint8Array([1, 2, 3]);
+		const before = inspectCommandPayload(view);
+		Object.defineProperties(view, {
+			metadata: { value: { unsupported: () => 1 }, enumerable: true },
+			secret: { get: getter, enumerable: true },
+			hidden: { value: Symbol('ignored') },
+			constructor: { get: getter },
+		});
+		Object.defineProperty(view, Symbol.toStringTag, { get: getter });
+		Object.defineProperty(view, Symbol('extra'), { value: view });
+		expect(inspectCommandPayload(view)).toMatchObject({
+			bytes: before.bytes,
+			entries: before.entries,
+			depth: before.depth,
+		});
+		const copy = copyCommandPayload(view) as Uint8Array;
+		expect([...copy]).toEqual([1, 2, 3]);
+		expect(copy.buffer).not.toBe(view.buffer);
+		expect(Reflect.ownKeys(copy)).toEqual(['0', '1', '2']);
+		expect(getter).not.toHaveBeenCalled();
+		copy[0] = 99;
+		expect(view[0]).toBe(1);
+	});
+
+	it('inspects and copies many shared-buffer views without enumerating their indices', () => {
+		const buffer = new ArrayBuffer(2 * 1024 * 1024);
+		new Uint8Array(buffer)[0] = 42;
+		const views = Array.from({ length: 49_999 }, () => new Uint8Array(buffer));
+		const ownKeys = Reflect.ownKeys;
+		const descriptor = Object.getOwnPropertyDescriptor;
+		// Fail immediately on numeric-index inspection, not after an expensive traversal.
+		const descriptors = vi
+			.spyOn(Object, 'getOwnPropertyDescriptor')
+			.mockImplementation((source, key) => {
+				if (ArrayBuffer.isView(source)) {
+					throw new Error('Unexpected view property inspection');
+				}
+				return descriptor(source, key);
+			});
+		const keys = vi.spyOn(Reflect, 'ownKeys').mockImplementation((source) => {
+			if (ArrayBuffer.isView(source)) {
+				throw new Error('Unexpected view enumeration');
+			}
+			return ownKeys(source);
+		});
+		try {
+			expect(inspectCommandPayload(views)).toMatchObject({
+				bytes: 6_097_200,
+				entries: 100_000,
+				depth: 2,
+			});
+			const copy = copyCommandPayload(views) as Uint8Array[];
+			expect(copy.length).toBe(49_999);
+			expect(copy[0].buffer).toBe(copy[49_998].buffer);
+			expect(copy[0].buffer).not.toBe(buffer);
+			expect(copy[49_998][0]).toBe(42);
+		} finally {
+			keys.mockRestore();
+			descriptors.mockRestore();
+		}
 	});
 
 	it('stops inspection before traversing over-budget properties or sparse slots', () => {

@@ -1,5 +1,3 @@
-// Not ready for host integration: typed-array own-key enumeration can amplify work
-// across views sharing a buffer. See docs/plugins/command-contract.md's blocking limitation.
 export type PayloadLimits = {
 	maxBytes: number;
 	maxDepth: number;
@@ -218,7 +216,6 @@ function scan(value: unknown, limits: PayloadLimits): Scan {
 				node.length = typedLength.call(source) as number;
 				node.offset = typedOffset.call(source) as number;
 				buffer = typedBuffer.call(source);
-				indexedLength = node.length;
 			} else {
 				node.viewName = 'DataView';
 				node.length = dataLength.call(source) as number;
@@ -228,12 +225,17 @@ function scan(value: unknown, limits: PayloadLimits): Scan {
 			if (!hasPrototype(source, viewConstructors[node.viewName])) {
 				invalid();
 			}
-			// Inspect the backing allocation before enumerating potentially many view indices.
+			// Account for the full shared allocation once, regardless of the visible range.
 			if (!nodes.has(buffer as object)) {
 				const backing = describe(buffer as object);
 				backing.complete = true;
 			}
 			add(buffer, undefined, 0);
+			if (node.viewName !== 'DataView') {
+				// Typed arrays carry binary state only. Enumerating custom properties would
+				// also enumerate every numeric index, multiplying work across shared views.
+				return node;
+			}
 		} else if (hasPrototype(source, ArrayBuffer)) {
 			node.kind = 'buffer';
 			node.length = bufferLength.call(source) as number;
@@ -280,7 +282,7 @@ function scan(value: unknown, limits: PayloadLimits): Scan {
 			} else {
 				const index = Number(key);
 				if (
-					(node.kind !== 'array' && node.kind !== 'view') ||
+					node.kind !== 'array' ||
 					!Number.isInteger(index) ||
 					index < 0 ||
 					index >= indexedLength ||

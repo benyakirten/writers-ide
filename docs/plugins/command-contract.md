@@ -192,6 +192,8 @@ Validation must cover every allowed type and rejection of unsupported values at 
 
 **Approved payload support; not implemented:** shared commands accept `ArrayBuffer`, typed arrays and `DataView` in their declared arguments and results. The shared contract must validate these values like any other payload. This lets file-processing components exchange bytes without base64 or ordinary-number-array conversion.
 
+Typed arrays are binary data only. Custom properties attached to them are not command data and are neither inspected nor copied. Put metadata in a surrounding plain record. This exception does not change property handling for `DataView` or `ArrayBuffer`.
+
 Copy buffers and views at the command boundary. Preserve the buffer/view type and view range. The recipient's copy must not alias the sender's memory. Do not transfer ownership or detach the sender's buffer. Exclude `SharedArrayBuffer` and views backed by shared memory. Binary support does not approve every structured-clone type. The payload limits below also apply to binary data.
 
 Validation must cover buffer and view types, nonzero view offsets/ranges, sender/recipient mutation independence, undetached sender buffers and rejection of shared memory. Bound copy work and memory under the resource policy below. Use the approved accounting rules below.
@@ -333,7 +335,7 @@ Tests must cover each accounting scope, validation/execution/result phases, canc
 
 ## Payload budgets and validator diagnostics
 
-**Internal primitives implemented with a blocking limitation; host integration not implemented:** enforce host-owned limits on payload bytes, nesting depth, visited objects/entries and aggregate in-flight payload reservations. Bound inspection itself; do not fully traverse an arbitrarily large payload merely to discover that it exceeds a limit.
+**Internal primitives implemented; host integration not implemented:** enforce host-owned limits on payload bytes, nesting depth, visited objects/entries and aggregate in-flight payload reservations. Bound inspection itself; do not fully traverse an arbitrarily large payload merely to discover that it exceeds a limit.
 
 Approved initial defaults, applied separately to arguments and results and also checked on schema-transformed values:
 
@@ -343,7 +345,7 @@ Approved initial defaults, applied separately to arguments and results and also 
 | Nesting depth                           |               64 levels |
 | Distinct objects and collection entries |        100,000 combined |
 
-These are initial engineering defaults, not measured performance guarantees. Internal inspection and reservation code implements the accounting below, subject to the blocking limitation documented at the end. Settings UI/persistence and dispatch integration remain unimplemented.
+These are initial engineering defaults, not measured performance guarantees. Internal inspection and reservation code implements the accounting below. The inspection limits at the end describe remaining JavaScript reflection constraints. Settings UI/persistence and dispatch integration remain unimplemented.
 
 ### Aggregate reservations
 
@@ -408,7 +410,7 @@ Tests must cover byte/depth/object/entry limits, aggregate reservations, large b
 
 ## Implementation details still requiring specification
 
-Pending-call, per-payload and aggregate defaults are approved above. So are retained-representation accounting, byte/depth/object/entry rules, application-wide settings, validation of setting values, changes applying to new invocations, overload rejection, cancellation accounting, failure precedence and safe diagnostics. The 16 ms initial-synchronous-validator warning threshold and the exported Error subclass are also approved. Settings persistence/integration remains unspecified. Resolve open details before implementing behavior that depends on them. The invocation runtime and validator timing instrumentation remain unimplemented. The internal primitives and their blocking limitation are described below. Schema validation is not frontend isolation. Host code must also preserve the approved declaration, project-targeting and revocation rules.
+Pending-call, per-payload and aggregate defaults are approved above. So are retained-representation accounting, byte/depth/object/entry rules, application-wide settings, validation of setting values, changes applying to new invocations, overload rejection, cancellation accounting, failure precedence and safe diagnostics. The 16 ms initial-synchronous-validator warning threshold and the exported Error subclass are also approved. Settings persistence/integration remains unspecified. Resolve open details before implementing behavior that depends on them. The invocation runtime and validator timing instrumentation remain unimplemented. The internal primitives and their inspection limits are described below. Schema validation is not frontend isolation. Host code must also preserve the approved declaration, project-targeting and revocation rules.
 
 ## Internal payload and reservation primitives
 
@@ -419,14 +421,18 @@ These working-branch modules are implementation code, not author-facing SDK entr
 
 The ledger rejects excess capacity without changing counters. It counts shared allocations once within an invocation, independent copies separately and separate invocations independently. Inspections are point-in-time receipts, not mutation tracking. If retained inspections observe different charges for the same object, retain the maximum charge until the corresponding receipts are released. The future dispatcher must recheck mutable values across asynchronous boundaries.
 
-The inspector currently rejects accessors, symbol/hidden properties and extra properties on built-in containers rather than invoking getters or silently losing data. It preserves sparse arrays, null-prototype records, repeated references and buffer/view sharing in the independent copy. Reflection failures produce fixed internal `PayloadError` messages without echoing payload or thrown messages. These internal errors are not normalized invocation errors; the future dispatcher must map their codes and attach diagnostic IDs. The functions are synchronous and do not offload work.
+Except for typed arrays' binary-only semantics below, the inspector rejects accessors, symbol/hidden properties and extra properties on built-in containers rather than invoking getters or silently losing data. It preserves sparse arrays, null-prototype records, repeated references and buffer/view sharing in the independent copy. Reflection failures produce fixed internal `PayloadError` messages without echoing payload or thrown messages. These internal errors are not normalized invocation errors; the future dispatcher must map their codes and attach diagnostic IDs. The functions are synchronous and do not offload work.
 
-### Blocking inspection limitation
+### Typed-array binary semantics and inspection limits
 
-**Not ready for host integration:** portable JavaScript cannot discover arbitrary extra own properties on a typed array without also enumerating its numeric indices. The current implementation performs that enumeration for every distinct view. Many views sharing one buffer can fit the byte/object limits but still require excessive inspection work. Backing-buffer deduplication does not bound this cost. Hidden/symbol own-key enumeration also has no streaming API. Proxy traps can execute arbitrary code; reflection is not isolation.
+**Approved and implemented internally:** typed arrays carry binary state only. Inspect their intrinsic type, range and backing buffer without enumerating numeric indices or custom properties. Copy their binary state independently. Exclude custom string, symbol, hidden and accessor properties from payload data and accounting. Do not read their values or invoke their getters. A self-reference attached as a custom typed-array property is likewise not part of the payload graph. This exception applies to typed arrays, not ordinary records, arrays, `DataView` or `ArrayBuffer` objects.
 
-An owner decision is required: either explicitly exclude custom typed-array properties from payload data, or approve another inspection restriction/boundary. Neither choice is implemented or approved by this slice. Do not describe the current inspector as fully work-bounded or connect it to command dispatch before resolving this limitation.
+Authors should put metadata beside the typed array in a plain record. For example, a caller can supply `{ bytes: new Uint8Array(buffer), description: 'Chapter export' }` to a command whose shared schema accepts that record. The recipient gets the declared bytes and description, not custom properties attached to the typed array.
 
-See [`command-payload.test.ts`](../../packages-js/plugins/command-payload.test.ts) and [`command-reservations.test.ts`](../../packages-js/plugins/command-reservations.test.ts) for supported-value, graph, copy, accounting, release and settings coverage. Passing these tests does not establish a bound on typed-array property enumeration.
+This avoids multiplying inspection work by each view's numeric length when many views share one buffer. A regression inspects and copies 49,999 views over one 2 MiB buffer under the approved defaults. It checks that view own-key enumeration and indexed property-descriptor inspection do not occur.
+
+Other reflection limits remain. JavaScript has no streaming own-key API for hidden/symbol properties, and proxy traps can execute arbitrary code. Supported graphs use bounded incremental accounting where possible, but this is not a hard bound on all engine reflection work or arbitrary plugin execution. The functions remain synchronous; callers must account for main-thread responsiveness. These caveats are not a new payload quota or an isolation guarantee.
+
+See [`command-payload.test.ts`](../../packages-js/plugins/command-payload.test.ts) and [`command-reservations.test.ts`](../../packages-js/plugins/command-reservations.test.ts) for supported-value, graph, copy, accounting, release and settings coverage.
 
 The [implementation plan](implementation-plan.md#part-4--external-packages-and-user-facing-trust) tracks the remaining native security, persistence and packaged-runtime work. This contract approval does not approve a command picker, shortcut system or external loading before those prerequisites are met.
