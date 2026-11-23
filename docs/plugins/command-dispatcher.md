@@ -83,6 +83,8 @@ The dispatcher warns when a validator's initial synchronous call exceeds 16 ms. 
 
 A host slot identifies a component instance that the host has already selected. For example, two project openings can have separate slots for the same component. This harness does not decide which project or package a slot represents. Future application assembly must supply that mapping from validated declarations and live scope.
 
+Construct the harness with an explicit host-owned `locale` source implementing `PluginLocale`. The source provides the current UI language/direction and immediate/change subscriptions. No application locale is guessed. An optional `workQueue` supplies the embedding host's shared cooperative scheduler; otherwise the standalone harness creates one queue shared by its activations. Application assembly must pass the pagination queue when these components join the application's scheduling budget.
+
 Host code calls `register(descriptor)` with a slot ID, explicit package/component/project-opening identity, declared APIs/commands, exact provider-slot dependencies, command capability and synchronous activation callback. The harness copies and freezes declaration data. It checks applicable identifier, list-size, duplicate and self-dependency rules. This is not parsing `manifest.toml`, matching package versions or selecting project scopes. Planning is iterative but synchronous and can scan the full slot catalogue. The harness does not yet provide catalogue budgets or cooperative scheduling.
 
 ### Activation and publication
@@ -96,9 +98,11 @@ Each activation gets a fresh host-generated instance ID. The harness calls the d
 - `signal`: ends with this activation.
 - `own(dispose)`: activation-owned, idempotent cleanup.
 - `commands`: the dispatcher-backed consumer invoker.
+- `tasks`: the existing activation-owned `TaskService` over the host's cooperative queue.
+- `locale`: an activation-owned `PluginLocale` adapter over the host's UI locale source.
 - `contributions.command(registration)`: the generic SDK command-registration signature.
 
-This is deliberately not a complete `FrontendContext`. It supplies no toolbar/view registration, tasks, native services, locale service or project connection.
+This is deliberately not a complete `FrontendContext`. It supplies no toolbar/view registration, native services or project connection.
 
 Every declared API and command must be published before setup succeeds. API factories are staged alongside commands, so a missing publication rolls back both kinds. Catching an invalid API publication still fails setup. Factories themselves run lazily when a consumer requests the API.
 
@@ -123,6 +127,30 @@ The complete teardown plan is marked revoked before abort events or owned cleanu
 `get` and `list` return frozen status snapshots. `subscribe` immediately delivers snapshots and returns an early disposer. Activation and cleanup failures use simple host-owned codes. This is not the production plugin-management UI or its persistence model.
 
 Lifecycle changes during activation, notifications, diagnostics or cleanup are guarded. Callers must defer those changes until the callback returns. This includes disposing staged publications from an immediate availability callback. Ordinary direct disposal during setup is allowed, but leaves setup invalid because the promised publication is missing.
+
+## Managed tasks and UI locale
+
+### Task ownership and continuations
+
+The harness reuses `createTaskService` from `@writers-ide/tasks`; it does not implement another executor. Each activation owns a separate service, with its activation ID as owner metadata. Replacement keys are local to that service. Components in one host share a queue, but cancelling one component does not cancel peer work or dispose the queue.
+
+Services are owned before the author activation callback runs. Setup may start a task and retain its handle for later state/UI use. Successful synchronous activation does not mean the task has completed. Failed activation cancels its tasks during rollback. Deactivation and host disposal also cancel owned work. Old contexts cannot submit new tasks, and late failures cannot be attributed to replacement activations. Status snapshots record a host-owned `task-failed` code, not the task's raw error contents. A task failure does not disable the component.
+
+Choose `forEach` or `cooperative` for incremental main-thread work, `async` for asynchronous APIs, and `worker` for worker computation. Promises do not offload CPU work. Cooperative callbacks must remain short. Task handles expose `result: Promise<TaskOutcome<T>>`, which resolves to completed, cancelled or failed rather than rejecting. See the [task API](../../packages-js/tasks/README.md#exact-task-api).
+
+A command or provider operation should pass its invocation/connection signal into its task options when work must end with that operation. Activation ownership alone does not cancel a task when one consumer connection or invocation ends. Authors must check cancellation before later effects and use fresh validated editor operations after computation. Neither cancellation nor rollback retracts completed effects or stops arbitrary asynchronous JavaScript.
+
+The internal worker helper still uses the existing `createWorker` library option. Verified package-worker URL selection and loading remain separate work. Worker creation/apply cancellation and stale result suppression reuse the task service's existing behavior. The harness additionally suppresses worker `apply` after private activation revocation, before sequential abort events finish.
+
+### Locale snapshots and subscriptions
+
+[`component-locale.ts`](../../packages-js/plugins/component-locale.ts) implements the approved `context.locale.snapshot()` and `subscribe(listener)` methods. Snapshots are copied, frozen `{ languageTag, direction }` data for the application UI, not manuscript language. Plugins own translations and fallback messages. The adapter supplies no private generated application messages or locale-changing method.
+
+Subscriptions deliver immediately and when the source language/direction changes. Their idempotent disposers support early release. Activation failure and teardown detach them. Methods reject after activation revocation, and no later source notice reaches the old listener. Source setup is guarded so teardown during immediate delivery cannot leak the returned source subscription.
+
+Nested changes are drained after the current listener returns, rather than recursively invoking it. A notice during snapshot acquisition discards the potentially stale read and obtains current data again. Release during a source read prevents subsequent listener delivery. Equal snapshots are not delivered repeatedly.
+
+Listener failures are isolated without unsubscribing. Promise rejections from asynchronous listeners are observed, but their completion is not awaited. Late failures after release/teardown are ignored. Live failures record a host-owned `locale-listener-failed` code without disabling the component or exposing the raw listener exception. Locale callbacks use the same lifecycle mutation guard as other host notifications.
 
 ## Alias-based provider connections
 
@@ -157,6 +185,8 @@ Listener failures do not unsubscribe. Promise rejections from asynchronous liste
 
 ## Validation entry points
 
+- [`component-locale.test.ts`](../../packages-js/plugins/component-locale.test.ts): frozen snapshots, subscription ownership, failures, nested changes, stale reads and guarded notifications.
+- [`component-tasks.test.ts`](../../packages-js/plugins/component-tasks.test.ts) and [`component-tasks-continuations.test.ts`](../../packages-js/plugins/component-tasks-continuations.test.ts): real task-service/queue ownership, cancellation, keys, rollback, stale handles, worker apply and API/command continuations. These run with the Svelte compiler in a Node test environment, using controlled animation frames and test workers; they are not packaged-worker or browser-layout evidence.
 - `packages-js/plugins/component-api-*.test.ts`: API declarations, endpoint metadata, caching, connection ownership, mixed API/command rollback, subscription retries and batch revocation. [`provider-facade.test.ts`](../../packages-js/plugins/provider-facade.test.ts) covers the shared facade helper. Existing bundled-provider tests verify extraction compatibility.
 - [`command-component-host.test.ts`](../../packages-js/plugins/command-component-host.test.ts) and [`command-component-regressions.test.ts`](../../packages-js/plugins/command-component-regressions.test.ts): publication checks, required/optional activation, cascade consent, rollback, stale contexts, independent commands and guarded cleanup/notifications. [`command-component-fixture.ts`](../../packages-js/plugins/command-component-fixture.ts) contains shared test setup, not runtime discovery.
 - [`command-dispatcher.test.ts`](../../packages-js/plugins/command-dispatcher.test.ts): execution, schemas, availability, aliases, cancellation, replacement, reentrant callbacks, diagnostics, timing and copy-admission regressions.

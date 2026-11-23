@@ -1,3 +1,11 @@
+import {
+	createTaskService,
+	WorkQueue,
+	type TaskService,
+	type WorkerTaskOptions,
+} from '@writers-ide/tasks';
+import type { PluginLocale } from './frontend';
+import { createActivationLocale } from './component-locale';
 import { createCommandDispatcher } from './command-dispatcher';
 import { ComponentApiManager } from './component-api-manager';
 import { apiKey } from './component-api-declarations';
@@ -24,13 +32,18 @@ type Snapshot = {
 	readonly instanceId?: string;
 	readonly errors: readonly string[];
 };
-type Options = NonNullable<Parameters<typeof createCommandDispatcher>[0]>;
+type Options = NonNullable<Parameters<typeof createCommandDispatcher>[0]> & {
+	readonly locale: PluginLocale;
+	readonly workQueue?: WorkQueue;
+};
 let nextInstance = 0;
 
 /** Internal trusted-descriptor harness. No loading, scope selection or native authority. */
 export class CommandComponentHost {
 	readonly #entries = new Map<string, Entry>();
 	readonly #dispatcher;
+	readonly #locale: PluginLocale;
+	readonly #workQueue: WorkQueue;
 	readonly #apis = new ComponentApiManager(this.#entries, (callback) => this.#callback(callback));
 	readonly #listeners = new Set<(snapshot: readonly Snapshot[]) => void>();
 	#busy = false;
@@ -38,10 +51,13 @@ export class CommandComponentHost {
 	#cleanupCallbacks = 0;
 	#disposed = false;
 
-	constructor(options: Options = {}) {
+	constructor(options: Options) {
+		const { locale, workQueue, ...dispatcherOptions } = options;
+		this.#locale = locale;
+		this.#workQueue = workQueue ?? new WorkQueue();
 		// Dispatcher diagnostics also run inside the lifecycle mutation guard.
 		this.#dispatcher = createCommandDispatcher({
-			...options,
+			...dispatcherOptions,
 			diagnostics: (data) => this.#callback(() => options.diagnostics?.(data)),
 			inspectError: options.inspectError
 				? (error, data) => this.#callback(() => options.inspectError?.(error, data))
@@ -272,6 +288,54 @@ export class CommandComponentHost {
 		} satisfies CommandInvoker);
 	}
 
+	#tasks(
+		activation: Activation,
+		onError: () => void,
+		owned: (dispose: Dispose) => Dispose,
+	): TaskService {
+		const service = createTaskService({
+			queue: this.#workQueue,
+			ownerId: activation.id,
+			signal: activation.controller.signal,
+			onError,
+		});
+		owned(() => service.dispose());
+		const assertLive = () => {
+			if (activation.phase === 'stopped') {
+				throw new Error('Task service has been disposed');
+			}
+		};
+		return Object.freeze({
+			forEach: (options) => {
+				assertLive();
+				return service.forEach(options);
+			},
+			cooperative: (options) => {
+				assertLive();
+				return service.cooperative(options);
+			},
+			async: (options) => {
+				assertLive();
+				return service.async(options);
+			},
+			worker: <I, O>(options: WorkerTaskOptions<I, O>) => {
+				assertLive();
+				return service.worker<I, O>({
+					...options,
+					apply: (value, context) => {
+						// The whole stop plan is revoked before its signals are aborted in sequence.
+						if (activation.phase === 'stopped') {
+							service.dispose();
+							return;
+						}
+						options.apply?.(value, context);
+					},
+				});
+			},
+			dispose: () => service.dispose(),
+		} satisfies TaskService);
+	}
+
 	#start(entry: Entry): void {
 		nextInstance++;
 		const id = `command-component-activation-${nextInstance}`;
@@ -290,36 +354,50 @@ export class CommandComponentHost {
 		entry.activation = activation;
 		const errors: string[] = [];
 		entry.errors = errors;
-		const context: CommandContext = Object.freeze({
-			identity: activation.identity,
-			apis: this.#apis.context(entry, activation),
-			signal: activation.controller.signal,
-			own: (dispose: Dispose) =>
-				own(
-					activation,
-					() => {
-						this.#cleanupCallbacks++;
-						try {
-							return dispose();
-						} finally {
-							this.#cleanupCallbacks--;
-						}
-					},
-					() => {
-						errors.push('cleanup-failed');
-					},
-				),
-			commands: this.#invoker(entry, activation),
-			contributions: Object.freeze({
-				command: <AI, AO, RI, RO>(registration: CommandRegistration<AI, AO, RI, RO>) =>
-					this.#publish(
-						entry,
-						activation,
-						registration as CommandRegistration<unknown, unknown, unknown, unknown>,
-					),
-			}),
-		});
+		const owned = (dispose: Dispose) =>
+			own(
+				activation,
+				() => {
+					this.#cleanupCallbacks++;
+					try {
+						return dispose();
+					} finally {
+						this.#cleanupCallbacks--;
+					}
+				},
+				() => {
+					errors.push('cleanup-failed');
+				},
+			);
 		try {
+			const tasks = this.#tasks(activation, () => errors.push('task-failed'), owned);
+			const locale = createActivationLocale({
+				source: this.#locale,
+				isLive: () => activation.phase !== 'stopped',
+				signal: activation.controller.signal,
+				own: owned,
+				callback: <T>(callback: () => T) => this.#callback(callback),
+				onError: () => {
+					errors.push('locale-listener-failed');
+				},
+			});
+			const context: CommandContext = Object.freeze({
+				identity: activation.identity,
+				apis: this.#apis.context(entry, activation),
+				signal: activation.controller.signal,
+				own: owned,
+				tasks,
+				locale,
+				commands: this.#invoker(entry, activation),
+				contributions: Object.freeze({
+					command: <AI, AO, RI, RO>(registration: CommandRegistration<AI, AO, RI, RO>) =>
+						this.#publish(
+							entry,
+							activation,
+							registration as CommandRegistration<unknown, unknown, unknown, unknown>,
+						),
+				}),
+			});
 			const result = entry.descriptor.activate(context);
 			synchronous(result);
 			if (typeof result === 'function') {

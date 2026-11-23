@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CommandComponentHost } from './command-component-host';
+import { createHost } from './command-component-fixture';
+import type { CommandComponentHost } from './command-component-host';
 import type { CommandContext, ComponentDescriptor } from './command-component-model';
 import { createCommandReservationLedger } from './command-reservations';
 import {
@@ -23,7 +24,7 @@ function rejectsMutation(host: CommandComponentHost) {
 
 describe('command component lifetime regressions', () => {
 	it('preserves an optional surviving command and its pending call when another publication disappears', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const pending = deferred();
 		const started = vi.fn(() => pending.promise);
 		const second = { ...declaration, id: 'second' };
@@ -92,7 +93,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('does not attribute stale own cleanup failure to a replacement activation', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const caller = consumer(host, true);
 		host.activate('consumer');
 		const old = caller.context;
@@ -126,7 +127,7 @@ describe('command component lifetime regressions', () => {
 					failures.push((error as Error).message);
 				}
 			});
-			const host = new CommandComponentHost({
+			const host = createHost({
 				diagnostics: source === 'diagnostic' ? attempt : undefined,
 			});
 			host.register({
@@ -157,7 +158,7 @@ describe('command component lifetime regressions', () => {
 		},
 	);
 	it('guards early and late own cleanup without preventing early owned command disposal', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		let context!: CommandContext;
 		let early!: () => void;
 		let remove!: () => void;
@@ -187,7 +188,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('does not change stable bindings or revoke pending calls for unrelated registration changes', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const pending = deferred();
 		host.register(
 			provider((context) => {
@@ -210,7 +211,7 @@ describe('command component lifetime regressions', () => {
 
 	it('revokes pending calls on command removal, observes late work, and permits no re-publication', async () => {
 		const ledger = createCommandReservationLedger();
-		const host = new CommandComponentHost({ ledger });
+		const host = createHost({ ledger });
 		const pending = deferred();
 		let context!: CommandContext;
 		let release!: () => void;
@@ -237,7 +238,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('stops subscriptions on consumer teardown even if the same callback is independently subscribed', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const caller = consumer(host, true);
 		host.activate('consumer');
 		const listener = vi.fn();
@@ -257,7 +258,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('cleans up failed consumer setup without revoking previously active siblings or required providers', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(provider());
 		const sibling = consumer(host);
 		host.activate('consumer');
@@ -284,7 +285,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('defensively captures dependency aliases, requirements, capabilities, and activation callbacks', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const requirements = [{ ...declaration, alias: 'run' }];
 		const dependencies = [{ ...dependency(), commands: requirements }];
 		const capabilities: 'contributions.command'[] = ['contributions.command'];
@@ -314,7 +315,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('isolates notification errors, rejects setup reentry, and lets later observers run', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const caller = consumer(host, true);
 		host.activate('consumer');
 		const later = vi.fn();
@@ -337,7 +338,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('observes async disposer rejection while continuing reverse cleanup', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const pending = deferred();
 		const cleanup = vi.fn();
 		host.register(
@@ -356,7 +357,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('keeps command aliases local to each dependency and rejects invalid runtime references', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(provider(undefined, 'one'));
 		host.register(provider(undefined, 'two'));
 		let context!: CommandContext;
@@ -381,7 +382,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('rolls back a staged command even when duplicate publication was caught after disposal', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(
 			provider((context) => {
 				publish(context)();
@@ -398,7 +399,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('never exposes failed staged publication to optional consumers', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const caller = consumer(host, true);
 		host.activate('consumer');
 		const listener = vi.fn();
@@ -417,7 +418,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('rejects reentrant registration disposal during initial availability notification atomically', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		let release!: () => void;
 		host.register(
 			provider((context) => {
@@ -445,7 +446,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('never retargets an old consumer after unregister and slot replacement', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(provider());
 		const first = consumer(host);
 		host.activate('consumer');
@@ -462,7 +463,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('accepts manifest count boundaries without enabling optional provider slots', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const commands = Array.from({ length: 32 }, (_, index) => ({
 			...declaration,
 			id: `command-${index}`,
@@ -502,7 +503,7 @@ describe('command component lifetime regressions', () => {
 	});
 
 	it('rejects unsupported activation returns without leaking owned resources', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const cleanup = vi.fn();
 		host.register(
 			descriptor('invalid', ((context: CommandContext) => {

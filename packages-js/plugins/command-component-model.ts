@@ -1,9 +1,11 @@
+import type { TaskService } from '@writers-ide/tasks';
 import type { CommandInvoker } from './commands';
 import type {
 	ActivationIdentity,
 	ComponentApis,
 	ComponentApiConnection,
 	FrontendContributions,
+	PluginLocale,
 } from './frontend';
 import type { PluginApiIdentity } from './index';
 import { apiDeclarations, apiKey, captureIdentity } from './component-api-declarations';
@@ -16,6 +18,8 @@ export type CommandContext = {
 	readonly signal: AbortSignal;
 	readonly own: (dispose: Dispose) => Dispose;
 	readonly commands: CommandInvoker;
+	readonly tasks: TaskService;
+	readonly locale: PluginLocale;
 	readonly contributions: Pick<FrontendContributions<never>, 'command'>;
 };
 export type Declaration = {

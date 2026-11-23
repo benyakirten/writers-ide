@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CommandComponentHost } from './command-component-host';
+import { createHost } from './command-component-fixture';
 import type { CommandContext } from './command-component-model';
 import {
 	available,
@@ -22,7 +22,7 @@ describe('shared API and command activation', () => {
 		'factory-not-function',
 		'throw',
 	])('rolls back both publication kinds after %s, even if the author catches errors', (failure) => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const observer = apiConsumer(host, true);
 		host.activate('consumer');
 		const events: unknown[] = [];
@@ -72,7 +72,7 @@ describe('shared API and command activation', () => {
 	});
 
 	it('publishes both kinds atomically and supports API lookup and commands during consumer setup', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const order: string[] = [];
 		host.register(
 			apiProvider(undefined, 'provider', {
@@ -105,7 +105,7 @@ describe('shared API and command activation', () => {
 	});
 
 	it('checks command and API compatibility together without discovering another slot', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const factory = vi.fn(() => ({ read: () => 1 }));
 		host.register(apiProvider(factory, 'wrong-slot'));
 		host.register(apiProvider(factory));
@@ -123,7 +123,7 @@ describe('shared API and command activation', () => {
 	});
 
 	it('optional mixed dependencies are unavailable when either declaration is incompatible', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(apiProvider());
 		host.activate('provider');
 		let context!: CommandContext;
@@ -145,7 +145,7 @@ describe('shared API and command activation', () => {
 	});
 
 	it('revokes failed consumer connections and commands without failing its healthy provider', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const cleanup = vi.fn();
 		host.register(
 			apiProvider((connection) => {
@@ -180,7 +180,7 @@ describe('shared API and command activation', () => {
 	});
 
 	it('uses API-only and mixed required edges for cascades and rejects required cycles before setup', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(apiProvider());
 		apiConsumer(host);
 		host.register(
@@ -203,7 +203,7 @@ describe('shared API and command activation', () => {
 		host.deactivate('provider', { cascade: true });
 		expect(host.list().every((entry) => entry.status === 'disabled')).toBe(true);
 		host.dispose();
-		const cycle = new CommandComponentHost();
+		const cycle = createHost();
 		const callback = vi.fn();
 		for (const [id, target] of [
 			['a', 'b'],
@@ -219,7 +219,7 @@ describe('shared API and command activation', () => {
 	});
 
 	it('supports optional cycles and availability transitions without enabling optional peers', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const events: unknown[] = [];
 		let a!: CommandContext;
 		host.register(
@@ -252,7 +252,7 @@ describe('shared API and command activation', () => {
 	});
 
 	it('rejects late factories and keeps old contexts dead after replacement', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		let context!: CommandContext;
 		host.register(
 			apiProvider(undefined, 'provider', {

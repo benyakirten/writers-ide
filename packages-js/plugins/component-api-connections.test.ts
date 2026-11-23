@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ComponentApiConnection } from './frontend';
 import type { CommandContext } from './command-component-model';
-import { CommandComponentHost } from './command-component-host';
+import { createHost } from './command-component-fixture';
 import { descriptor, flush } from './command-component-fixture';
 import { api, api2, apiConsumer, apiProvider, requirement } from './component-api-fixture';
 
 describe('component API connections', () => {
 	it('captures actual frozen application/project endpoint identities and caches per activation and exact major', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const endpoints: ComponentApiConnection[] = [];
 
 		const result = { mutable: true };
@@ -98,7 +98,7 @@ describe('component API connections', () => {
 		'function',
 		'async',
 	])('attributes invalid %s factory shape to provider without disabling it', async (shape) => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const cleanup = vi.fn();
 		const getter = vi.fn();
 		host.register(
@@ -144,7 +144,7 @@ describe('component API connections', () => {
 	});
 
 	it('permits null-prototype methods and does not impose a method count cap', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(
 			apiProvider(() =>
 				Object.assign(
@@ -164,7 +164,7 @@ describe('component API connections', () => {
 	});
 
 	it('owns reverse/idempotent/late cleanup, guards receiver and arguments, and attributes cleanup to provider', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const events: string[] = [];
 		let connection!: ComponentApiConnection;
 		let guard!: (this: { value: number }, increment: number) => number | undefined;
@@ -214,7 +214,7 @@ describe('component API connections', () => {
 	});
 
 	it('pins aliases to explicit namespace and project slots without choosing by registration order', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const connections: ComponentApiConnection[] = [];
 		for (const [slot, packageId, opening] of [
 			['first', '@other/service', 'opening-one'],
@@ -260,7 +260,7 @@ describe('component API connections', () => {
 	});
 
 	it('prevents stale reports from either endpoint targeting replacements and ignores stale cleanup attribution', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const connections: ComponentApiConnection[] = [];
 		host.register(
 			apiProvider((connection) => {

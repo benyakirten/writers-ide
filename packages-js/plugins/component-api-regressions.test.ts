@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CommandComponentHost } from './command-component-host';
+import { createHost } from './command-component-fixture';
 import type { CommandContext } from './command-component-model';
 import type { ComponentApiConnection } from './frontend';
 import {
@@ -16,7 +16,7 @@ import { CommandInvocationError } from './commands';
 
 describe('component API callback and revocation regressions', () => {
 	it('rejects reentrant get but defers factory-created subscriptions until the cached facade is ready', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		let context!: CommandContext;
 		const events: unknown[] = [];
 		const factory = vi.fn(() => {
@@ -37,7 +37,7 @@ describe('component API callback and revocation regressions', () => {
 	});
 
 	it('delivers pending factory-created subscriptions on successful retry after failed construction', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		let context!: CommandContext;
 		const events: unknown[] = [];
 		let attempts = 0;
@@ -70,7 +70,7 @@ describe('component API callback and revocation regressions', () => {
 	it.each(['get', 'lifecycle'])(
 		'bounds persistent subscription-initiated factory failures and supports a later %s retry',
 		(retry) => {
-			const host = new CommandComponentHost();
+			const host = createHost();
 			let context!: CommandContext;
 			let attempts = 0;
 			let failing = true;
@@ -119,7 +119,7 @@ describe('component API callback and revocation regressions', () => {
 	);
 
 	it('serializes self-subscription during initial resolution without recursion or duplicate notifications', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		let context!: CommandContext;
 		const outer: unknown[] = [];
 		const inner: unknown[] = [];
@@ -140,7 +140,7 @@ describe('component API callback and revocation regressions', () => {
 	});
 
 	it('preserves subscriptions after listener failure and cached connections after early unsubscribe', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const cleanup = vi.fn();
 		host.register(
 			apiProvider((connection) => {
@@ -180,7 +180,7 @@ describe('component API callback and revocation regressions', () => {
 	});
 
 	it('blocks lifecycle mutation in runtime factories, notifications and early/late connection cleanup', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		let connection!: ComponentApiConnection;
 		const assertBusy = () => {
 			expect(() => host.register(descriptor('intruder'))).toThrow('busy');
@@ -207,7 +207,7 @@ describe('component API callback and revocation regressions', () => {
 	});
 
 	it('revokes every API and command endpoint before any connection-owned or activation-owned cleanup', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const contexts: CommandContext[] = [];
 		const facades: { read(): unknown }[] = [];
 		const signals: AbortSignal[] = [];
@@ -283,7 +283,7 @@ describe('component API callback and revocation regressions', () => {
 	});
 
 	it('revokes sibling invokers and API guards before the first batch abort listener runs', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		let a!: CommandContext;
 		let b!: CommandContext;
 		let guarded!: () => unknown;
@@ -367,7 +367,7 @@ describe('component API callback and revocation regressions', () => {
 	});
 
 	it('cleans resources from a failed factory without blaming or disabling an unrelated component', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const cleanups: string[] = [];
 		host.register(
 			apiProvider((connection) => {

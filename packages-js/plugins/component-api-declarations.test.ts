@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CommandComponentHost } from './command-component-host';
+import { createHost } from './command-component-fixture';
 import { capture, type ComponentDescriptor } from './command-component-model';
 import { descriptor } from './command-component-fixture';
 import { api, api2, apiProvider, requirement } from './component-api-fixture';
@@ -19,7 +19,7 @@ describe('component API descriptor capture', () => {
 		{ packageId: '@' + 'a'.repeat(257) + '/pkg', componentId: 'component', projectOpeningId: null },
 		{ packageId: 'pkg', componentId: 'a'.repeat(257), projectOpeningId: null },
 	])('rejects invalid or absent explicit identity: %j', (identity) => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		expect(() =>
 			host.register({ ...descriptor('opaque-slot'), identity } as ComponentDescriptor),
 		).toThrow();
@@ -123,7 +123,7 @@ describe('component API descriptor capture', () => {
 		);
 		expect(captured.provides).toEqual([]);
 		expect(captured.dependencies[0].apis).toEqual([]);
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const order: string[] = [];
 		host.register(
 			descriptor('provider', () => {
@@ -143,7 +143,7 @@ describe('component API descriptor capture', () => {
 	});
 
 	it('requires every requested major and rejects the entire closure before callbacks', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const activate = vi.fn();
 		host.register(apiProvider(undefined, 'provider', { activate }));
 		host.register(

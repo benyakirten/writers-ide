@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CommandComponentHost } from './command-component-host';
+import { createHost } from './command-component-fixture';
 import type { CommandContext } from './command-component-model';
 import type { ComponentApiConnection } from './frontend';
 import {
@@ -17,7 +17,7 @@ import { api, apiConsumer, apiProvider } from './component-api-fixture';
 
 describe('component API runtime availability', () => {
 	it('preserves a mixed optional dependency API and pending surviving command after another command is released', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const removed = deferred();
 		const surviving = deferred();
 		const service = deferred();
@@ -98,7 +98,7 @@ describe('component API runtime availability', () => {
 	});
 
 	it('observes asynchronous listener rejection without treating a pending promise as failure or unsubscribing', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(apiProvider());
 		const consumer = apiConsumer(host, true);
 		host.activate('provider');
@@ -129,7 +129,7 @@ describe('component API runtime availability', () => {
 	});
 
 	it('ignores late listener rejection from a stopped consumer instead of attributing it to the replacement', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(apiProvider());
 		const consumer = apiConsumer(host, true);
 		host.activate('provider');

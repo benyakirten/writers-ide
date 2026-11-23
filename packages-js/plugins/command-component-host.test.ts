@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CommandComponentHost } from './command-component-host';
+import { createHost } from './command-component-fixture';
 import type { CommandContext, ComponentDescriptor } from './command-component-model';
 import { type CommandInvoker } from './commands';
 import { createCommandReservationLedger } from './command-reservations';
@@ -20,7 +20,7 @@ import {
 
 describe('internal command component host', () => {
 	it('activates provider-first with a narrow frozen context and dispatches copied values', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const order: string[] = [];
 		host.register(
 			provider((context) => {
@@ -30,8 +30,10 @@ describe('internal command component host', () => {
 					'commands',
 					'contributions',
 					'identity',
+					'locale',
 					'own',
 					'signal',
+					'tasks',
 				]);
 				expect(Object.isFrozen(context)).toBe(true);
 				publish(context);
@@ -66,7 +68,7 @@ describe('internal command component host', () => {
 		'disposed',
 		'caught',
 	])('rolls back %s publication failures', (failure) => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const cleanup = vi.fn();
 		let context!: CommandContext;
 		const implementation = (value: CommandContext) => {
@@ -122,7 +124,7 @@ describe('internal command component host', () => {
 	});
 
 	it('rejects late publication and never resurrects an old registration or invoker', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		let context!: CommandContext;
 		let release!: () => void;
 		host.register(
@@ -146,7 +148,7 @@ describe('internal command component host', () => {
 	});
 
 	it('stages publications until successful setup and preserves healthy providers after consumer failure', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const optional = consumer(host, true);
 		host.activate('consumer');
 		const events: boolean[] = [];
@@ -179,7 +181,7 @@ describe('internal command component host', () => {
 	it.each(['missing', 'incompatible', 'cycle'])(
 		'preflights the full required graph: %s',
 		(kind) => {
-			const host = new CommandComponentHost();
+			const host = createHost();
 			const callback = vi.fn();
 			host.register(
 				provider((context) => {
@@ -209,7 +211,7 @@ describe('internal command component host', () => {
 	);
 
 	it('does not activate optional providers and permits optional cycles', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(
 			descriptor('a', () => undefined, {
 				dependencies: [{ alias: 'b', providerSlot: 'b', optional: true, commands: [] }],
@@ -228,7 +230,7 @@ describe('internal command component host', () => {
 	});
 
 	it('routes repeated local IDs only to exact host-selected slots', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(
 			provider((context) => {
 				publish(context, () => 'project-a');
@@ -249,7 +251,7 @@ describe('internal command component host', () => {
 	});
 
 	it('guards cascades and cleans up required consumers before providers', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const order: string[] = [];
 		host.register(
 			provider((context) => {
@@ -295,7 +297,7 @@ describe('internal command component host', () => {
 	});
 
 	it('stops required consumers on author-owned publication loss without stopping optional peers or provider', async () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		let release!: () => void;
 		host.register(
 			provider((context) => {
@@ -320,7 +322,7 @@ describe('internal command component host', () => {
 	});
 
 	it('delivers optional transitions to all invokers and releases caller subscriptions', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const a = consumer(host, true, 'a');
 		const b = consumer(host, true, 'b');
 		host.activate('a');
@@ -347,7 +349,7 @@ describe('internal command component host', () => {
 	});
 
 	it('owns idempotent early releases and reverses cleanup after revocation, including errors and late own', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		let context!: CommandContext;
 		const events: string[] = [];
 		host.register(
@@ -384,7 +386,7 @@ describe('internal command component host', () => {
 	it.each([false, true])(
 		'rejects asynchronous activation and observes late rejection (thenable: %s)',
 		async (thenable) => {
-			const host = new CommandComponentHost();
+			const host = createHost();
 			const late = deferred();
 			const cleanup = vi.fn();
 			let context!: CommandContext;
@@ -408,7 +410,7 @@ describe('internal command component host', () => {
 
 	it('revokes pending calls on unregister and keeps retained work charged until settlement', async () => {
 		const ledger = createCommandReservationLedger();
-		const host = new CommandComponentHost({ ledger });
+		const host = createHost({ ledger });
 		const pending = deferred();
 		host.register(
 			provider((context) => {
@@ -434,7 +436,7 @@ describe('internal command component host', () => {
 	});
 
 	it('rejects lifecycle reentry in setup, cleanup, initial subscriptions and availability notifications', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const assertBusy = () => {
 			expect(() => host.register(descriptor('intruder'))).toThrow('busy');
 			expect(() => host.activate('provider')).toThrow('busy');
@@ -460,7 +462,7 @@ describe('internal command component host', () => {
 	});
 
 	it('revokes every endpoint before any whole-host cleanup and preserves unrelated siblings on failure', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const signals: AbortSignal[] = [];
 		for (const id of ['a', 'b']) {
 			host.register(
@@ -486,7 +488,7 @@ describe('internal command component host', () => {
 	});
 
 	it('captures frozen declarations and returns defensive snapshots', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const commands = [{ ...declaration }];
 		const input = { ...provider(), commands };
 		host.register(input);
@@ -543,7 +545,7 @@ describe('internal command component host', () => {
 			})),
 		},
 	])('rejects invalid declarations atomically: %#', (extra) => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		host.register(descriptor('existing'));
 		expect(() => host.register(descriptor('invalid', () => undefined, extra))).toThrow();
 		expect(host.list().map((entry) => entry.slotId)).toEqual(['existing']);
@@ -551,7 +553,7 @@ describe('internal command component host', () => {
 	});
 
 	it('accepts exact 256-byte command identities and exact safe-integer majors', () => {
-		const host = new CommandComponentHost();
+		const host = createHost();
 		const wide = {
 			id: 'é'.repeat(128),
 			contractId: 'x'.repeat(256),

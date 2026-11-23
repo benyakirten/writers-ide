@@ -1,6 +1,20 @@
-import type { CommandComponentHost } from './command-component-host';
+import { CommandComponentHost } from './command-component-host';
+import type { PluginLocale } from './frontend';
 import type { CommandContext, ComponentDescriptor, Dependency } from './command-component-model';
 import { definePluginCommand, type CommandInvoker, type PluginCommand } from './commands';
+
+export function createHost(
+	options: Partial<ConstructorParameters<typeof CommandComponentHost>[0]> = {},
+) {
+	const locale: PluginLocale = {
+		snapshot: () => ({ languageTag: 'en-US', direction: 'ltr' }),
+		subscribe(listener) {
+			listener(this.snapshot());
+			return () => undefined;
+		},
+	};
+	return new CommandComponentHost({ locale, ...options });
+}
 
 const schema: PluginCommand<unknown, unknown, unknown, unknown>['args'] = {
 	'~standard': { version: 1, vendor: 'test', validate: (value) => ({ value }) },
