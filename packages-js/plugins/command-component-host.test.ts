@@ -25,7 +25,14 @@ describe('internal command component host', () => {
 		host.register(
 			provider((context) => {
 				order.push('provider');
-				expect(Object.keys(context).sort()).toEqual(['commands', 'contributions', 'own', 'signal']);
+				expect(Object.keys(context).sort()).toEqual([
+					'apis',
+					'commands',
+					'contributions',
+					'identity',
+					'own',
+					'signal',
+				]);
 				expect(Object.isFrozen(context)).toBe(true);
 				publish(context);
 			}),

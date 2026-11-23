@@ -22,6 +22,7 @@ import type {
 } from '@writers-ide/plugins';
 
 import { createTaskService, WorkQueue } from '@writers-ide/tasks';
+import { createProviderFacade } from '../../../packages-js/plugins/provider-facade';
 
 const capabilities = new Set<PluginCapability>([
 	'contributions.toolbar',
@@ -837,45 +838,15 @@ export class PluginHost<Presentation> implements PluginManagementService {
 			if (!live()) {
 				throw new Error(`API connection revoked during factory: ${providerId}/${contract.id}`);
 			}
-			if (implementation === null || typeof implementation !== 'object') {
-				throw new Error('API factory must return a synchronous method-only facade');
-			}
-			if (implementation instanceof Promise) {
-				// Reject async factories without leaving their native promise rejection unhandled.
-				void Promise.prototype.then.call(implementation, undefined, () => {});
-				throw new Error('API factory must return a synchronous method-only facade');
-			}
-			const facade: Record<string, unknown> = Object.create(null);
-			for (const name of Reflect.ownKeys(implementation)) {
-				const descriptor = Object.getOwnPropertyDescriptor(implementation, name);
-				if (
-					typeof name !== 'string' ||
-					name === 'then' ||
-					!descriptor ||
-					!('value' in descriptor) ||
-					typeof descriptor.value !== 'function'
-				) {
-					throw new Error(
-						'API facade must contain only own string-named methods (no accessors, symbols or thenables)',
-					);
-				}
-				const method = descriptor.value;
-				facade[name] = (...args: unknown[]) => {
-					if (!live()) {
-						throw new Error(`Plugin API revoked: ${providerId}/${contract.id}`);
-					}
-					return Reflect.apply(method, implementation, args);
-				};
-			}
-			// Reject inherited thenables and prototype methods rather than silently exposing a partial API.
-			const prototype = Object.getPrototypeOf(implementation);
-			if (prototype !== null && prototype !== Object.prototype) {
-				throw new Error('API facade must be a plain method-only object');
-			}
+			const facade = createProviderFacade(
+				implementation,
+				live,
+				`Plugin API revoked: ${providerId}/${contract.id}`,
+			);
 			if (!live()) {
 				throw new Error(`API connection revoked during factory: ${providerId}/${contract.id}`);
 			}
-			connection.facade = Object.freeze(facade);
+			connection.facade = facade;
 			// A factory may subscribe to the connection it is still constructing.
 			// Deliver only after the cached facade is ready, including on a later retry.
 			for (const subscription of [...this.#apiSubscriptions]) {

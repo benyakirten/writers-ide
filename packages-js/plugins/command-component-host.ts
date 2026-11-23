@@ -1,4 +1,6 @@
 import { createCommandDispatcher } from './command-dispatcher';
+import { ComponentApiManager } from './component-api-manager';
+import { apiKey } from './component-api-declarations';
 import type { CommandInvoker, CommandRegistration } from './commands';
 import type { Dispose } from './index';
 import {
@@ -29,6 +31,7 @@ let nextInstance = 0;
 export class CommandComponentHost {
 	readonly #entries = new Map<string, Entry>();
 	readonly #dispatcher;
+	readonly #apis = new ComponentApiManager(this.#entries, (callback) => this.#callback(callback));
 	readonly #listeners = new Set<(snapshot: readonly Snapshot[]) => void>();
 	#busy = false;
 	#callbacks = 0;
@@ -211,6 +214,7 @@ export class CommandComponentHost {
 		}
 	}
 	#bindingsChanged(): void {
+		this.#apis.changed();
 		for (const entry of this.#entries.values()) {
 			const activation = entry.activation;
 			if (activation && activation.phase !== 'stopped') {
@@ -227,6 +231,7 @@ export class CommandComponentHost {
 		const invoker = this.#dispatcher.createInvoker({
 			instanceId: activation.id,
 			signal: activation.controller.signal,
+			isLive: () => activation.phase !== 'stopped',
 			declarations: entry.descriptor.dependencies.flatMap((dependency) =>
 				dependency.commands.map((command) => ({
 					dependencyAlias: dependency.alias,
@@ -269,8 +274,11 @@ export class CommandComponentHost {
 
 	#start(entry: Entry): void {
 		nextInstance++;
+		const id = `command-component-activation-${nextInstance}`;
 		const activation: Activation = {
-			id: `command-component-activation-${nextInstance}`,
+			id,
+			identity: Object.freeze({ ...entry.descriptor.identity, activationId: id }),
+			apis: new Map(),
 			controller: new AbortController(),
 			cleanups: new Set(),
 			publications: new Map(),
@@ -283,6 +291,8 @@ export class CommandComponentHost {
 		const errors: string[] = [];
 		entry.errors = errors;
 		const context: CommandContext = Object.freeze({
+			identity: activation.identity,
+			apis: this.#apis.context(entry, activation),
 			signal: activation.controller.signal,
 			own: (dispose: Dispose) =>
 				own(
@@ -319,15 +329,18 @@ export class CommandComponentHost {
 			}
 			if (
 				activation.invalid ||
+				(entry.descriptor.provides ?? []).some((api) => !activation.apis.has(apiKey(api))) ||
 				entry.descriptor.commands.some((command) => !activation.publications.has(command.id))
 			) {
-				throw new Error('Invalid or missing command publication');
+				throw new Error('Invalid or missing API or command publication');
 			}
 			activation.phase = 'active';
 			entry.status = 'active';
 			this.#bindingsChanged();
 		} catch (error) {
 			this.#revoke(entry);
+			this.#abort(activation);
+			this.#apis.drain();
 			this.#cleanup(entry, activation);
 			entry.status = 'failed';
 			entry.errors.push('activation-failed');
@@ -435,12 +448,16 @@ export class CommandComponentHost {
 		}
 		activation.phase = 'stopped';
 		entry.status = 'disabled';
+		this.#apis.revoke(activation);
+		activation.listeners.clear();
+	}
+	#abort(activation: Activation): void {
 		activation.controller.abort();
 		for (const publication of activation.publications.values()) {
 			publication.controller.abort();
 		}
 		activation.publications.clear();
-		activation.listeners.clear();
+		activation.apis.clear();
 	}
 	#cleanup(entry: Entry, activation: Activation): void {
 		for (const release of [...activation.cleanups].reverse()) {
@@ -459,7 +476,13 @@ export class CommandComponentHost {
 		for (const { entry } of activations) {
 			this.#revoke(entry);
 		}
+		for (const { activation } of activations) {
+			if (activation) {
+				this.#abort(activation);
+			}
+		}
 		revokePublication();
+		this.#apis.drain();
 		this.#bindingsChanged();
 		for (const { entry, activation } of activations) {
 			if (activation) {

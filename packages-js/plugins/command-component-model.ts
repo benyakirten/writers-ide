@@ -1,9 +1,18 @@
 import type { CommandInvoker } from './commands';
-import type { FrontendContributions } from './frontend';
+import type {
+	ActivationIdentity,
+	ComponentApis,
+	ComponentApiConnection,
+	FrontendContributions,
+} from './frontend';
+import type { PluginApiIdentity } from './index';
+import { apiDeclarations, apiKey, captureIdentity } from './component-api-declarations';
 import type { Dispose } from './index';
 import type { CommandProviderBinding } from './command-dispatcher';
 
 export type CommandContext = {
+	readonly identity: ActivationIdentity;
+	readonly apis: ComponentApis;
 	readonly signal: AbortSignal;
 	readonly own: (dispose: Dispose) => Dispose;
 	readonly commands: CommandInvoker;
@@ -18,11 +27,14 @@ export type Dependency = {
 	readonly alias: string;
 	readonly providerSlot: string;
 	readonly optional?: boolean;
+	readonly apis?: readonly PluginApiIdentity[];
 	readonly commands: readonly (Declaration & { readonly alias: string })[];
 };
 // Slots are already selected by the host. These are not package discovery inputs.
 export type ComponentDescriptor = {
 	readonly slotId: string;
+	readonly identity: Omit<ActivationIdentity, 'activationId'>;
+	readonly provides?: readonly PluginApiIdentity[];
 	readonly commands: readonly Declaration[];
 	readonly dependencies: readonly Dependency[];
 	readonly capabilities: readonly 'contributions.command'[];
@@ -31,6 +43,8 @@ export type ComponentDescriptor = {
 export type Publication = { binding: CommandProviderBinding; controller: AbortController };
 export type Activation = {
 	id: string;
+	identity: ActivationIdentity;
+	apis: Map<string, (connection: ComponentApiConnection) => object>;
 	controller: AbortController;
 	cleanups: Set<Dispose>;
 	publications: Map<string, Publication>;
@@ -78,6 +92,8 @@ function declaration(value: Declaration): Declaration {
 }
 export function capture(input: ComponentDescriptor): ComponentDescriptor {
 	text(input.slotId, 'Host slot');
+	const identity = captureIdentity(input.identity);
+	const provides = apiDeclarations(input.provides);
 	list(input.commands, 32, 'Commands');
 	list(input.dependencies, 64, 'Dependencies');
 	list(input.capabilities, 1, 'Capabilities');
@@ -118,6 +134,7 @@ export function capture(input: ComponentDescriptor): ComponentDescriptor {
 				providerSlot: dependency.providerSlot,
 				optional: dependency.optional ?? false,
 				commands: requirements,
+				apis: apiDeclarations(dependency.apis),
 			});
 		}),
 	);
@@ -131,6 +148,8 @@ export function capture(input: ComponentDescriptor): ComponentDescriptor {
 	);
 	return Object.freeze({
 		slotId: input.slotId,
+		identity,
+		provides,
 		commands,
 		dependencies,
 		capabilities: Object.freeze([...input.capabilities]),
@@ -172,18 +191,26 @@ export function own(activation: Activation, dispose: Dispose, report: () => void
 }
 
 export function compatible(provider: Entry, dependency: Dependency): boolean {
-	return dependency.commands.every((required) =>
-		provider.descriptor.commands.some(
-			(provided) =>
-				provided.id === required.id &&
-				provided.contractId === required.contractId &&
-				provided.major === required.major,
-		),
+	return (
+		(dependency.apis ?? []).every((required) =>
+			(provider.descriptor.provides ?? []).some(
+				(provided) => apiKey(provided) === apiKey(required),
+			),
+		) &&
+		dependency.commands.every((required) =>
+			provider.descriptor.commands.some(
+				(provided) =>
+					provided.id === required.id &&
+					provided.contractId === required.contractId &&
+					provided.major === required.major,
+			),
+		)
 	);
 }
 export function published(provider: Entry, dependency: Dependency): boolean {
 	return (
 		provider.activation?.phase === 'active' &&
+		(dependency.apis ?? []).every((api) => provider.activation?.apis.has(apiKey(api))) &&
 		dependency.commands.every((command) => provider.activation?.publications.has(command.id))
 	);
 }

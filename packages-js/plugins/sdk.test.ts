@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { runInNewContext } from 'node:vm';
 import {
 	CommandInvocationError,
+	definePluginApi,
 	definePluginCommand,
 	isCommandInvocationError,
 } from '@writers-ide/plugins';
@@ -15,6 +16,28 @@ const undefinedSchema = {
 		types: undefined as { input: undefined; output: undefined } | undefined,
 	},
 };
+
+describe('definePluginApi', () => {
+	it('freezes an exact API identity without normalizing it', () => {
+		const identity = { id: ' Example.API ', major: 2 };
+		const api = definePluginApi(identity);
+		expect(api).toEqual(identity);
+		expect(api).not.toBe(identity);
+		expect(Object.isFrozen(api)).toBe(true);
+		expect(definePluginApi({ id: 'é'.repeat(128), major: 1 }).id).toBe('é'.repeat(128));
+	});
+
+	it.each(['', ' \t\n', 'é'.repeat(129), 'x'.repeat(257)])('rejects invalid API ID %j', (id) => {
+		expect(() => definePluginApi({ id, major: 1 })).toThrow('Plugin API ID');
+	});
+
+	it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+		'rejects invalid API major %s',
+		(major) => {
+			expect(() => definePluginApi({ id: 'test.api', major })).toThrow('positive safe integer');
+		},
+	);
+});
 
 describe('definePluginCommand', () => {
 	it('freezes a descriptor without executing or freezing its validators', () => {

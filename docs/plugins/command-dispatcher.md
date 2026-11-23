@@ -1,12 +1,12 @@
-# Internal command dispatcher
+# Internal component APIs and command dispatcher
 
-The dispatcher executes a typed application command on behalf of a component. It checks a declared dependency, validates and copies data, accounts for resources and tracks cancellation. This guide is for contributors connecting host services, not plugin authors installing packages. Read the [shared command contract](command-contract.md) for author-facing declarations and examples.
+The internal component harness connects provider APIs and typed application commands to one activation lifetime. The dispatcher executes a typed application command on behalf of a component. It checks a declared dependency, validates and copies data, accounts for resources and tracks cancellation. This guide is for contributors connecting host services, not plugin authors installing packages. Read the [shared command contract](command-contract.md) for author-facing declarations and examples.
 
 ## Implementation boundary
 
-[`command-dispatcher.ts`](../../packages-js/plugins/command-dispatcher.ts) is an internal module. It has no package export and is not connected to the bundled plugin host. Tests can supply trusted dependency declarations, provider registrations and lifetime signals directly. The [component lifecycle harness](#component-lifecycle-harness) now constructs these bindings from host-selected command component descriptors.
+[`command-dispatcher.ts`](../../packages-js/plugins/command-dispatcher.ts) is an internal module. It has no package export and is not connected to the bundled plugin host. Tests can supply trusted dependency declarations, provider registrations and lifetime signals directly. The [component lifecycle harness](#component-lifecycle-harness) now constructs these bindings from host-selected component descriptors.
 
-The dispatcher implements execution and availability. The internal harness adds synchronous activation, command publication checks and required-consumer lifecycle planning. Neither implements manifest-to-runtime assembly, project selection or leases, external loading, native authorization, settings persistence or a settings menu. Creating a dispatcher or harness does not grant permission to run external code.
+The dispatcher implements execution and availability. The internal harness adds synchronous activation, API/command publication checks, provider connections and required-consumer lifecycle planning. Neither implements manifest-to-runtime assembly, project selection or leases, external loading, native authorization, settings persistence or a settings menu. Creating a dispatcher or harness does not grant permission to run external code.
 
 ## What the host supplies
 
@@ -79,11 +79,11 @@ The dispatcher warns when a validator's initial synchronous call exceeds 16 ms. 
 
 ## Component lifecycle harness
 
-[`CommandComponentHost`](../../packages-js/plugins/command-component-host.ts) connects the dispatcher to a small command-only component lifecycle. It is internal test/implementation infrastructure, not the application's current bundled host or a public SDK constructor. [`command-component-model.ts`](../../packages-js/plugins/command-component-model.ts) contains descriptor capture and iterative dependency planning.
+[`CommandComponentHost`](../../packages-js/plugins/command-component-host.ts) connects the dispatcher to a small component lifecycle for provider APIs and commands. It is internal test/implementation infrastructure, not the application's current bundled host or a public SDK constructor. [`command-component-model.ts`](../../packages-js/plugins/command-component-model.ts) contains descriptor capture and iterative dependency planning.
 
 A host slot identifies a component instance that the host has already selected. For example, two project openings can have separate slots for the same component. This harness does not decide which project or package a slot represents. Future application assembly must supply that mapping from validated declarations and live scope.
 
-Host code calls `register(descriptor)` with a slot ID, declared commands, exact provider-slot dependencies, command capability and synchronous activation callback. The harness copies and freezes declaration data. It checks applicable identifier, list-size, duplicate and self-dependency rules. This is not parsing `manifest.toml`, matching package versions or implementing general provider APIs. Planning is iterative but synchronous and can scan the full slot catalogue. The harness does not yet provide catalogue budgets or cooperative scheduling.
+Host code calls `register(descriptor)` with a slot ID, explicit package/component/project-opening identity, declared APIs/commands, exact provider-slot dependencies, command capability and synchronous activation callback. The harness copies and freezes declaration data. It checks applicable identifier, list-size, duplicate and self-dependency rules. This is not parsing `manifest.toml`, matching package versions or selecting project scopes. Planning is iterative but synchronous and can scan the full slot catalogue. The harness does not yet provide catalogue budgets or cooperative scheduling.
 
 ### Activation and publication
 
@@ -91,12 +91,16 @@ Host code calls `activate(slotId)` to enable a registered component. The harness
 
 Each activation gets a fresh host-generated instance ID. The harness calls the descriptor's activation callback with only:
 
+- `identity`: frozen `ActivationIdentity` metadata. The host supplies package/component identity and a fixed project-opening ID or `null`; the harness adds a fresh activation ID.
+- `apis`: alias-based `ComponentApis` for publication and live provider connections.
 - `signal`: ends with this activation.
 - `own(dispose)`: activation-owned, idempotent cleanup.
 - `commands`: the dispatcher-backed consumer invoker.
 - `contributions.command(registration)`: the generic SDK command-registration signature.
 
-This is deliberately not a complete `FrontendContext`. It supplies no toolbar/view registration, tasks, provider APIs, native services, locale service or project connection.
+This is deliberately not a complete `FrontendContext`. It supplies no toolbar/view registration, tasks, native services, locale service or project connection.
+
+Every declared API and command must be published before setup succeeds. API factories are staged alongside commands, so a missing publication rolls back both kinds. Catching an invalid API publication still fails setup. Factories themselves run lazily when a consumer requests the API.
 
 Command registration is allowed only during synchronous setup and requires `contributions.command`. Each declared command must be published exactly once, with the exact ID/contract/major. Undeclared, duplicate, mismatched or missing publications fail activation. Catching an invalid registration inside author code does not make setup valid. Registrations are staged and invisible to consumers until setup succeeds. Promise/thenable activation results are rejected and their late failures are observed. Later publication attempts are rejected.
 
@@ -112,7 +116,7 @@ Optional command availability is per command. Removing command A does not hide a
 
 An author can release its own command registration early. This is publication loss, not a user disable request. It revokes that registration and stops consumers that require the missing command, including their required dependents. It does not stop the provider or unrelated optional work. The command cannot be republished later in that activation.
 
-The complete teardown plan is revoked before owned cleanup runs. Pending dispatcher calls reject promptly, but unfinished implementation work still retains capacity until it settles. `dispose()` revokes the harness's activations and dispatcher without claiming to terminate arbitrary code.
+The complete teardown plan is marked revoked before abort events or owned cleanup run. Both API facades and command invokers consult private activation state. AbortSignal flags and events still change sequentially; they are not an atomic batch. Pending dispatcher calls reject promptly, but unfinished implementation work still retains capacity until it settles. `dispose()` revokes the harness's activations and dispatcher without claiming to terminate arbitrary code.
 
 ### Management and callback boundaries
 
@@ -120,8 +124,40 @@ The complete teardown plan is revoked before owned cleanup runs. Pending dispatc
 
 Lifecycle changes during activation, notifications, diagnostics or cleanup are guarded. Callers must defer those changes until the callback returns. This includes disposing staged publications from an immediate availability callback. Ordinary direct disposal during setup is allowed, but leaves setup invalid because the promised publication is missing.
 
+## Alias-based provider connections
+
+[`component-api-manager.ts`](../../packages-js/plugins/component-api-manager.ts) implements `context.apis.provide`, `get` and `subscribe` for the internal harness. [`component-api-declarations.ts`](../../packages-js/plugins/component-api-declarations.ts) captures host identity and API declarations. `provides` and dependency `apis` default to empty arrays. Each accepts at most 32 exact ID/major pairs. Multiple majors of one API are allowed; duplicate pairs are not.
+
+A provider publishes each declared API factory once during synchronous activation. A consumer uses its dependency alias and shared `PluginApi` contract, not a provider's private slot ID. The host resolves that alias to an already-selected slot. Undeclared aliases or contracts fail. Declared optional absence returns `null` and never enables a provider.
+
+For a given consumer activation, provider activation and API ID/major, the first lookup calls the factory and caches its frozen facade. Later lookups and subscriptions reuse it. The factory must finish synchronously with a plain method-only object. Facade methods may return promises. Returned objects and method-result promises are not recursively revoked or copied like command payloads.
+
+### Connection metadata and ownership
+
+The factory receives a frozen `ComponentApiConnection` with these members:
+
+- `consumer` and `provider`: each endpoint's actual frozen `ActivationIdentity`. An application endpoint keeps `projectOpeningId: null`, even when its peer identifies a project opening.
+- `consumerId`: an opaque runtime owner key. The harness uses the consumer activation ID. Do not parse it for package or project identity.
+- `signal`: aborts when either endpoint ends.
+- `own(dispose)`: connection-owned cleanup with reverse-order release, idempotent early disposal and immediate disposal after revocation.
+- `guard(callback)`: preserves arguments and receiver while live, then suppresses future calls after revocation. It does not catch live callback errors or undo work.
+- `reportError(error)`: records a provider-mediated failure against the exact live consumer activation. Reports after endpoint teardown cannot affect a replacement activation.
+
+Ending either endpoint marks its cached connections dead. Batch teardown marks every planned endpoint and handle dead before dispatching author abort callbacks. Connection signals and owned cleanup then run before activation-owned cleanup. Old facades never become live after reactivation.
+
+### Subscriptions and failures
+
+API subscriptions deliver immediately and when provider availability changes. Disposing one subscription does not revoke the cached connection used by other lookups or subscriptions. Removing an optional command does not hide a surviving API requested through the same dependency.
+
+Factory failures are attributed to the provider. Connection cleanup failures are also attributed to that provider's original activation. Resolution and listener failures are attributed to the consumer. These errors do not disable unrelated components. Internal status snapshots use host-owned codes rather than raw exception messages.
+
+Listener failures do not unsubscribe. Promise rejections from asynchronous listeners are observed, and their reports cannot contaminate a replacement activation. A factory that subscribes to its own pending connection gets delivery only after construction succeeds. Failed construction cannot repeatedly retry itself in the same notification pass. A later explicit lookup or lifecycle notification can retry.
+
+[`provider-facade.ts`](../../packages-js/plugins/provider-facade.ts) is shared with the existing bundled host. It contains the method-only shape validation and top-level revocation wrapper. The extraction preserves the bundled host's existing facade behavior; it does not give that host alias-based contexts or endpoint metadata. The helper is internal and adds no SDK entry point.
+
 ## Validation entry points
 
+- `packages-js/plugins/component-api-*.test.ts`: API declarations, endpoint metadata, caching, connection ownership, mixed API/command rollback, subscription retries and batch revocation. [`provider-facade.test.ts`](../../packages-js/plugins/provider-facade.test.ts) covers the shared facade helper. Existing bundled-provider tests verify extraction compatibility.
 - [`command-component-host.test.ts`](../../packages-js/plugins/command-component-host.test.ts) and [`command-component-regressions.test.ts`](../../packages-js/plugins/command-component-regressions.test.ts): publication checks, required/optional activation, cascade consent, rollback, stale contexts, independent commands and guarded cleanup/notifications. [`command-component-fixture.ts`](../../packages-js/plugins/command-component-fixture.ts) contains shared test setup, not runtime discovery.
 - [`command-dispatcher.test.ts`](../../packages-js/plugins/command-dispatcher.test.ts): execution, schemas, availability, aliases, cancellation, replacement, reentrant callbacks, diagnostics, timing and copy-admission regressions.
 - [`command-payload.test.ts`](../../packages-js/plugins/command-payload.test.ts): permitted data, graph snapshots, independent copying, binary relationships and inspection limits.

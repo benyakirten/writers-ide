@@ -36,6 +36,8 @@ export type CommandAliasDeclaration = {
 export type CommandConsumerSource = {
 	readonly instanceId: string;
 	readonly signal: AbortSignal;
+	// Hosts can revoke a batch before dispatching its sequential abort events.
+	readonly isLive?: () => boolean;
 	readonly declarations: readonly CommandAliasDeclaration[];
 	// Notify after replacing/removing a binding, even when availability stays true.
 	readonly subscribeBindings: (listener: () => void) => Release;
@@ -156,7 +158,12 @@ export function createCommandDispatcher(options: Options = {}): CommandDispatche
 				}
 			}
 			const live = () => {
-				if (ended || source.signal.aborted || shutdown.signal.aborted) {
+				if (
+					ended ||
+					source.signal.aborted ||
+					shutdown.signal.aborted ||
+					source.isLive?.() === false
+				) {
 					throw new Failure('revoked');
 				}
 			};
@@ -280,7 +287,13 @@ export function createCommandDispatcher(options: Options = {}): CommandDispatche
 						}
 					};
 					const isActive = () => {
-						if (!active || ended || source.signal.aborted || shutdown.signal.aborted) {
+						if (
+							!active ||
+							ended ||
+							source.signal.aborted ||
+							shutdown.signal.aborted ||
+							source.isLive?.() === false
+						) {
 							dispose();
 							return false;
 						}

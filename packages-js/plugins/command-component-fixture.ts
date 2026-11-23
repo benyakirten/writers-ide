@@ -25,7 +25,19 @@ export function descriptor(
 	activate: ComponentDescriptor['activate'] = () => undefined,
 	extra: Partial<ComponentDescriptor> = {},
 ): ComponentDescriptor {
-	return { slotId, activate, commands: [], dependencies: [], capabilities: [], ...extra };
+	return {
+		slotId,
+		identity: {
+			packageId: 'test-fixture',
+			componentId: 'synthetic-component',
+			projectOpeningId: null,
+		},
+		activate,
+		commands: [],
+		dependencies: [],
+		capabilities: [],
+		...extra,
+	};
 }
 export function provider(
 	activate: ComponentDescriptor['activate'] = (context) => {

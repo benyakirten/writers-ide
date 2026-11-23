@@ -41,8 +41,13 @@ export type PluginApi<T extends object> = PluginApiIdentity & {
 };
 
 export function definePluginApi<T extends object>(identity: PluginApiIdentity): PluginApi<T> {
-	if (typeof identity.id !== 'string' || identity.id.trim().length === 0) {
-		throw new Error('Plugin API ID must be a nonempty string');
+	if (
+		typeof identity.id !== 'string' ||
+		identity.id.length > 256 ||
+		identity.id.trim().length === 0 ||
+		new TextEncoder().encode(identity.id).byteLength > 256
+	) {
+		throw new Error('Plugin API ID must be a nonempty string of at most 256 UTF-8 bytes');
 	}
 	if (!Number.isSafeInteger(identity.major) || identity.major <= 0) {
 		throw new Error('Plugin API major must be a positive safe integer');

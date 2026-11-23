@@ -1,6 +1,6 @@
 # Shared application commands
 
-**Status: source contracts/helpers, internal manifest checks, an isolated dispatcher and a command-only lifecycle harness are implemented. The application's bundled host is unchanged.** This page records the external-package command design. Today's `CommandContribution` takes no arguments and returns a synchronous boolean. There is no current plugin-facing command-invocation service or user-facing command routing.
+**Status: source contracts/helpers, internal manifest checks, an isolated dispatcher and an API/command lifecycle harness are implemented. The application's bundled host retains its existing context and lifecycle.** This page records the external-package command design. Today's `CommandContribution` takes no arguments and returns a synchronous boolean. There is no current plugin-facing command-invocation service or user-facing command routing.
 
 An application command is a named action owned by a component. Another component can invoke it through a declared dependency. It is not a ProseMirror command or a live provider service. Registration does not create a button, shortcut or command-picker entry. See the [package specification](package-api-proposal.md) for component lifetimes and package installation.
 
@@ -108,7 +108,7 @@ This registers the implementation; it does not run it. The example uses short sy
 
 Required consumers activate only when their required commands are available. Optional consumers may remain active without them. These checks do not run command implementations or make activation asynchronous.
 
-The [internal component harness](command-dispatcher.md#component-lifecycle-harness) enforces this for host-supplied command-only descriptors. Registrations are staged until activation succeeds. A caught invalid registration still fails setup. Host-triggered deactivation plans require cascade consent when required consumers are affected. Author-owned publication loss stops affected required consumers, while optional consumers retain access to surviving commands. The harness is not a package loader and does not supply the full `FrontendContext`.
+The [internal component harness](command-dispatcher.md#component-lifecycle-harness) enforces this for host-supplied API/command descriptors. Required API and command publications share the same commit/rollback lifetime. Registrations are staged until activation succeeds. A caught invalid registration still fails setup. Host-triggered deactivation plans require cascade consent when required consumers are affected. Author-owned publication loss stops affected required consumers, while optional consumers retain access to surviving commands. The harness is not a package loader and does not supply the full `FrontendContext`.
 
 ## Declare and invoke the consumer dependency
 

@@ -42,6 +42,7 @@ function setup(
 		diagnostics?: (metadata: CommandDiagnostic) => void;
 		inspectError?: (error: unknown, metadata: CommandDiagnostic) => void;
 		now?: () => number;
+		isLive?: () => boolean;
 	} = {},
 ) {
 	const caller = new AbortController();
@@ -64,6 +65,7 @@ function setup(
 	const source: CommandConsumerSource = {
 		instanceId: 'caller:project:activation-1',
 		signal: caller.signal,
+		isLive: options.isLive,
 		declarations: [
 			{
 				dependencyAlias: 'dependency',
@@ -128,6 +130,34 @@ const limits = (values: Partial<ReservationLimits>): ReservationLimits => ({
 });
 
 describe('isolated command dispatcher', () => {
+	it('normalizes mark-phase revocation and suppresses availability delivery before signal abort', async () => {
+		let live = true;
+		const f = setup({ isLive: () => live });
+		const events: boolean[] = [];
+		f.subscribe((value) => events.push(value));
+		expect(f.available()).toBe(true);
+		live = false;
+		expect(f.caller.signal.aborted).toBe(false);
+		for (const operation of [() => f.available(), () => f.subscribe(() => undefined)]) {
+			let failure: unknown;
+			try {
+				operation();
+			} catch (error) {
+				failure = error;
+			}
+			expect(failure).toBeInstanceOf(CommandInvocationError);
+			expect(failure).toMatchObject({ code: 'revoked', diagnosticId: expect.any(String) });
+		}
+		await expect(f.execute()).rejects.toMatchObject({
+			code: 'revoked',
+			diagnosticId: expect.any(String),
+		});
+		f.bind(undefined);
+		expect(events).toEqual([true]);
+		expect(f.implementation).not.toHaveBeenCalled();
+		f.caller.abort();
+		f.dispatcher.dispose();
+	});
 	it.each([false, true])(
 		'rolls back invoker setup when binding subscription throws (reentrant abort: %s)',
 		(abort) => {
