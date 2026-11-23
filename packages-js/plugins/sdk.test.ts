@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { runInNewContext } from 'node:vm';
-import { definePluginCommand, isCommandInvocationError } from '@writers-ide/plugins';
+import {
+	CommandInvocationError,
+	definePluginCommand,
+	isCommandInvocationError,
+} from '@writers-ide/plugins';
 import { isNativeServiceError } from '@writers-ide/plugins/native';
 
 const undefinedSchema = {
@@ -82,14 +86,21 @@ for (const [name, guard, codes] of [
 ] as const) {
 	describe(`${name} error recognition`, () => {
 		it.each(codes)('recognizes standard Errors with supported code %s', (code) => {
-			expect(guard(Object.assign(new Error('failure'), { code }))).toBe(true);
-			expect(guard(Object.assign(new TypeError('failure'), { code }))).toBe(true);
+			expect(
+				guard(Object.assign(new Error('failure'), { code, diagnosticId: 'test-diagnostic' })),
+			).toBe(true);
+			expect(
+				guard(Object.assign(new TypeError('failure'), { code, diagnosticId: 'test-diagnostic' })),
+			).toBe(true);
 		});
 
 		it('recognizes Errors from another JavaScript realm', () => {
-			const error: unknown = runInNewContext('Object.assign(new Error("failure"), { code })', {
-				code: codes[0],
-			});
+			const error: unknown = runInNewContext(
+				'Object.assign(new Error("failure"), { code, diagnosticId: "test-diagnostic" })',
+				{
+					code: codes[0],
+				},
+			);
 			expect(error).not.toBeInstanceOf(Error);
 			expect(guard(error)).toBe(true);
 		});
@@ -122,6 +133,48 @@ for (const [name, guard, codes] of [
 		});
 	});
 }
+
+describe('CommandInvocationError', () => {
+	it('is an exported Error subclass with required diagnostic metadata', () => {
+		const error = new CommandInvocationError('invalid-arguments', 'Invalid arguments.', 'diag-1');
+		expect(error).toBeInstanceOf(Error);
+		expect(error).toBeInstanceOf(CommandInvocationError);
+		expect(error.name).toBe('CommandInvocationError');
+		expect(error.message).toBe('Invalid arguments.');
+		expect(error.code).toBe('invalid-arguments');
+		expect(error.diagnosticId).toBe('diag-1');
+		expect(typeof error.stack).toBe('string');
+		expect(isCommandInvocationError(error)).toBe(true);
+	});
+
+	it('requires string diagnostic metadata without trusting its provenance', () => {
+		for (const diagnosticId of [undefined, null, 1, {}]) {
+			expect(
+				isCommandInvocationError(
+					Object.assign(new Error(), {
+						code: 'cancelled',
+						diagnosticId,
+					}),
+				),
+			).toBe(false);
+		}
+		const getter = Object.defineProperty(new Error(), 'diagnosticId', {
+			get() {
+				throw new Error('private');
+			},
+		});
+		Object.assign(getter, { code: 'cancelled' });
+		expect(isCommandInvocationError(getter)).toBe(false);
+		expect(
+			isCommandInvocationError(
+				Object.assign(new Error(), {
+					code: 'cancelled',
+					diagnosticId: 'forged',
+				}),
+			),
+		).toBe(true);
+	});
+});
 
 it('keeps command-only and native-only error codes separate', () => {
 	expect(isNativeServiceError(Object.assign(new Error(), { code: 'execution-failed' }))).toBe(

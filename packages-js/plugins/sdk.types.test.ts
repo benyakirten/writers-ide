@@ -1,5 +1,6 @@
 import { expectTypeOf, it } from 'vitest';
 import {
+	CommandInvocationError,
 	definePluginCommand,
 	isCommandInvocationError,
 	type CommandInvoker,
@@ -9,7 +10,6 @@ import {
 	type PluginCommand,
 	type ProjectConnections,
 	type ProjectReference,
-	type CommandInvocationError,
 } from '@writers-ide/plugins';
 import {
 	isNativeServiceError,
@@ -50,6 +50,19 @@ const transformed = definePluginCommand({
 		},
 	},
 });
+
+function checkErrorTypes() {
+	const error = new CommandInvocationError('cancelled', 'Cancelled.', 'diagnostic-1');
+	expectTypeOf(error).toExtend<Error>();
+	expectTypeOf(error.diagnosticId).toEqualTypeOf<string>();
+	// @ts-expect-error Diagnostic metadata is read-only to consumers.
+	error.diagnosticId = 'changed';
+	// @ts-expect-error Error codes are read-only to consumers.
+	error.code = 'revoked';
+	// @ts-expect-error Diagnostic IDs are required.
+	new CommandInvocationError('cancelled', 'Cancelled.');
+}
+void checkErrorTypes;
 
 function checkAuthorTypes(
 	context: FrontendContext<string>,

@@ -96,7 +96,17 @@ export type CommandInvocationErrorCode =
 	| 'limit-exceeded'
 	| 'execution-failed';
 
-export type CommandInvocationError = Error & { readonly code: CommandInvocationErrorCode };
+export class CommandInvocationError extends Error {
+	readonly code: CommandInvocationErrorCode;
+	readonly diagnosticId: string;
+
+	constructor(code: CommandInvocationErrorCode, message: string, diagnosticId: string) {
+		super(message);
+		this.name = 'CommandInvocationError';
+		this.code = code;
+		this.diagnosticId = diagnosticId;
+	}
+}
 
 const commandErrorCodes: ReadonlySet<string> = new Set<CommandInvocationErrorCode>([
 	'cancelled',
@@ -112,5 +122,12 @@ const commandErrorCodes: ReadonlySet<string> = new Set<CommandInvocationErrorCod
 
 /** Recognizes representation only, not the error's origin or authority. */
 export function isCommandInvocationError(value: unknown): value is CommandInvocationError {
-	return hasErrorCode(value, commandErrorCodes);
+	if (!hasErrorCode(value, commandErrorCodes)) {
+		return false;
+	}
+	try {
+		return typeof (value as CommandInvocationError).diagnosticId === 'string';
+	} catch {
+		return false;
+	}
 }

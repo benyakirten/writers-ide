@@ -239,7 +239,7 @@ Tests must cover immediate and promise-based argument/result validation, cancell
 
 ## Invocation errors
 
-**Error types/guard exported; runtime normalization not implemented:** normalize shared-command invocation failures into typed errors. The public names are `CommandInvocationErrorCode`, `CommandInvocationError` and `isCommandInvocationError`. These are separate from native-service errors and synchronous editor results.
+**Error class/guard exported; runtime normalization not implemented:** normalize shared-command invocation failures into typed errors. The public names are `CommandInvocationErrorCode`, `CommandInvocationError` and `isCommandInvocationError`. These are separate from native-service errors and synchronous editor results.
 
 ```ts
 type CommandInvocationErrorCode =
@@ -253,9 +253,12 @@ type CommandInvocationErrorCode =
 	| 'limit-exceeded'
 	| 'execution-failed';
 
-type CommandInvocationError = Error & {
+declare class CommandInvocationError extends Error {
 	readonly code: CommandInvocationErrorCode;
-};
+	readonly diagnosticId: string;
+
+	constructor(code: CommandInvocationErrorCode, message: string, diagnosticId: string);
+}
 
 declare function isCommandInvocationError(value: unknown): value is CommandInvocationError;
 ```
@@ -290,7 +293,9 @@ A failed check prevents later checks and execution. In particular, unavailable o
 
 ### Safe diagnostics
 
-**Approved; not implemented:** caller errors contain the approved error code, a host-written explanation and a diagnostic ID. The ID links the error to a host diagnostic record. The exported error type does not yet expose that ID; its exact field shape remains to be specified.
+**Error class implemented; diagnostic records and runtime normalization not implemented:** `CommandInvocationError` extends `Error` and has required read-only `code` and `diagnosticId` fields. Its constructor takes `(code, message, diagnosticId)`. Host-produced errors will contain a host-written explanation and an opaque diagnostic ID linking the error to a host diagnostic record. Do not parse IDs or treat them as credentials.
+
+The exported class supports ordinary `Error` behavior and `instanceof`. Retain `isCommandInvocationError` for errors from other realms or SDK copies. It checks the Error representation, known code and string diagnostic ID without authenticating provenance. Constructing the error class does not create a diagnostic record.
 
 Ordinary diagnostics contain caller/provider component-instance identities, command identity, contract version, failure phase, timing, relevant limit measurements and the diagnostic ID. Do not automatically log arguments, results, raw validator messages or plugin-thrown messages. These can contain manuscript text, paths or other sensitive data.
 
@@ -328,7 +333,7 @@ Tests must cover each accounting scope, validation/execution/result phases, canc
 
 ## Payload budgets and validator diagnostics
 
-**Approved resource policy; not implemented:** enforce host-owned limits on payload bytes, nesting depth, visited objects/entries and aggregate in-flight payload reservations. Bound inspection itself; do not fully traverse an arbitrarily large payload merely to discover that it exceeds a limit.
+**Internal primitives implemented with a blocking limitation; host integration not implemented:** enforce host-owned limits on payload bytes, nesting depth, visited objects/entries and aggregate in-flight payload reservations. Bound inspection itself; do not fully traverse an arbitrarily large payload merely to discover that it exceeds a limit.
 
 Approved initial defaults, applied separately to arguments and results and also checked on schema-transformed values:
 
@@ -338,7 +343,7 @@ Approved initial defaults, applied separately to arguments and results and also 
 | Nesting depth                           |               64 levels |
 | Distinct objects and collection entries |        100,000 combined |
 
-These are initial engineering defaults, not measured performance guarantees. The aggregate reservations, accounting formula and settings behavior below are also approved plans, not implemented behavior.
+These are initial engineering defaults, not measured performance guarantees. Internal inspection and reservation code implements the accounting below, subject to the blocking limitation documented at the end. Settings UI/persistence and dispatch integration remain unimplemented.
 
 ### Aggregate reservations
 
@@ -391,14 +396,37 @@ Apply settings changes to new invocations. An admitted invocation retains its or
 
 Check inputs before copying or schema validation. Check transformed outputs and command results as well. Exceeding a host budget rejects with `CommandInvocationError` code `limit-exceeded`. Account for memory actually retained or copied, including backing buffers rather than only a view's visible byte length. Aggregate reservations prevent many individually acceptable payloads from bypassing the overall memory policy. Implement the approved accounting and reservation rules above.
 
-Measure validator duration and report slow validation through diagnostics. Preserve cancellation and lifetime checks around asynchronous boundaries. Do not require validators to be generators or run in workers. No new timeout API or numerical duration threshold is selected.
+### Validator timing
+
+**Approved; not implemented:** measure the initial synchronous validator call, up to its return of a result or promise. Warn if this portion exceeds 16 ms. This is a host-controlled starting threshold, roughly one frame at 60 Hz, not a responsiveness guarantee. For promise-based validation, measure total elapsed time separately. Do not label that elapsed time as main-thread blocking.
+
+Report command identity, argument/result validation phase and measured duration, not payloads or raw validator messages. Warnings do not reject, cancel or time out invocations. This instrumentation cannot measure every synchronous segment after an asynchronous validator resumes. It is not complete CPU monitoring. Preserve cancellation and lifetime checks around asynchronous boundaries. Do not require validators to be generators or run in workers.
 
 These budgets bound host-managed processing, not arbitrary trusted frontend execution. A timer cannot interrupt a synchronous validator. The host cannot prevent plugin code from allocating memory or blocking its thread, and a transform can allocate a large output before the host rejects it. Do not describe payload reservations as a hard bound on process memory or total validator work.
 
-Tests must cover byte/depth/object/entry limits, aggregate reservations, large backing buffers behind small views, transformed outputs and results exceeding budgets, and bounded host inspection. Verify slow-validator diagnostics without claiming forced interruption. Tests must also cover overlapping retained representations, shared-allocation deduplication, byte charges, sparse arrays, depth on every reference path, object/entry counts, initial revocation precedence and settings changes with work in flight. Slow-validator thresholds and responsiveness measurements remain outstanding.
+Tests must cover byte/depth/object/entry limits, aggregate reservations, large backing buffers behind small views, transformed outputs and results exceeding budgets, and bounded host inspection. Verify slow-validator diagnostics without claiming forced interruption. Tests must also cover overlapping retained representations, shared-allocation deduplication, byte charges, sparse arrays, depth on every reference path, object/entry counts, initial revocation precedence and settings changes with work in flight. Validator timing instrumentation and responsiveness measurements remain outstanding.
 
 ## Implementation details still requiring specification
 
-Pending-call, per-payload and aggregate defaults are approved above. So are retained-representation accounting, byte/depth/object/entry rules, application-wide settings, validation of setting values, changes applying to new invocations, overload rejection, cancellation accounting, failure precedence and safe diagnostics. Slow-validator thresholds, the diagnostic-ID field shape and the settings persistence/integration mechanism remain unspecified. Resolve open details before implementing behavior that depends on them. The invocation runtime remains unimplemented. Schema validation is not frontend isolation. Host code must also preserve the approved declaration, project-targeting and revocation rules.
+Pending-call, per-payload and aggregate defaults are approved above. So are retained-representation accounting, byte/depth/object/entry rules, application-wide settings, validation of setting values, changes applying to new invocations, overload rejection, cancellation accounting, failure precedence and safe diagnostics. The 16 ms initial-synchronous-validator warning threshold and the exported Error subclass are also approved. Settings persistence/integration remains unspecified. Resolve open details before implementing behavior that depends on them. The invocation runtime and validator timing instrumentation remain unimplemented. The internal primitives and their blocking limitation are described below. Schema validation is not frontend isolation. Host code must also preserve the approved declaration, project-targeting and revocation rules.
+
+## Internal payload and reservation primitives
+
+These working-branch modules are implementation code, not author-facing SDK entry points. Neither is connected to the current plugin host:
+
+- [`command-payload.ts`](../../packages-js/plugins/command-payload.ts) inspects permitted data and copies it independently. It returns byte, depth and combined object/entry measurements. Per-allocation charges let reservation accounting deduplicate shared objects across retained representations. Traversal uses an iterative graph walk and cached subtree heights for repeated-reference paths.
+- [`command-reservations.ts`](../../packages-js/plugins/command-reservations.ts) creates one window's pending-call and payload ledger. Host code supplies actual component-instance IDs. Admission captures frozen limits. Retaining a value inspects it and adds a representation receipt. The returned release function is idempotent. The host must release the call only after work settles and cleanup drops its data; cancellation does not automatically do so.
+
+The ledger rejects excess capacity without changing counters. It counts shared allocations once within an invocation, independent copies separately and separate invocations independently. Inspections are point-in-time receipts, not mutation tracking. If retained inspections observe different charges for the same object, retain the maximum charge until the corresponding receipts are released. The future dispatcher must recheck mutable values across asynchronous boundaries.
+
+The inspector currently rejects accessors, symbol/hidden properties and extra properties on built-in containers rather than invoking getters or silently losing data. It preserves sparse arrays, null-prototype records, repeated references and buffer/view sharing in the independent copy. Reflection failures produce fixed internal `PayloadError` messages without echoing payload or thrown messages. These internal errors are not normalized invocation errors; the future dispatcher must map their codes and attach diagnostic IDs. The functions are synchronous and do not offload work.
+
+### Blocking inspection limitation
+
+**Not ready for host integration:** portable JavaScript cannot discover arbitrary extra own properties on a typed array without also enumerating its numeric indices. The current implementation performs that enumeration for every distinct view. Many views sharing one buffer can fit the byte/object limits but still require excessive inspection work. Backing-buffer deduplication does not bound this cost. Hidden/symbol own-key enumeration also has no streaming API. Proxy traps can execute arbitrary code; reflection is not isolation.
+
+An owner decision is required: either explicitly exclude custom typed-array properties from payload data, or approve another inspection restriction/boundary. Neither choice is implemented or approved by this slice. Do not describe the current inspector as fully work-bounded or connect it to command dispatch before resolving this limitation.
+
+See [`command-payload.test.ts`](../../packages-js/plugins/command-payload.test.ts) and [`command-reservations.test.ts`](../../packages-js/plugins/command-reservations.test.ts) for supported-value, graph, copy, accounting, release and settings coverage. Passing these tests does not establish a bound on typed-array property enumeration.
 
 The [implementation plan](implementation-plan.md#part-4--external-packages-and-user-facing-trust) tracks the remaining native security, persistence and packaged-runtime work. This contract approval does not approve a command picker, shortcut system or external loading before those prerequisites are met.

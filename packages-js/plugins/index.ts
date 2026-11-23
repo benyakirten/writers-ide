@@ -7,7 +7,7 @@ export {
 	type CommandRegistration,
 	type CommandInvoker,
 	type CommandInvocationErrorCode,
-	type CommandInvocationError,
+	CommandInvocationError,
 } from './commands';
 export type {
 	FrontendContext,
