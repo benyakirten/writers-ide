@@ -2,13 +2,23 @@
 
 **Status: approved direction; not implemented.** This plan describes a SQLite-backed index of files and filesystem metadata within a registered project. It is not a document content store or an authoritative catalog of books, scenes or other application documents.
 
-The filesystem remains the source of truth for indexed files. File contents stay in their existing storage. The index does not contain manuscript text or binary file contents. Selecting SQLite for this index does not select the project's content format or the index database's location. It also does not require sharing the host plugin-management database.
+The filesystem remains the source of truth for indexed files. File contents stay in their existing storage. The index does not contain manuscript text or binary file contents. This does not select the project's content format.
+
+**Approved storage location; not implemented:** keep the index in application-managed local storage, outside the project folder. Associate it with the registered project. Use a separate rebuildable index database, not the database holding host settings, installation records and permission grants. Each computer builds and maintains its own observations. Copying or synchronizing a project does not need to carry its index. Indexing does not require write access to the project folder. Exact local directory and schema remain implementation details. Do not assume a fixed scan cost for every project.
+
+## Automatic index recovery
+
+**Approved recovery policy; not implemented:** automatically rebuild a corrupt or incompatible index without requiring user approval. Stop serving the unusable cache, report recovery through index status and diagnostics, and create a replacement from filesystem observations. Return available partial replacement records with `initialized: false` until initialization succeeds. If no usable query state is available, queries reject under the native error model rather than returning corrupt data.
+
+Recovery must not modify project files, permission grants, installation records or host settings. If rebuilding fails, expose the failure. Bound automatic retries; do not repeatedly restart recovery without a limit. Exact retry limits, replacement mechanics and schema compatibility checks still need implementation design. An ordinary query or filesystem scan failure is not by itself evidence that the database is corrupt.
 
 ## Approved responsibilities
 
-The host maintains the index and exposes bounded metadata queries to authorized plugins. Plugins should not each need to enumerate the filesystem to discover the same files. The author query API remains undecided; recording the index does not approve unrestricted SQL or cross-project access.
+The host maintains the index and exposes bounded metadata queries to authorized plugins. Plugins should not each need to enumerate the filesystem to discover the same files. The approved query API is described below. It does not permit unrestricted SQL or cross-project access.
 
-Metadata queries must finish their SQLite statements and read transactions before returning a page. Pagination must not retain a filesystem iterator, directory handle, SQLite statement or read transaction between plugin requests. Continuations use the approved stateless keyset design below. The query method and page envelope still need review.
+Metadata queries must finish their SQLite statements and read transactions before returning a page. Pagination must not retain a filesystem iterator, directory handle, SQLite statement or read transaction between plugin requests. Continuations use the approved stateless keyset design below. The query method and page envelope are approved below; production integration remains outstanding.
+
+**Approved discovery policy; not implemented:** do not automatically apply `.gitignore` or other Git ignore rules to indexing. Version-control tracking does not determine whether an entry appears in plugin queries. Index entries within the registered project subject to containment, unsupported-entry handling and host resource limits. Explicit host-configurable indexing exclusions are future work. Their effect on query completeness and status must be defined before introduction.
 
 The indexer itself necessarily accesses the filesystem. Its active scans and watchers may hold native resources and must have bounded work, cancellation and cleanup. Removing resource-owning pagination does not remove the need to manage those resources.
 
@@ -21,7 +31,33 @@ The existing file-service requirements still apply:
 - Keep the approved initial response maximum of 256 entries per page, with no caller-selected page size. Bound query work and payloads separately.
 - Read saved bytes through the separately approved `ProjectFiles.read()` operation. Revalidate the actual filesystem target and permissions at read time; the index may be stale.
 
-These constraints do not finalize the indexed query method, page envelope or authority for future operations such as manual refresh. Entry/status types and the async subscription signature are approved below.
+Query/page, entry/status and async subscription contracts are approved below. Reconciliation remains host-controlled initially. Plugins have no scan-request API.
+
+## Query API
+
+**Approved shape; not implemented:**
+
+```ts
+type FileIndexQueryOptions = NativeRequestOptions & {
+	readonly after?: string;
+};
+
+type FileIndexPage = {
+	readonly entries: readonly FileIndexEntry[];
+	readonly status: FileIndexStatus;
+	readonly nextToken: string | null;
+};
+
+interface ProjectFiles {
+	queryIndex(directory: string, options?: FileIndexQueryOptions): Promise<FileIndexPage>;
+}
+```
+
+The directory is project-relative, with explicit `'.'` for the root. Return immediate children in deterministic non-locale-aware path order, up to 256 entries. `after` accepts a returned opaque token, not a file path or row number. There is no caller-selected page size, custom sorting or SQL.
+
+`status` describes the index state used for this page. A null `nextToken` means no further indexed entries after this position at query time. It does not establish filesystem completeness; inspect the status, especially during initialization or uncertainty. Entries and status must describe a coherent query-visible state. Different pages may have different revisions.
+
+The method uses the existing metadata permission, cancellation and native error policies. Final native export grouping, error mapping and implementation remain under review.
 
 ## Query pagination
 
@@ -33,7 +69,7 @@ Tokens are reusable while their project/query scope remains valid. Each use quer
 
 Concurrent insertions before the continuation point may require refresh to appear. Renames and other changes can affect membership or repeat a file under a new path. Use invalidation to refresh relevant queries. Do not promise duplicate-free traversal or a stable snapshot across pages of a changing index.
 
-The initial API does not provide direct page-number jumps or configurable ordering. Directory-first ordering, metadata sorting and random-access navigation are future candidates needing explicit continuation semantics. The method name, page envelope, completion signaling and query inputs still need approval.
+The initial API does not provide direct page-number jumps or configurable ordering. Directory-first ordering, metadata sorting and random-access navigation are future candidates needing explicit continuation semantics. The query signature, page envelope and completion signaling are approved above.
 
 ## Indexed entry metadata
 
@@ -52,7 +88,7 @@ type FileIndexEntry = {
 
 These are cached observations, not guaranteed current properties. Metadata inspection failures remain visible through index uncertainty/error reporting; they are not a reason to classify an unknown entry as unsupported or declare its deletion. Modification time does not prove unchanged contents. Saved reads still validate the actual target and grants.
 
-The entry exposes no file contents, link target, checksum or stable application-document ID. A path is a filesystem location and may change on rename. This approves the entry type, not a database schema or query/page/continuation contract.
+The entry exposes no file contents, link target, checksum or stable application-document ID. A path is a filesystem location and may change on rename. Entry and query/page contracts are approved, but no database schema is selected.
 
 ## Permissions
 
@@ -60,17 +96,27 @@ The entry exposes no file contents, link target, checksum or stable application-
 
 A component with only read permission may read a known permitted path but cannot enumerate indexed metadata, read index status or subscribe to index changes. A metadata-only component can observe indexed state without reading contents. Each operation still needs authorization even when the shared project-file service object is non-null.
 
-This selects no new permission name and does not grant unrestricted SQL, cross-project metadata, unsaved editor content, raw OS-event streams or caller-triggered rescans. Manual-refresh behavior and any associated authority need separate review. Preserve activation/project scope, mandatory consent and revocation for queries and subscriptions.
+This selects no new permission name and does not grant unrestricted SQL, cross-project metadata, unsaved editor content, raw OS-event streams or caller-triggered rescans. Plugins cannot request reconciliation initially. Any future plugin scan-request API needs separate permission and resource-policy review. Preserve activation/project scope, mandatory consent and revocation for queries and subscriptions.
 
 ## Change detection and reconciliation
 
 Use native filesystem notifications to discover changes promptly. Treat events as hints, not a complete or ordered record of every change. Events can be combined or lost, and no watcher runs while the application is closed.
 
-Run reconciliation on a timer to repair missed changes. The interval, scanning strategy and watcher/reconciler lifetime are open. Startup/reopen recovery also needs a defined reconciliation policy. A manually requested refresh is a proposed addition; its caller permissions and scheduling behavior are not approved yet.
+**Approved lifetime; not implemented:** opening a project starts its filesystem watcher and initial reconciliation. Periodic reconciliation runs while the project remains open. The host owns this work. It does not depend on plugin activation, query use or subscription count. Disabling a plugin or releasing its last subscription does not stop indexing. Plugins need no indexing usage handle.
 
-Reconciliation compares filesystem observations with indexed metadata and updates the index. It must not treat an unreadable directory or incomplete scan as proof that all its previous entries were deleted. A stored file can change or disappear between a query and a read. SQLite transactions do not make filesystem observations atomic.
+Closing the project stops its watcher and timer and cancels pending indexing work. Reopening starts a new indexing lifetime and initial reconciliation. Cached records may remain available under the readiness rules below, but they do not establish initialization for the new opening.
 
-Keep indexing work off the frontend UI thread. Use bounded scanning and database updates. Design handling for watcher overflow, scan errors, project closure and interruption before selecting timer defaults or promising freshness.
+Run reconciliation on a timer to repair missed changes. Allow at most one reconciliation at a time for each open project. If a request arrives during a scan, mark one additional pass as pending. Combine further requests into that pending pass rather than queueing each request separately. Project closure cancels active and pending work. This applies to reconciliation requests; it does not require a full scan for every filesystem notification.
+
+**Approved watcher-gap response; not implemented:** when the watcher reports an overflow or another known event gap, set `needsReconciliation: true` and notify subscribers after that status becomes query-visible. Request reconciliation without waiting for the periodic timer. Keep scheduling/resource limits and bounded failure retries. If a scan is already running, combine the request into the single pending pass. Continue serving usable indexed results with their uncertainty status. A completed scan must not clear uncertainty from a newer, unresolved gap.
+
+The interval, bounded scanning strategy and detailed interruption/recovery policy remain open. Reconciliation is host-controlled initially. Repeating a plugin query reads the current index; it does not request a filesystem scan. A host-owned user refresh action remains a candidate whose UI and behavior need design. Plugin-requested reconciliation is future work, not an initial API.
+
+Reconciliation compares filesystem observations with indexed metadata and updates the index. It must not treat an unreadable directory or incomplete scan as proof that all its previous entries were deleted. **Approved directory-failure policy; not implemented:** continue scanning accessible directories after a directory-specific failure. Preserve previous records for the failed area. Update successfully observed areas and track scan coverage before confirming deletions. Report the failure through `lastError` and keep `needsReconciliation: true`. During initial reconciliation, keep `initialized: false` until initialization fully succeeds. If initialization already succeeded in this opening, retain `initialized: true`; the error and uncertainty fields describe the later failure. A partial pass does not advance the last successful full-reconciliation time. Retry through bounded host scheduling. Cancellation, project closure or an unusable database can still stop the entire pass.
+
+A stored file can change or disappear between a query and a read. SQLite transactions do not make filesystem observations atomic.
+
+Keep indexing work off the frontend UI thread. Use bounded scanning and database updates. Apply the approved watcher-gap response. Finish scan-error, watcher-recovery and interruption mechanics before selecting timer defaults or promising freshness.
 
 ## Readiness and freshness
 
@@ -98,11 +144,11 @@ type FileIndexStatus = {
 - `lastReconciledAt` is the last known successful full reconciliation time in milliseconds since the Unix epoch. It may come from a previous opening. Null means no successful time is known.
 - `lastError` is a display-only summary of background indexing failure, cleared after successful reconciliation. Do not parse it as an error code or expose credentials/absolute paths in it.
 
-A query that cannot run still rejects under the native error model. A background scan error can instead coexist with useful indexed results and status. The type and field meanings are approved. The subscription signature is approved below; the query API and native export grouping still need review.
+A query that cannot run still rejects under the native error model. A background scan error can instead coexist with useful indexed results and status. The type and field meanings are approved. The subscription signature is approved below; the query API is approved above, while native export grouping still needs review.
 
 Ready means the required index initialization has completed. It does not promise a frozen filesystem, immediate watcher processing or a consistent snapshot across separate page requests. Reads of known paths remain separately authorized filesystem operations and do not wait for index readiness.
 
-Readiness transitions must notify subscribers even when no file entries changed. Make the new state query-visible before delivering its invalidation. A way to explicitly request fresher observations is still under review with manual refresh.
+Readiness transitions must notify subscribers even when no file entries changed. Make the new state query-visible before delivering its invalidation. Plugins cannot explicitly request fresher filesystem observations through the initial API.
 
 ## Subscriptions
 
@@ -131,22 +177,27 @@ Subscriptions do not make the index immediately consistent with the filesystem. 
 
 ## Decisions before implementation
 
-1. **Query API:** method name, directory/query inputs, page envelope and completion signaling using the approved entry/status types and opaque live keyset continuation. Internal token encoding is not a public contract.
-2. **Reconciliation:** timer policy, bounded scans, handling incomplete observations, interruption and any manual-refresh/freshness request.
-3. **Resources and future authority:** apply the approved metadata/read permission grouping and bound queries, subscriptions, watcher work, queued reconciliation and memory. Review authority for any manual-refresh operation separately.
-4. **Persistence:** index schema, database placement, migration, rebuild and recovery. Keep rebuildable observations separate from permission grants and content ownership.
+1. **Reconciliation:** timer policy, bounded scans, handling incomplete observations, interruption and any host-owned user refresh action.
+2. **Resources and native integration:** apply the approved permission grouping and bound queries, subscriptions, watcher work, queued reconciliation and memory. Finish native error/validation integration and export grouping. Keep plugin scan requests out of the initial API. Internal token encoding is not a public contract.
+3. **Persistence:** index schema, compatibility checks, replacement mechanics and bounded retry policy for approved automatic recovery within application-managed local storage. Keep rebuildable observations separate from permission grants and content ownership.
 
 Native credentials, project containment and authorization remain required. This plan does not authorize file writes, general native networking or executable backend plugins.
 
 ## Validation to add
 
+- Corrupt or incompatible indexes rebuild automatically without serving unusable records. Recovery reports status/diagnostics, returns available partial replacement data as uninitialized and leaves project files, grants and host settings unchanged. Rebuild failure is visible and does not cause unlimited retries.
 - Indexed query pages release statements/transactions before returning and require no retained native pagination cursor.
+- Git-ignored files and directories remain eligible for indexing. Projects without Git follow the same discovery policy. Containment, unsupported-entry handling and resource limits still apply.
 - Multiple authorized projects cannot query or subscribe to one another accidentally.
 - Metadata permission covers queries, status and invalidation but not contents. Read-only permission covers known-path reads but not metadata queries/status/subscriptions. Check denial and revocation independently of service-object availability.
-- Watcher events and reconciliation converge after missed events, overflow and reopen.
+- Opening a project starts its watcher and initial reconciliation without a plugin consumer. Periodic work continues after the last subscription ends or a plugin is disabled. Closure stops the watcher/timer and cancels pending indexing work; reopening requires fresh initialization.
+- Reconciliations do not overlap within one open project. Requests during a scan combine into one pending pass, with no per-request backlog. Closure cancels active and pending work.
+- Watcher events and reconciliation converge after missed events, overflow and reopen. Known gaps publish uncertainty and request reconciliation without waiting for the timer, within scheduling/resource limits and bounded failure retries. Requests during a scan combine into one pending pass. Scan completion does not clear uncertainty from a newer unresolved gap.
+- Directory-specific failures preserve records for failed areas while accessible areas continue updating. Confirm deletions only with sufficient successful observations. Report error/uncertainty, retain the correct initialization state and do not advance the successful full-reconciliation time for a partial pass. Retry within host limits; cancellation, closure and unusable databases can stop the entire pass.
 - Partial scans and permission errors do not cause false deletion records; incomplete empty results do not claim empty directories.
 - Cached/partial query results carry matching revision and status information. Test overlapping initialized/reconciling states, known gaps, background failures and preserved previous-reconciliation time. Known-path reads do not depend on index readiness.
 - Readiness transitions invalidate subscribers even when file rows do not change.
+- `queryIndex()` accepts directory/options, returns the approved entries/status/next-token page and reports completion only for indexed results at query time. Test empty partial pages without claiming filesystem completeness.
 - Keyset pagination uses deterministic path ordering and validates malformed/foreign-query tokens. Tokens can be reused against current indexed state without retained native resources or single-use tracking.
 - Continuation still works if the last returned entry is deleted; concurrent insertions and renames follow documented live-view semantics. Each page includes its own status/revision.
 - Pagination and notifications handle concurrent index updates under the chosen consistency policy.

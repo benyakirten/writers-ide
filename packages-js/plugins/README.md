@@ -378,15 +378,17 @@ The host attaches native credentials and checks each operation. A non-null servi
 
 **Approved file-index direction; not implemented:** the host will maintain a project-scoped SQLite index of files and filesystem metadata. It stores no file contents and is not an authoritative catalog of application documents. Plugins will query bounded metadata pages instead of each maintaining a native directory enumeration. Each query must finish its database statement/transaction before returning; pagination retains no native directory iterator or database statement between requests.
 
-The index follows native filesystem notifications and periodic reconciliation. Notifications may be missed, so reconciliation repairs observations. Subscriptions will send coalesced invalidation notices after index updates commit. A notice means to refresh relevant visible/dependent queries, not reload every record or process a per-file operation log. Several updates may share one notice. The host owns subscription cleanup on activation end, access revocation and project closure. The async subscription signature is approved below. Exact indexed query and continuation contracts remain open. Queries will return available cached or partial records while checking continues, with explicit readiness/freshness information and the revision used. An incomplete empty result must not be shown as proof that a directory is empty. Failed/partial scans are not confirmed deletions. Ready means required initialization completed, not that all filesystem changes are already observed. Separate pages are not automatically one snapshot.
+Git ignore rules will not automatically hide files or directories from the index. Discovery is separate from version-control tracking. Containment, unsupported-entry handling and host resource limits still apply. Explicit host-configurable indexing exclusions are future work.
 
-Readiness transitions will also invalidate subscriptions even when file entries do not change, after the new state is query-visible. Known-path saved-file reads do not depend on index readiness. The approved `FileIndexStatus` data contains an opaque `revision`, `initialized`, `reconciling`, `needsReconciliation`, `lastReconciledAt` and `lastError`. Initialization applies to this opening; cached records do not establish it. The last successful full-reconciliation time is Unix-epoch milliseconds or null and may be known from a previous opening. A display-only background error can coexist with usable records and clears after successful reconciliation. Do not parse its text or treat `needsReconciliation: false` as proof of perfect freshness. Query failures still reject. See the [exact status type and meanings](../../docs/plugins/file-index-plan.md#approved-status-shape). Initial delivery follows the async subscription contract below. Reconciliation cadence and any manual-refresh operation still need review.
+The index follows native filesystem notifications and periodic reconciliation. Notifications may be missed, so reconciliation repairs observations. Subscriptions will send coalesced invalidation notices after index updates commit. A notice means to refresh relevant visible/dependent queries, not reload every record or process a per-file operation log. Several updates may share one notice. The host owns subscription cleanup on activation end, access revocation and project closure. The async subscription signature is approved below. The query/page and live-keyset contracts are approved below. Queries will return available cached or partial records while checking continues, with explicit readiness/freshness information and the revision used. An incomplete empty result must not be shown as proof that a directory is empty. Failed/partial scans are not confirmed deletions. Ready means required initialization completed, not that all filesystem changes are already observed. Separate pages are not automatically one snapshot.
+
+Readiness transitions will also invalidate subscriptions even when file entries do not change, after the new state is query-visible. Known-path saved-file reads do not depend on index readiness. The approved `FileIndexStatus` data contains an opaque `revision`, `initialized`, `reconciling`, `needsReconciliation`, `lastReconciledAt` and `lastError`. Initialization applies to this opening; cached records do not establish it. The last successful full-reconciliation time is Unix-epoch milliseconds or null and may be known from a previous opening. A display-only background error can coexist with usable records and clears after successful reconciliation. Do not parse its text or treat `needsReconciliation: false` as proof of perfect freshness. Query failures still reject. See the [exact status type and meanings](../../docs/plugins/file-index-plan.md#approved-status-shape). Initial delivery follows the async subscription contract below. Reconciliation is host-controlled initially. Querying again reads current indexed data; it does not request a filesystem scan. There is no initial plugin scan-request API. Plugin-requested reconciliation is future work. Reconciliation cadence and any host-owned user refresh action still need design.
 
 `project.files.list` with resource `project` covers indexed metadata queries, index-status reads and coalesced invalidation subscriptions. Saved contents still need `project.files.read`. Neither implies the other. A read-only component can read a known permitted path but cannot enumerate metadata or observe index status/changes. A metadata-only component cannot read file contents. Each method remains permission-checked even when the file-service object is available. This grouping adds no raw filesystem-event API or manual-rescan authority.
 
-Directory-view requirements remain: project-relative paths, explicit `'.'` for the registered root, no empty/missing-path default, nonrecursive views initially and at most 256 entries per page without a caller-selected page size. Unsupported entries expose no link targets or contents and must not be traversed. The new API must preserve authorization and resource bounds. Entry/status types and the keyset strategy are approved below. Method names, page envelope and completion fields still need review.
+Directory-view requirements remain: project-relative paths, explicit `'.'` for the registered root, no empty/missing-path default, nonrecursive views initially and at most 256 entries per page without a caller-selected page size. Unsupported entries expose no link targets or contents and must not be traversed. The new API must preserve authorization and resource bounds. Entry/status types and the keyset strategy are approved below. The query/page shape below is approved; production integration remains outstanding.
 
-Saved-file reads still access the filesystem and check actual targets and read grants. An indexed path may disappear, change or become prohibited before a read; the record itself grants no access. The index database's location and project content storage remain separate decisions. See the [file-index plan](../../docs/plugins/file-index-plan.md) for accepted direction, open questions and validation requirements.
+Saved-file reads still access the filesystem and check actual targets and read grants. An indexed path may disappear, change or become prohibited before a read; the record itself grants no access. The host keeps a separate, rebuildable index database in application-managed local storage outside the project folder. Each computer maintains its own index; the project does not need to carry or synchronize it. The index is separate from host settings, installation records and permission grants. If the index is corrupt or incompatible, the host rebuilds it automatically. Recovery reports status and diagnostics instead of serving unusable records. Available partial replacement results remain uninitialized until initialization succeeds. Rebuild failures remain visible, and retries are bounded. Recovery leaves project files, permission grants and host settings untouched. This does not select project content storage. See the [file-index plan](../../docs/plugins/file-index-plan.md) for accepted direction, open questions and validation requirements.
 
 ### Indexed entry metadata
 
@@ -403,7 +405,29 @@ type FileIndexEntry = {
 
 Paths are project-relative. Size is the observed file byte count, or null for directories, unsupported entries or unavailable metadata. Modification time is observed file/directory mtime in Unix-epoch milliseconds, or null when unavailable/unsupported. Display unknown values as unknown, not zero. Inspection failures remain visible through index uncertainty/error reporting.
 
-These are cached observations. Mtime does not prove unchanged contents, and reads still check the actual target and permission. Entries contain no file contents, link targets, checksums or stable document IDs. A path may change on rename. The entry type is approved. Pagination uses opaque reusable keyset tokens, as described below; query methods and page envelope still need review.
+These are cached observations. Mtime does not prove unchanged contents, and reads still check the actual target and permission. Entries contain no file contents, link targets, checksums or stable document IDs. A path may change on rename. The entry type is approved. The query/page and opaque reusable keyset contracts below are also approved.
+
+### Planned indexed queries
+
+**Approved shape; not implemented:** the project-file service will expose `queryIndex(directory, options?)`. `FileIndexQueryOptions` extends native cancellation options with `after?: string`. `FileIndexPage` contains read-only `entries: readonly FileIndexEntry[]`, `status: FileIndexStatus` and `nextToken: string | null`.
+
+Inside a managed async task or async UI handler, with the authorized host-supplied `files` service and cancellation `signal`:
+
+```ts
+const page = await files.queryIndex('research', { signal });
+
+if (page.nextToken !== null) {
+	const nextPage = await files.queryIndex('research', {
+		signal,
+		after: page.nextToken,
+	});
+	console.info(nextPage.entries);
+}
+```
+
+The method accepts the directory separately from its options, matching `read(path, options)`. Use `'.'` for the project root. Return immediate children in deterministic path order, up to 256 entries. `after` takes the returned opaque token, not a path or offset. No page-size option, custom sorting or arbitrary SQL is included.
+
+Each page's status describes the indexed state used for its entries. A null next token means no further indexed entries after that position at query time. It does not prove a directory is completely observed or that another page would share the same revision. See the [query contract](../../docs/plugins/file-index-plan.md#query-api).
 
 ### Planned index pagination
 
@@ -413,7 +437,7 @@ Treat tokens as opaque data, not permission credentials. The host validates thei
 
 Each page includes its own status/revision. Multiple pages are not a historical snapshot. Insertions before the continuation point may appear only after refresh, and renames can change membership or repeat a file under a new path. Use invalidation notices to refresh relevant queries. Do not assume duplicate-free traversal of a changing index.
 
-Direct page-number jumps and configurable ordering are not initial features. Directory-first/metadata sorting and random-access navigation are future candidates, not a requirement to load and sort the entire index in a plugin. Exact query/page/completion fields remain under review. See the [pagination plan](../../docs/plugins/file-index-plan.md#query-pagination).
+Direct page-number jumps and configurable ordering are not initial features. Directory-first/metadata sorting and random-access navigation are future candidates, not a requirement to load and sort the entire index in a plugin. The query/page/completion fields above are approved. See the [pagination plan](../../docs/plugins/file-index-plan.md#query-pagination).
 
 ### Planned async index subscriptions
 
