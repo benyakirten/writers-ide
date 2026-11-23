@@ -45,6 +45,8 @@ export interface ReservationRelease {
 export interface CommandReservation {
 	readonly limits: ReservationLimits;
 	retain(value: unknown): ReservationRelease;
+	// Trusted inspection from prepareCommandPayload; reserve before copying that snapshot.
+	reserveCopy(inspection: PayloadInspection): ReservationRelease;
 	// The host calls this only after running work settles and cleanup drops its data.
 	release(): void;
 }
@@ -190,37 +192,51 @@ export function createCommandReservationLedger(
 				adjustBytes(-removed);
 			};
 
+			const retainInspection = (inspection: PayloadInspection): ReservationRelease => {
+				// Inspection can reenter host code through proxy traps and release this call.
+				requireActive();
+				let additional = inspection.scalarBytes;
+				for (const [object, charge] of inspection.allocations) {
+					const increase = Math.max(0, charge - (allocations.get(object)?.maximum ?? 0));
+					requireCapacity(additional, increase, Number.MAX_SAFE_INTEGER);
+					additional += increase;
+				}
+				requireCapacity(bytes, additional, limits.maxWindowBytes);
+				requireCapacity(caller.bytes, additional, limits.maxComponentBytes);
+				requireCapacity(provider.bytes, additional, limits.maxComponentBytes);
+				for (const [object, charge] of inspection.allocations) {
+					let allocation = allocations.get(object);
+					if (allocation === undefined) {
+						allocation = { maximum: 0, charges: new Map() };
+						allocations.set(object, allocation);
+					}
+					allocation.charges.set(charge, (allocation.charges.get(charge) ?? 0) + 1);
+					allocation.maximum = Math.max(allocation.maximum, charge);
+				}
+				adjustBytes(additional);
+				const receipt: Receipt = { inspection };
+				receipts.add(receipt);
+				return () => drop(receipt);
+			};
+
 			return Object.freeze({
 				limits,
 				retain(value: unknown) {
 					requireActive();
-					// Inspections are point-in-time receipts, not mutation tracking. The dispatcher
-					// must inspect again across async boundaries before using mutable values.
-					const inspection = inspectCommandPayload(value, limits.payload);
-					// Proxy traps during inspection can reenter host code and release this call.
+					// Receipts are point-in-time measurements, not mutation tracking.
+					return retainInspection(inspectCommandPayload(value, limits.payload));
+				},
+				reserveCopy(inspection: PayloadInspection) {
 					requireActive();
-					let additional = inspection.scalarBytes;
-					for (const [object, charge] of inspection.allocations) {
-						const increase = Math.max(0, charge - (allocations.get(object)?.maximum ?? 0));
-						requireCapacity(additional, increase, Number.MAX_SAFE_INTEGER);
-						additional += increase;
-					}
-					requireCapacity(bytes, additional, limits.maxWindowBytes);
-					requireCapacity(caller.bytes, additional, limits.maxComponentBytes);
-					requireCapacity(provider.bytes, additional, limits.maxComponentBytes);
-					for (const [object, charge] of inspection.allocations) {
-						let allocation = allocations.get(object);
-						if (allocation === undefined) {
-							allocation = { maximum: 0, charges: new Map() };
-							allocations.set(object, allocation);
-						}
-						allocation.charges.set(charge, (allocation.charges.get(charge) ?? 0) + 1);
-						allocation.maximum = Math.max(allocation.maximum, charge);
-					}
-					adjustBytes(additional);
-					const receipt: Receipt = { inspection };
-					receipts.add(receipt);
-					return () => drop(receipt);
+					requireCapacity(0, inspection.bytes, limits.payload.maxBytes);
+					requireCapacity(0, inspection.depth, limits.payload.maxDepth);
+					requireCapacity(0, inspection.entries, limits.payload.maxEntries);
+					return retainInspection({
+						...inspection,
+						allocations: new Map(
+							Array.from(inspection.allocations.values(), (charge) => [{}, charge]),
+						),
+					});
 				},
 				release() {
 					if (released) {

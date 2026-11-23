@@ -1,12 +1,12 @@
 # Shared application commands
 
-**Status: source contracts/helpers and internal manifest checks implemented; invocation runtime not implemented.** This page records the external-package command design. Today's `CommandContribution` takes no arguments and returns a synchronous boolean. There is no current plugin-facing command-invocation service or user-facing command routing.
+**Status: source contracts/helpers, internal manifest checks and an isolated dispatcher are implemented; application host integration is not.** This page records the external-package command design. Today's `CommandContribution` takes no arguments and returns a synchronous boolean. There is no current plugin-facing command-invocation service or user-facing command routing.
 
 An application command is a named action owned by a component. Another component can invoke it through a declared dependency. It is not a ProseMirror command or a live provider service. Registration does not create a button, shortcut or command-picker entry. See the [package specification](package-api-proposal.md) for component lifetimes and package installation.
 
 ## Choose an editor command or an application command
 
-Writer's IDE has two command APIs. They serve different purposes. Synchronous editor commands are implemented today. The typed shared application command contracts and definition/error helpers are exported. The internal Rust parser validates command declarations and the static resolver matches every requested command ID, contract ID and major. These checks do not verify runtime publication or implement invocation. See the [internal manifest guide](manifest-resolution.md).
+Writer's IDE has two command APIs. They serve different purposes. Synchronous editor commands are implemented today. The typed shared application command contracts and definition/error helpers are exported. The internal Rust parser validates command declarations and the static resolver matches every requested command ID, contract ID and major. These checks do not verify runtime publication. A separate [internal dispatcher](command-dispatcher.md) now implements invocation against host-supplied bindings, without application host integration. See the [internal manifest guide](manifest-resolution.md).
 
 | Need                                                                                 | Use                                                                     | Why                                                                                                      |
 | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -145,7 +145,7 @@ The host resolves the declared package/component/command for the appropriate pro
 
 ## Check command availability
 
-**Approved consumer methods; not implemented:** `context.commands.isAvailable(dependencyAlias, commandAlias, contract)` returns a boolean. `context.commands.subscribeAvailability(dependencyAlias, commandAlias, contract, listener)` returns `Dispose`. Project-bound command access uses the same methods on `connection.commands`.
+**Implemented in the isolated dispatcher; application integration pending:** `context.commands.isAvailable(dependencyAlias, commandAlias, contract)` returns a boolean. `context.commands.subscribeAvailability(dependencyAlias, commandAlias, contract, listener)` returns `Dispose`. Project-bound command access uses the same methods on `connection.commands`.
 
 Both methods resolve only declared dependency/command aliases and check the supplied contract identity/major. Invalid aliases or mismatched contract references are author errors, not an unavailable result. Availability means the declared command can currently be invoked, not that it will succeed, pass argument validation or have spare concurrency capacity.
 
@@ -173,7 +173,7 @@ Tests must cover initial delivery, availability transitions, activation/connecti
 
 ## Supported command values
 
-**Approved initial value list; not implemented:** allow only these values in command arguments and results:
+**Implemented internally; application integration pending:** allow only these values in command arguments and results:
 
 - `null`, `undefined`, strings, booleans, numbers and `bigint`.
 - Arrays and plain records.
@@ -190,7 +190,7 @@ Validation must cover every allowed type and rejection of unsupported values at 
 
 ## Binary arguments and results
 
-**Approved payload support; not implemented:** shared commands accept `ArrayBuffer`, typed arrays and `DataView` in their declared arguments and results. The shared contract must validate these values like any other payload. This lets file-processing components exchange bytes without base64 or ordinary-number-array conversion.
+**Implemented internally; application integration pending:** shared commands accept `ArrayBuffer`, typed arrays and `DataView` in their declared arguments and results. The shared contract must validate these values like any other payload. This lets file-processing components exchange bytes without base64 or ordinary-number-array conversion.
 
 Typed arrays are binary data only. Custom properties attached to them are not command data and are neither inspected nor copied. Put metadata in a surrounding plain record. This exception does not change property handling for `DataView` or `ArrayBuffer`.
 
@@ -200,7 +200,7 @@ Validation must cover buffer and view types, nonzero view offsets/ranges, sender
 
 ## Dates, maps and sets
 
-**Approved payload support; not implemented:** shared commands accept `Date`, `Map` and `Set` in declared arguments and results. Copy these values with their standard type behavior preserved. Recipient mutations must not affect sender containers or nested mutable data. Map keys, map values and set members must themselves be permitted command data. Shared contracts must validate the declared types and their contents. Resource accounting must include nested contents, not just the outer container.
+**Implemented internally; application integration pending:** shared commands accept `Date`, `Map` and `Set` in declared arguments and results. Copy these values with their standard type behavior preserved. Recipient mutations must not affect sender containers or nested mutable data. Map keys, map values and set members must themselves be permitted command data. Shared contracts must validate the declared types and their contents. Resource accounting must include nested contents, not just the outer container.
 
 Command payloads do not need to be JSON-serializable. An individual contract can choose JSON-compatible representations when its feature needs them. Supporting these three types does not approve arbitrary class instances or every structured-clone type. Cycles are rejected under the policy below. The supported-value list above is explicit; resource defaults and accounting rules are approved below.
 
@@ -208,7 +208,7 @@ Validation must cover retained types, nested permitted/disallowed values, date v
 
 ## Cycles and repeated references
 
-**Approved reference policy; not implemented:** reject cyclic command arguments and results initially. A cycle is a reference path that leads back to an object already on that path. Report a clear payload-validation failure. Authors can represent parent/back relationships using IDs instead of cycles. Cycle support can be considered later; it is not an initial requirement.
+**Implemented internally; application integration pending:** reject cyclic command arguments and results initially. A cycle is a reference path that leads back to an object already on that path. Report a clear payload-validation failure. Authors can represent parent/back relationships using IDs instead of cycles. Cycle support can be considered later; it is not an initial requirement.
 
 Allow repeated references that do not form a cycle. Preserve those relationships within the boundary copy. For example, if `payload.selected === payload.chapters[0]`, the copied payload retains that equality. Its mutable data remains independent of the sender. This applies to permitted containers and their contents, including map keys/values and set members.
 
@@ -216,7 +216,7 @@ Host traversal must distinguish cycles from repeated references. Tests must cove
 
 ## Schema outputs and transformations
 
-**Approved validation policy; not implemented:** use the schema validator's successful output, not the original value, for the next step. A schema may define conversions, defaults or normalization. The host does not add implicit coercion of its own.
+**Implemented in the isolated dispatcher; application integration pending:** use the schema validator's successful output, not the original value, for the next step. A schema may define conversions, defaults or normalization. The host does not add implicit coercion of its own.
 
 | Boundary          | Author supplies                             | Recipient receives                             |
 | ----------------- | ------------------------------------------- | ---------------------------------------------- |
@@ -231,7 +231,7 @@ Transforms may construct new objects or change repeated-reference relationships.
 
 ## Synchronous and asynchronous validation
 
-**Approved validator support; not implemented:** accept both immediate results and promises from Standard Schema-compatible argument and result validators. Await validation when needed and use its successful output under the transformation policy above.
+**Implemented in the isolated dispatcher; application integration pending:** accept both immediate results and promises from Standard Schema-compatible argument and result validators. Await validation when needed and use its successful output under the transformation policy above.
 
 After argument validation, recheck invocation cancellation and command availability before starting the implementation. After result validation, recheck invocation lifetime before delivery. Cancellation during argument validation prevents implementation execution. Late validation completion must not restart a cancelled invocation or deliver its result. Observe late validation failures so they do not become unhandled rejections.
 
@@ -241,7 +241,7 @@ Tests must cover immediate and promise-based argument/result validation, cancell
 
 ## Invocation errors
 
-**Error class/guard exported; runtime normalization not implemented:** normalize shared-command invocation failures into typed errors. The public names are `CommandInvocationErrorCode`, `CommandInvocationError` and `isCommandInvocationError`. These are separate from native-service errors and synchronous editor results.
+**Error class/guard exported; normalization implemented in the isolated dispatcher:** normalize shared-command invocation failures into typed errors. The public names are `CommandInvocationErrorCode`, `CommandInvocationError` and `isCommandInvocationError`. These are separate from native-service errors and synchronous editor results.
 
 ```ts
 type CommandInvocationErrorCode =
@@ -279,11 +279,11 @@ declare function isCommandInvocationError(value: unknown): value is CommandInvoc
 
 A schema's reported validation failure uses `invalid-arguments` or `invalid-result`, depending on the phase. An unexpected validator exception uses `execution-failed`. Keep original exceptions available to host diagnostics. Callers do not need to understand a provider's private thrown values. Recognizing an error establishes neither origin nor authority.
 
-Use typed command results for expected domain outcomes, such as no matching records. Do not turn every domain outcome into an invocation error. The contract does not change errors outside command invocation. Root SDK exports are approved in the [SDK assembly](sdk-export-review.md#approved-sdk-assembly). The guard is a nonthrowing Error-representation and known-code check. It supports other JavaScript realms without authenticating origin or granting authority. Failure precedence and safe diagnostics are approved below. Runtime normalization remains unimplemented. Tests must cover the codes, validator failures versus exceptions, implementation throws/rejections and lifecycle races.
+Use typed command results for expected domain outcomes, such as no matching records. Do not turn every domain outcome into an invocation error. The contract does not change errors outside command invocation. Root SDK exports are approved in the [SDK assembly](sdk-export-review.md#approved-sdk-assembly). The guard is a nonthrowing Error-representation and known-code check. It supports other JavaScript realms without authenticating origin or granting authority. Failure precedence and safe diagnostics are approved below. Runtime normalization is tested in the isolated dispatcher, not connected to the application host. Tests must cover the codes, validator failures versus exceptions, implementation throws/rejections and lifecycle races.
 
 ### Failure precedence
 
-**Approved; not implemented:** perform initial checks in this order:
+**Implemented in the isolated dispatcher:** perform initial checks in this order:
 
 1. Caller connection lifetime and caller cancellation.
 2. Declared dependency/command access and contract matching.
@@ -295,7 +295,7 @@ A failed check prevents later checks and execution. In particular, unavailable o
 
 ### Safe diagnostics
 
-**Error class implemented; diagnostic records and runtime normalization not implemented:** `CommandInvocationError` extends `Error` and has required read-only `code` and `diagnosticId` fields. Its constructor takes `(code, message, diagnosticId)`. Host-produced errors will contain a host-written explanation and an opaque diagnostic ID linking the error to a host diagnostic record. Do not parse IDs or treat them as credentials.
+**Error class and isolated normalization/diagnostic delivery implemented; storage and application integration pending:** `CommandInvocationError` extends `Error` and has required read-only `code` and `diagnosticId` fields. Its constructor takes `(code, message, diagnosticId)`. Dispatcher-produced errors contain a host-written explanation and an opaque diagnostic ID linking the error to metadata delivered to an optional host observer. The dispatcher creates no persistent diagnostic store. Do not parse IDs or treat them as credentials.
 
 The exported class supports ordinary `Error` behavior and `instanceof`. Retain `isCommandInvocationError` for errors from other realms or SDK copies. It checks the Error representation, known code and string diagnostic ID without authenticating provenance. Constructing the error class does not create a diagnostic record.
 
@@ -307,13 +307,13 @@ Tests must cover check ordering, single settlement under lifecycle races, safe c
 
 ## Concurrency overload
 
-**Approved admission policy; not implemented:** reject an invocation immediately when host command-concurrency limits are reached. Do not queue it for later execution. An invocation rejected for concurrency must run neither its schema validators nor its implementation. Reject with `CommandInvocationError` code `limit-exceeded`, not a native-service error.
+**Implemented in the isolated dispatcher:** reject an invocation immediately when host command-concurrency limits are reached. Do not queue it for later execution. An invocation rejected for concurrency must run neither its schema validators nor its implementation. Reject with `CommandInvocationError` code `limit-exceeded`, not a native-service error.
 
 Callers can disable controls during work, combine repeated requests or retry deliberately with their own bounded policy. The host must not introduce hidden delayed execution. A bounded host waiting queue is future work if demonstrated workflows need it.
 
 ### Accounting and capacity release
 
-**Approved accounting policy; not implemented:** each admitted invocation occupies capacity for its calling activation, provider activation and plugin-hosting window. Reject admission if any applicable concurrency limit is reached. This bounds one caller's requests across providers, aggregate requests to one provider and aggregate window work.
+**Implemented in the isolated dispatcher:** each admitted invocation occupies capacity for its calling activation, provider activation and plugin-hosting window. Reject admission if any applicable concurrency limit is reached. This bounds one caller's requests across providers, aggregate requests to one provider and aggregate window work.
 
 Approved initial defaults:
 
@@ -345,7 +345,7 @@ Approved initial defaults, applied separately to arguments and results and also 
 | Nesting depth                           |               64 levels |
 | Distinct objects and collection entries |        100,000 combined |
 
-These are initial engineering defaults, not measured performance guarantees. Internal inspection and reservation code implements the accounting below. The inspection limits at the end describe remaining JavaScript reflection constraints. Settings UI/persistence and dispatch integration remain unimplemented.
+These are initial engineering defaults, not measured performance guarantees. Internal inspection and reservation code implements the accounting below. The inspection limits at the end describe remaining JavaScript reflection constraints. Settings UI/persistence and application host integration remain unimplemented.
 
 ### Aggregate reservations
 
@@ -400,21 +400,21 @@ Check inputs before copying or schema validation. Check transformed outputs and 
 
 ### Validator timing
 
-**Approved; not implemented:** measure the initial synchronous validator call, up to its return of a result or promise. Warn if this portion exceeds 16 ms. This is a host-controlled starting threshold, roughly one frame at 60 Hz, not a responsiveness guarantee. For promise-based validation, measure total elapsed time separately. Do not label that elapsed time as main-thread blocking.
+**Implemented in the isolated dispatcher:** measure the initial synchronous validator call, up to its return of a result or promise. Warn if this portion exceeds 16 ms. This is a host-controlled starting threshold, roughly one frame at 60 Hz, not a responsiveness guarantee. For promise-based validation, measure total elapsed time separately. Do not label that elapsed time as main-thread blocking.
 
 Report command identity, argument/result validation phase and measured duration, not payloads or raw validator messages. Warnings do not reject, cancel or time out invocations. This instrumentation cannot measure every synchronous segment after an asynchronous validator resumes. It is not complete CPU monitoring. Preserve cancellation and lifetime checks around asynchronous boundaries. Do not require validators to be generators or run in workers.
 
 These budgets bound host-managed processing, not arbitrary trusted frontend execution. A timer cannot interrupt a synchronous validator. The host cannot prevent plugin code from allocating memory or blocking its thread, and a transform can allocate a large output before the host rejects it. Do not describe payload reservations as a hard bound on process memory or total validator work.
 
-Tests must cover byte/depth/object/entry limits, aggregate reservations, large backing buffers behind small views, transformed outputs and results exceeding budgets, and bounded host inspection. Verify slow-validator diagnostics without claiming forced interruption. Tests must also cover overlapping retained representations, shared-allocation deduplication, byte charges, sparse arrays, depth on every reference path, object/entry counts, initial revocation precedence and settings changes with work in flight. Validator timing instrumentation and responsiveness measurements remain outstanding.
+Tests must cover byte/depth/object/entry limits, aggregate reservations, large backing buffers behind small views, transformed outputs and results exceeding budgets, and bounded host inspection. Verify slow-validator diagnostics without claiming forced interruption. Tests must also cover overlapping retained representations, shared-allocation deduplication, byte charges, sparse arrays, depth on every reference path, object/entry counts, initial revocation precedence and settings changes with work in flight. Validator timing instrumentation is covered by isolated tests. Representative responsiveness measurements remain outstanding.
 
 ## Implementation details still requiring specification
 
-Pending-call, per-payload and aggregate defaults are approved above. So are retained-representation accounting, byte/depth/object/entry rules, application-wide settings, validation of setting values, changes applying to new invocations, overload rejection, cancellation accounting, failure precedence and safe diagnostics. The 16 ms initial-synchronous-validator warning threshold and the exported Error subclass are also approved. Settings persistence/integration remains unspecified. Resolve open details before implementing behavior that depends on them. The invocation runtime and validator timing instrumentation remain unimplemented. The internal primitives and their inspection limits are described below. Schema validation is not frontend isolation. Host code must also preserve the approved declaration, project-targeting and revocation rules.
+Pending-call, per-payload and aggregate defaults are approved above. So are retained-representation accounting, byte/depth/object/entry rules, application-wide settings, validation of setting values, changes applying to new invocations, overload rejection, cancellation accounting, failure precedence and safe diagnostics. The 16 ms initial-synchronous-validator warning threshold and the exported Error subclass are also approved. Settings persistence/integration remains unspecified. Resolve open details before implementing behavior that depends on them. The isolated dispatcher implements invocation and validator timing against trusted host-supplied bindings. Activation/publication, frontend context/project integration and settings persistence remain separate work. See the [dispatcher guide](command-dispatcher.md). The internal primitives and their inspection limits are described below. Schema validation is not frontend isolation. Host code must also preserve the approved declaration, project-targeting and revocation rules.
 
 ## Internal payload and reservation primitives
 
-These working-branch modules are implementation code, not author-facing SDK entry points. Neither is connected to the current plugin host:
+These working-branch modules are implementation code, not author-facing SDK entry points. The [isolated dispatcher](command-dispatcher.md) uses them; it is not connected to the current plugin host:
 
 - [`command-payload.ts`](../../packages-js/plugins/command-payload.ts) inspects permitted data and copies it independently. It returns byte, depth and combined object/entry measurements. Per-allocation charges let reservation accounting deduplicate shared objects across retained representations. Traversal uses an iterative graph walk and cached subtree heights for repeated-reference paths.
 - [`command-reservations.ts`](../../packages-js/plugins/command-reservations.ts) creates one window's pending-call and payload ledger. Host code supplies actual component-instance IDs. Admission captures frozen limits. Retaining a value inspects it and adds a representation receipt. The returned release function is idempotent. The host must release the call only after work settles and cleanup drops its data; cancellation does not automatically do so.

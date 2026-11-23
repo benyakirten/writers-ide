@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as payload from './command-payload';
-import { inspectCommandPayload, PayloadError } from './command-payload';
+import { inspectCommandPayload, PayloadError, prepareCommandPayload } from './command-payload';
 import {
 	createCommandReservationLedger,
 	DEFAULT_RESERVATION_LIMITS,
@@ -39,6 +39,115 @@ function unionBytes(values: unknown[]): number {
 }
 
 describe('internal command reservations', () => {
+	it('reserves prepared copies without rescanning or deduplicating their ghost identities against the source', () => {
+		const ledger = createCommandReservationLedger();
+		const call = ledger.admit('caller', 'provider');
+		const buffer = new ArrayBuffer(32);
+		const value = { a: new Uint8Array(buffer), b: new DataView(buffer) };
+		const prepared = prepareCommandPayload(value, call.limits.payload);
+		const source = call.retain(value);
+		const size = prepared.inspection.bytes;
+		const inspect = vi.spyOn(payload, 'inspectCommandPayload').mockImplementation(() => {
+			throw new Error('must not rescan');
+		});
+		try {
+			const release = call.reserveCopy(prepared.inspection);
+			expect(ledger.snapshot().bytes).toBe(size * 2);
+			expect(ledger.snapshot().components.map((component) => component.bytes)).toEqual([
+				size * 2,
+				size * 2,
+			]);
+			expect(prepared.inspection.allocations.has(buffer)).toBe(true);
+			release();
+			release();
+			expect(ledger.snapshot().bytes).toBe(size);
+			call.reserveCopy(prepared.inspection);
+			source();
+			expect(ledger.snapshot().bytes).toBe(size);
+			call.release();
+			call.release();
+			expect(ledger.snapshot()).toMatchObject({ bytes: 0, pending: 0 });
+			expect(() => call.reserveCopy(prepared.inspection)).toThrow('already been released');
+		} finally {
+			inspect.mockRestore();
+		}
+	});
+
+	it.each(['maxWindowBytes', 'maxComponentBytes'] as const)(
+		'rejects prepared copies atomically before allocation at %s',
+		(scope) => {
+			const value = { buffer: new ArrayBuffer(64) };
+			const prepared = prepareCommandPayload(value);
+			const ledger = createCommandReservationLedger(
+				limits({ [scope]: prepared.inspection.bytes * 2 - 1 }),
+			);
+			const call = ledger.admit('caller', 'provider');
+			call.retain(value);
+			const before = ledger.snapshot();
+			const copy = vi.spyOn(prepared, 'copy');
+			exceeded(() => {
+				call.reserveCopy(prepared.inspection);
+				prepared.copy();
+			});
+			expect(copy).not.toHaveBeenCalled();
+			expect(ledger.snapshot()).toEqual(before);
+			call.release();
+			expect(ledger.snapshot()).toMatchObject({ bytes: 0, pending: 0 });
+		},
+	);
+
+	it('replaces ghost receipts with actual copy identities without requiring triple capacity', () => {
+		const value = { buffer: new Uint8Array(32) };
+		const prepared = prepareCommandPayload(value);
+		const size = prepared.inspection.bytes;
+		const ledger = createCommandReservationLedger(
+			limits({ maxWindowBytes: size * 2, maxComponentBytes: size * 2 }),
+		);
+		const call = ledger.admit('caller', 'provider');
+		call.retain(value);
+		const provisional = call.reserveCopy(prepared.inspection);
+		const copied = prepared.copy();
+		expect(inspectCommandPayload(copied).bytes).toBe(size);
+		expect(ledger.snapshot().bytes).toBe(size * 2);
+		provisional();
+		const actual = call.retain(copied);
+		const shared = call.retain(copied);
+		expect(ledger.snapshot().bytes).toBe(size * 2);
+		actual();
+		shared();
+		expect(ledger.snapshot().bytes).toBe(size);
+		call.release();
+	});
+
+	it('releases ghost capacity when a prepared copy fails', () => {
+		const ledger = createCommandReservationLedger();
+		const call = ledger.admit('caller', 'provider');
+		const buffer = new ArrayBuffer(8);
+		const prepared = prepareCommandPayload(buffer);
+		const provisional = call.reserveCopy(prepared.inspection);
+		structuredClone(buffer, { transfer: [buffer] });
+		try {
+			expect(() => prepared.copy()).toThrow(PayloadError);
+		} finally {
+			provisional();
+		}
+		expect(ledger.snapshot()).toMatchObject({ bytes: 0, pending: 1 });
+		call.release();
+	});
+
+	it.each([
+		{ maxBytes: 32, maxDepth: 10, maxEntries: 10 },
+		{ maxBytes: 1000, maxDepth: 1, maxEntries: 10 },
+		{ maxBytes: 1000, maxDepth: 10, maxEntries: 1 },
+	])('checks prepared inspection against the admitted payload limits: %j', (payloadLimits) => {
+		const prepared = prepareCommandPayload({ child: {} });
+		const ledger = createCommandReservationLedger(limits({ payload: payloadLimits }));
+		const call = ledger.admit('caller', 'provider');
+		const before = ledger.snapshot();
+		exceeded(() => call.reserveCopy(prepared.inspection));
+		expect(ledger.snapshot()).toEqual(before);
+		call.release();
+	});
 	it('has frozen approved defaults and independent window ledgers', () => {
 		expect(DEFAULT_RESERVATION_LIMITS).toEqual({
 			payload: { maxBytes: 8_388_608, maxDepth: 64, maxEntries: 100_000 },

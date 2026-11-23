@@ -5,6 +5,7 @@ import {
 	DEFAULT_PAYLOAD_LIMITS,
 	inspectCommandPayload,
 	PayloadError,
+	prepareCommandPayload,
 	type PayloadLimits,
 } from './command-payload';
 
@@ -47,6 +48,82 @@ function boundary(value: unknown, bytes: number, entries: number, depth: number)
 }
 
 describe('command payload inspection and copying', () => {
+	it('copies a prepared graph without a second proxy scan or newly introduced backing allocation', () => {
+		const small = new ArrayBuffer(8);
+		const large = new ArrayBuffer(4096);
+		const target = { buffer: small };
+		let enumerations = 0;
+		const value = new Proxy(target, {
+			ownKeys(object) {
+				enumerations++;
+				if (enumerations > 2) {
+					object.buffer = large;
+				}
+				return Reflect.ownKeys(object);
+			},
+		});
+		const prepared = prepareCommandPayload(value);
+		const copied = prepared.copy() as typeof target;
+		expect(enumerations).toBe(2);
+		expect(copied.buffer.byteLength).toBe(8);
+		expect(copied.buffer).not.toBe(small);
+		expect(inspectCommandPayload(copied).bytes).toBe(prepared.inspection.bytes);
+	});
+
+	it('captures container edges, dates, lengths and shared references when preparing', () => {
+		const child = { value: 1 };
+		const date = new Date(10);
+		const value = {
+			array: [child, child],
+			map: new Map([[child, date]]),
+			set: new Set([child]),
+			date,
+		};
+		const prepared = prepareCommandPayload(value);
+		child.value = 2;
+		value.array.push({ value: 3 });
+		value.map.clear();
+		value.set.clear();
+		date.setTime(20);
+		const copied = prepared.copy() as typeof value;
+		expect(copied.array).toHaveLength(2);
+		expect(copied.array[0]).toEqual({ value: 1 });
+		expect(copied.array[0]).toBe(copied.array[1]);
+		expect(copied.map.get(copied.array[0])).toBe(copied.date);
+		expect(copied.set.has(copied.array[0])).toBe(true);
+		expect(copied.date.getTime()).toBe(10);
+		expect(inspectCommandPayload(copied).bytes).toBe(prepared.inspection.bytes);
+	});
+
+	it('bounds buffer copying to the prepared length after a resizable source grows', () => {
+		// Node 26 supports resizable buffers; the SDK's library target is ES2022.
+		interface ResizableBuffer extends ArrayBuffer {
+			resize(length: number): void;
+		}
+		const buffer: ResizableBuffer = Reflect.construct(ArrayBuffer, [8, { maxByteLength: 4096 }]);
+		new Uint8Array(buffer)[0] = 42;
+		const prepared = prepareCommandPayload({ buffer, view: new Uint8Array(buffer, 2, 3) });
+		buffer.resize(4096);
+		const copied = prepared.copy() as { buffer: ArrayBuffer; view: Uint8Array };
+		expect(copied.buffer.byteLength).toBe(8);
+		expect(new Uint8Array(copied.buffer)[0]).toBe(42);
+		expect(copied.view.buffer).toBe(copied.buffer);
+		expect(copied.view.byteOffset).toBe(2);
+		expect(copied.view.byteLength).toBe(3);
+		expect(inspectCommandPayload(copied).bytes).toBe(prepared.inspection.bytes);
+	});
+
+	it('keeps copy-time buffer failures message-safe', () => {
+		const buffer = new ArrayBuffer(8);
+		const prepared = prepareCommandPayload(buffer);
+		structuredClone(buffer, { transfer: [buffer] });
+		expect(() => prepared.copy()).toThrow(
+			expect.objectContaining({
+				code: 'invalid-payload',
+				message: 'Command payload contains unsupported data.',
+			}),
+		);
+	});
 	it('has frozen approved defaults', () => {
 		expect(DEFAULT_PAYLOAD_LIMITS).toEqual({
 			maxBytes: 8_388_608,

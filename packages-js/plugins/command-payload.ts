@@ -375,76 +375,101 @@ export function inspectCommandPayload(
 	return guarded(() => scan(value, limits).inspection);
 }
 
+export interface PreparedCommandPayload {
+	readonly inspection: PayloadInspection;
+	copy(): unknown;
+}
+
+// Internal host snapshot. Copying never traverses the sender's graph again.
+export function prepareCommandPayload(
+	value: unknown,
+	limits: PayloadLimits = DEFAULT_PAYLOAD_LIMITS,
+): PreparedCommandPayload {
+	return guarded(() => {
+		const { nodes, inspection } = scan(value, limits);
+		return {
+			inspection,
+			copy: () =>
+				guarded(() => {
+					const copies = new Map<object, object>();
+					for (const node of nodes.values()) {
+						switch (node.kind) {
+							case 'record':
+								copies.set(node.source, node.nullPrototype ? Object.create(null) : {});
+								break;
+							case 'array':
+								copies.set(node.source, new Array(node.length));
+								break;
+							case 'date':
+								copies.set(node.source, new Date(node.time));
+								break;
+							case 'map':
+								copies.set(node.source, new Map());
+								break;
+							case 'set':
+								copies.set(node.source, new Set());
+								break;
+							case 'buffer': {
+								const buffer = new ArrayBuffer(node.length);
+								new Uint8Array(buffer).set(
+									new Uint8Array(node.source as ArrayBuffer, 0, node.length),
+								);
+								copies.set(node.source, buffer);
+								break;
+							}
+						}
+					}
+					const copied = (item: unknown): unknown =>
+						item !== null && typeof item === 'object' ? copies.get(item) : item;
+					for (const node of nodes.values()) {
+						if (node.kind === 'view') {
+							const Constructor = viewConstructors[node.viewName];
+							copies.set(
+								node.source,
+								new Constructor(
+									copied(node.edges[0].value) as ArrayBuffer,
+									node.offset,
+									node.length,
+								),
+							);
+						}
+					}
+					for (const node of nodes.values()) {
+						const target = copies.get(node.source);
+						for (let index = 0; index < node.edges.length; index++) {
+							const edge = node.edges[index];
+							switch (node.kind) {
+								case 'record':
+								case 'array':
+									Object.defineProperty(target, edge.key!, {
+										value: copied(edge.value),
+										enumerable: true,
+										writable: true,
+										configurable: true,
+									});
+									break;
+								case 'map':
+									(target as Map<unknown, unknown>).set(
+										copied(edge.value),
+										copied(node.edges[index + 1].value),
+									);
+									index++;
+									break;
+								case 'set':
+									(target as Set<unknown>).add(copied(edge.value));
+									break;
+							}
+						}
+					}
+					return copied(value);
+				}),
+		};
+	});
+}
+
 export function copyCommandPayload(
 	value: unknown,
 	limits: PayloadLimits = DEFAULT_PAYLOAD_LIMITS,
 ): unknown {
-	return guarded(() => {
-		const { nodes } = scan(value, limits);
-		const copies = new Map<object, object>();
-		for (const node of nodes.values()) {
-			switch (node.kind) {
-				case 'record':
-					copies.set(node.source, node.nullPrototype ? Object.create(null) : {});
-					break;
-				case 'array':
-					copies.set(node.source, new Array(node.length));
-					break;
-				case 'date':
-					copies.set(node.source, new Date(node.time));
-					break;
-				case 'map':
-					copies.set(node.source, new Map());
-					break;
-				case 'set':
-					copies.set(node.source, new Set());
-					break;
-				case 'buffer': {
-					const buffer = new ArrayBuffer(node.length);
-					new Uint8Array(buffer).set(new Uint8Array(node.source as ArrayBuffer));
-					copies.set(node.source, buffer);
-					break;
-				}
-			}
-		}
-		const copied = (item: unknown): unknown =>
-			item !== null && typeof item === 'object' ? copies.get(item) : item;
-		for (const node of nodes.values()) {
-			if (node.kind === 'view') {
-				const Constructor = viewConstructors[node.viewName];
-				copies.set(
-					node.source,
-					new Constructor(copied(node.edges[0].value) as ArrayBuffer, node.offset, node.length),
-				);
-			}
-		}
-		for (const node of nodes.values()) {
-			const target = copies.get(node.source);
-			for (let index = 0; index < node.edges.length; index++) {
-				const edge = node.edges[index];
-				switch (node.kind) {
-					case 'record':
-					case 'array':
-						Object.defineProperty(target, edge.key!, {
-							value: copied(edge.value),
-							enumerable: true,
-							writable: true,
-							configurable: true,
-						});
-						break;
-					case 'map':
-						(target as Map<unknown, unknown>).set(
-							copied(edge.value),
-							copied(node.edges[index + 1].value),
-						);
-						index++;
-						break;
-					case 'set':
-						(target as Set<unknown>).add(copied(edge.value));
-						break;
-				}
-			}
-		}
-		return copied(value);
-	});
+	return prepareCommandPayload(value, limits).copy();
 }
