@@ -2,6 +2,10 @@
 #[allow(dead_code)]
 mod plugin_integrity;
 
+// Pure declarations and static dependency analysis; no external execution is enabled.
+#[allow(dead_code)]
+mod plugin_manifest;
+
 // No runtime owner or resource routes are connected in this internal slice.
 #[allow(dead_code)]
 mod plugin_resources;

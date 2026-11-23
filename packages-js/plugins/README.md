@@ -290,7 +290,7 @@ The root exports `FrontendContext`, `FrontendEntry`, `FrontendContributions`, `C
 
 `definePluginCommand` checks a non-whitespace-only contract ID of at most 256 UTF-8 bytes and a positive safe-integer major. It freezes the descriptor without registering an implementation, executing a command or validating payloads. `isCommandInvocationError` and `/native`'s `isNativeServiceError` are nonthrowing Error-representation and known-code checks. They support other JavaScript realms, but authenticate neither origin nor authority.
 
-Only the contracts and helpers are implemented. The examples in the planned-service sections below describe future host behavior. They cannot run against today's bundled `PluginContext`.
+These SDK exports implement contracts and helpers, not the planned host services. Separately, the internal Rust [manifest parser and static resolver](../../docs/plugins/manifest-resolution.md) now validate external declarations, snapshot membership and dependency eligibility. They are not SDK exports and have no application runtime callers. Static eligibility does not establish enablement, published implementations or grants. The examples in the planned-service sections below describe future host behavior. They cannot run against today's bundled `PluginContext`.
 
 ## Planned alias-based provider API
 

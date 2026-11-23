@@ -23,6 +23,8 @@ Use `pnpm dev` for the browser frontend and `pnpm dev:tauri` for the desktop app
 
 The private workspace SDK exports approved frontend context, command, identity, project and locale contracts. Its `/svelte` entry supplies presentation and frontend context types. Its `/native` entry supplies native service/data/error contracts and an error guard. These exports do not implement the services: the current bundled host still supplies its existing `PluginContext`, not `FrontendContext`. External loading, native authorization, project/locale services and typed shared-command invocation remain unimplemented. A curated external runtime-profile artifact has not shipped.
 
+The internal Rust [`plugin_manifest` module](docs/plugins/manifest-resolution.md) now validates manifest bytes and resolves static package/component dependencies. It checks declarations and compatibility without importing or activating code. It is not wired into the application and supplies no installation, enablement or native authority.
+
 The public [`@writers-ide/word-processing/structure` API](packages-js/word-processing/README.md#read-only-document-structure-helpers) now provides read-only block grouping for the current page model. Basic Menu uses it with feature-owned formatting helpers. Basic Menu remains bundled, not a separately packaged plugin. See the [plugin implementation checklist](docs/plugins/implementation-plan.md#foundation-slice-and-remaining-execution-checklist) for completed work and prerequisites.
 
 ## Cooperative editor work

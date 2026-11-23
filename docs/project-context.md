@@ -151,6 +151,8 @@ A plugin may eventually supply migrations or fallback exporters. Basic preservat
 
 ### Current plugin APIs
 
+The internal Rust [`plugin_manifest` module](plugins/manifest-resolution.md) implements strict manifest parsing and deterministic static dependency resolution. It validates approved byte/field/count rules and exact entry/style membership in verified snapshots. It reports profile and required-dependency blockers without blocking healthy siblings. It has no app commands or runtime callers. Static eligibility is not enablement, active availability, a permission grant or authority to import code.
+
 The private workspace SDK now exports approved `FrontendContext`/entry/contribution contracts, alias-based provider/endpoint types, identity/project/locale types, four-role command types and definition/error helpers. `/svelte` adds frontend aliases; `/native` exports approved native service/data/error contracts and a guard. The root still includes legacy bundled types. The current host still supplies its unchanged `PluginContext`, not `FrontendContext`. Locale/native/project services and typed shared-command invocation are not implemented. Neither a curated external runtime-profile artifact nor a production loader, native authorizer, database or installer is implemented. See the [execution checklist](plugins/implementation-plan.md#foundation-slice-and-remaining-execution-checklist).
 
 The generic host manages activation, cleanup, toolbar/view/command contributions and task utilities. It does not contain formatting commands or a formatting service.
@@ -281,7 +283,7 @@ Pagination lives in `src/lib/editor/state/page-layout.svelte.ts`, `src/lib/edito
 
 ### Other platform code
 
-- Rust startup is in `src-tauri/src/lib.rs` and `src-tauri/src/main.rs`. The backend currently has the Tauri greeting command and opener plugin, not project storage or conversion services.
+- Rust startup is in `src-tauri/src/lib.rs` and `src-tauri/src/main.rs`. The backend currently has the Tauri greeting command and opener plugin, not project storage or conversion services. Internal `src-tauri/src/plugin_integrity/` and `plugin_resources/` implement verified bytes and resource helpers. `src-tauri/src/plugin_manifest/` contains normalized declarations, strict parsing, limited SemVer matching and static resolution, with parser/resolver tests. These modules do not implement production installation, loading or native authorization.
 - Shared reactive services live in `src/lib/editor/state/` and `src/lib/services/`. Most still use module-level instances. `src/lib/utils/observable.ts` supports events and shortcuts.
 - Localization uses `project.inlang/settings.json`, `messages/`, `src/lib/i18n.ts`, `src/lib/services/locale-manager.svelte.ts` and generated `src/lib/paraglide/` code. Browser language falls back to English. French messages still include English text, and some UI text is hard-coded. `LocaleManager` independently starts in English. Saved language preferences are not implemented.
 - UI code uses Tailwind 4 with compatibility styles, Bits UI menus, icons, toasts and theme variables. This is not a finished theme/settings platform.

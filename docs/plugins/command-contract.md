@@ -1,12 +1,12 @@
 # Shared application commands
 
-**Status: source contracts/helpers implemented; invocation runtime not implemented.** This page records the external-package command design. Today's `CommandContribution` takes no arguments and returns a synchronous boolean. There is no current plugin-facing command-invocation service or user-facing command routing.
+**Status: source contracts/helpers and internal manifest checks implemented; invocation runtime not implemented.** This page records the external-package command design. Today's `CommandContribution` takes no arguments and returns a synchronous boolean. There is no current plugin-facing command-invocation service or user-facing command routing.
 
 An application command is a named action owned by a component. Another component can invoke it through a declared dependency. It is not a ProseMirror command or a live provider service. Registration does not create a button, shortcut or command-picker entry. See the [package specification](package-api-proposal.md) for component lifetimes and package installation.
 
 ## Choose an editor command or an application command
 
-Writer's IDE has two command APIs. They serve different purposes. Synchronous editor commands are implemented today. The typed shared application command contracts and definition/error helpers are exported. Their invocation runtime is not implemented.
+Writer's IDE has two command APIs. They serve different purposes. Synchronous editor commands are implemented today. The typed shared application command contracts and definition/error helpers are exported. The internal Rust parser validates command declarations and the static resolver matches every requested command ID, contract ID and major. These checks do not verify runtime publication or implement invocation. See the [internal manifest guide](manifest-resolution.md).
 
 | Need                                                                                 | Use                                                                     | Why                                                                                                      |
 | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -63,7 +63,7 @@ The example accepts an object containing a bounded string and returns a nonnegat
 
 ## Declaration-count limits
 
-**Approved limits; enforcement is not implemented:** a component may declare at most 32 shared commands in its `commands` list. A consumer may request at most 32 commands in each dependency's `commands` list. Exceeding either limit rejects the whole manifest before plugin code is imported. These are host-owned engineering starting points that a plugin cannot raise. The 64 KiB whole-manifest limit also applies.
+**Approved limits; internal parser checks implemented:** a component may declare at most 32 shared commands in its `commands` list. A consumer may request at most 32 commands in each dependency's `commands` list. Exceeding either limit rejects the whole manifest before plugin code is imported. These are host-owned engineering starting points that a plugin cannot raise. The 64 KiB whole-manifest limit also applies.
 
 Internal event handlers and individual methods on a provider API do not count toward these command limits. A toolbar does not need to expose each button handler as a shared application command. Choose shared commands for named actions that other components should invoke. Use provider APIs for service contracts, not merely to avoid a command-count limit.
 
@@ -80,7 +80,7 @@ major = 1
 
 Here, `count-words` is local to the component. The contract identity and major describe the operation's public inputs/results. Different components can reuse the same local command ID.
 
-**Approved identifier rules; contract helper checks implemented, manifest/host checks pending:** command IDs, contract IDs and consumer command aliases must each be nonempty strings that are not whitespace-only, with at most 256 UTF-8 bytes. This is a byte limit, not JavaScript string length. All three allow flexible characters and match exactly, including case. The host will reject invalid values rather than trim, normalize or truncate them. These rules apply to manifest fields and their corresponding runtime definitions, registrations and lookups. They do not make command IDs globally unique. Consumer command aliases are scoped to a dependency, as explained below.
+**Approved identifier rules; manifest and contract helper checks implemented, host runtime checks pending:** command IDs, contract IDs and consumer command aliases must each be nonempty strings that are not whitespace-only, with at most 256 UTF-8 bytes. This is a byte limit, not JavaScript string length. All three allow flexible characters and match exactly, including case. The manifest parser rejects invalid values rather than trimming, normalizing or truncating them. Corresponding host runtime registration and lookup checks remain outstanding. These rules apply to manifest fields and their corresponding runtime definitions, registrations and lookups. They do not make command IDs globally unique. Consumer command aliases are scoped to a dependency, as explained below.
 
 The provider's entry module exports the following function. The host calls it synchronously when enabling the component. Its component must declare the `contributions.command` capability.
 
