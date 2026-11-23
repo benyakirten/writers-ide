@@ -372,36 +372,17 @@ const task = context.tasks.async({
 
 The task result can later supply the decoded text to the feature's state or UI. Native work started during activation waits for successful setup confirmation; activation itself stays synchronous. For binary files, use the bytes directly instead of decoding them.
 
-The host attaches native credentials and checks each operation. A non-null service can also belong to a list-only component; that does not authorize reading. Arbitrary filesystem paths and URLs are not accepted. Native failures reject, cancellation and host resource limits apply, and no write operation or unlimited-size read is provided. Directory listing is approved below. Numerical budgets remain separate reviews. See the [native service proposal](../../docs/plugins/package-api-proposal.md#5-native-permissions-and-a-research-component).
+The host attaches native credentials and checks each operation. A non-null service can also belong to a list-only component; that does not authorize reading. Arbitrary filesystem paths and URLs are not accepted. Native failures reject, cancellation and host resource limits apply, and no write operation or unlimited-size read is provided. Metadata discovery follows the file-index direction below. Its query/subscription API and numerical budgets remain under review. See the [native service proposal](../../docs/plugins/package-api-proposal.md#5-native-permissions-and-a-research-component).
 
 ## Planned native directory listing
 
-**Approved contract; not implemented:** the project-file service will expose `list(path, options?)`, accepting an optional cancellation signal and continuation cursor. The component must declare `project.files.list` with resource `project`; read permission does not imply listing permission.
+**Approved file-index direction; not implemented:** the host will maintain a project-scoped SQLite index of files and filesystem metadata. It stores no file contents and is not an authoritative catalog of application documents. Plugins will query bounded metadata pages instead of each maintaining a native directory enumeration. Each query must finish its database statement/transaction before returning; pagination retains no native directory iterator or database statement between requests.
 
-A `DirectoryPage` contains read-only `entries` and `nextCursor: string | null`. Each `ProjectDirectoryEntry` contains a project-relative `path` and a `kind`: `file`, `directory` or `unsupported`. Returned paths are relative to the project root, so an entry such as `research/notes.txt` can be passed directly to `read()` when the component has read permission.
+The index follows native filesystem notifications and periodic reconciliation. Notifications may be missed, so reconciliation repairs observations. The exact query, continuation and change-subscription APIs still need design. Freshness/readiness, reconciliation cadence and any manual-refresh operation are also open. Do not assume indexed metadata is immediately current or that multiple pages form a snapshot.
 
-Inside a managed async task callback, with `files` obtained from `context.native.projectFiles` and `signal` supplied by the task, the author can request one page and then its continuation:
+Directory-view requirements remain: project-relative paths, explicit `'.'` for the registered root, no empty/missing-path default, nonrecursive views initially and at most 256 entries per page without a caller-selected page size. Unsupported entries expose no link targets or contents and must not be traversed. The new API must preserve authorization and resource bounds. Its final method names and result/continuation types are not selected yet.
 
-```ts
-const page = await files.list('research', { signal });
-
-for (const entry of page.entries) {
-	console.info(entry.path, entry.kind);
-}
-
-if (page.nextCursor !== null) {
-	const nextPage = await files.list('research', {
-		signal,
-		cursor: page.nextCursor,
-	});
-	// Process the returned page before requesting another continuation.
-	console.info(nextPage.entries);
-}
-```
-
-This lists only immediate children, not an entire directory tree. A null next cursor means completion. Cursors are opaque and bound to the activation, project opening and directory. Each accepted continuation consumes its input cursor; success returns a fresh cursor or null. On accepted-request failure/cancellation, restart rather than reusing the consumed cursor.
-
-Identified links and special files use `unsupported`, without exposing their targets or contents. The host never traverses them. Concurrent filesystem changes can cause omissions or duplicates between pages; this is not a snapshot. Use `files.list('.', { signal })` to list the activation's registered project root. It never means the process working directory. Empty or missing paths are errors rather than implicit root requests. Absolute paths and parent traversal are prohibited. This exposes no absolute root location and does not make the root readable through `read()`. Each page contains at most 256 entries, and may contain fewer. Only `nextCursor === null` means completion. There is no initial `pageSize` option, and plugins cannot raise the host limit. Smaller requested pages are a future candidate; virtualized UI can buffer a page and render only visible rows. Native work and memory still need separate bounds. Cursor expiry remains under review. No recursive traversal or size/modification-time metadata is added. See the [native contract](../../docs/plugins/package-api-proposal.md#5-native-permissions-and-a-research-component).
+Saved-file reads still access the filesystem and check actual targets and read grants. An indexed path may disappear, change or become prohibited before a read; the record itself grants no access. The index database's location and project content storage remain separate decisions. See the [file-index plan](../../docs/plugins/file-index-plan.md) for accepted direction, open questions and validation requirements.
 
 ## Planned UI locale API
 

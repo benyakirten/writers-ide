@@ -93,11 +93,13 @@ The future direction is to separate calculated page boundaries from authored con
 
 ### Open storage decisions
 
-No project storage format has been selected. A directory, SQLite database, archive or combination could be appropriate.
+No project content storage format has been selected. A directory, SQLite database, archive or combination could be appropriate.
 
 SQLite is approved separately for the host plugin-management registry, not implemented. That registry stores installation records, component choices, project permission associations and staged-update/recovery metadata. Package files remain in separate directories; activation credentials are not persisted. This does not select the project content or plugin-owned data format.
 
-The design must address stable IDs, assets, incremental loading, transactions, migrations and recovery. Do not describe SQLite, ZIP or Git as chosen merely because they have been discussed.
+A project-scoped SQLite file/metadata index is also approved direction, not implemented. It stores no file contents and is not an authoritative application-document catalog. Filesystem notifications and periodic reconciliation maintain it; query pages must not retain native enumeration or database resources between requests. Query/subscription APIs, freshness, reconciliation scheduling and database placement remain open. See the [file-index plan](plugins/file-index-plan.md). This selects neither content storage nor a shared database with the host registry.
+
+The content-storage design must address stable IDs, assets, incremental loading, transactions, migrations and recovery. Do not describe a content format or history engine as chosen merely because it has been discussed.
 
 ## Workspace and extension UX
 
