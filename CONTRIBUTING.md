@@ -182,7 +182,7 @@ pnpm test:e2e
 pnpm build
 ```
 
-`pnpm test:unit:ci` runs the application unit suite, SDK runtime tests and SDK compile-time checks. For focused SDK work, optionally run `pnpm --filter @writers-ide/plugins test` and `pnpm --filter @writers-ide/plugins check` directly.
+`pnpm test:unit:ci` runs the application unit suite, SDK runtime tests, SDK compile-time checks and Node profile/build/server tests. Run `pnpm test:plugin-profile:build` for the focused Node checks. Run `pnpm build:plugin-profile` to generate standalone fixture profile artifacts. These artifacts do not enable application external loading. For focused SDK work, optionally run `pnpm --filter @writers-ide/plugins test` and `pnpm --filter @writers-ide/plugins check` directly.
 
 ### Cross-engine browser smoke tests
 
@@ -193,6 +193,8 @@ pnpm test:smoke
 pnpm test:smoke --project=webkit
 pnpm test:tasks
 pnpm test:plugins
+pnpm test:plugin-profile
+pnpm test:plugin-profile --project=webkit
 pnpm test:word-processing
 pnpm test:e2e
 pnpm exec playwright show-report browser-report
@@ -200,22 +202,23 @@ pnpm exec playwright show-report browser-report
 
 The suites have different purposes:
 
-| Command                | Coverage                                                                                                                                  |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `test:smoke`           | Startup, fonts, typing, selection, formatting, undo, menus, focus, visible page geometry, locale fallback and plugin management           |
-| `test:tasks`           | Shared task ownership, emitted worker modules, buffer transfers, cancellation and worker errors                                           |
-| `test:plugins`         | Provider dependencies, removal/consent, presentation lifetimes and opt-in application assembly with project-filtered production bars/tabs |
-| `test:word-processing` | Public editor access, independent formatting, history, worker results, input rules, mapped decorations and behavior failures              |
-| `test:e2e`             | The full app suite, including pagination, docking and stylesheet compatibility                                                            |
+| Command                | Coverage                                                                                                                                             |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test:smoke`           | Startup, fonts, typing, selection, formatting, undo, menus, focus, visible page geometry, locale fallback and plugin management                      |
+| `test:tasks`           | Shared task ownership, emitted worker modules, buffer transfers, cancellation and worker errors                                                      |
+| `test:plugins`         | Provider dependencies, removal/consent, presentation lifetimes and opt-in application assembly with project-filtered production bars/tabs            |
+| `test:plugin-profile`  | Independently compiled plugin against generated shared runtime artifacts, CSS ownership, assets, startup cancellation and verified-byte Blob workers |
+| `test:word-processing` | Public editor access, independent formatting, history, worker results, input rules, mapped decorations and behavior failures                         |
+| `test:e2e`             | The full app suite, including pagination, docking and stylesheet compatibility                                                                       |
 
 `test:smoke` includes the dedicated pagination-selection regressions.
 They check carets through page creation and forward/reversed ranges through formatting, reflow and undo.
 The suite replaced the old starter `<h1>` test.
 
-The task, plugin and word-processing suites each build a separate small test application.
+The task, plugin, runtime-profile and word-processing suites each build a separate small test application.
 The main app e2e configuration excludes their test files.
 Run their dedicated commands alongside app tests.
-Browser Smoke CI runs each dedicated suite for its selected engine.
+Browser Smoke CI runs each dedicated suite, including `test:plugin-profile`, for its selected engine. The [runtime profile guide](docs/plugins/runtime-profile.md) explains generated artifacts, the immutable fixture server and the limits of browser prefetch verification. Its worker provider uses the existing library factory callback, not the complete approved external `module: URL` API.
 
 Tests check that content fits and is preserved.
 They do not require identical page breaks across browser engines.

@@ -17,6 +17,8 @@ See [builds, assets and activation checks](package-api-proposal.md#7-builds-asse
 [verified resource delivery](implementation-plan.md#verified-resource-delivery) and
 [native authorization](implementation-plan.md#native-request-attribution-and-authorization).
 
+A separate [runtime-profile browser fixture](runtime-profile.md) now tests generated shared-runtime artifacts with an independently compiled plugin. Its Node server retains hash-checked accepted buffers. Native import/link fetches rely on that immutable server and trusted transport; browser prefetch cannot bind later response bytes. It is not this Tauri prototype or a production authorized resource route. Its Blob worker provider uses the existing library factory callback, not the complete approved external `module: URL` API.
+
 ## Verified source and configuration
 
 Paths below link to the inspected source. Installed dependency source was also inspected locally.
@@ -61,8 +63,9 @@ Use the Tauri packaging path to test production asset loading, not ordinary `car
   Integrity records must remain outside package-controlled files. Never regenerate them to accept a mismatch.
 - The current route cannot provide recovery-before-import by adding a late activation check.
   Its static imports already evaluate feature modules.
-- Shared dependencies currently participate in the normal frontend bundle.
-  Mapping plugin imports to a second bundle does not establish shared runtime identity.
+- Shared dependencies still participate in the application's normal frontend bundle.
+  The separate runtime-profile fixture builds its trusted host and runtime entries in one graph and verifies independent plugin compatibility.
+  Mapping production plugin imports to a second runtime copy would not establish shared identity.
 
 ## Bootstrap boundary and remaining design
 

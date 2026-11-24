@@ -6,6 +6,10 @@ export default defineConfig({
 	testIgnore: [
 		'tasks.test.ts',
 		'plugin-dependencies.test.ts',
+		'plugin-presentations.test.ts',
+		'plugin-application-host.test.ts',
+		'plugin-runtime-profile.test.ts',
+		'**/fixtures/runtime-profile/*.test.mjs',
 		'word-processing.test.ts',
 		'word-processing-behaviors.test.ts',
 		'word-processing-renderers.test.ts',

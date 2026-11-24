@@ -38,6 +38,8 @@ jobs:
         run: pnpm test:tasks --project=${{ matrix.browser }}
       - name: Plugin providers and dependency management tests
         run: pnpm test:plugins --project=${{ matrix.browser }}
+      - name: Separate plugin runtime-profile tests
+        run: pnpm test:plugin-profile --project=${{ matrix.browser }}
       - name: Word-processing provider and independent formatting tests
         run: pnpm test:word-processing --project=${{ matrix.browser }}
       - name: Upload browser report and failure diagnostics

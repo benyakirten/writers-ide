@@ -1,0 +1,27 @@
+export {
+	wordProcessingApi,
+	createWordProcessingService,
+	createWordProcessingConnection,
+} from '@writers-ide/word-processing';
+export type {
+	WordProcessingApi,
+	EditorTarget,
+	EditorSnapshot,
+	WordProcessingSnapshot,
+	EditorContext,
+	EditorReadOptions,
+	EditorEditOptions,
+	EditorResult,
+	EditorFailureReason,
+	EditorCommandRegistration,
+	EditorCommandSnapshot,
+	EditorBehaviorContext,
+	EditorBehaviorRegistration,
+	EditorBehaviorSnapshot,
+	EditorRendererContext,
+	EditorNodeViewRegistration,
+	EditorMarkViewRegistration,
+	WordProcessingSources,
+	WordProcessingService,
+	EditorBehaviorFailure,
+} from '@writers-ide/word-processing';
