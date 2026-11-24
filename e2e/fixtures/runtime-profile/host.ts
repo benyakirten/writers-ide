@@ -10,7 +10,7 @@ import { Resources } from './resources';
 import Host from './Host.svelte';
 
 const accepted: ConstructorParameters<typeof Resources>[0] = await (
-	await fetch('/accepted.json')
+	await fetch(location.hash === '#portable-sdk' ? '/sample-accepted.json' : '/accepted.json')
 ).json();
 // Native dynamic imports live in the unbundled fixture bootstrap. The trusted
 // profile builder deliberately requires literal, closed references in its graph.

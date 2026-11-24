@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { buildRuntimeProfile, moduleSpecifiers } from '../../../tooling/plugin-profile/build.mjs';
+import { prepareSample, checkSample, buildSample } from './sample.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 export const output = path.resolve(here, '../../../node_modules/.cache/runtime-profile-fixture');
@@ -161,6 +162,40 @@ export async function buildFixture() {
 			modules: manifest.modules,
 		}),
 	);
+	const sample = await prepareSample();
+	try {
+		const checked = checkSample(sample.project);
+		if (checked.status !== 0) {
+			throw new Error(checked.stdout + checked.stderr);
+		}
+		const sampleStage = path.join(output, 'sample-stage');
+		await buildSample(sample.project, exact, sampleStage);
+		const sampleStyles = Object.keys(await files(sampleStage)).filter((name) =>
+			name.endsWith('.css'),
+		);
+		await writeFile(
+			path.join(sampleStage, 'manifest.toml'),
+			`# Runtime-profile example, not an installable application package\nstyles = ${JSON.stringify(sampleStyles)}\n`,
+		);
+		const sampleRecord = await files(sampleStage);
+		const sampleSnapshot = createHash('sha256').update(JSON.stringify(sampleRecord)).digest('hex');
+		await rm(path.join(output, 'snapshots', sampleSnapshot), { recursive: true, force: true });
+		await rename(sampleStage, path.join(output, 'snapshots', sampleSnapshot));
+		await writeFile(
+			path.join(output, 'sample-accepted.json'),
+			JSON.stringify({
+				snapshot: sampleSnapshot,
+				record: sampleRecord,
+				styles: sampleStyles,
+				entry: 'entry.js',
+				profile: manifest.id,
+				sharedStyles: manifest.styles,
+				modules: manifest.modules,
+			}),
+		);
+	} finally {
+		await sample.dispose();
+	}
 	const imports = Object.fromEntries(
 		Object.entries(map.imports).map(([id, artifact]) => [
 			id,

@@ -182,7 +182,9 @@ pnpm test:e2e
 pnpm build
 ```
 
-`pnpm test:unit:ci` runs the application unit suite, SDK runtime tests, SDK compile-time checks and Node profile/build/server tests. Run `pnpm test:plugin-profile:build` for the focused Node checks. Run `pnpm build:plugin-profile` to generate standalone fixture profile artifacts. These artifacts do not enable application external loading. For focused SDK work, optionally run `pnpm --filter @writers-ide/plugins test` and `pnpm --filter @writers-ide/plugins check` directly.
+`pnpm test:unit:ci` runs the application unit suite, SDK runtime tests, SDK compile-time checks, Node profile/build/server tests and portable SDK/sample checks. Run `pnpm test:plugin-profile:build` for focused profile/build/server checks. Run `pnpm test:plugin-sdk` for portable declaration and standalone sample checks. The sample is copied outside the checkout with real SDK packages, third-party dependencies and build tools. It uses strict `svelte-check` and audits compiler resolution without workspace aliases or source fallbacks.
+
+Run `pnpm build:plugin-profile` to generate shared runtime artifacts. Run `pnpm build:plugin-sdk` to generate five private declarations-only packages in `node_modules/.cache/plugin-sdk`. They are not published npm packages and contain no JavaScript. The [portable SDK guide](docs/plugins/portable-sdk.md) explains local package delivery and the independent sample. Neither builder enables application external loading. For package-local SDK work, optionally run `pnpm --filter @writers-ide/plugins test` and `pnpm --filter @writers-ide/plugins check` directly.
 
 ### Cross-engine browser smoke tests
 
@@ -202,14 +204,14 @@ pnpm exec playwright show-report browser-report
 
 The suites have different purposes:
 
-| Command                | Coverage                                                                                                                                             |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `test:smoke`           | Startup, fonts, typing, selection, formatting, undo, menus, focus, visible page geometry, locale fallback and plugin management                      |
-| `test:tasks`           | Shared task ownership, emitted worker modules, buffer transfers, cancellation and worker errors                                                      |
-| `test:plugins`         | Provider dependencies, removal/consent, presentation lifetimes and opt-in application assembly with project-filtered production bars/tabs            |
-| `test:plugin-profile`  | Independently compiled plugin against generated shared runtime artifacts, CSS ownership, assets, startup cancellation and verified-byte Blob workers |
-| `test:word-processing` | Public editor access, independent formatting, history, worker results, input rules, mapped decorations and behavior failures                         |
-| `test:e2e`             | The full app suite, including pagination, docking and stylesheet compatibility                                                                       |
+| Command                | Coverage                                                                                                                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `test:smoke`           | Startup, fonts, typing, selection, formatting, undo, menus, focus, visible page geometry, locale fallback and plugin management           |
+| `test:tasks`           | Shared task ownership, emitted worker modules, buffer transfers, cancellation and worker errors                                           |
+| `test:plugins`         | Provider dependencies, removal/consent, presentation lifetimes and opt-in application assembly with project-filtered production bars/tabs |
+| `test:plugin-profile`  | Independent fixture and portable SDK sample against shared runtime artifacts, CSS/assets, cancellation and verified-byte Blob workers     |
+| `test:word-processing` | Public editor access, independent formatting, history, worker results, input rules, mapped decorations and behavior failures              |
+| `test:e2e`             | The full app suite, including pagination, docking and stylesheet compatibility                                                            |
 
 `test:smoke` includes the dedicated pagination-selection regressions.
 They check carets through page creation and forward/reversed ranges through formatting, reflow and undo.

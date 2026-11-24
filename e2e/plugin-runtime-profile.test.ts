@@ -53,6 +53,45 @@ test('separate artifacts share namespaces, Svelte context, styles, assets, comma
 	await fixture(page, 'await f.start();');
 	await expect(plugin).toHaveCount(1);
 });
+test('portable SDK sample activates from its independent accepted snapshot', async ({
+	page,
+	request,
+}) => {
+	await page.goto('/#portable-sdk');
+	await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
+	const sample = page.locator('.portable-sdk');
+	await expect(sample).toHaveAttribute('data-context', 'same-runtime-context');
+	await expect(sample).toHaveCSS('color', 'rgb(17, 83, 129)');
+	await expect(page.getByTestId('portable-card')).toHaveText('Portable SDK: 42');
+	await expect
+		.poll(() => fixture(page, 'return f.events;'))
+		.toEqual(
+			expect.arrayContaining([
+				'portable:activate',
+				'portable:locale:en',
+				'portable:command:42',
+				'portable:provider:consumer',
+			]),
+		);
+	const original = await (await request.get('/accepted.json')).json();
+	const accepted = await (await request.get('/sample-accepted.json')).json();
+	expect(accepted.snapshot).not.toBe(original.snapshot);
+	expect(accepted.profile).toBe(original.profile);
+	expect(await fixture(page, 'return f.base;')).toContain(`/snapshots/${accepted.snapshot}/`);
+	await page.getByRole('button', { name: 'Portable action' }).click();
+	expect(await fixture(page, 'return f.events;')).toContain('portable:click');
+	await fixture(page, 'await f.stop();');
+	await expect(sample).toHaveCount(0);
+	expect(await fixture(page, 'return f.owners();')).toEqual([]);
+	expect(await fixture(page, 'return f.events;')).toEqual(
+		expect.arrayContaining(['portable:ui-destroy', 'portable:cleanup:true']),
+	);
+	expect(await fixture(page, 'try { f.retained(); return false; } catch { return true; }')).toBe(
+		true,
+	);
+	await fixture(page, 'await f.start();');
+	await expect(sample).toHaveCount(1);
+});
 test('shared CSS owners survive one release and disappear after the final release', async ({
 	page,
 }) => {

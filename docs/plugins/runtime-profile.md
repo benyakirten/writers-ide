@@ -10,14 +10,16 @@ Run these commands from the repository root with the [contributor toolchain](../
 
 ```sh
 pnpm build:plugin-profile
+pnpm build:plugin-sdk
 pnpm test:plugin-profile:build
+pnpm test:plugin-sdk
 pnpm test:plugin-profile
 pnpm test:plugin-profile --project=webkit
 ```
 
-`build:plugin-profile` writes profile artifacts to `node_modules/.cache/plugin-profile`. It does not build a plugin or enable application loading. `test:plugin-profile:build` runs the Node profile, fixture-build and immutable-server tests. `test:unit:ci` includes these checks.
+`build:plugin-profile` writes profile artifacts to `node_modules/.cache/plugin-profile`. It does not build a plugin or enable application loading. `test:plugin-profile:build` runs the Node profile, fixture-build and immutable-server tests. `test:plugin-sdk` runs the separate portable declaration and standalone sample checks. `test:unit:ci` includes both groups alongside application units and SDK runtime/type checks.
 
-`test:plugin-profile` runs both configured engines by default. Use `--project=chromium` or `--project=webkit` to select one. It uses `playwright.profile.config.ts`. It builds the shared runtime and trusted fixture host, then independently compiles the plugin. Its output goes to `node_modules/.cache/runtime-profile-fixture`. The dedicated server supplies those artifacts to Chromium and WebKit. Main app Playwright excludes this isolated suite. Browser Smoke CI runs it for each selected engine.
+`test:plugin-profile` runs both configured engines by default. Use `--project=chromium` or `--project=webkit` to select one. It uses `playwright.profile.config.ts`. It builds the shared runtime and trusted fixture host, then independently compiles the original plugin and the portable SDK sample. Its output goes to `node_modules/.cache/runtime-profile-fixture`. The dedicated server supplies those artifacts to Chromium and WebKit. Main app Playwright excludes this isolated suite. Browser Smoke CI runs it for each selected engine.
 
 ## Profile artifacts and shared identity
 
@@ -30,7 +32,7 @@ The output includes:
 - `profile.json`: versions, compiler settings, exact runtime exports, type-facade inventories and dependency-graph evidence.
 - `import-map.json`: 27 exact native ES-module mappings. It has no prefix or wildcard entries.
 - `modules/`: runtime entries, trusted host entries, shared chunks and emitted assets.
-- `facades/*.ts`: explicit approved SDK value and type re-exports. These are workspace-source artifacts, **not a portable `.d.ts` package**.
+- `facades/*.ts`: explicit approved SDK value and type re-exports. These remain workspace-source artifacts, **not a portable `.d.ts` package**. The separate [portable SDK builder](portable-sdk.md) now emits declarations-only packages from the same curated facade lists.
 
 The map contains nine SDK entries, ten public Svelte entries, four ProseMirror roots and the public DnD root. The remaining three entries are compiler internals derived from actual production compilation: `svelte/internal/client`, `svelte/internal/disclose-version` and `svelte/internal/flags/legacy`. Representative compiler fixtures and shared package sources supply the evidence. Arbitrary Svelte internals are not public author APIs. Type-only `svelte/action` and `svelte/elements` have no runtime mappings.
 
@@ -45,6 +47,14 @@ The fixture plugin lives in `e2e/fixtures/runtime-profile/plugin/`. Its build ex
 The exact `@writers-ide/layout/dock-colors.css` input is bundled into the plugin's emitted stylesheet. The build declares that output in `manifest.toml`. CSS is not a JavaScript import-map entry. The host also loads the profile's shared component styles.
 
 Each worker is built separately as one self-contained module. Worker helpers are bundled into it. `@writers-ide/tasks/worker` has no window mapping, and workers do not inherit the window import map.
+
+## Portable SDK sample
+
+The [standalone sample](../../examples/plugins/portable-sdk/README.md) is copied outside the checkout with generated declarations-only SDK packages, real third-party dependencies and build tools. Strict `svelte-check` uses `skipLibCheck: false`. A compiler-program audit requires every source, including TypeScript libraries, to resolve inside that clean project. It uses no workspace paths, stubs or source fallbacks. Negative cases check export boundaries, provider and command types, Svelte props/snippets/generics, missing dependencies and out-of-project imports.
+
+The sample's own Vite configuration builds the same source against exact profile imports. It bundles private `prosemirror-commands` while sharing ProseMirror core roots. The build creates a separate accepted sample snapshot. The existing immutable server verifies and retains both snapshots; the original rich fixture remains unchanged.
+
+Open `/#portable-sdk` on the fixture server to select `/sample-accepted.json`. The sample uses the same trusted host and runtime map. That internal host calls `activate(context)` and supplies `SvelteFrontendContext`. The fixture registers the `host` dependency provider, its probe API and command; these are test APIs, not built-in SDK services. See the [portable SDK guide](portable-sdk.md) for package delivery and the [sample README](../../examples/plugins/portable-sdk/README.md#activation-and-provider-contracts) for activation and ownership.
 
 ## Accepted bytes and the native-fetch limit
 
@@ -68,13 +78,15 @@ This tests verified-byte Blob workers through an advanced library callback. It d
 
 ## Evidence and remaining work
 
-The browser suite checks all 27 runtime namespaces. It exercises a separately compiled Svelte presentation, inherited host and tooltip contexts, declared CSS, image assets and a package-local dynamic import. It also checks typed command cooperation and ProseMirror constructors and transactions in both host-to-plugin and plugin-to-host directions. Rollback, render failure, teardown, stale handles, shared CSS owners, delayed starts, late imports and worker cleanup have regressions.
+The browser suite contains 32 cases across Chromium and WebKit. It preserves all 30 original cases and adds two portable SDK sample cases. The sample checks activation, providers, command results, inherited Svelte context, generic content, styles, clicks, teardown and reactivation.
+
+The original fixture checks all 27 runtime namespaces. It exercises a separately compiled Svelte presentation, inherited host and tooltip contexts, declared CSS, image assets and a package-local dynamic import. It also checks typed command cooperation and ProseMirror constructors and transactions in both host-to-plugin and plugin-to-host directions. Rollback, render failure, teardown, stale handles, shared CSS owners, delayed starts, late imports and worker cleanup have regressions.
 
 The builder records shared DnD identity, and the browser checks emitted dock-color CSS. This suite does not demonstrate a complete independent drag interaction or pagination geometry.
 
 Focused validation is recorded in the [cumulative plugin changelog](change-log.md#tested-runtime-profile-and-independent-plugin-fixture). Remaining release work includes:
 
-- Portable standalone declaration delivery and independent author type checking.
+- Public SDK release and package delivery. Private portable declarations and independent author type checking are implemented; the five generated SDK packages are not published.
 - Integration of the approved `module: URL` managed-worker API.
 - Production authorized resource delivery, manifest-to-runtime assembly and loading gates.
 - Packaged evidence across supported operating systems and installed WebViews, including the minimum supported macOS.

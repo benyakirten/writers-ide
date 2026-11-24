@@ -30,9 +30,9 @@ async function readTree(directory, prefix = '') {
 	}
 	return buffers;
 }
-/** @param {string} directory */
-export async function createFixtureServer(directory) {
-	const acceptedBytes = await readFile(path.join(directory, 'accepted.json'));
+/** @param {string} directory @param {string} filename */
+async function readAccepted(directory, filename) {
+	const acceptedBytes = await readFile(path.join(directory, filename));
 	/** @type {{snapshot: string, record: Record<string, string>}} */
 	const accepted = JSON.parse(acceptedBytes.toString());
 	const record = Object.fromEntries(
@@ -53,6 +53,14 @@ export async function createFixtureServer(directory) {
 			throw new Error(`Accepted snapshot integrity mismatch: ${name}`);
 		}
 	}
+	return { acceptedBytes, snapshot, packageBuffers };
+}
+/** @param {string} directory @param {{sample?: boolean}} options */
+export async function createFixtureServer(directory, { sample = false } = {}) {
+	const { acceptedBytes, snapshot, packageBuffers } = await readAccepted(
+		directory,
+		'accepted.json',
+	);
 	// These owned buffers are never exposed or reread from disk after startup.
 	// Frontend prefetch is only preliminary. Import/link fetches rely on this
 	// immutable server and transport; prefetch cannot protect a replaced response.
@@ -66,6 +74,11 @@ export async function createFixtureServer(directory) {
 		['profile', await readTree(path.join(directory, 'profile'))],
 		[`snapshots/${snapshot}`, packageBuffers],
 	];
+	if (sample) {
+		const extra = await readAccepted(directory, 'sample-accepted.json');
+		buffers.set('/sample-accepted.json', extra.acceptedBytes);
+		trees.push([`snapshots/${extra.snapshot}`, extra.packageBuffers]);
+	}
 	for (const [prefix, tree] of trees) {
 		for (const [name, bytes] of tree) {
 			buffers.set(`/${prefix}/${name.split('/').map(encodeURIComponent).join('/')}`, bytes);
@@ -96,7 +109,7 @@ export async function createFixtureServer(directory) {
 	});
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	const server = await createFixtureServer(output);
+	const server = await createFixtureServer(output, { sample: true });
 	server.listen(4179, '127.0.0.1');
 	for (const signal of ['SIGINT', 'SIGTERM']) {
 		process.on(signal, () => server.close());

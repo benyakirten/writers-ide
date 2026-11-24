@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -63,6 +63,74 @@ test('second requests serve accepted immutable buffers after package and record 
 		await rm(data.directory, { recursive: true, force: true });
 	}
 });
+/** @param {string} directory */
+async function addSample(directory) {
+	const entry = 'export const portable = true;';
+	const record = { 'entry.js': createHash('sha256').update(entry).digest('hex') };
+	const snapshot = createHash('sha256').update(JSON.stringify(record)).digest('hex');
+	const packageDirectory = path.join(directory, 'snapshots', snapshot);
+	await mkdir(packageDirectory, { recursive: true });
+	await writeFile(path.join(packageDirectory, 'entry.js'), entry);
+	await writeFile(
+		path.join(directory, 'sample-accepted.json'),
+		JSON.stringify({ snapshot, record }),
+	);
+	return { entry, snapshot, packageDirectory };
+}
+test('sample mode independently verifies and retains the second accepted snapshot', async () => {
+	const data = await fixture();
+	const sample = await addSample(data.directory);
+	const server = await createFixtureServer(data.directory, { sample: true });
+	try {
+		server.listen(0, '127.0.0.1');
+		await once(server, 'listening');
+		const address = server.address();
+		assert.ok(address && typeof address !== 'string');
+		const base = `http://127.0.0.1:${address.port}`;
+		const accepted = await readFile(path.join(data.directory, 'sample-accepted.json'), 'utf8');
+		await rm(sample.packageDirectory, { recursive: true });
+		await writeFile(path.join(data.directory, 'sample-accepted.json'), '{}');
+		assert.equal(await (await fetch(`${base}/sample-accepted.json`)).text(), accepted);
+		assert.equal(
+			await (await fetch(`${base}/snapshots/${sample.snapshot}/entry.js`)).text(),
+			sample.entry,
+		);
+		assert.equal(
+			await (await fetch(`${base}/snapshots/${data.snapshot}/entry.js`)).text(),
+			data.originals['entry.js'],
+		);
+	} finally {
+		server.closeAllConnections();
+		await new Promise((resolve) => server.close(resolve));
+		await rm(data.directory, { recursive: true, force: true });
+	}
+});
+for (const mutation of ['changed', 'missing', 'extra', 'record']) {
+	test(`sample startup rejects ${mutation} second-snapshot data`, async () => {
+		const data = await fixture();
+		const sample = await addSample(data.directory);
+		try {
+			if (mutation === 'changed') {
+				await writeFile(path.join(sample.packageDirectory, 'entry.js'), 'changed');
+			} else if (mutation === 'missing') {
+				await rm(path.join(sample.packageDirectory, 'entry.js'));
+			} else if (mutation === 'extra') {
+				await writeFile(path.join(sample.packageDirectory, 'extra.js'), 'extra');
+			} else {
+				await writeFile(
+					path.join(data.directory, 'sample-accepted.json'),
+					JSON.stringify({ snapshot: sample.snapshot, record: {} }),
+				);
+			}
+			await assert.rejects(
+				createFixtureServer(data.directory, { sample: true }),
+				/snapshot.*mismatch/,
+			);
+		} finally {
+			await rm(data.directory, { recursive: true, force: true });
+		}
+	});
+}
 for (const mutation of ['changed', 'missing', 'extra', 'record']) {
 	test(`startup rejects ${mutation} snapshot data rather than accepting new runtime hashes`, async () => {
 		const data = await fixture();
