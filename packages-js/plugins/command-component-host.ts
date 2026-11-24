@@ -5,6 +5,8 @@ import {
 	type WorkerTaskOptions,
 } from '@writers-ide/tasks';
 import type { ActivationIdentity, PluginLocale, ProjectReference } from './frontend';
+import { captureWorkerModules, type WorkerModuleSource } from './component-worker-modules';
+export type { WorkerModuleSource } from './component-worker-modules';
 import { ComponentProjectRegistry } from './component-project-registry';
 import { ComponentProjectConnections } from './component-project-connections';
 import {
@@ -54,6 +56,7 @@ type Snapshot = {
 type Options = NonNullable<Parameters<typeof createCommandDispatcher>[0]> & {
 	readonly locale: PluginLocale;
 	readonly workQueue?: WorkQueue;
+	readonly workerModules?: (identity: ActivationIdentity) => WorkerModuleSource | null;
 };
 let nextInstance = 0;
 
@@ -74,6 +77,7 @@ export class CommandComponentHost<Presentation = unknown> {
 	readonly #dispatcher;
 	readonly #locale: PluginLocale;
 	readonly #workQueue: WorkQueue;
+	readonly #workerModules: Options['workerModules'];
 	readonly #apis = new ComponentApiManager(this.#entries, (callback) => this.#callback(callback));
 	readonly #projects = new ComponentProjectRegistry();
 	readonly #connections = new ComponentProjectConnections(
@@ -93,7 +97,8 @@ export class CommandComponentHost<Presentation = unknown> {
 	#disposed = false;
 
 	constructor(options: Options) {
-		const { locale, workQueue, ...dispatcherOptions } = options;
+		const { locale, workQueue, workerModules, ...dispatcherOptions } = options;
+		this.#workerModules = workerModules;
 		this.#locale = locale;
 		this.#workQueue = workQueue ?? new WorkQueue();
 		// Dispatcher diagnostics also run inside the lifecycle mutation guard.
@@ -442,11 +447,36 @@ export class CommandComponentHost<Presentation = unknown> {
 		onError: () => void,
 		owned: (dispose: Dispose) => Dispose,
 	): TaskService {
+		const source = this.#callback(() =>
+			captureWorkerModules(this.#workerModules?.(activation.identity) ?? null),
+		);
+		const assertModuleLive = (signal: AbortSignal) => {
+			// A stop batch revokes every phase before aborting its individual signals.
+			if (activation.phase === 'stopped') {
+				service.dispose();
+				throw new Error('Task service has been disposed');
+			}
+			signal.throwIfAborted();
+		};
 		const service = createTaskService({
 			queue: this.#workQueue,
 			ownerId: activation.id,
 			signal: activation.controller.signal,
+			isLive: () => activation.phase !== 'stopped',
 			onError,
+			loadWorkerModule: async (module, context) => {
+				assertModuleLive(context.signal);
+				if (!source) {
+					throw new Error('Task worker module source is not configured');
+				}
+				try {
+					return await this.#callback(() =>
+						source(module, context, (callback) => this.#callback(callback)),
+					);
+				} finally {
+					assertModuleLive(context.signal);
+				}
+			},
 		});
 		owned(() => service.dispose());
 		const assertLive = () => {
@@ -469,16 +499,29 @@ export class CommandComponentHost<Presentation = unknown> {
 			},
 			worker: <I, O>(options: WorkerTaskOptions<I, O>) => {
 				assertLive();
-				return service.worker<I, O>({
-					...options,
-					apply: (value, context) => {
-						// The whole stop plan is revoked before its signals are aborted in sequence.
-						if (activation.phase === 'stopped') {
-							service.dispose();
-							return;
-						}
-						options.apply?.(value, context);
-					},
+				return this.#callback(() => {
+					if ('createWorker' in options) {
+						throw new Error(
+							'Component task workers require module URLs; createWorker is not supported',
+						);
+					}
+					const { key, label, signal, module, input, transfer, apply } = options;
+					return service.worker<I, O>({
+						key,
+						label,
+						signal,
+						module,
+						input,
+						transfer,
+						apply: (value, context) => {
+							// The whole stop plan is revoked before its signals are aborted in sequence.
+							if (activation.phase === 'stopped') {
+								service.dispose();
+								return;
+							}
+							apply?.(value, context);
+						},
+					});
 				});
 			},
 			dispose: () => service.dispose(),

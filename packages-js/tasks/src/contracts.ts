@@ -35,11 +35,18 @@ export type ForEachTaskOptions<T> = TaskOptions & {
 export type AsyncTaskOptions<T> = TaskOptions & {
 	run(context: TaskContext): T | PromiseLike<T>;
 };
-export type WorkerTaskOptions<I, O> = TaskOptions & {
-	createWorker(): Worker;
+type WorkerTaskData<I, O> = TaskOptions & {
 	input: I;
 	transfer?: Transferable[];
 	apply?(value: O, context: TaskContext): void;
+};
+export type WorkerTaskOptions<I, O> = WorkerTaskData<I, O> & {
+	module: URL;
+	createWorker?: never;
+};
+export type WorkerFactoryTaskOptions<I, O> = WorkerTaskData<I, O> & {
+	createWorker(): Worker;
+	module?: never;
 };
 export type TaskFailure = { ownerId: string; key: string; label: string; error: unknown };
 export type TaskServiceOptions = {
@@ -47,6 +54,8 @@ export type TaskServiceOptions = {
 	ownerId: string;
 	signal: AbortSignal;
 	onError?(failure: TaskFailure): void;
+	isLive?(): boolean;
+	loadWorkerModule?(module: URL, context: TaskContext): Uint8Array | PromiseLike<Uint8Array>;
 };
 export interface TaskService {
 	forEach<T>(options: ForEachTaskOptions<T>): CooperativeTaskHandle<void>;
@@ -54,4 +63,7 @@ export interface TaskService {
 	async<T>(options: AsyncTaskOptions<T>): TaskHandle<T>;
 	worker<I, O>(options: WorkerTaskOptions<I, O>): TaskHandle<O>;
 	dispose(): void;
+}
+export interface AdvancedTaskService extends TaskService {
+	worker<I, O>(options: WorkerTaskOptions<I, O> | WorkerFactoryTaskOptions<I, O>): TaskHandle<O>;
 }

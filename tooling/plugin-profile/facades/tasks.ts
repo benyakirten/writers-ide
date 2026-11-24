@@ -1,6 +1,9 @@
 export { WorkQueue, createTaskService } from '@writers-ide/tasks';
 export type {
 	TaskService,
+	AdvancedTaskService,
+	WorkerTaskOptions,
+	WorkerFactoryTaskOptions,
 	TaskOutcome,
 	TaskHandle,
 	CooperativeTaskHandle,

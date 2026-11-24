@@ -212,6 +212,30 @@ test(
 				/number.*not assignable.*string/,
 			],
 			[
+				'ordinary task worker factory',
+				'ts',
+				`import type { FrontendContext } from '@writers-ide/plugins'; export function bad(c: FrontendContext<unknown>) { c.tasks.worker({key:'bad', label:'Bad', input:1, createWorker: () => new Worker('worker.js')}); }`,
+				/\(\) => Worker.*not assignable/,
+			],
+			[
+				'mixed task worker selections',
+				'ts',
+				`import { createTaskService, type TaskServiceOptions } from '@writers-ide/tasks'; export function bad(options: TaskServiceOptions) { createTaskService(options).worker({key:'bad', label:'Bad', input:1, module:new URL('https://example.test/worker.js'), createWorker: () => new Worker('worker.js')}); }`,
+				/not assignable/,
+			],
+			[
+				'missing task worker module',
+				'ts',
+				`import type { FrontendContext } from '@writers-ide/plugins'; export function bad(c: FrontendContext<unknown>) { c.tasks.worker({key:'bad', label:'Bad', input:1}); }`,
+				/module.*missing/,
+			],
+			[
+				'non-URL task worker module',
+				'ts',
+				`import type { FrontendContext } from '@writers-ide/plugins'; export function bad(c: FrontendContext<unknown>) { c.tasks.worker({key:'bad', label:'Bad', input:1, module:'./worker.js'}); }`,
+				/string.*not assignable.*URL/,
+			],
+			[
 				'required component prop',
 				'svelte',
 				`<script lang="ts">import { IconButton } from '@writers-ide/components';</script><IconButton tooltipDirection="horizontal" onclick={() => {}}>{#snippet icon()}+{/snippet}</IconButton>`,

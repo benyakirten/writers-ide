@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	createTaskService,
 	WorkQueue,
-	type TaskService,
+	type AdvancedTaskService,
 	type CooperativeTaskHandle,
 } from '../../../packages-js/tasks';
 
@@ -17,7 +17,7 @@ class MockWorker extends EventTarget {
 describe('tasks library', () => {
 	let queue: WorkQueue;
 	let owner: AbortController;
-	let service: TaskService;
+	let service: AdvancedTaskService;
 	let frames: Map<number, FrameRequestCallback>;
 	let now: number;
 	let id: number;
@@ -390,7 +390,7 @@ describe('tasks library', () => {
 	});
 
 	it('lets cleanup-created replacements supersede the operation that triggered cleanup', async () => {
-		let newest: ReturnType<TaskService['async']> | undefined;
+		let newest: ReturnType<AdvancedTaskService['async']> | undefined;
 		const original = service.cooperative({
 			key: 'same',
 			label: 'Old',

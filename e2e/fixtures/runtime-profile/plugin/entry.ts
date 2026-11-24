@@ -55,9 +55,16 @@ export function activate(context: SvelteFrontendContext) {
 		throw new Error('Fixture activation failure');
 	}
 	void run().catch((error) => lifecycle(`command-error:${String(error)}`));
-	const workerFile = './worker.js';
-	void probe.worker(new URL(workerFile, import.meta.url).href, 21).then(
-		(result) => lifecycle(`worker:${JSON.stringify(result)}`),
-		(error) => lifecycle(`worker-error:${String(error)}`),
-	);
+	const workerFile = './task.worker.js';
+	void context.tasks
+		.worker<number, number>({
+			key: 'activation-worker',
+			label: 'Double in worker',
+			module: new URL(workerFile, import.meta.url),
+			input: 21,
+		})
+		.result.then(
+			(result) => lifecycle(`worker:${JSON.stringify(result)}`),
+			(error) => lifecycle(`worker-error:${String(error)}`),
+		);
 }

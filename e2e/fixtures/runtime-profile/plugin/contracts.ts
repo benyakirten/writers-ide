@@ -1,10 +1,7 @@
 import { definePluginApi, definePluginCommand, type PluginCommand } from '@writers-ide/plugins';
 import type { EditorView } from 'prosemirror-view';
-import type { TaskOutcome } from '@writers-ide/tasks';
-// This provider is a fixture experiment, not an author SDK worker-selection API.
 export interface Probe {
 	check(view: EditorView): boolean;
-	worker(url: string, input: number, mode?: string): Promise<TaskOutcome<number>>;
 	event(value: string): void;
 	lifecycle(): (value: string) => void;
 }

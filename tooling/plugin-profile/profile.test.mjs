@@ -63,7 +63,8 @@ const approved = {
 	},
 	'@writers-ide/tasks': {
 		runtime: names('WorkQueue createTaskService'),
-		types: names(`TaskService TaskOutcome TaskHandle CooperativeTaskHandle TaskContext TaskOptions
+		types: names(`TaskService AdvancedTaskService WorkerTaskOptions WorkerFactoryTaskOptions
+					TaskOutcome TaskHandle CooperativeTaskHandle TaskContext TaskOptions
 			CooperativeTaskOptions ForEachTaskOptions AsyncTaskOptions WorkPriority WorkProgress WorkStatus
 			WorkOptions WorkHandle TaskServiceOptions TaskFailure`),
 	},
@@ -325,8 +326,7 @@ test('artifact source facades typecheck and reject private runtime and type expo
 		import type { BundledPlugin } from './facades/plugins.ts';
 		// @ts-expect-error bundled provider identity is not an author export
 		import { WORD_PROCESSING_PLUGIN_ID } from './facades/word-processing.ts';
-		// @ts-expect-error standalone worker factory options are not an approved named type
-		import type { WorkerTaskOptions } from './facades/tasks.ts';
+		import type { AdvancedTaskService, WorkerTaskOptions, WorkerFactoryTaskOptions } from './facades/tasks.ts';
 		// @ts-expect-error legacy Svelte descriptor is not an author export
 		import type { SveltePlugin } from './facades/plugins-svelte.ts';
 		// @ts-expect-error native contracts do not expose raw invocation

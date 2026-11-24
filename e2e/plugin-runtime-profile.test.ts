@@ -70,6 +70,7 @@ test('portable SDK sample activates from its independent accepted snapshot', asy
 				'portable:activate',
 				'portable:locale:en',
 				'portable:command:42',
+				'portable:worker:{"status":"completed","value":42}',
 				'portable:provider:consumer',
 			]),
 		);
@@ -283,36 +284,34 @@ test('verified Blob workers clean up completion, cancellation and startup failur
 }) => {
 	await ready(page);
 	await expect.poll(() => fixture(page, 'return f.stats.terminated;')).toBe(1);
+	await fixture(page, 'f.resetStats();');
 	for (const mode of ['cancel', 'constructor-failure', 'startup-failure']) {
 		const result = await fixture<{ status: string }>(
 			page,
-			`return f.worker(f.base + '${mode === 'startup-failure' ? 'broken-worker.js' : 'worker.js'}', 5, '${mode}');`,
+			`return f.worker(f.base + '${mode === 'startup-failure' ? 'broken-worker.js' : 'task.worker.js'}', 5, '${mode}');`,
 		);
 		expect(result.status).toBe(mode === 'cancel' ? 'cancelled' : 'failed');
 	}
-	expect(await fixture(page, 'return f.stats;')).toEqual({ created: 3, terminated: 3, revoked: 4 });
+	expect(await fixture(page, 'return f.stats;')).toEqual({ created: 1, terminated: 1, revoked: 2 });
 	for (const url of [
-		'https://example.com/worker.js',
-		'file:///tmp/worker.js',
-		'/snapshots/foreign/worker.js',
+		'https://example.com/task.worker.js',
+		'file:///tmp/task.worker.js',
+		'/snapshots/foreign/task.worker.js',
+		'data:text/javascript,postMessage(1)',
+		'blob:https://example.com/foreign',
+		'task.worker.js?unknown',
 	]) {
 		expect(
-			await fixture(
-				page,
-				`try { await f.worker(${JSON.stringify(url)}, 1); return false; } catch (error) { return String(error); }`,
-			),
-		).toContain('Not an accepted snapshot URL');
+			await fixture(page, `return (await f.worker(${JSON.stringify(url)}, 1)).error;`),
+		).toContain('not owned by this activation');
 	}
-	await page.route('**/snapshots/**/worker.js', (route) =>
+	await page.route('**/snapshots/**/task.worker.js', (route) =>
 		route.fulfill({ body: 'throw new Error("tampered")', contentType: 'text/javascript' }),
 	);
 	expect(
-		await fixture(
-			page,
-			'try { await f.worker(f.base + "worker.js", 1); return false; } catch (error) { return String(error); }',
-		),
+		await fixture(page, 'return (await f.worker(f.base + "task.worker.js", 1)).error;'),
 	).toContain('Integrity mismatch');
-	expect(await fixture(page, 'return f.stats;')).toEqual({ created: 3, terminated: 3, revoked: 4 });
+	expect(await fixture(page, 'return f.stats;')).toEqual({ created: 1, terminated: 1, revoked: 2 });
 });
 test('in-flight stylesheet abort and load failure release their owners', async ({ page }) => {
 	await ready(page);
@@ -355,17 +354,14 @@ test('abort during worker byte acquisition creates no Blob or worker', async ({ 
 	await ready(page);
 	await expect.poll(() => fixture(page, 'return f.stats.terminated;')).toBe(1);
 	let workerRoute: import('@playwright/test').Route | undefined;
-	await page.route('**/snapshots/**/worker.js', (route) => {
+	await page.route('**/snapshots/**/task.worker.js', (route) => {
 		workerRoute = route;
 	});
-	await fixture(
-		page,
-		'window.workerResult = f.workerWithAbort(f.base + "worker.js").then(() => "unexpected", (error) => error.name);',
-	);
+	await fixture(page, 'window.workerResult = f.workerWithAbort(f.base + "task.worker.js");');
 	await expect.poll(() => Boolean(workerRoute)).toBe(true);
-	expect(await fixture(page, 'f.workerAbortController.abort(); return window.workerResult;')).toBe(
-		'AbortError',
-	);
+	expect(
+		await fixture(page, 'f.workerAbortController.abort(); return window.workerResult;'),
+	).toEqual({ status: 'cancelled' });
 	expect(await fixture(page, 'return f.stats;')).toEqual({ created: 1, terminated: 1, revoked: 1 });
 	await workerRoute!.abort();
 });
@@ -385,4 +381,224 @@ test('aborted preparation releases resources and unknown bare imports fail in br
 		await page.evaluate('window.fixtureImport("/unknown.js").then(() => false, () => true)'),
 	).toBe(true);
 	expect(await page.evaluate('window.unknownImported ?? false')).toBe(false);
+});
+
+async function workerReady(page: Page) {
+	await ready(page);
+	await expect.poll(() => fixture(page, 'return f.stats.terminated;')).toBe(1);
+	await fixture(page, 'f.resetStats();');
+}
+
+test('ordinary context rejects author factories synchronously', async ({ page }) => {
+	await workerReady(page);
+	expect(
+		await fixture(
+			page,
+			'try { f.factoryRejected(); return false; } catch (error) { return String(error); }',
+		),
+	).toContain('createWorker is not supported');
+	expect(await fixture(page, 'return f.stats;')).toEqual({ created: 0, terminated: 0, revoked: 0 });
+	expect(await fixture(page, 'return f.allocations();')).toBe(0);
+});
+
+test('module transfer detaches input and applies one result exactly once', async ({ page }) => {
+	await workerReady(page);
+	expect(await fixture(page, 'return f.transfer();')).toEqual({
+		detached: true,
+		status: 'completed',
+		value: 42,
+	});
+	expect(
+		await fixture<string[]>(page, 'return f.events;').then((events) =>
+			events.filter((event) => event.startsWith('transfer-apply:')),
+		),
+	).toEqual(['transfer-apply:42']);
+	expect(await fixture(page, 'return f.stats;')).toEqual({ created: 1, terminated: 1, revoked: 1 });
+});
+
+test('uncloneable worker input fails and releases library-owned resources', async ({ page }) => {
+	await workerReady(page);
+	const result = await fixture<{ status: string; error: string }>(
+		page,
+		'return f.worker(f.base + "task.worker.js", () => 1);',
+	);
+	expect(result.status).toBe('failed');
+	expect(result.error).toMatch(/clone|serializ/i);
+	expect(await fixture(page, 'return f.stats;')).toEqual({ created: 1, terminated: 1, revoked: 1 });
+	expect(
+		await fixture<{ errors: string[] }>(page, 'return f.diagnostics();').then(
+			(value) => value.errors,
+		),
+	).not.toEqual([]);
+});
+
+for (const action of ['replacement', 'request', 'stop']) {
+	test(`running module task ${action} suppresses stale apply`, async ({ page }) => {
+		await workerReady(page);
+		await fixture(
+			page,
+			'window.oldWorker = f.worker(f.base + "task.worker.js", {value: 111, delay: 250}, "", f.workerAbortController.signal, "same");',
+		);
+		await expect.poll(() => fixture(page, 'return f.stats.created;')).toBe(1);
+		if (action === 'replacement') {
+			expect(
+				await fixture(
+					page,
+					'return f.worker(f.base + "task.worker.js", 7, "", undefined, "same");',
+				),
+			).toEqual({ status: 'completed', value: 14 });
+		} else if (action === 'request') {
+			await fixture(page, 'f.workerAbortController.abort();');
+		} else {
+			await fixture(page, 'await f.stop();');
+		}
+		expect(await fixture(page, 'return window.oldWorker;')).toEqual({ status: 'cancelled' });
+		await page.waitForTimeout(300);
+		expect(await fixture(page, 'return f.events;')).not.toContain('apply:222');
+		const count = action === 'replacement' ? 2 : 1;
+		expect(await fixture(page, 'return f.stats;')).toEqual({
+			created: count,
+			terminated: count,
+			revoked: count,
+		});
+	});
+}
+
+for (const action of ['replacement', 'request', 'stop']) {
+	test(`loading module task ${action} suppresses late verified bytes`, async ({ page }) => {
+		await workerReady(page);
+		// Trusted adapter deliberately ignores cancellation to test the task's late-result guard.
+		await fixture(page, 'f.ignoreReadAbort(true);');
+		let delayed: import('@playwright/test').Route | undefined;
+		await page.route('**/snapshots/**/task.worker.js', async (route) => {
+			if (!delayed) {
+				delayed = route;
+			} else {
+				await route.continue();
+			}
+		});
+		await fixture(
+			page,
+			'window.oldWorker = f.worker(f.base + "task.worker.js", 111, "", f.workerAbortController.signal, "same");',
+		);
+		await expect.poll(() => Boolean(delayed)).toBe(true);
+		if (action === 'replacement') {
+			expect(
+				await fixture(
+					page,
+					'return f.worker(f.base + "task.worker.js", 7, "", undefined, "same");',
+				),
+			).toEqual({ status: 'completed', value: 14 });
+		} else if (action === 'request') {
+			await fixture(page, 'f.workerAbortController.abort();');
+		} else {
+			await fixture(page, 'await f.stop();');
+		}
+		expect(await fixture(page, 'return window.oldWorker;')).toEqual({ status: 'cancelled' });
+		await delayed!.continue();
+		await page.waitForTimeout(100);
+		expect(await fixture(page, 'return f.events;')).not.toContain('apply:222');
+		const count = action === 'replacement' ? 1 : 0;
+		expect(await fixture(page, 'return f.allocations();')).toBe(count);
+		expect(await fixture(page, 'return f.stats;')).toEqual({
+			created: count,
+			terminated: count,
+			revoked: count,
+		});
+	});
+}
+
+test('snapshot source is captured per activation and is never implicit for an unbound slot', async ({
+	page,
+	request,
+}) => {
+	await workerReady(page);
+	await fixture(page, 'f.clearBinding();');
+	expect(await fixture(page, 'return f.worker(f.base + "task.worker.js", 3);')).toEqual({
+		status: 'completed',
+		value: 6,
+	});
+	await fixture(page, 'await f.stop(); f.bindSnapshot(false); await f.start();');
+	const missing = await fixture<{ status: string; error: string }>(
+		page,
+		'return f.worker(f.base + "task.worker.js", 3);',
+	);
+	expect(missing.status).toBe('failed');
+	expect(missing.error).toContain('source is not configured');
+	await fixture(page, 'await f.stop(); f.bindSnapshot(true); await f.start();');
+	expect(await fixture(page, 'return f.worker(f.base + "task.worker.js", 4);')).toEqual({
+		status: 'completed',
+		value: 8,
+	});
+	const foreign = await (await request.get('/sample-accepted.json')).json();
+	const result = await fixture<{ status: string; error: string }>(
+		page,
+		`return f.worker(new URL('/snapshots/${foreign.snapshot}/calculate.worker.js', location.href).href, 1);`,
+	);
+	expect(result.status).toBe('failed');
+	expect(result.error).toContain('not owned by this activation');
+});
+
+test('invalid module ownership never fetches a fallback resource', async ({ page }) => {
+	await workerReady(page);
+	const requests: string[] = [];
+	page.on('request', (request) => requests.push(request.url()));
+	for (const target of [
+		'https://example.com/task.worker.js',
+		'file:///tmp/task.worker.js',
+		'data:text/javascript,0',
+		'blob:https://example.com/unknown',
+		'/snapshots/foreign/task.worker.js',
+	]) {
+		expect(
+			await fixture<{ status: string }>(
+				page,
+				`return f.worker(${JSON.stringify(target)}, 1);`,
+			).then((outcome) => outcome.status),
+		).toBe('failed');
+	}
+	for (const suffix of ['unknown.js', 'task.worker.js?x', 'task.worker.js#x', 'task%2Eworker.js']) {
+		expect(
+			await fixture<{ status: string }>(
+				page,
+				`return f.worker(f.base + ${JSON.stringify(suffix)}, 1);`,
+			).then((outcome) => outcome.status),
+		).toBe('failed');
+	}
+	expect(requests).toEqual([]);
+	expect(await fixture(page, 'return f.stats;')).toEqual({ created: 0, terminated: 0, revoked: 0 });
+	expect(await fixture(page, 'return f.allocations();')).toBe(0);
+});
+
+test('late async result remains cancelled after teardown and fresh activation', async ({
+	page,
+}) => {
+	await workerReady(page);
+	await fixture(
+		page,
+		'window.pendingAsync = f.asyncStale(); await f.stop(); await f.start(); window.pendingAsync.resolve(99);',
+	);
+	expect(await fixture(page, 'return window.pendingAsync.result;')).toEqual({
+		status: 'cancelled',
+	});
+	expect(await fixture(page, 'return f.worker(f.base + "task.worker.js", 4);')).toEqual({
+		status: 'completed',
+		value: 8,
+	});
+});
+
+test('duplicate worker responses apply exactly once', async ({ page }) => {
+	await workerReady(page);
+	expect(await fixture(page, 'return f.worker(f.base + "duplicate.worker.js", 17);')).toEqual({
+		status: 'completed',
+		value: 34,
+	});
+	await page.waitForTimeout(100);
+	expect(
+		await fixture<string[]>(page, 'return f.events;').then((events) =>
+			events.filter((event) => event === 'apply:34'),
+		),
+	).toEqual(['apply:34']);
+	expect(await fixture(page, 'return f.stats;')).toEqual({ created: 1, terminated: 1, revoked: 1 });
+	expect(await fixture(page, 'return f.allocations();')).toBe(1);
 });

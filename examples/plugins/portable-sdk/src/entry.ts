@@ -27,6 +27,15 @@ export function activate(context: SvelteFrontendContext) {
 		presentation: defineSveltePresentation(Presentation, { probe, label: 'Portable SDK' }),
 	});
 	probe.event('portable:activate');
+	const workerFile = './calculate.worker.js';
+	void context.tasks
+		.worker<number, number>({
+			key: 'calculate',
+			label: 'Calculate in worker',
+			module: new URL(workerFile, import.meta.url),
+			input: 21,
+		})
+		.result.then((outcome) => lifecycle(`portable:worker:${JSON.stringify(outcome)}`));
 	void context.commands.execute('host', 'double', double, 21).then(
 		(value) => lifecycle(`portable:command:${value}`),
 		(error) => lifecycle(`portable:error:${String(error)}`),

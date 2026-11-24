@@ -1,6 +1,41 @@
 import { vi } from 'vitest';
 import { createHost, descriptor } from './command-component-fixture';
 import type { CommandContext } from './command-component-model';
+import type { WorkerModuleSource } from './command-component-host';
+
+export const workerModule = new URL('https://packages.test/snapshots/one/worker.js');
+
+export function moduleWorkers(fake = fakeWorker(), create?: () => void) {
+	const createObjectURL = vi.fn(() => 'blob:managed-worker');
+	const revokeObjectURL = vi.fn();
+	vi.stubGlobal(
+		'URL',
+		new Proxy(URL, {
+			get(target, key, receiver) {
+				if (key === 'createObjectURL') {
+					return createObjectURL;
+				}
+				if (key === 'revokeObjectURL') {
+					return revokeObjectURL;
+				}
+				return Reflect.get(target, key, receiver);
+			},
+		}),
+	);
+	vi.stubGlobal(
+		'Worker',
+		vi.fn(function () {
+			create?.();
+			return fake.worker;
+		}),
+	);
+	const source: WorkerModuleSource = {
+		base: new URL('./', workerModule),
+		files: ['worker.js'],
+		read: () => new Uint8Array([1]),
+	};
+	return { fake, source, workerModules: () => source };
+}
 
 export function frames() {
 	const pending = new Map<number, FrameRequestCallback>();

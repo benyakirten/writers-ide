@@ -220,7 +220,7 @@ The suite replaced the old starter `<h1>` test.
 The task, plugin, runtime-profile and word-processing suites each build a separate small test application.
 The main app e2e configuration excludes their test files.
 Run their dedicated commands alongside app tests.
-Browser Smoke CI runs each dedicated suite, including `test:plugin-profile`, for its selected engine. The [runtime profile guide](docs/plugins/runtime-profile.md) explains generated artifacts, the immutable fixture server and the limits of browser prefetch verification. Its worker provider uses the existing library factory callback, not the complete approved external `module: URL` API.
+Browser Smoke CI runs each dedicated suite, including `test:plugin-profile`, for its selected engine. The [runtime profile guide](docs/plugins/runtime-profile.md) explains generated artifacts, the immutable fixture server and the limits of browser prefetch verification. Both independently built plugins use ordinary `context.tasks.worker({ module: URL, ... })` requests. The trusted fixture host supplies snapshot-bound verified-byte sources. Browser cases cover URL ownership, cancellation during loading, posting/transfer timing and Blob Worker cleanup. Production native byte-source and profile integration remain pending.
 
 Tests check that content fits and is preserved.
 They do not require identical page breaks across browser engines.

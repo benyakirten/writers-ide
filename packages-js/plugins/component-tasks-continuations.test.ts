@@ -131,16 +131,15 @@ describe('component task continuations', () => {
 		host.dispose();
 	});
 
-	it('attributes generator cleanup failure to the stopped activation, not its replacement or peers', async () => {
+	it('retains generator cleanup failure on the cancelled task without reporting after revocation', async () => {
 		const host = createHost();
-		let cleanup!: () => void;
+		const cleanup = vi.fn(() => {
+			throw new Error('Private cleanup failure');
+		});
 		let task!: TaskHandle<void>;
 
 		host.register(
 			descriptor('one', (context) => {
-				cleanup = () => {
-					throw new Error('Private cleanup failure');
-				};
 				task = context.tasks.cooperative({
 					key: 'scan',
 					label: 'Scan',
@@ -163,7 +162,9 @@ describe('component task continuations', () => {
 		const old = task;
 		host.deactivate('one');
 		expect(await old.result).toEqual({ status: 'cancelled' });
-		expect(host.get('one')!.errors).toEqual(['task-failed']);
+		expect(cleanup).toHaveBeenCalledOnce();
+		expect(old.error).toBeInstanceOf(Error);
+		expect(host.get('one')!.errors).toEqual([]);
 		expect(host.get('peer')!.errors).toEqual([]);
 		host.activate('one');
 		expect(host.get('one')!.errors).toEqual([]);

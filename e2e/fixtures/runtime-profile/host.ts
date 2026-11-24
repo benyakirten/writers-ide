@@ -4,7 +4,10 @@ import { EditorState, Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { Transform } from 'prosemirror-transform';
 import type { SveltePresentation } from '@writers-ide/plugins/svelte';
-import { CommandComponentHost } from '../../../packages-js/plugins/command-component-host';
+import {
+	CommandComponentHost,
+	type WorkerModuleSource,
+} from '../../../packages-js/plugins/command-component-host';
 import { probeApi, publishedApi, double } from './plugin/contracts';
 import { Resources } from './resources';
 import Host from './Host.svelte';
@@ -20,7 +23,42 @@ const importArtifact = (
 const resources = new Resources(accepted);
 const events: string[] = [];
 const stats = { created: 0, terminated: 0, revoked: 0 };
+// Trusted test instrumentation observes library-owned resources; authors supply no factory.
+let nextWorkerMode = '';
+const NativeWorker = globalThis.Worker;
+let allocated = 0;
+const createObjectURL = URL.createObjectURL.bind(URL);
+URL.createObjectURL = (blob) => {
+	allocated++;
+	return createObjectURL(blob);
+};
+const revoke = URL.revokeObjectURL.bind(URL);
+URL.revokeObjectURL = (url) => {
+	stats.revoked++;
+	revoke(url);
+};
+globalThis.Worker = class extends NativeWorker {
+	constructor(url: string | URL, options?: WorkerOptions) {
+		if (nextWorkerMode === 'constructor-failure') {
+			nextWorkerMode = '';
+			throw new Error('Fixture constructor failure');
+		}
+		super(url, options);
+		stats.created++;
+	}
+	terminate() {
+		stats.terminated++;
+		super.terminate();
+	}
+};
+let snapshotBound = true;
+let ignoreReadAbort = false;
+const bindings = new Map<string, WorkerModuleSource>();
 const host = new CommandComponentHost<SveltePresentation>({
+	workerModules: (identity) =>
+		identity.packageId === 'runtime-profile-fixture' && identity.projectOpeningId === null
+			? (bindings.get(identity.componentId) ?? null)
+			: null,
 	locale: {
 		snapshot: () => ({ languageTag: 'en', direction: 'ltr' }),
 		subscribe(listener) {
@@ -40,63 +78,29 @@ const base = (slotId: string) => ({
 	dependencies: [],
 	capabilities: [],
 });
-let hostContext: Parameters<Parameters<typeof host.register>[0]['activate']>[0];
+type ContextActivate = Parameters<typeof host.register>[0]['activate'];
+type Context = Parameters<Parameters<typeof host.register>[0]['activate']>[0];
+let pluginContext: Context;
+let workerSequence = 0;
 const handles = new Set<{ cancel(): void }>();
-async function worker(url: string, input: number, mode = '', signal = hostContext.signal) {
-	const controller = new AbortController();
-	const abort = () => controller.abort();
-	signal.addEventListener('abort', abort, { once: true });
-	if (signal.aborted) {
-		controller.abort();
+function worker(url: string, input: unknown, mode = '', signal?: AbortSignal, key?: string) {
+	nextWorkerMode = mode;
+	const task = pluginContext.tasks.worker<unknown, unknown>({
+		key: key ?? `worker-${workerSequence++}`,
+		label: 'Ordinary module worker',
+		module: new URL(url, location.href),
+		signal,
+		input,
+		apply: (value) => events.push(`apply:${JSON.stringify(value)}`),
+	});
+	handles.add(task);
+	if (mode === 'cancel') {
+		task.cancel();
 	}
-	try {
-		const bytes = await resources.verify(url, controller.signal);
-		const task = hostContext.tasks.worker<number, number>({
-			key: `worker-${stats.created}`,
-			label: 'Verified fixture worker',
-			signal: controller.signal,
-			input,
-			createWorker() {
-				controller.signal.throwIfAborted();
-				const blob = URL.createObjectURL(new Blob([bytes], { type: 'text/javascript' }));
-				let instance: Worker;
-				try {
-					if (mode === 'constructor-failure') {
-						throw new Error('Fixture constructor failure');
-					}
-					instance = new Worker(blob, { type: 'module' });
-					stats.created++;
-				} catch (error) {
-					URL.revokeObjectURL(blob);
-					stats.revoked++;
-					throw error;
-				}
-				const terminate = instance.terminate.bind(instance);
-				let live = true;
-				instance.terminate = () => {
-					if (live) {
-						live = false;
-						terminate();
-						stats.terminated++;
-						URL.revokeObjectURL(blob);
-						stats.revoked++;
-					}
-				};
-				return instance;
-			},
-		});
-		handles.add(task);
-		if (mode === 'cancel') {
-			task.cancel();
-		}
-		try {
-			return await task.result;
-		} finally {
-			handles.delete(task);
-		}
-	} finally {
-		signal.removeEventListener('abort', abort);
-	}
+	return task.result.then((outcome) => {
+		handles.delete(task);
+		return outcome.status === 'failed' ? { ...outcome, error: String(outcome.error) } : outcome;
+	});
 }
 host.register({
 	...base('host'),
@@ -104,14 +108,13 @@ host.register({
 	commands: [{ id: 'double', contractId: double.id, major: 1 }],
 	capabilities: ['contributions.command'],
 	activate(context) {
-		hostContext = context;
 		context.contributions.command({
 			id: 'double',
 			name: 'Double',
 			contract: double,
 			execute: (value) => value * 2,
 		});
-		context.apis.provide(probeApi, (connection) => ({
+		context.apis.provide(probeApi, () => ({
 			event(value) {
 				events.push(value);
 			},
@@ -120,7 +123,6 @@ host.register({
 					events.push(value);
 				};
 			},
-			worker: (url, input, mode) => worker(url, input, mode, connection.signal),
 			check(pluginView) {
 				const tr = pluginView.state.tr.insertText('host');
 				const valid =
@@ -187,6 +189,21 @@ async function start(profile = accepted.profile) {
 		checkSession(session);
 		session.release = await resources.prepare(profile, session.controller.signal);
 		checkSession(session);
+		if (snapshotBound) {
+			bindings.set('plugin', {
+				base: resources.base,
+				files: Object.keys(accepted.record),
+				read: async (path, signal) =>
+					new Uint8Array(
+						await resources.verify(
+							new URL(path, resources.base).href,
+							ignoreReadAbort ? undefined : signal,
+						),
+					),
+			});
+		} else {
+			bindings.delete('plugin');
+		}
 		const plugin = await importArtifact(new URL(accepted.entry, resources.base).href);
 		checkSession(session);
 		if (typeof plugin.activate !== 'function') {
@@ -205,7 +222,10 @@ async function start(profile = accepted.profile) {
 						commands: [{ alias: 'double', id: 'double', contractId: double.id, major: 1 }],
 					},
 				],
-				activate: plugin.activate as Parameters<typeof host.register>[0]['activate'],
+				activate(context) {
+					pluginContext = context;
+					(plugin.activate as ContextActivate)(context);
+				},
 			});
 			host.register({
 				...base('consumer'),
@@ -251,6 +271,65 @@ const api = {
 	owners: () => [...resources.styles.values()].map((entry) => entry.owners),
 	acquire: (signal?: AbortSignal) => resources.acquire(signal),
 	worker,
+	allocations: () => allocated,
+	resetStats() {
+		allocated = 0;
+		nextWorkerMode = '';
+		stats.created = 0;
+		stats.terminated = 0;
+		stats.revoked = 0;
+	},
+	bindSnapshot(value: boolean) {
+		snapshotBound = value;
+	},
+	clearBinding() {
+		bindings.delete('plugin');
+	},
+	ignoreReadAbort(value: boolean) {
+		ignoreReadAbort = value;
+	},
+	diagnostics: () => host.get('plugin'),
+	factoryRejected() {
+		return pluginContext.tasks.worker({
+			key: 'invalid-factory',
+			label: 'Invalid factory',
+			input: 1,
+			// Deliberately probe the JavaScript boundary, not just TypeScript.
+			createWorker() {
+				throw new Error('Author factory must not execute');
+			},
+		} as never);
+	},
+	transfer() {
+		const buffer = new Uint8Array([21]).buffer;
+		const task = pluginContext.tasks.worker<ArrayBuffer, ArrayBuffer>({
+			key: 'transfer',
+			label: 'Transfer',
+			module: new URL('task.worker.js', resources.base),
+			input: buffer,
+			transfer: [buffer],
+			apply(value) {
+				events.push(`transfer-apply:${new Uint8Array(value)[0]}`);
+			},
+		});
+		return task.result.then((outcome) => ({
+			detached: buffer.byteLength === 0,
+			status: outcome.status,
+			value: outcome.status === 'completed' ? new Uint8Array(outcome.value)[0] : null,
+		}));
+	},
+	asyncStale() {
+		let resolve!: (value: number) => void;
+		const task = pluginContext.tasks.async({
+			key: 'async-stale',
+			label: 'Async stale',
+			run: () =>
+				new Promise<number>((done) => {
+					resolve = done;
+				}),
+		});
+		return { result: task.result, resolve };
+	},
 	workerAbortController: new AbortController(),
 	workerWithAbort(url: string) {
 		return worker(url, 1, '', api.workerAbortController.signal);

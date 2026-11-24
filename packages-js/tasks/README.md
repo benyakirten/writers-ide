@@ -15,7 +15,7 @@ This is a private Svelte 5 workspace library that exports source files, not a co
 
 ## Use tasks in a plugin
 
-A plugin is an object with a manifest and an `activate(context)` method. The **plugin host** is the application service that registers, enables and disables plugins. Application setup registers the object with `host.register(plugin)`. When setup or the Plugins manager enables it, the host calls its `activate` method synchronously. Plugin authors do not call that method themselves.
+For the default bundled host, a plugin is an object with a manifest and an `activate(context)` method. The **plugin host** is the application service that registers, enables and disables plugins. Application setup registers the object with `host.register(plugin)`. When setup or the Plugins manager enables it, the host calls its `activate` method synchronously. Plugin authors do not call that method themselves.
 
 The host supplies the `context` argument. Its `tasks` API starts managed work owned by that activation. The host cancels that work when the plugin is disabled or activation fails. Enabling the plugin again creates a new activation and context.
 
@@ -57,7 +57,7 @@ A presentation can receive `context.tasks` as an explicit prop. If a task belong
 
 ## Advanced use: create an independent queue
 
-**Use `context.tasks` for ordinary plugin work.** It already shares scheduling with pagination and other plugins and owns activation cleanup. `WorkQueue`, `WorkOptions`, `WorkHandle`, `createTaskService`, `TaskServiceOptions` and `TaskFailure` are advanced exports for authors intentionally constructing their own queue or task service. Their inclusion in the external SDK is approved; production external loading is not implemented.
+**Use `context.tasks` for ordinary plugin work.** It already shares scheduling with pagination and other plugins and owns activation cleanup. `WorkQueue`, `WorkOptions`, `WorkHandle`, `createTaskService`, `AdvancedTaskService`, `WorkerFactoryTaskOptions`, `TaskServiceOptions` and `TaskFailure` are advanced exports for authors intentionally constructing their own queue or task service. The curated SDK exports these contracts. Production external loading is not implemented.
 
 An independent queue can be useful for an embedded tool that also runs in a standalone application or test harness. It does not share the host queue's scheduling decisions or frame budget. It does not run cooperative callbacks on another thread. Authors must wire cancellation, disposal and error reporting themselves.
 
@@ -114,6 +114,10 @@ const tasks: TaskService = createTaskService({
 controller.abort();
 ```
 
+`createTaskService()` returns `AdvancedTaskService`. It accepts module requests when the host configures `loadWorkerModule(module, context): Uint8Array | PromiseLike<Uint8Array>`. The callback receives a copied URL and the task's cancellation signal. It must obtain trusted bytes and enforce its host's URL ownership policy. Without a loader, a module request resolves to a failed outcome. There is no `fetch` fallback.
+
+The optional `isLive(): boolean` callback lets a host mark a lifetime dead before delivering its AbortSignal events. Active tasks recheck it before later work and settlement. A dead lifetime cancels pending outcomes and suppresses later error reports. Cleanup errors remain available through `handle.error`. Already-completed outcomes do not change. The internal component host maps this callback to its private activation phase.
+
 ### Queue leases
 
 A lease keeps the queue running until its release function is called. Managed services acquire and release these leases for cooperative work. Plugin task callers do not call `start()`. Async and worker tasks do not acquire scheduler leases.
@@ -131,7 +135,7 @@ Writer's IDE supplies the same application-owned queue to pagination and its plu
 ## Exact task API
 
 ```ts
-createTaskService({ queue, ownerId, signal, onError? }): TaskService
+createTaskService({ queue, ownerId, signal, onError?, isLive?, loadWorkerModule? }): AdvancedTaskService
 
 tasks.forEach<T>({
   key, label, items: Iterable<T>,
@@ -152,7 +156,7 @@ tasks.async<T>({
 }): TaskHandle<T>
 
 tasks.worker<I, O>({
-  key, label, createWorker: () => Worker, input: I,
+  key, label, module: URL, input: I,
   transfer?: Transferable[], signal?,
   apply?: (value: O, context: { signal: AbortSignal }) => void,
 }): TaskHandle<O>
@@ -265,25 +269,53 @@ The service cannot undo side effects inside `run`. After an `await`, check cance
 
 ## Bundled one-shot workers
 
-The examples below use the current standalone/bundled library API, which accepts `createWorker()`. The approved external-package API will instead accept `module: URL`, such as `new URL('./count.worker.js', import.meta.url)` relative to the caller's frontend module. That future call selects a prebuilt worker file in the caller activation's verified package snapshot. The host will create a verified-byte Blob worker and own its cleanup. External loading is not implemented, and the current `WorkerTaskOptions` type still describes the construction callback. See [package-worker selection](../../docs/plugins/implementation-plan.md#package-worker-selection-api) for the approved contract and validation requirements.
+The ordinary `TaskService` in `FrontendContext` accepts `WorkerTaskOptions<I, O>`: `{ module: URL, input, key, label, transfer?, signal?, apply? }`. It does not accept `createWorker`, in either types or the internal component host's runtime wrapper. A trusted host binds the activation to its package files and verified byte reader. Module selection and the browser fixture are implemented; production native resource integration is not.
 
-Use a dedicated, fresh worker for each invocation. Do not return an already-running or shared worker.
-
-This example runs in browser code compiled by a bundler that supports module-worker URLs. `tasks` is a live service, `paragraphTexts` is a string array, and `wordCount` is writable host state. Place the worker module below at `./count.worker.ts`, relative to this caller:
+Put this named export in a frontend plugin's entry module. The internal host calls `activate(context)` synchronously when enabling the component and supplies `FrontendContext`. Activation starts the task and installs result handling; it does not wait for computation. The input below is sample text, not manuscript data. The host must bind this component to a snapshot containing the emitted `count.worker.js` file:
 
 ```ts
-const count = tasks.worker<string[], number>({
+import type { FrontendContext } from '@writers-ide/plugins';
+
+export function activate(context: FrontendContext<unknown>) {
+	const workerFile = './count.worker.js';
+	const count = context.tasks.worker<string[], number>({
+		key: 'count',
+		label: 'Count words',
+		module: new URL(workerFile, import.meta.url),
+		input: ['The story begins.', 'Another paragraph follows.'],
+	});
+	void count.result.then((outcome) => {
+		if (outcome.status === 'completed' && !context.signal.aborted) {
+			console.info('Sample word count:', outcome.value);
+		}
+	});
+}
+```
+
+Build the worker source separately into one self-contained ES module at that relative output path. Preserve or rewrite the frontend URL to match the emitted file. `new URL()` alone does not compile a worker. See the [portable sample's build](../../examples/plugins/portable-sdk/README.md#managed-worker) for a complete independent example.
+
+The service copies the module URL once before asynchronous loading. Later mutation of the caller's URL does not retarget the task. It reads input and transfer data when posting to the worker, not as a deep snapshot at submission. Mutable input objects and transfer arrays can therefore change during byte loading. Transfers occur only when `postMessage` runs. Cancellation before posting does not detach a buffer.
+
+The task library creates a fresh module Worker from a Blob containing the returned bytes. Worker `import.meta.url` names that Blob. Package-relative imports and assets inside the worker are unsupported. Send required data through messages or transfers. Workers do not inherit the window import map.
+
+### Advanced worker factories
+
+An explicitly constructed `AdvancedTaskService` also accepts `WorkerFactoryTaskOptions<I, O>`, with a synchronous `createWorker(): Worker` instead of `module`. Supply exactly one of these options. This supports independent browser tools and tests; it is not the ordinary `FrontendContext` worker API.
+
+For example, after constructing `independentTasks` in [advanced use](#advanced-use-create-an-independent-queue), browser code built with module-worker support can submit:
+
+```ts
+independentTasks.worker<string[], number>({
 	key: 'count',
 	label: 'Count words',
-	input: paragraphTexts,
+	input: ['The story begins.'],
 	createWorker: () => new Worker(new URL('./count.worker.ts', import.meta.url), { type: 'module' }),
-	apply(value, { signal }) {
-		wordCount = value; // synchronous; validate current application targets here
-	},
 });
 ```
 
-[`examples/count.worker.ts`](examples/count.worker.ts) is a complete worker module. Author its handler using the separate entry:
+Return a fresh dedicated worker, never an already-running or shared one. The service owns listener removal and termination. The factory owns any resources it creates outside that worker, including its own object URLs. Explicit construction does not inherit the component host's snapshot binding or private batch-stop liveness. Wire lifetime and error handling as described above. The default bundled host still exposes `AdvancedTaskService` through its legacy `PluginContext`; it has not migrated to `FrontendContext`.
+
+[`examples/count.worker.ts`](examples/count.worker.ts) is a complete worker module. When the worker build has the matching helper JavaScript available, author its handler using the separate entry:
 
 ```ts
 import { defineTaskWorker } from '@writers-ide/tasks/worker';
@@ -299,7 +331,7 @@ defineTaskWorker<string[], number>(self, (paragraphs) => {
 
 The helper catches synchronous failures, asynchronous failures, and failures to copy the result into a message. It returns an uninstaller that is safe to call more than once. The request callback runs later rather than during message receipt. If you uninstall before that callback starts, `run` is skipped.
 
-Compile the worker in the normal WebWorker TypeScript environment. It needs no DOM runtime import.
+Compile the worker in the normal WebWorker TypeScript environment. It needs no DOM runtime import. The generated portable SDK supplies declarations only, not helper JavaScript. Either supply and bundle the matching `defineTaskWorker` implementation separately, or implement the protocol directly with a type-only `TaskWorkerScope` import, as the [standalone sample](../../examples/plugins/portable-sdk/src/calculate.worker.ts) does. There is no window mapping for `@writers-ide/tasks/worker`.
 
 The transport is the message connection between the caller and the worker. It uses these message shapes:
 
@@ -313,11 +345,11 @@ Error records must have string `name` and `message` fields. If present, `stack` 
 
 ### Worker lifetime and failures
 
-The service removes listeners and terminates the worker after success, failure, cancellation, replacement, or owner teardown.
+The service removes listeners and terminates the worker after success, failure, cancellation, replacement, or owner teardown. For module requests it also revokes its Blob URL.
 
-It handles exceptions from `createWorker` and `postMessage`. It also handles worker `error` events and `messageerror` events, which indicate that a message could not be deserialized. Failures reported by the worker and synchronous failures in `apply` are handled too.
+It handles module loading, Blob URL allocation, Worker construction, listener registration and `postMessage` failures. Advanced factory exceptions are handled too. It also handles worker `error` events and `messageerror` events, which indicate that a message could not be deserialized. Failures reported by the worker and synchronous failures in `apply` are handled too.
 
-Late callbacks cannot apply cancelled results. Before calling `apply`, the service records that a response has been accepted. If another response arrives during that call, it cannot apply the result twice.
+Cancellation and replacement are rechecked after option getters and before later side effects. Late byte completion cannot create a worker for an inactive task. Late callbacks cannot apply cancelled results. Before calling `apply`, the service records that a response has been accepted. If another response arrives during that call, it cannot apply the result twice.
 
 Each listener removal and termination is attempted independently. One cleanup error does not prevent the remaining cleanup. Cleanup errors are reported and retained on the handle. They do not change an outcome that has already settled.
 
@@ -364,5 +396,7 @@ Run from the repository root:
 ```sh
 pnpm test:unit:ci src/lib/testing/tasks-library src/lib/editor/state/work-queue.svelte.test.ts src/lib/components/pagination/queue.svelte.test.ts
 ```
+
+[`package-worker-tasks.svelte.test.ts`](../../src/lib/testing/package-worker-tasks.svelte.test.ts) covers module loading, option-getter reentry, liveness, posting and cleanup. Internal component tests cover exact URL binding and guarded byte adapters. Run `pnpm test:plugin-profile` for ordinary module-worker browser coverage in both the rich plugin and portable sample. These are separate from the advanced factory fixture below.
 
 Existing queue tests remain at their original path and exercise the compatibility export. Unit worker tests use mock transports. Run `pnpm test:tasks` for the dedicated production-built browser fixture in Chromium/WebKit: emitted module workers, real buffer transfers, cancellation, failure/recovery, and shared queue ownership. These tests do not establish packaged Tauri behavior or a performance target.

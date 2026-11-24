@@ -17,7 +17,7 @@ See [builds, assets and activation checks](package-api-proposal.md#7-builds-asse
 [verified resource delivery](implementation-plan.md#verified-resource-delivery) and
 [native authorization](implementation-plan.md#native-request-attribution-and-authorization).
 
-A separate [runtime-profile browser fixture](runtime-profile.md) now tests generated shared-runtime artifacts with an independently compiled plugin. Its Node server retains hash-checked accepted buffers. Native import/link fetches rely on that immutable server and trusted transport; browser prefetch cannot bind later response bytes. It is not this Tauri prototype or a production authorized resource route. Its Blob worker provider uses the existing library factory callback, not the complete approved external `module: URL` API.
+A separate [runtime-profile browser fixture](runtime-profile.md) now tests generated shared-runtime artifacts with an independently compiled plugin. Its Node server retains hash-checked accepted buffers. Native import/link fetches rely on that immutable server and trusted transport; browser prefetch cannot bind later response bytes. It is not this Tauri prototype or a production authorized resource route. Both independently built plugins now use ordinary `context.tasks.worker({ module: URL, ... })` requests. Its trusted internal host supplies snapshot-bound verified-byte readers, and the task library owns Blob Worker creation and cleanup. This browser implementation does not connect a production native authorized byte source or release profile.
 
 ## Verified source and configuration
 

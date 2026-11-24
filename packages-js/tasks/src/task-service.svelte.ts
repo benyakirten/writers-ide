@@ -1,4 +1,5 @@
 import type {
+	AdvancedTaskService,
 	AsyncTaskOptions,
 	CooperativeTaskHandle,
 	CooperativeTaskOptions,
@@ -6,9 +7,9 @@ import type {
 	TaskHandle,
 	TaskOptions,
 	TaskOutcome,
-	TaskService,
 	TaskServiceOptions,
 	WorkerTaskOptions,
+	WorkerFactoryTaskOptions,
 } from './contracts';
 import type { WorkHandle, WorkProgress, WorkStatus } from './work-queue.svelte';
 import type { WorkerResponse } from './protocol';
@@ -32,6 +33,7 @@ class Task<T> implements CooperativeTaskHandle<T> {
 		options: TaskOptions,
 		readonly remove: () => void,
 		readonly report: (error: unknown) => void,
+		readonly isLive: () => boolean,
 	) {
 		this.key = options.key;
 		this.label = options.label;
@@ -53,9 +55,27 @@ class Task<T> implements CooperativeTaskHandle<T> {
 		return this.#status === 'queued' || this.#status === 'running' || this.#status === 'paused';
 	}
 
+	get current(): boolean {
+		if (!this.active) {
+			return false;
+		}
+		try {
+			if (this.isLive()) {
+				return this.active;
+			}
+		} catch (error) {
+			this.#settle({ status: 'failed', error });
+			return false;
+		}
+		this.cancel();
+		return false;
+	}
+
 	fail(error: unknown): void {
 		if (this.active) {
-			this.finish({ status: 'failed', error });
+			if (this.current) {
+				this.finish({ status: 'failed', error });
+			}
 		} else {
 			// Generator cleanup can fail after reentrant cancellation has settled the outcome.
 			this.recordError(error);
@@ -71,6 +91,13 @@ class Task<T> implements CooperativeTaskHandle<T> {
 	}
 
 	finish(outcome: TaskOutcome<T>): void {
+		if (outcome.status !== 'cancelled' && !this.current) {
+			return;
+		}
+		this.#settle(outcome);
+	}
+
+	#settle(outcome: TaskOutcome<T>): void {
 		if (!this.active) {
 			return;
 		}
@@ -96,13 +123,13 @@ class Task<T> implements CooperativeTaskHandle<T> {
 		this.finish({ status: 'cancelled' });
 	}
 	pause(): void {
-		if (this.active && this.work) {
+		if (this.current && this.work) {
 			this.work.pause();
 			this.status = this.work.status;
 		}
 	}
 	resume(): void {
-		if (this.active && this.work) {
+		if (this.current && this.work) {
 			this.work.resume();
 			this.status = this.work.status;
 		}
@@ -110,7 +137,7 @@ class Task<T> implements CooperativeTaskHandle<T> {
 }
 
 /** A revocable activation scope over an explicitly supplied shared scheduler. */
-export function createTaskService(options: TaskServiceOptions): TaskService {
+export function createTaskService(options: TaskServiceOptions): AdvancedTaskService {
 	activation++;
 	const namespace = `tasks:${activation}:${options.ownerId}:`;
 	const tasks = new Map<string, Pick<TaskHandle<unknown>, 'cancel'>>();
@@ -130,6 +157,9 @@ export function createTaskService(options: TaskServiceOptions): TaskService {
 			},
 			(error) => {
 				try {
+					if (options.isLive?.() === false) {
+						return;
+					}
 					options.onError?.({
 						ownerId: options.ownerId,
 						key: request.key,
@@ -140,6 +170,7 @@ export function createTaskService(options: TaskServiceOptions): TaskService {
 					/* Error observers must not interrupt scheduling or resource cleanup. */
 				}
 			},
+			() => !disposed && !options.signal.aborted && options.isLive?.() !== false,
 		);
 		// Publish before cancellation: cleanup may synchronously submit a newer replacement.
 		tasks.set(request.key, task);
@@ -149,13 +180,16 @@ export function createTaskService(options: TaskServiceOptions): TaskService {
 		previous?.cancel();
 		if (request.signal?.aborted || disposed || options.signal.aborted) {
 			task.cancel();
+		} else {
+			// Hosts may mark a whole stop batch before delivering any abort signals.
+			void task.current;
 		}
 		return task;
 	}
 
 	function cooperative<T>(request: CooperativeTaskOptions<T>): CooperativeTaskHandle<T> {
 		const task = begin<T>(request);
-		if (!task.active) {
+		if (!task.current) {
 			return task;
 		}
 		const release = options.queue.start();
@@ -177,10 +211,14 @@ export function createTaskService(options: TaskServiceOptions): TaskService {
 			create: () => {
 				let iterator: Generator<WorkProgress | void, T, unknown>;
 				try {
-					if (!task.active) {
+					if (!task.current) {
 						return (function* () {})();
 					}
-					iterator = request.create({ signal: task.signal });
+					const create = request.create;
+					if (!task.current) {
+						return (function* () {})();
+					}
+					iterator = create.call(request, { signal: task.signal });
 				} catch (error) {
 					task.fail(error);
 					throw error;
@@ -189,19 +227,22 @@ export function createTaskService(options: TaskServiceOptions): TaskService {
 				// Forward return explicitly so cancellation during factory/next closes the author's iterator.
 				return {
 					next() {
-						if (task.active && task.status !== 'paused') {
+						if (!task.current) {
+							return { done: true, value: undefined };
+						}
+						if (task.status !== 'paused') {
 							task.status = 'running';
 						}
 						try {
 							const result = iterator.next();
 							if (result.done) {
 								closed = true;
-								if (task.active) {
+								if (task.current) {
 									task.finish({ status: 'completed', value: result.value });
 								}
 								return { done: true, value: undefined };
 							}
-							if (task.active && result.value !== undefined) {
+							if (task.current && result.value !== undefined) {
 								task.progress = { ...task.progress, ...result.value };
 							}
 							return { done: false, value: result.value };
@@ -225,7 +266,7 @@ export function createTaskService(options: TaskServiceOptions): TaskService {
 				} as Generator<WorkProgress | void, void, unknown>;
 			},
 		});
-		if (!task.active) {
+		if (!task.current) {
 			task.work.cancel();
 		} else if (task.work.signal.aborted) {
 			task.cancel();
@@ -259,116 +300,240 @@ export function createTaskService(options: TaskServiceOptions): TaskService {
 
 	function asyncTask<T>(request: AsyncTaskOptions<T>): TaskHandle<T> {
 		const task = begin<T>(request);
-		if (!task.active) {
+		if (!task.current) {
 			return task;
 		}
 		task.status = 'running';
 		try {
-			const value = request.run({ signal: task.signal });
+			const run = request.run;
+			if (!task.current) {
+				return task;
+			}
+			const value = run.call(request, { signal: task.signal });
 			void Promise.resolve(value).then(
 				(value) => {
-					if (task.active) {
+					if (task.current) {
 						task.finish({ status: 'completed', value });
 					}
 				},
 				(error: unknown) => {
-					if (task.active) {
+					if (task.current) {
 						task.fail(error);
 					}
 				},
 			);
 		} catch (error) {
-			if (task.active) {
+			if (task.current) {
 				task.fail(error);
 			}
 		}
 		return task;
 	}
 
-	function worker<I, O>(request: WorkerTaskOptions<I, O>): TaskHandle<O> {
+	function worker<I, O>(
+		request: WorkerTaskOptions<I, O> | WorkerFactoryTaskOptions<I, O>,
+	): TaskHandle<O> {
 		const task = begin<O>(request);
-		if (!task.active) {
+		if (!task.current) {
 			return task;
 		}
 		task.status = 'running';
-		try {
-			const instance = request.createWorker();
-			let received = false;
-			const message = (event: MessageEvent<WorkerResponse<O>>) => {
-				if (!task.active || received) {
+		let instance: Worker | undefined;
+		let objectURL: string | undefined;
+		const cleanup = () => {
+			// Clear ownership before calling browser APIs, which may reenter cancellation.
+			const current = instance;
+			const url = objectURL;
+			instance = undefined;
+			objectURL = undefined;
+			const releases = current
+				? [
+						() => current.removeEventListener('message', message),
+						() => current.removeEventListener('error', error),
+						() => current.removeEventListener('messageerror', messageerror),
+						() => current.terminate(),
+					]
+				: [];
+			if (url !== undefined) {
+				releases.push(() => URL.revokeObjectURL(url));
+			}
+			for (const release of releases) {
+				try {
+					release();
+				} catch (error) {
+					task.recordError(error);
+				}
+			}
+		};
+		task.cleanup = cleanup;
+		let received = false;
+		const message = (event: MessageEvent<WorkerResponse<O>>) => {
+			if (!task.current || received) {
+				return;
+			}
+			received = true;
+			try {
+				const response = event.data;
+				if (typeof response !== 'object' || response === null) {
+					throw new Error('Invalid task worker response');
+				}
+				if (response.type === 'tasks:error') {
+					if (
+						typeof response.error !== 'object' ||
+						response.error === null ||
+						typeof response.error.name !== 'string' ||
+						typeof response.error.message !== 'string' ||
+						(response.error.stack !== undefined && typeof response.error.stack !== 'string')
+					) {
+						throw new Error('Invalid task worker response');
+					}
+					const error = new Error(response.error.message);
+					error.name = response.error.name;
+					error.stack = response.error.stack;
+					throw error;
+				}
+				if (response.type !== 'tasks:result' || !Object.hasOwn(response, 'value')) {
+					throw new Error('Invalid task worker response');
+				}
+				const value = response.value;
+				const apply = request.apply;
+				if (!task.current) {
 					return;
 				}
-				received = true;
-				try {
-					const response = event.data;
-					if (typeof response !== 'object' || response === null) {
-						throw new Error('Invalid task worker response');
-					}
-					if (response.type === 'tasks:error') {
-						if (
-							typeof response.error !== 'object' ||
-							response.error === null ||
-							typeof response.error.name !== 'string' ||
-							typeof response.error.message !== 'string' ||
-							(response.error.stack !== undefined && typeof response.error.stack !== 'string')
-						) {
-							throw new Error('Invalid task worker response');
-						}
-						const error = new Error(response.error.message);
-						error.name = response.error.name;
-						error.stack = response.error.stack;
-						throw error;
-					}
-					if (response.type !== 'tasks:result' || !Object.hasOwn(response, 'value')) {
-						throw new Error('Invalid task worker response');
-					}
-					request.apply?.(response.value, { signal: task.signal });
-					if (task.active) {
-						task.finish({ status: 'completed', value: response.value });
-					}
-				} catch (error) {
-					if (task.active) {
-						task.fail(error);
+				apply?.call(request, value, { signal: task.signal });
+				if (task.current) {
+					task.finish({ status: 'completed', value });
+				}
+			} catch (error) {
+				if (task.current) {
+					task.fail(error);
+				}
+			}
+		};
+		const error = (event: ErrorEvent) => {
+			event.preventDefault();
+			if (task.current) {
+				task.fail(event.error ?? new Error(event.message || 'Task worker failed'));
+			}
+		};
+		const messageerror = () => {
+			if (task.current) {
+				task.fail(new Error('Task worker response could not be cloned'));
+			}
+		};
+		function start(create: () => Worker | undefined): void {
+			if (!task.current) {
+				return;
+			}
+			try {
+				instance = create();
+				if (!task.current) {
+					cleanup();
+					return;
+				}
+				if (!instance) {
+					throw new Error('Task worker factory did not return a Worker');
+				}
+				const current = instance;
+				for (const [type, listener] of [
+					['message', message],
+					['error', error],
+					['messageerror', messageerror],
+				] as const) {
+					current.addEventListener(type, listener as EventListener);
+					if (!task.current) {
+						// A listener registration may have cancelled before it returned.
+						current.removeEventListener(type, listener as EventListener);
+						return;
 					}
 				}
-			};
-			const error = (event: ErrorEvent) => {
-				event.preventDefault();
-				if (task.active) {
-					task.fail(event.error ?? new Error(event.message || 'Task worker failed'));
+				const input = request.input;
+				if (!task.current) {
+					return;
 				}
-			};
-			const messageerror = () => {
-				if (task.active) {
-					task.fail(new Error('Task worker response could not be cloned'));
+				const transfer = request.transfer ?? [];
+				if (!task.current) {
+					return;
 				}
-			};
-			const cleanup = () => {
-				for (const release of [
-					() => instance.removeEventListener('message', message),
-					() => instance.removeEventListener('error', error),
-					() => instance.removeEventListener('messageerror', messageerror),
-					() => instance.terminate(),
-				]) {
-					try {
-						release();
-					} catch (error) {
-						task.recordError(error);
-					}
+				current.postMessage({ type: 'tasks:run', input }, transfer);
+				void task.current;
+			} catch (error) {
+				if (task.current) {
+					task.fail(error);
+				} else {
+					cleanup();
 				}
-			};
-			// The factory itself may have cancelled/replaced this task.
-			if (!task.active) {
-				cleanup();
+			}
+		}
+		try {
+			const hasModule = 'module' in request;
+			const hasFactory = 'createWorker' in request;
+			if (!task.current) {
 				return task;
 			}
-			task.cleanup = cleanup;
-			instance.addEventListener('message', message);
-			instance.addEventListener('error', error);
-			instance.addEventListener('messageerror', messageerror);
-			instance.postMessage({ type: 'tasks:run', input: request.input }, request.transfer ?? []);
+			if (hasModule === hasFactory) {
+				throw new Error('Task worker requires exactly one of module or createWorker');
+			}
+			if (hasFactory) {
+				const createWorker = request.createWorker;
+				if (!task.current) {
+					return task;
+				}
+				if (typeof createWorker !== 'function') {
+					throw new Error('Task worker createWorker must be a function');
+				}
+				start(() => createWorker.call(request));
+			} else {
+				const requestedModule = request.module;
+				if (!task.current) {
+					return task;
+				}
+				if (!(requestedModule instanceof URL)) {
+					throw new Error('Task worker module must be a URL');
+				}
+				const href = requestedModule.href;
+				if (!task.current) {
+					return task;
+				}
+				const module = new URL(href);
+				const loadWorkerModule = options.loadWorkerModule;
+				if (!task.current) {
+					return task;
+				}
+				if (!loadWorkerModule) {
+					throw new Error('Task worker module loader is not configured');
+				}
+				const bytes = loadWorkerModule.call(options, module, { signal: task.signal });
+				void Promise.resolve(bytes).then(
+					(bytes) => {
+						if (!task.current) {
+							return;
+						}
+						start(() => {
+							if (!(bytes instanceof Uint8Array)) {
+								throw new Error('Task worker module loader must return Uint8Array bytes');
+							}
+							const blob = new Blob([new Uint8Array(bytes)], { type: 'text/javascript' });
+							if (!task.current) {
+								return undefined;
+							}
+							objectURL = URL.createObjectURL(blob);
+							if (!task.current) {
+								cleanup();
+								return undefined;
+							}
+							return new Worker(objectURL, { type: 'module' });
+						});
+					},
+					(error: unknown) => {
+						if (task.current) {
+							task.fail(error);
+						}
+					},
+				);
+			}
 		} catch (error) {
-			if (task.active) {
+			if (task.current) {
 				task.fail(error);
 			}
 		}

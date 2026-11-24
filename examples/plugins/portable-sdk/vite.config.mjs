@@ -68,10 +68,13 @@ export default defineConfig(({ command }) => {
 			minify: false,
 			assetsInlineLimit: 0,
 			rolldownOptions: {
-				input: path.join(root, 'src/entry.ts'),
+				input: {
+					entry: path.join(root, 'src/entry.ts'),
+					'calculate.worker': path.join(root, 'src/calculate.worker.ts'),
+				},
 				preserveEntrySignatures: 'strict',
 				output: {
-					entryFileNames: 'entry.js',
+					entryFileNames: '[name].js',
 					chunkFileNames: 'chunks/[name]-[hash].js',
 					assetFileNames: 'assets/[name][extname]',
 				},

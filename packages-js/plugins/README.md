@@ -233,9 +233,13 @@ Use `context.tasks` for work that should stop when your plugin stops:
 - `forEach` processes short units and yields between them. This is **cooperative** work: the callback must return control so the UI can respond.
 - `cooperative` supports advanced generator-based work with explicit yield points.
 - `async` manages work based on promises, such as network requests.
-- `worker` runs a bundled worker module off the main thread for one job.
+- `worker` runs a self-contained worker module off the main thread for one job.
 
 The helpers provide cancellation, replacement by plugin-local key, reactive status/progress, and outcome promises that do not reject. A task failure appears in management errors but does not disable its plugin. No extra manifest capability is needed. Short synchronous actions do not need a task helper.
+
+The ordinary `FrontendContext.tasks` is a `TaskService`. Its worker call accepts only `{ module: URL, input, key, label, transfer?, signal?, apply? }`. Construct the URL relative to the calling frontend module and emit the worker as a separate self-contained JavaScript file. The internal host binds the activation to exact package URLs and a trusted verified-byte reader. The task library creates and cleans up the Blob worker. Missing byte sources fail without a fetch fallback. The [module-worker example](../tasks/README.md#bundled-one-shot-workers) explains synchronous activation setup, result handling, build output and transfer timing.
+
+The default bundled host still supplies legacy `PluginContext`, whose tasks use `AdvancedTaskService` with synchronous factory support. That host has not migrated to `FrontendContext`. Explicit `createTaskService()` also returns `AdvancedTaskService`; independent callers own its lifetime and byte-source policy. Production native worker integration and external loading remain unfinished.
 
 The application shares one cooperative scheduler with pagination. The helpers manage scheduler ownership and cancel work on unload or activation rollback. They cannot interrupt a running synchronous callback, and promises do not move CPU work off-thread. Use short units for DOM-dependent work and workers for suitable computation. See the [task-author guide](../tasks/README.md) for complete examples.
 

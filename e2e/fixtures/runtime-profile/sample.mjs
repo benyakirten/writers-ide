@@ -171,7 +171,11 @@ export async function buildSample(project, exact, outDir) {
 	assert.equal(result.status, 0, result.stdout + result.stderr);
 	for (const entry of await readdir(outDir, { recursive: true })) {
 		if (entry.endsWith('.js')) {
-			for (const id of moduleSpecifiers(await readFile(path.join(outDir, entry), 'utf8'))) {
+			const imports = moduleSpecifiers(await readFile(path.join(outDir, entry), 'utf8'));
+			if (entry.endsWith('.worker.js')) {
+				assert.deepEqual(imports, [], 'Sample worker must be self-contained');
+			}
+			for (const id of imports) {
 				assert.ok(
 					id.startsWith('./') || id.startsWith('../') || exact.has(id),
 					`Unknown sample import ${id}`,

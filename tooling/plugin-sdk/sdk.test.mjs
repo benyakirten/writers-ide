@@ -115,7 +115,7 @@ test(
 					const text = await readFile(path.join(output, filename), 'utf8');
 					assert.doesNotMatch(
 						text,
-						/svelte2tsx|__sveltets_|\/Users\/|writers-ide\/packages-js|\.svelte["']|\.ts["']/,
+						/svelte2tsx|__sveltets_|\/Users\/|writers-ide\/packages-js|\.svelte["']|\.ts["']|WorkerModuleSource|captureWorkerModules|component-worker-modules/,
 					);
 					const packageName = `@writers-ide/${filename.split('/')[1]}`;
 					const manifest = await readJson(
@@ -234,6 +234,101 @@ defineTaskWorker({ postMessage() {}, addEventListener() {}, removeEventListener(
 				assertClean(compile(filename).diagnostics);
 			},
 		);
+
+		await t.test('task services preserve URL-only and advanced factory types', async () => {
+			assert.deepEqual(result.inventory['@writers-ide/tasks'], {
+				runtime: ['WorkQueue', 'createTaskService'],
+				types: [
+					'TaskService',
+					'AdvancedTaskService',
+					'WorkerTaskOptions',
+					'WorkerFactoryTaskOptions',
+					'TaskOutcome',
+					'TaskHandle',
+					'CooperativeTaskHandle',
+					'TaskContext',
+					'TaskOptions',
+					'CooperativeTaskOptions',
+					'ForEachTaskOptions',
+					'AsyncTaskOptions',
+					'WorkPriority',
+					'WorkProgress',
+					'WorkStatus',
+					'WorkOptions',
+					'WorkHandle',
+					'TaskServiceOptions',
+					'TaskFailure',
+				].sort(),
+			});
+			const filename = path.join(consumer, 'tasks.ts');
+			await writeFile(
+				filename,
+				`
+import type { FrontendContext } from '@writers-ide/plugins';
+import { createTaskService, type AdvancedTaskService, type TaskService, type TaskServiceOptions,
+  type TaskContext, type TaskHandle, type WorkerTaskOptions, type WorkerFactoryTaskOptions } from '@writers-ide/tasks';
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+type Assert<T extends true> = T;
+declare const context: FrontendContext<unknown>;
+declare const options: TaskServiceOptions;
+type Ordinary = Assert<Equal<typeof context.tasks, TaskService>>;
+const advanced = createTaskService(options);
+type Advanced = Assert<Equal<typeof advanced, AdvancedTaskService>>;
+type Loader = Assert<Equal<NonNullable<TaskServiceOptions['loadWorkerModule']>,
+  (module: URL, context: TaskContext) => Uint8Array | PromiseLike<Uint8Array>>>;
+const module = new URL('./worker.js', import.meta.url);
+const input = { buffer: new ArrayBuffer(8), count: 1 };
+const request: WorkerTaskOptions<typeof input, number> = {
+  key: 'url', label: 'URL', module, input, transfer: [input.buffer],
+  apply(value, task) {
+    type Output = Assert<Equal<typeof value, number>>;
+    type Context = Assert<Equal<typeof task, TaskContext>>;
+  },
+};
+const handle = context.tasks.worker(request);
+type Handle = Assert<Equal<typeof handle, TaskHandle<number>>>;
+const inferred = context.tasks.worker({ key: 'infer', label: 'Infer', module, input,
+  transfer: [input.buffer], apply(value: number, task) {
+    type Context = Assert<Equal<typeof task, TaskContext>>;
+  } });
+type Inferred = Assert<Equal<typeof inferred, TaskHandle<number>>>;
+const factory: WorkerFactoryTaskOptions<typeof input, number> = {
+  key: 'factory', label: 'Factory', input, transfer: [input.buffer],
+  createWorker: () => new Worker(module), apply(value, task) {
+    type Output = Assert<Equal<typeof value, number>>;
+    type Context = Assert<Equal<typeof task, TaskContext>>;
+  },
+};
+const factoryHandle = advanced.worker(factory);
+type FactoryHandle = Assert<Equal<typeof factoryHandle, TaskHandle<number>>>;
+const inferredFactory = advanced.worker({ key: 'infer', label: 'Infer', input,
+  transfer: [input.buffer], createWorker: () => new Worker(module), apply(value: number) {} });
+type InferredFactory = Assert<Equal<typeof inferredFactory, TaskHandle<number>>>;
+advanced.worker(request);
+// @ts-expect-error factory variables cannot bypass the ordinary service
+context.tasks.worker(factory);
+// @ts-expect-error ordinary tasks reject factories
+context.tasks.worker({ key: 'bad', label: 'Bad', input, createWorker: () => new Worker(module) });
+// @ts-expect-error ordinary tasks reject mixed selections
+context.tasks.worker({ ...request, createWorker: () => new Worker(module) });
+// @ts-expect-error advanced tasks reject mixed selections
+advanced.worker({ ...factory, module });
+// @ts-expect-error missing module
+context.tasks.worker({ key: 'bad', label: 'Bad', input });
+// @ts-expect-error module must be a URL
+context.tasks.worker({ ...request, module: './worker.js' });
+// @ts-expect-error input is not erased
+context.tasks.worker<typeof input, number>({ ...request, input: 'bad' });
+// @ts-expect-error output is not erased
+context.tasks.worker<typeof input, number>({ ...request, apply(value: string) {} });
+// @ts-expect-error transfer entries must be transferable
+context.tasks.worker({ ...request, transfer: [null] });
+// @ts-expect-error loader supplies bytes, not a URL or an authorization boolean
+const invalidLoader: TaskServiceOptions = { ...options, loadWorkerModule: () => true };
+`,
+			);
+			assertClean(compile(filename).diagnostics);
+		});
 
 		await t.test('ordinary generic Svelte presentations retain prop inference', async () => {
 			const generic = `<script lang="ts" generics="T extends { id: string }">

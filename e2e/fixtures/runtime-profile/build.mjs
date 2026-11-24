@@ -108,7 +108,7 @@ export async function buildFixture() {
 			},
 		},
 	});
-	for (const name of ['worker', 'broken-worker']) {
+	for (const name of ['task.worker', 'broken-worker', 'duplicate.worker']) {
 		await build({
 			configFile: false,
 			root: here,

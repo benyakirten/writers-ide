@@ -1,4 +1,4 @@
-import type { TaskService } from '@writers-ide/tasks';
+import type { AdvancedTaskService } from '@writers-ide/tasks';
 
 export {
 	definePluginCommand,
@@ -136,7 +136,7 @@ export type PluginContext<Presentation> = {
 	readonly own: (dispose: Dispose) => Dispose;
 	readonly contributions: PluginContributions<Presentation>;
 	/** Activation-owned helpers; optional to use, not a sandbox or editor API. */
-	readonly tasks: TaskService;
+	readonly tasks: AdvancedTaskService;
 	readonly apis: PluginApis;
 };
 

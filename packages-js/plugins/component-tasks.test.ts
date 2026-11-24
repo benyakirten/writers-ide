@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkQueue, type TaskHandle } from '@writers-ide/tasks';
 import { createHost, deferred, descriptor, flush, provider } from './command-component-fixture';
 import type { CommandContext } from './command-component-model';
-import { activate, fakeWorker, frames } from './component-tasks-fixture';
+import {
+	activate,
+	fakeWorker,
+	frames,
+	moduleWorkers,
+	workerModule,
+} from './component-tasks-fixture';
 
 describe('activation-owned component tasks', () => {
 	let frame: () => void;
@@ -212,7 +218,7 @@ describe('activation-owned component tasks', () => {
 				}),
 			).toThrow('disposed');
 			expect(() =>
-				old.tasks.worker({ key: 'x', label: 'X', input: null, createWorker: run }),
+				old.tasks.worker({ key: 'x', label: 'X', input: null, module: workerModule }),
 			).toThrow('disposed');
 			pending[settle](new Error('Late private outcome'));
 			await flush();
@@ -225,17 +231,18 @@ describe('activation-owned component tasks', () => {
 	);
 
 	it('terminates workers and suppresses apply after disposal', async () => {
-		const host = createHost();
+		const { fake, workerModules } = moduleWorkers();
+		const host = createHost({ workerModules });
 		const context = activate(host);
-		const fake = fakeWorker();
 		const apply = vi.fn();
 		const task = context.tasks.worker({
 			key: 'worker',
 			label: 'Worker',
 			input: null,
-			createWorker: () => fake.worker,
+			module: workerModule,
 			apply,
 		});
+		await flush();
 		host.dispose();
 		fake.result(42);
 		expect(await task.result).toEqual({ status: 'cancelled' });
@@ -244,23 +251,24 @@ describe('activation-owned component tasks', () => {
 	});
 
 	it.each(['create', 'apply'])('preserves cancellation during worker %s', async (stage) => {
-		const host = createHost();
-		const context = activate(host);
 		const fake = fakeWorker();
+		const { workerModules } = moduleWorkers(fake, () => {
+			if (stage === 'create') {
+				host.deactivate('one');
+			}
+		});
+		const host = createHost({ workerModules });
+		const context = activate(host);
 		const task = context.tasks.worker({
 			key: 'worker',
 			label: 'Worker',
 			input: null,
-			createWorker: () => {
-				if (stage === 'create') {
-					host.deactivate('one');
-				}
-				return fake.worker;
-			},
+			module: workerModule,
 			apply: () => {
 				host.deactivate('one');
 			},
 		});
+		await flush();
 		if (stage === 'apply') {
 			fake.result(42);
 		}
@@ -271,18 +279,19 @@ describe('activation-owned component tasks', () => {
 	});
 
 	it('revokes the complete stop batch before sequential abort callbacks can submit or apply', async () => {
-		const host = createHost();
+		const { fake, workerModules } = moduleWorkers();
+		const host = createHost({ workerModules });
 		const one = activate(host);
 		const two = activate(host, 'two');
-		const fake = fakeWorker();
 		const apply = vi.fn();
 		const task = two.tasks.worker({
 			key: 'worker',
 			label: 'Worker',
 			input: null,
-			createWorker: () => fake.worker,
+			module: workerModule,
 			apply,
 		});
+		await flush();
 		const run = vi.fn();
 		let checked = false;
 		one.signal.addEventListener('abort', () => {

@@ -175,7 +175,7 @@ Plugins can register node and mark renderers for existing schema types. This fir
 
 Read the [plugin context](plugins/context.md#existing-content-renderers-part-3c-first-slice-implemented--unmerged) and [word-processing guide](../packages-js/word-processing/README.md#part-3c-renderers-for-existing-content) for complete rules. The [renderer examples](../e2e/fixtures/word-processing/README.md) are opt-in, not enabled in the default app. The current editor still uses the existing schema and pagination model. New node/mark types, schema lifecycle, and missing-content preservation need separate approval.
 
-The [runtime profile guide](plugins/runtime-profile.md) explains the generated artifacts, independent plugin build and fixture limits. It links the tooling and browser source. Production loading and the approved native worker selection API remain separate work.
+The [runtime profile guide](plugins/runtime-profile.md) explains the generated artifacts, independent plugin build and fixture limits. It links the tooling and browser source. Ordinary `FrontendContext.tasks` now accepts module-only worker requests. The internal host binds exact per-activation package URLs to trusted byte reads, and the library owns Blob Worker cleanup. Explicit service construction returns `AdvancedTaskService` with synchronous factory support; legacy bundled `PluginContext` retains that advanced service. Production native authorized byte-source and profile integration remain separate work.
 
 ## Plugin developer experience
 
@@ -329,17 +329,17 @@ pnpm build
 
 Choose checks that exercise the changed behavior:
 
-| Check                  | What it covers                                                                                                                     |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Unit tests             | State, transfer rules, commands, scheduling, pagination logic and plugin APIs                                                      |
-| App smoke/e2e          | Real typing, selection, undo, geometry, docking, focus, locale fallback and plugin management                                      |
-| `test:tasks`           | Built workers, buffer transfers, cancellation and shared queue ownership                                                           |
-| `test:plugins`         | Provider dependencies, removal confirmation, API invalidation and error reporting                                                  |
-| `test:plugin-profile`  | Independent plugin and portable sample builds, shared runtime identity, CSS/assets, cancellation and fixture-provider Blob workers |
-| `test:word-processing` | Editor access, independent formatting, behavior registration, input rules, decorations and workers                                 |
-| `test:performance`     | Focused Storybook paragraph-search benchmarks                                                                                      |
+| Check                  | What it covers                                                                                                                         |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit tests             | State, transfer rules, commands, scheduling, pagination logic and plugin APIs                                                          |
+| App smoke/e2e          | Real typing, selection, undo, geometry, docking, focus, locale fallback and plugin management                                          |
+| `test:tasks`           | Built workers, buffer transfers, cancellation and shared queue ownership                                                               |
+| `test:plugins`         | Provider dependencies, removal confirmation, API invalidation and error reporting                                                      |
+| `test:plugin-profile`  | Independent plugin and portable sample builds, shared runtime identity, CSS/assets, cancellation and ordinary module task Blob workers |
+| `test:word-processing` | Editor access, independent formatting, behavior registration, input rules, decorations and workers                                     |
+| `test:performance`     | Focused Storybook paragraph-search benchmarks                                                                                          |
 
-The dedicated task, plugin, runtime-profile and editor fixtures build separately from the app. Run their commands explicitly; the main app e2e configuration excludes their test files. Browser Smoke CI runs each suite for its selected engine. `test:unit:ci` also includes SDK runtime/type checks, Node profile/build/server checks and portable SDK/sample checks. Run `pnpm test:plugin-sdk` for focused declarations and external sample validation. `pnpm build:plugin-sdk` writes private declarations-only packages to `node_modules/.cache/plugin-sdk`; these are not published SDK packages. The runtime-profile fixture relies on an immutable server and trusted transport for native imports and stylesheet fetches. Its prefetch checks cannot bind later fetch bytes. It implements neither production native resource authorization nor the approved `module: URL` worker API.
+The dedicated task, plugin, runtime-profile and editor fixtures build separately from the app. Run their commands explicitly; the main app e2e configuration excludes their test files. Browser Smoke CI runs each suite for its selected engine. `test:unit:ci` also includes SDK runtime/type checks, Node profile/build/server checks and portable SDK/sample checks. Run `pnpm test:plugin-sdk` for focused declarations and external sample validation. `pnpm build:plugin-sdk` writes private declarations-only packages to `node_modules/.cache/plugin-sdk`; these are not published SDK packages. The runtime-profile fixture relies on an immutable server and trusted transport for native imports and stylesheet fetches. Its prefetch checks cannot bind later fetch bytes. It implements the ordinary `module: URL` worker API and snapshot-bound byte-source adapter, not production native resource authorization or release-profile integration.
 
 Unit tests use jsdom, which does not calculate browser layout. Use real-browser tests for geometry. The docking suite covers pointer and keyboard moves, capacity limits, floating bars, cancellation, overlapping bars and viewport changes. Pagination tests cover page creation, content preservation, forward/reverse selections and undo.
 

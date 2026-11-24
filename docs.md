@@ -22,7 +22,7 @@ For plugin implementation work, see the [implementation plan](docs/plugins/imple
 
 - [Plugins](packages-js/plugins/README.md): add features, manage their lifetime, and connect plugins through declared APIs.
 - [Word processing](packages-js/word-processing/README.md): read and edit documents, register commands, and add editor behaviors.
-- [Tasks](packages-js/tasks/README.md): schedule incremental work, manage asynchronous operations, and run workers.
+- [Tasks](packages-js/tasks/README.md): schedule incremental work, manage asynchronous operations, and run module-only activation-owned workers. The guide also explains advanced factory services and lifetime ownership.
 - [Layout](packages-js/layout/README.md): reuse bar placement, capacity, and drag-and-drop logic.
 - [Components](packages-js/components/README.md): reuse buttons, tooltips, and pointer components.
 

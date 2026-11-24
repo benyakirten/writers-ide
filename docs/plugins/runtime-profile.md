@@ -46,13 +46,13 @@ The fixture plugin lives in `e2e/fixtures/runtime-profile/plugin/`. Its build ex
 
 The exact `@writers-ide/layout/dock-colors.css` input is bundled into the plugin's emitted stylesheet. The build declares that output in `manifest.toml`. CSS is not a JavaScript import-map entry. The host also loads the profile's shared component styles.
 
-Each worker is built separately as one self-contained module. Worker helpers are bundled into it. `@writers-ide/tasks/worker` has no window mapping, and workers do not inherit the window import map.
+Each worker is built separately as one self-contained module. The rich fixture bundles the worker helper. The portable sample implements the protocol directly with only a type import. `@writers-ide/tasks/worker` has no window mapping, and workers do not inherit the window import map.
 
 ## Portable SDK sample
 
 The [standalone sample](../../examples/plugins/portable-sdk/README.md) is copied outside the checkout with generated declarations-only SDK packages, real third-party dependencies and build tools. Strict `svelte-check` uses `skipLibCheck: false`. A compiler-program audit requires every source, including TypeScript libraries, to resolve inside that clean project. It uses no workspace paths, stubs or source fallbacks. Negative cases check export boundaries, provider and command types, Svelte props/snippets/generics, missing dependencies and out-of-project imports.
 
-The sample's own Vite configuration builds the same source against exact profile imports. It bundles private `prosemirror-commands` while sharing ProseMirror core roots. The build creates a separate accepted sample snapshot. The existing immutable server verifies and retains both snapshots; the original rich fixture remains unchanged.
+The sample's own Vite configuration builds the same source against exact profile imports. It bundles private `prosemirror-commands` while sharing ProseMirror core roots. The build creates a separate accepted sample snapshot. The existing immutable server verifies and retains both snapshots. Both plugins use ordinary module task workers.
 
 Open `/#portable-sdk` on the fixture server to select `/sample-accepted.json`. The sample uses the same trusted host and runtime map. That internal host calls `activate(context)` and supplies `SvelteFrontendContext`. The fixture registers the `host` dependency provider, its probe API and command; these are test APIs, not built-in SDK services. See the [portable SDK guide](portable-sdk.md) for package delivery and the [sample README](../../examples/plugins/portable-sdk/README.md#activation-and-provider-contracts) for activation and ownership.
 
@@ -72,13 +72,19 @@ The fixture loads declared CSS before calling the plugin's named synchronous `ac
 
 Asynchronous preparation uses cancellation and session-generation checks. Stop or replacement prevents an older start from activating or retaining CSS. Native import itself cannot be cancelled once underway. A late import may still evaluate top-level code, but it cannot resurrect a stopped activation. Plugins must keep activation-specific work in activation, not module evaluation.
 
-The plugin requests workers through a **fixture host provider**. That provider verifies the requested snapshot bytes, creates a Blob from those returned bytes and uses the existing task service's `createWorker` factory. Completion, cancellation and startup failure terminate workers and revoke Blob URLs. Cancellation during byte acquisition creates neither a Blob nor a worker. Remote, filesystem and foreign-snapshot targets are rejected.
+Both the rich plugin and portable sample call `context.tasks.worker({ module: URL, input, key, label, ... })`. Their URLs are relative to the emitted frontend entry. Each build emits a separate self-contained `.worker.js` file. The ordinary context accepts only module requests, not author worker factories. See the [task guide](../../packages-js/tasks/README.md#bundled-one-shot-workers) for a complete activation example and input/transfer timing.
 
-This tests verified-byte Blob workers through an advanced library callback. It does **not** implement the approved external `context.tasks.worker({ module: URL, ... })` API. That option/type and native resource integration remain outstanding. Worker `import.meta.url` names the Blob, so package-relative worker imports and assets are unsupported.
+The trusted fixture host supplies internal `workerModules(identity)` metadata for each activation. It captures a snapshot base URL, file list and byte reader. The reader uses `resources.verify` to obtain checked bytes. Exact canonical URL membership selects the file, including encoded filenames. Unknown, foreign-snapshot, arbitrary remote, file, data and Blob targets have no fallback. An HTTP URL in this fixture is accepted only if it exactly belongs to the host-bound package. This is package ownership validation, not an external networking policy or sandbox.
+
+The task library owns Blob creation, fresh module Worker construction, termination and object-URL revocation. It cleans up after result, failure, cancellation, replacement and startup failures, including constructor, listener and posting failures. Cancellation during byte acquisition creates neither a Blob nor a worker. Late completion cannot revive a stopped activation. Browser API instrumentation exists only in trusted test infrastructure to observe those resources; authors supply no factory.
+
+The module URL is copied before loading. Input objects and transfer arrays are not deep-snapshotted at submission. They can change while loading, and transfer happens only on posting. Worker `import.meta.url` names the Blob, so package-relative worker imports and assets are unsupported. Workers have no window import map. The portable sample implements the protocol with a type-only `TaskWorkerScope` import because generated SDK packages contain no helper JavaScript. The rich fixture bundles the helper separately.
+
+This implements the approved ordinary API, internal snapshot binding and browser path. It does not connect a production native authorized byte source, release profile or application loader.
 
 ## Evidence and remaining work
 
-The browser suite contains 32 cases across Chromium and WebKit. It preserves all 30 original cases and adds two portable SDK sample cases. The sample checks activation, providers, command results, inherited Svelte context, generic content, styles, clicks, teardown and reactivation.
+The browser suite covers ordinary module workers in both independently built plugins. Cases include URL ownership and rejection, verified-byte failures, cancellation during delayed reads, transfer timing, replacement, cleanup, duplicate responses and stale activation completion. The sample also checks activation, providers, command results, inherited Svelte context, generic content, styles, clicks, teardown and reactivation. Recorded runs and their limits belong in the [cumulative changelog](change-log.md#tested-runtime-profile-and-independent-plugin-fixture).
 
 The original fixture checks all 27 runtime namespaces. It exercises a separately compiled Svelte presentation, inherited host and tooltip contexts, declared CSS, image assets and a package-local dynamic import. It also checks typed command cooperation and ProseMirror constructors and transactions in both host-to-plugin and plugin-to-host directions. Rollback, render failure, teardown, stale handles, shared CSS owners, delayed starts, late imports and worker cleanup have regressions.
 
@@ -87,7 +93,7 @@ The builder records shared DnD identity, and the browser checks emitted dock-col
 Focused validation is recorded in the [cumulative plugin changelog](change-log.md#tested-runtime-profile-and-independent-plugin-fixture). Remaining release work includes:
 
 - Public SDK release and package delivery. Private portable declarations and independent author type checking are implemented; the five generated SDK packages are not published.
-- Integration of the approved `module: URL` managed-worker API.
+- Integration of the implemented module-worker API with a production native authorized byte source and release-profile delivery.
 - Production authorized resource delivery, manifest-to-runtime assembly and loading gates.
 - Packaged evidence across supported operating systems and installed WebViews, including the minimum supported macOS.
 

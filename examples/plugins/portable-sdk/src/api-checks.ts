@@ -3,6 +3,16 @@ import { defineSveltePresentation } from '@writers-ide/plugins/svelte';
 import { IconButton } from '@writers-ide/components';
 import { DockDraggable } from '@writers-ide/layout';
 import type { ComponentProps, Snippet } from 'svelte';
+import {
+	createTaskService,
+	type AdvancedTaskService,
+	type TaskContext,
+	type TaskHandle,
+	type TaskService,
+	type TaskServiceOptions,
+	type WorkerTaskOptions,
+	type WorkerFactoryTaskOptions,
+} from '@writers-ide/tasks';
 import Card from './Card.svelte';
 import { fourRoles, probeApi, publishedApi } from './contracts';
 
@@ -57,4 +67,89 @@ export function checkApi(
 		render,
 	});
 	return { result, resultType };
+}
+
+// These calls are checked against the copied SDK, not executed by the fixture.
+export function checkTasks(context: FrontendContext<unknown>, options: TaskServiceOptions) {
+	const ordinary: Assert<Equal<typeof context.tasks, TaskService>> = true;
+	const advanced = createTaskService(options);
+	const advancedType: Assert<Equal<typeof advanced, AdvancedTaskService>> = true;
+	const module = new URL('./worker.js', import.meta.url);
+	const input = { buffer: new ArrayBuffer(8), count: 2 };
+	const request: WorkerTaskOptions<typeof input, number> = {
+		key: 'module',
+		label: 'Module',
+		module,
+		input,
+		transfer: [input.buffer],
+		apply(value, task) {
+			const output: Assert<Equal<typeof value, number>> = true;
+			const taskContext: Assert<Equal<typeof task, TaskContext>> = true;
+			void [output, taskContext];
+		},
+	};
+	const handle = context.tasks.worker(request);
+	const handleType: Assert<Equal<typeof handle, TaskHandle<number>>> = true;
+	const inferred = context.tasks.worker({
+		key: 'inferred',
+		label: 'Inferred',
+		module,
+		input,
+		transfer: [input.buffer],
+		apply(value: number, task) {
+			const taskContext: Assert<Equal<typeof task, TaskContext>> = true;
+			void [value, taskContext];
+		},
+	});
+	const inferredType: Assert<Equal<typeof inferred, TaskHandle<number>>> = true;
+	const factory: WorkerFactoryTaskOptions<typeof input, number> = {
+		key: 'factory',
+		label: 'Factory',
+		input,
+		transfer: [input.buffer],
+		createWorker: () => new Worker(module, { type: 'module' }),
+		apply(value, task) {
+			const output: Assert<Equal<typeof value, number>> = true;
+			const taskContext: Assert<Equal<typeof task, TaskContext>> = true;
+			void [output, taskContext];
+		},
+	};
+	const factoryHandle = advanced.worker(factory);
+	const factoryType: Assert<Equal<typeof factoryHandle, TaskHandle<number>>> = true;
+	const inferredFactory = advanced.worker({
+		key: 'inferred-factory',
+		label: 'Inferred factory',
+		input,
+		transfer: [input.buffer],
+		createWorker: () => new Worker(module),
+		apply(value: number) {
+			void value;
+		},
+	});
+	const inferredFactoryType: Assert<Equal<typeof inferredFactory, TaskHandle<number>>> = true;
+	advanced.worker(request);
+	// @ts-expect-error ordinary activation tasks do not accept worker factories, even via a variable
+	context.tasks.worker(factory);
+	// @ts-expect-error ordinary tasks require a module URL
+	context.tasks.worker({ key: 'bad', label: 'Bad', input, createWorker: () => new Worker(module) });
+	// @ts-expect-error module and factory selections are mutually exclusive
+	advanced.worker({ ...factory, module });
+	// @ts-expect-error ordinary tasks reject mixed selections too
+	context.tasks.worker({ ...request, createWorker: () => new Worker(module) });
+	// @ts-expect-error module is required
+	context.tasks.worker({ key: 'bad', label: 'Bad', input });
+	// @ts-expect-error module is a URL, not a string
+	context.tasks.worker({ ...request, module: './worker.js' });
+	// @ts-expect-error input type is preserved
+	context.tasks.worker<typeof input, number>({ ...request, input: 'bad' });
+	context.tasks.worker<typeof input, number>({
+		...request,
+		// @ts-expect-error apply receives the declared output type
+		apply(value: string) {
+			void value;
+		},
+	});
+	// @ts-expect-error transfer entries must be transferable
+	context.tasks.worker({ ...request, transfer: [null] });
+	return { ordinary, advancedType, handleType, inferredType, factoryType, inferredFactoryType };
 }
