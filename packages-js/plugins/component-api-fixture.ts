@@ -4,6 +4,8 @@ import type { CommandContext, ComponentDescriptor, Dependency } from './command-
 import { CommandComponentHost } from './command-component-host';
 import { descriptor } from './command-component-fixture';
 
+let nextProvider = 0;
+let nextConsumer = 0;
 export interface TestApi {
 	read(): unknown;
 }
@@ -20,8 +22,8 @@ export function apiProvider(
 	return descriptor(slotId, (context) => context.apis.provide(api, factory), {
 		identity: {
 			packageId: '@providers/service',
-			componentId: 'provider',
-			projectOpeningId: 'opening / opaque',
+			componentId: `provider-${++nextProvider}`,
+			projectOpeningId: null,
 		},
 		provides: [api],
 		...extra,
@@ -45,7 +47,7 @@ export function apiConsumer(
 			{
 				identity: {
 					packageId: '@consumers/service',
-					componentId: 'consumer',
+					componentId: `consumer-${++nextConsumer}`,
 					projectOpeningId: null,
 				},
 				dependencies: [requirement(target, optional)],

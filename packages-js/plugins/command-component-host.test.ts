@@ -32,6 +32,8 @@ describe('internal command component host', () => {
 					'identity',
 					'locale',
 					'own',
+					'project',
+					'projects',
 					'signal',
 					'tasks',
 				]);

@@ -6,7 +6,7 @@ The internal component harness connects provider APIs and typed application comm
 
 [`command-dispatcher.ts`](../../packages-js/plugins/command-dispatcher.ts) is an internal module. It has no package export and is not connected to the bundled plugin host. Tests can supply trusted dependency declarations, provider registrations and lifetime signals directly. The [component lifecycle harness](#component-lifecycle-harness) now constructs these bindings from host-selected component descriptors.
 
-The dispatcher implements execution and availability. The internal harness adds synchronous activation, API/command publication checks, provider connections and required-consumer lifecycle planning. Neither implements manifest-to-runtime assembly, project selection or leases, external loading, native authorization, settings persistence or a settings menu. Creating a dispatcher or harness does not grant permission to run external code.
+The dispatcher implements execution and availability. The internal harness adds synchronous activation, API/command publication checks, provider connections and required-consumer lifecycle planning. The harness also implements in-memory project references, selection and independent leases. Neither module implements manifest-to-runtime assembly, the application's project UI/persistence, external loading, native authorization, settings persistence or a settings menu. Creating a dispatcher or harness does not grant permission to run external code.
 
 ## What the host supplies
 
@@ -61,7 +61,7 @@ Updates to an injected ledger apply to new admissions. Existing calls retain the
 
 ## Cancellation and cleanup
 
-The invocation signal combines explicit cancellation, consumer/connection teardown, provider teardown, registration removal and dispatcher disposal. Binding replacement also revokes the old invocation.
+The invocation signal combines explicit cancellation, consumer/connection teardown, provider teardown, registration removal and dispatcher disposal. Batch teardown uses internal `markRevoked()` and `drainRevocations()` phases: affected pending outcomes become terminal before abort and diagnostic callbacks run. These phases do not release reservations for still-running work. Binding replacement also revokes the old invocation.
 
 Cancellation rejects the public promise promptly and signals cooperative work. It does not start another phase or deliver a late result. Pending validators and implementations are still observed so late rejection does not become an unhandled promise rejection.
 
@@ -81,7 +81,7 @@ The dispatcher warns when a validator's initial synchronous call exceeds 16 ms. 
 
 [`CommandComponentHost`](../../packages-js/plugins/command-component-host.ts) connects the dispatcher to a small component lifecycle for provider APIs and commands. It is internal test/implementation infrastructure, not the application's current bundled host or a public SDK constructor. [`command-component-model.ts`](../../packages-js/plugins/command-component-model.ts) contains descriptor capture and iterative dependency planning.
 
-A host slot identifies a component instance that the host has already selected. For example, two project openings can have separate slots for the same component. This harness does not decide which project or package a slot represents. Future application assembly must supply that mapping from validated declarations and live scope.
+A host slot identifies a component instance that the host has already selected. For example, two project openings can have separate slots for the same component. Application assembly supplies that mapping from validated declarations. The harness now validates each project opening against its own live registry and enforces direct/selected-project scope rules. See the [project connection guide](project-connections.md).
 
 Construct the harness with an explicit host-owned `locale` source implementing `PluginLocale`. The source provides the current UI language/direction and immediate/change subscriptions. No application locale is guessed. An optional `workQueue` supplies the embedding host's shared cooperative scheduler; otherwise the standalone harness creates one queue shared by its activations. Application assembly must pass the pagination queue when these components join the application's scheduling budget.
 
@@ -100,9 +100,10 @@ Each activation gets a fresh host-generated instance ID. The harness calls the d
 - `commands`: the dispatcher-backed consumer invoker.
 - `tasks`: the existing activation-owned `TaskService` over the host's cooperative queue.
 - `locale`: an activation-owned `PluginLocale` adapter over the host's UI locale source.
+- `project` and `projects`: scope-correct project reference/connection services, described in the [project guide](project-connections.md#context-scope).
 - `contributions.command(registration)`: the generic SDK command-registration signature.
 
-This is deliberately not a complete `FrontendContext`. It supplies no toolbar/view registration, native services or project connection.
+This is deliberately not a complete `FrontendContext`. It supplies no toolbar/view registration or native services. It now includes the approved project/application context distinction: a fixed `project` with `projects: null`, or `project: null` with the independent project-connection service.
 
 Every declared API and command must be published before setup succeeds. API factories are staged alongside commands, so a missing publication rolls back both kinds. Catching an invalid API publication still fails setup. Factories themselves run lazily when a consumer requests the API.
 
@@ -158,7 +159,7 @@ Listener failures are isolated without unsubscribing. Promise rejections from as
 
 A provider publishes each declared API factory once during synchronous activation. A consumer uses its dependency alias and shared `PluginApi` contract, not a provider's private slot ID. The host resolves that alias to an already-selected slot. Undeclared aliases or contracts fail. Declared optional absence returns `null` and never enables a provider.
 
-For a given consumer activation, provider activation and API ID/major, the first lookup calls the factory and caches its frozen facade. Later lookups and subscriptions reuse it. The factory must finish synchronously with a plain method-only object. Facade methods may return promises. Returned objects and method-result promises are not recursively revoked or copied like command payloads.
+For direct access, the first lookup caches a frozen facade per consumer activation, provider activation and API ID/major. Later direct lookups and subscriptions reuse it. Each project lease has its own independent cache and lifetime while retaining the actual consumer/provider activation metadata. The factory must finish synchronously with a plain method-only object. Facade methods may return promises. Returned objects and method-result promises are not recursively revoked or copied like command payloads.
 
 ### Connection metadata and ownership
 
@@ -185,6 +186,7 @@ Listener failures do not unsubscribe. Promise rejections from asynchronous liste
 
 ## Validation entry points
 
+- `packages-js/plugins/component-project-*.test.ts`: host-issued references, exact routing, scope checks, independent leases, project closure/reopening and batch revocation. See the [project connection guide](project-connections.md).
 - [`component-locale.test.ts`](../../packages-js/plugins/component-locale.test.ts): frozen snapshots, subscription ownership, failures, nested changes, stale reads and guarded notifications.
 - [`component-tasks.test.ts`](../../packages-js/plugins/component-tasks.test.ts) and [`component-tasks-continuations.test.ts`](../../packages-js/plugins/component-tasks-continuations.test.ts): real task-service/queue ownership, cancellation, keys, rollback, stale handles, worker apply and API/command continuations. These run with the Svelte compiler in a Node test environment, using controlled animation frames and test workers; they are not packaged-worker or browser-layout evidence.
 - `packages-js/plugins/component-api-*.test.ts`: API declarations, endpoint metadata, caching, connection ownership, mixed API/command rollback, subscription retries and batch revocation. [`provider-facade.test.ts`](../../packages-js/plugins/provider-facade.test.ts) covers the shared facade helper. Existing bundled-provider tests verify extraction compatibility.

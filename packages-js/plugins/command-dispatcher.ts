@@ -28,6 +28,7 @@ export type CommandAliasDeclaration = {
 	readonly dependencyAlias: string;
 	readonly commandAlias: string;
 	readonly commandId: string;
+	readonly invalidRoute?: boolean;
 	readonly contractId: string;
 	readonly major: number;
 	// Return the same binding object until that exact registration/connection changes.
@@ -66,6 +67,10 @@ type Options = {
 };
 export interface CommandDispatcher {
 	createInvoker(source: CommandConsumerSource): CommandInvoker;
+	/** Fix terminal outcomes after private host liveness changes, without running observers. */
+	markRevoked(): void;
+	/** Deliver deferred invocation aborts and diagnostics after the whole batch is marked. */
+	drainRevocations(): void;
 	dispose(): void;
 }
 
@@ -107,16 +112,34 @@ export function createCommandDispatcher(options: Options = {}): CommandDispatche
 	const now = options.now ?? (() => performance.now());
 	const shutdown = new AbortController();
 	const scopes = new Set<Release>();
+	const pending = new Set<Release>();
+	const revocations: Release[] = [];
+	let disposed = false;
+	const markRevoked = () => {
+		for (const mark of [...pending]) {
+			mark();
+		}
+	};
+	const drainRevocations = () => {
+		for (const drain of revocations.splice(0)) {
+			drain();
+		}
+	};
 
 	return {
+		markRevoked,
+		drainRevocations,
 		dispose() {
+			disposed = true;
+			markRevoked();
+			drainRevocations();
 			shutdown.abort();
 			for (const stop of Array.from(scopes)) {
 				stop();
 			}
 		},
 		createInvoker(source) {
-			let ended = shutdown.signal.aborted || source.signal.aborted;
+			let ended = disposed || shutdown.signal.aborted || source.signal.aborted;
 			const watchers = new Set<Release>();
 			const cleanups = new Set<Release>();
 			const notify = () => {
@@ -160,6 +183,7 @@ export function createCommandDispatcher(options: Options = {}): CommandDispatche
 			const live = () => {
 				if (
 					ended ||
+					disposed ||
 					source.signal.aborted ||
 					shutdown.signal.aborted ||
 					source.isLive?.() === false
@@ -180,7 +204,7 @@ export function createCommandDispatcher(options: Options = {}): CommandDispatche
 				const found = source.declarations.find(
 					(entry) => entry.dependencyAlias === dependency && entry.commandAlias === command,
 				);
-				if (!found) {
+				if (!found || found.invalidRoute) {
 					throw new Failure('invalid-reference');
 				}
 				capture?.(found);
@@ -398,6 +422,39 @@ export function createCommandDispatcher(options: Options = {}): CommandDispatche
 								cleanup();
 							}
 						};
+						const settleFailure = (code: CommandInvocationErrorCode) => {
+							terminal = true;
+							pending.delete(mark);
+							unwatch();
+							reject(new CommandInvocationError(code, messages[code], id));
+						};
+						const mark = () => {
+							if (terminal) {
+								return;
+							}
+							// These are trusted host lifetime/binding predicates, not author observers.
+							const revoked =
+								disposed ||
+								ended ||
+								source.signal.aborted ||
+								shutdown.signal.aborted ||
+								source.isLive?.() === false ||
+								(binding &&
+									(binding.signal.aborted ||
+										binding.registrationSignal.aborted ||
+										(entry && entry.resolve() !== binding)));
+							if (!revoked) {
+								return;
+							}
+							settleFailure('revoked');
+							revocations.push(() => {
+								controller.abort();
+								report(
+									metadata(id, phase, 'failure', started, entry, binding, reservation, 'revoked'),
+								);
+							});
+						};
+						pending.add(mark);
 						const fail = (code: CommandInvocationErrorCode, raw?: { error: unknown }) => {
 							const data = metadata(
 								id,
@@ -410,9 +467,7 @@ export function createCommandDispatcher(options: Options = {}): CommandDispatche
 								code,
 							);
 							if (!terminal) {
-								terminal = true;
-								unwatch();
-								reject(new CommandInvocationError(code, messages[code], id));
+								settleFailure(code);
 								controller.abort();
 							}
 							report(data);
@@ -633,6 +688,7 @@ export function createCommandDispatcher(options: Options = {}): CommandDispatche
 								outputReceipt();
 								check();
 								terminal = true;
+								pending.delete(mark);
 								unwatch();
 								resolve(delivery.value as ResultOutput);
 								delivery.release();
@@ -645,6 +701,7 @@ export function createCommandDispatcher(options: Options = {}): CommandDispatche
 								}
 							} finally {
 								input = copied = transformed = raw = output = undefined;
+								pending.delete(mark);
 								unwatch();
 								reservation?.release();
 							}

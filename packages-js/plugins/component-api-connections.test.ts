@@ -8,6 +8,7 @@ import { api, api2, apiConsumer, apiProvider, requirement } from './component-ap
 describe('component API connections', () => {
 	it('captures actual frozen application/project endpoint identities and caches per activation and exact major', async () => {
 		const host = createHost();
+		const project = host.openProject('endpoint-project', 'Endpoint project');
 		const endpoints: ComponentApiConnection[] = [];
 
 		const result = { mutable: true };
@@ -42,7 +43,7 @@ describe('component API connections', () => {
 					identity: {
 						packageId: 'application',
 						componentId: 'coordinator',
-						projectOpeningId: null,
+						projectOpeningId: project.openingId,
 					},
 					dependencies: [{ ...requirement('project-slot'), apis: [api, api2] }],
 				},
@@ -69,8 +70,8 @@ describe('component API connections', () => {
 		expect(connection.consumer.activationId).toBe(host.get('application-slot')!.instanceId);
 		expect(connection.provider.activationId).toBe(host.get('project-slot')!.instanceId);
 		expect(connection.provider.packageId).toBe('@providers/service');
-		expect(connection.provider.projectOpeningId).toBe('opening / opaque');
-		expect(connection.consumer.projectOpeningId).toBeNull();
+		expect(connection.provider.projectOpeningId).toBeNull();
+		expect(connection.consumer.projectOpeningId).toBe(project.openingId);
 		for (const value of [
 			context,
 			context.apis,
@@ -216,10 +217,13 @@ describe('component API connections', () => {
 	it('pins aliases to explicit namespace and project slots without choosing by registration order', () => {
 		const host = createHost();
 		const connections: ComponentApiConnection[] = [];
+		const one = host.openProject('one', 'One');
+		const two = host.openProject('two', 'Two');
+		const three = host.openProject('three', 'Three');
 		for (const [slot, packageId, opening] of [
-			['first', '@other/service', 'opening-one'],
-			['second', '@wanted/service', 'opening-two'],
-			['third', '@wanted/service', 'opening-three'],
+			['first', '@other/service', one.openingId],
+			['second', '@wanted/service', two.openingId],
+			['third', '@wanted/service', three.openingId],
 		]) {
 			host.register(
 				apiProvider(
@@ -244,7 +248,7 @@ describe('component API connections', () => {
 					identity: {
 						packageId: 'consumer',
 						componentId: 'project',
-						projectOpeningId: 'opening-two',
+						projectOpeningId: two.openingId,
 					},
 					dependencies: [requirement('second')],
 				},
@@ -254,8 +258,8 @@ describe('component API connections', () => {
 		expect(context.apis.get('service', api)!.read()).toBe('second');
 		expect(connections).toHaveLength(1);
 		expect(connections[0].provider.packageId).toBe('@wanted/service');
-		expect(connections[0].provider.projectOpeningId).toBe('opening-two');
-		expect(connections[0].consumer.projectOpeningId).toBe('opening-two');
+		expect(connections[0].provider.projectOpeningId).toBe(two.openingId);
+		expect(connections[0].consumer.projectOpeningId).toBe(two.openingId);
 		host.dispose();
 	});
 

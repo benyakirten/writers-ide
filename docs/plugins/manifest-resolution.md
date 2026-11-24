@@ -64,11 +64,11 @@ The resolver requires every requested API ID/major pair and every requested comm
 
 Binding output describes how a future host must route a connection:
 
-| Output                 | Meaning                                                                                                                      |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `SameProjectOpening`   | A project consumer uses a project provider in its own live opening.                                                          |
-| `SameWindow`           | A project or application consumer uses an application provider in the same window.                                           |
-| `SelectedProjectLease` | An optional application-to-project integration requires a future explicit live-project lease. It is not direct availability. |
+| Output                 | Meaning                                                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `SameProjectOpening`   | A project consumer uses a project provider in its own live opening.                                                    |
+| `SameWindow`           | A project or application consumer uses an application provider in the same window.                                     |
+| `SelectedProjectLease` | An optional application-to-project integration requires an explicit live-project lease. It is not direct availability. |
 
 Resolution receives no live project registry and selects no project. A profile outside `supported_profiles` blocks that component. Missing packages/components, version mismatches, incompatible scopes and missing contracts block consumers only when the dependency is required. Blocked providers propagate through required edges. Optional integrations report issues without blocking their consumers. Healthy unrelated siblings remain eligible.
 

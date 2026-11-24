@@ -124,6 +124,106 @@ function setup(
 		},
 	};
 }
+describe('internal dispatcher revocation phases', () => {
+	it('marks private lifetime revocation without abort or diagnostic observers until drain', async () => {
+		let live = true;
+		const gate = deferred();
+		const signals: AbortSignal[] = [];
+		const now = vi.fn(() => 0);
+		const fixture = setup({
+			isLive: () => live,
+			now,
+			execute: (_args, context) => {
+				signals.push(context.signal);
+				return gate.promise;
+			},
+		});
+		const request = new AbortController();
+		const calls = [undefined, request.signal].map((signal) =>
+			fixture.execute(null, signal).catch((error: unknown) => error),
+		);
+		await flush();
+		live = false;
+		now.mockClear();
+		fixture.dispatcher.markRevoked();
+		expect(now).not.toHaveBeenCalled();
+		expect(fixture.diagnostics).toEqual([]);
+		expect(signals.map((signal) => signal.aborted)).toEqual([false, false]);
+		request.abort();
+		expect(await Promise.all(calls)).toEqual([
+			expect.objectContaining({ code: 'revoked' }),
+			expect.objectContaining({ code: 'revoked' }),
+		]);
+		fixture.dispatcher.drainRevocations();
+		expect(signals.every((signal) => signal.aborted)).toBe(true);
+		expect(fixture.diagnostics.map((data) => data.code)).toEqual(['revoked', 'revoked']);
+		expect(fixture.ledger.snapshot().pending).toBe(2);
+		fixture.dispatcher.markRevoked();
+		fixture.dispatcher.drainRevocations();
+		expect(fixture.diagnostics).toHaveLength(2);
+		gate.resolve(null);
+		await flush();
+		expect(fixture.ledger.snapshot().pending).toBe(0);
+		fixture.dispatcher.dispose();
+	});
+
+	it('marks a privately removed provider binding even while all source signals remain live', async () => {
+		const gate = deferred();
+		let providerLive = true;
+		const fixture = setup({ execute: () => gate.promise });
+		const invoker = fixture.dispatcher.createInvoker({
+			...fixture.source,
+			declarations: [
+				{
+					...fixture.source.declarations[0],
+					resolve: () => (providerLive ? fixture.binding : undefined),
+				},
+			],
+		});
+		const outcome = invoker
+			.execute('dependency', 'command', fixture.contract, null)
+			.catch((error: unknown) => error);
+		await flush();
+		providerLive = false;
+		fixture.dispatcher.markRevoked();
+		expect(await outcome).toMatchObject({ code: 'revoked' });
+		expect(fixture.caller.signal.aborted).toBe(false);
+		expect(fixture.provider.signal.aborted).toBe(false);
+		expect(fixture.diagnostics).toEqual([]);
+		fixture.dispatcher.drainRevocations();
+		expect(fixture.diagnostics.map((data) => data.code)).toEqual(['revoked']);
+		gate.resolve(null);
+		await flush();
+		fixture.dispatcher.dispose();
+	});
+
+	it('fixes all pending outcomes before standalone dispatcher disposal runs abort observers', async () => {
+		const gate = deferred();
+		const signals: AbortSignal[] = [];
+		const fixture = setup({
+			execute: (_args, context) => {
+				signals.push(context.signal);
+				return gate.promise;
+			},
+		});
+		const request = new AbortController();
+		const calls = [undefined, request.signal].map((signal) =>
+			fixture.execute(null, signal).catch((error: unknown) => error),
+		);
+		await flush();
+		signals[0].addEventListener('abort', () => request.abort());
+		fixture.dispatcher.dispose();
+		expect(await Promise.all(calls)).toEqual([
+			expect.objectContaining({ code: 'revoked' }),
+			expect.objectContaining({ code: 'revoked' }),
+		]);
+		expect(fixture.ledger.snapshot().pending).toBe(2);
+		gate.resolve(null);
+		await flush();
+		expect(fixture.ledger.snapshot().pending).toBe(0);
+	});
+});
+
 const limits = (values: Partial<ReservationLimits>): ReservationLimits => ({
 	...DEFAULT_RESERVATION_LIMITS,
 	...values,

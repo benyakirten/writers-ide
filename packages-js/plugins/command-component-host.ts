@@ -4,7 +4,15 @@ import {
 	type TaskService,
 	type WorkerTaskOptions,
 } from '@writers-ide/tasks';
-import type { PluginLocale } from './frontend';
+import type { PluginLocale, ProjectReference } from './frontend';
+import { ComponentProjectRegistry } from './component-project-registry';
+import { ComponentProjectConnections } from './component-project-connections';
+import {
+	resolveProvider,
+	routed,
+	validateRegistration,
+	type ConnectionScope,
+} from './component-project-routing';
 import { createActivationLocale } from './component-locale';
 import { createCommandDispatcher } from './command-dispatcher';
 import { ComponentApiManager } from './component-api-manager';
@@ -38,13 +46,24 @@ type Options = NonNullable<Parameters<typeof createCommandDispatcher>[0]> & {
 };
 let nextInstance = 0;
 
-/** Internal trusted-descriptor harness. No loading, scope selection or native authority. */
+/** Internal trusted-descriptor harness. No package loading, persistence or native authority. */
 export class CommandComponentHost {
 	readonly #entries = new Map<string, Entry>();
 	readonly #dispatcher;
 	readonly #locale: PluginLocale;
 	readonly #workQueue: WorkQueue;
 	readonly #apis = new ComponentApiManager(this.#entries, (callback) => this.#callback(callback));
+	readonly #projects = new ComponentProjectRegistry();
+	readonly #connections = new ComponentProjectConnections(
+		this.#projects,
+		this.#apis,
+		(entry, owner, scope) => this.#invoker(entry, owner, scope),
+		(callback) => this.#callback(callback),
+		() => {
+			this.#dispatcher.markRevoked();
+			this.#callback(() => this.#dispatcher.drainRevocations());
+		},
+	);
 	readonly #listeners = new Set<(snapshot: readonly Snapshot[]) => void>();
 	#busy = false;
 	#callbacks = 0;
@@ -65,12 +84,44 @@ export class CommandComponentHost {
 		});
 	}
 
+	openProject(id: string, name: string): ProjectReference {
+		return this.#mutate(() => this.#projects.open(id, name));
+	}
+	selectProject(reference: ProjectReference | null): void {
+		this.#mutate(() => this.#projects.select(reference));
+	}
+	closeProject(reference: ProjectReference): void {
+		this.#mutate(() =>
+			this.#projects.close(reference, () => {
+				const plan = new Set<string>();
+				for (const [id, entry] of this.#entries) {
+					if (entry.descriptor.identity.projectOpeningId === reference.openingId) {
+						for (const member of removalPlan(this.#entries, id)) {
+							plan.add(member);
+						}
+					}
+				}
+				this.#connections.revokeOpening(reference.openingId);
+				this.#stop([...plan]);
+			}),
+		);
+	}
+
+	#assertOpening(entry: Pick<Entry, 'descriptor'>): void {
+		const opening = entry.descriptor.identity.projectOpeningId;
+		if (opening !== null && !this.#projects.reference(opening)) {
+			throw new Error('Component project opening is unknown or closed');
+		}
+	}
+
 	register(descriptor: ComponentDescriptor): Snapshot {
 		return this.#mutate(() => {
 			const captured = capture(descriptor);
 			if (this.#entries.has(captured.slotId)) {
 				throw new Error('Component slot already registered');
 			}
+			this.#assertOpening({ descriptor: captured });
+			validateRegistration(this.#entries, captured);
 			this.#entries.set(captured.slotId, { descriptor: captured, status: 'disabled', errors: [] });
 			return this.get(captured.slotId)!;
 		});
@@ -108,10 +159,14 @@ export class CommandComponentHost {
 			try {
 				const plan = activationPlan(this.#entries, slotId);
 				for (const id of plan) {
+					this.#assertOpening(this.#entry(id));
+				}
+				for (const id of plan) {
 					const entry = this.#entry(id);
 					if (entry.status !== 'active') {
 						for (const dependency of entry.descriptor.dependencies) {
 							if (
+								dependency.binding !== 'selected-project' &&
 								!dependency.optional &&
 								!published(this.#entry(dependency.providerSlot), dependency)
 							) {
@@ -176,6 +231,9 @@ export class CommandComponentHost {
 			}
 			this.#disposed = true;
 			this.#stop([...plan]);
+			for (const project of this.#projects.list()) {
+				this.#projects.close(project, () => undefined);
+			}
 			this.#dispatcher.dispose();
 			this.#listeners.clear();
 		});
@@ -243,20 +301,21 @@ export class CommandComponentHost {
 		}
 	}
 
-	#invoker(entry: Entry, activation: Activation): CommandInvoker {
+	#invoker(entry: Entry, activation: Activation, scope?: ConnectionScope): CommandInvoker {
 		const invoker = this.#dispatcher.createInvoker({
 			instanceId: activation.id,
-			signal: activation.controller.signal,
-			isLive: () => activation.phase !== 'stopped',
+			signal: scope?.signal ?? activation.controller.signal,
+			isLive: () => activation.phase !== 'stopped' && (scope?.isLive() ?? true),
 			declarations: entry.descriptor.dependencies.flatMap((dependency) =>
 				dependency.commands.map((command) => ({
 					dependencyAlias: dependency.alias,
 					commandAlias: command.alias,
 					commandId: command.id,
+					invalidRoute: !routed(dependency, scope?.openingId),
 					contractId: command.contractId,
 					major: command.major,
 					resolve: () => {
-						const provider = this.#entries.get(dependency.providerSlot);
+						const provider = resolveProvider(this.#entries, entry, dependency, scope?.openingId);
 						if (
 							activation.phase === 'stopped' ||
 							!provider ||
@@ -381,7 +440,16 @@ export class CommandComponentHost {
 					errors.push('locale-listener-failed');
 				},
 			});
+			const project =
+				entry.descriptor.identity.projectOpeningId === null
+					? null
+					: this.#projects.reference(entry.descriptor.identity.projectOpeningId)!;
+			const projectContext =
+				project === null
+					? { project: null, projects: this.#connections.context(entry, activation, owned) }
+					: { project, projects: null };
 			const context: CommandContext = Object.freeze({
+				...projectContext,
 				identity: activation.identity,
 				apis: this.#apis.context(entry, activation),
 				signal: activation.controller.signal,
@@ -489,6 +557,7 @@ export class CommandComponentHost {
 							consumer.status === 'active' &&
 							consumer.descriptor.dependencies.some(
 								(dependency) =>
+									dependency.binding !== 'selected-project' &&
 									!dependency.optional &&
 									dependency.providerSlot === entry.descriptor.slotId &&
 									dependency.commands.some((command) => command.id === registration.id),
@@ -527,9 +596,11 @@ export class CommandComponentHost {
 		activation.phase = 'stopped';
 		entry.status = 'disabled';
 		this.#apis.revoke(activation);
+		this.#connections.revokeOwner(activation);
 		activation.listeners.clear();
 	}
 	#abort(activation: Activation): void {
+		this.#connections.drain();
 		activation.controller.abort();
 		for (const publication of activation.publications.values()) {
 			publication.controller.abort();
@@ -554,6 +625,7 @@ export class CommandComponentHost {
 		for (const { entry } of activations) {
 			this.#revoke(entry);
 		}
+		this.#connections.drain();
 		for (const { activation } of activations) {
 			if (activation) {
 				this.#abort(activation);

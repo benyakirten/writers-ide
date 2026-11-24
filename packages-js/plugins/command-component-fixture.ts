@@ -26,7 +26,10 @@ export const contract = definePluginCommand({
 	result: schema,
 });
 export const declaration = { id: 'local.ID', contractId: contract.id, major: 1 };
-export function dependency(providerSlot = 'provider', optional = false): Dependency {
+export function dependency(
+	providerSlot = 'provider',
+	optional = false,
+): Extract<Dependency, { providerSlot: string }> {
 	return {
 		alias: 'analysis',
 		providerSlot,
@@ -34,16 +37,18 @@ export function dependency(providerSlot = 'provider', optional = false): Depende
 		commands: [{ ...declaration, alias: 'run' }],
 	};
 }
+let nextFixtureIdentity = 0;
 export function descriptor(
 	slotId: string,
 	activate: ComponentDescriptor['activate'] = () => undefined,
 	extra: Partial<ComponentDescriptor> = {},
 ): ComponentDescriptor {
+	nextFixtureIdentity++;
 	return {
 		slotId,
 		identity: {
 			packageId: 'test-fixture',
-			componentId: 'synthetic-component',
+			componentId: `synthetic-component-${nextFixtureIdentity}`,
 			projectOpeningId: null,
 		},
 		activate,

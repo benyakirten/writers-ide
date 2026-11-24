@@ -2,10 +2,12 @@ import type { ComponentApis, ComponentApiConnection } from './frontend';
 import type { Dispose, PluginApi, PluginApiIdentity } from './index';
 import { apiIdentity, apiKey } from './component-api-declarations';
 import { compatible, synchronous, type Activation, type Entry } from './command-component-model';
+import { resolveProvider, type ConnectionScope } from './component-project-routing';
 import { createProviderFacade } from './provider-facade';
 
 type Connection = {
 	consumer: Activation;
+	scope: ConnectionScope;
 	provider: Activation;
 	key: string;
 	live: boolean;
@@ -16,14 +18,17 @@ type Connection = {
 type Subscription = {
 	entry: Entry;
 	consumer: Activation;
+	scope: ConnectionScope;
 	alias: string;
 	contract: PluginApiIdentity;
 	listener: (api: object | null) => void;
 	last?: Activation | null;
 };
 
-/** Internal activation-owned bindings over host-selected slots, not a routing service. */
+/** Internal API bindings with activation-owned direct caches and independent lease caches. */
 export class ComponentApiManager {
+	readonly #direct = new WeakMap<Activation, ConnectionScope>();
+	#nextScope = 0;
 	readonly #connections = new Set<Connection>();
 	readonly #subscriptions = new Set<Subscription>();
 	readonly #pending = new Set<Subscription>();
@@ -37,7 +42,24 @@ export class ComponentApiManager {
 		this.#callback = callback;
 	}
 
-	context(entry: Entry, activation: Activation): ComponentApis {
+	scope(
+		activation: Activation,
+		openingId?: string,
+		signal = activation.controller.signal,
+		isLive = () => activation.phase !== 'stopped',
+	): ConnectionScope {
+		this.#nextScope++;
+		return { id: this.#nextScope, openingId, signal, isLive };
+	}
+	context(entry: Entry, activation: Activation, scope?: ConnectionScope): ComponentApis {
+		if (!scope) {
+			scope = this.#direct.get(activation);
+			if (!scope) {
+				scope = this.scope(activation);
+				this.#direct.set(activation, scope);
+			}
+		}
+		const lifetime = scope;
 		return Object.freeze({
 			provide: <T extends object>(
 				contract: PluginApi<T>,
@@ -65,7 +87,7 @@ export class ComponentApiManager {
 			get: <T extends object>(alias: string, contract: PluginApi<T>): T | null =>
 				this.#callback(() => {
 					try {
-						return this.#get(entry, activation, alias, apiIdentity(contract)) as T | null;
+						return this.#get(entry, activation, alias, apiIdentity(contract), lifetime) as T | null;
 					} catch (error) {
 						this.#report(entry, activation, 'api-resolution-failed');
 						throw error;
@@ -78,13 +100,14 @@ export class ComponentApiManager {
 			): Dispose =>
 				this.#callback(() => {
 					const identity = apiIdentity(contract);
-					this.#target(entry, activation, alias, identity);
+					this.#target(entry, activation, alias, identity, lifetime);
 					if (typeof listener !== 'function') {
 						throw new Error('API subscription listener required');
 					}
 					const subscription: Subscription = {
 						entry,
 						consumer: activation,
+						scope: lifetime,
 						alias,
 						contract: identity,
 						listener: (api) => listener(api as T | null),
@@ -107,15 +130,16 @@ export class ComponentApiManager {
 		consumer: Activation,
 		alias: string,
 		contract: PluginApiIdentity,
+		scope: ConnectionScope,
 	): Activation | null {
-		if (entry.activation !== consumer || consumer.phase === 'stopped') {
+		if (entry.activation !== consumer || consumer.phase === 'stopped' || !scope.isLive()) {
 			throw new Error('Component API consumer is revoked');
 		}
 		const dependency = entry.descriptor.dependencies.find((value) => value.alias === alias);
 		if (!dependency || !(dependency.apis ?? []).some((api) => apiKey(api) === apiKey(contract))) {
 			throw new Error('Undeclared API dependency alias or contract');
 		}
-		const provider = this.#entries.get(dependency.providerSlot);
+		const provider = resolveProvider(this.#entries, entry, dependency, scope.openingId);
 		if (
 			provider &&
 			compatible(provider, dependency) &&
@@ -134,36 +158,50 @@ export class ComponentApiManager {
 		consumer: Activation,
 		alias: string,
 		contract: PluginApiIdentity,
+		scope: ConnectionScope,
 	): object | null {
-		const provider = this.#target(entry, consumer, alias, contract);
+		const provider = this.#target(entry, consumer, alias, contract, scope);
 		if (!provider) {
 			return null;
 		}
 		const key = apiKey(contract);
-		const existing = this.#find(consumer, provider, key);
+		const existing = this.#find(consumer, provider, key, scope);
 		if (existing) {
 			if (!existing.facade) {
 				throw new Error('Reentrant API factory');
 			}
 			return existing.facade;
 		}
-		return this.#connect(entry, consumer, provider, key);
+		return this.#connect(entry, consumer, provider, key, scope);
 	}
-	#find(consumer: Activation, provider: Activation, key: string): Connection | undefined {
+	#find(
+		consumer: Activation,
+		provider: Activation,
+		key: string,
+		scope: ConnectionScope,
+	): Connection | undefined {
 		return [...this.#connections].find(
 			(connection) =>
 				connection.live &&
 				connection.consumer === consumer &&
+				connection.scope === scope &&
 				connection.provider === provider &&
 				connection.key === key,
 		);
 	}
-	#connect(entry: Entry, consumer: Activation, provider: Activation, key: string): object {
+	#connect(
+		entry: Entry,
+		consumer: Activation,
+		provider: Activation,
+		key: string,
+		scope: ConnectionScope,
+	): object {
 		const providerEntry = [...this.#entries.values()].find(
 			(value) => value.activation === provider,
 		)!;
 		const connection: Connection = {
 			consumer,
+			scope,
 			provider,
 			key,
 			live: true,
@@ -171,7 +209,10 @@ export class ComponentApiManager {
 			cleanups: new Set(),
 		};
 		const live = () =>
-			connection.live && consumer.phase !== 'stopped' && provider.phase === 'active';
+			connection.live &&
+			scope.isLive() &&
+			consumer.phase !== 'stopped' &&
+			provider.phase === 'active';
 		this.#connections.add(connection);
 		const metadata: ComponentApiConnection = Object.freeze({
 			consumerId: consumer.id,
@@ -219,16 +260,18 @@ export class ComponentApiManager {
 			if (!live()) {
 				throw new Error('Component API connection revoked during factory');
 			}
-			this.#failedNotifications.delete(this.#notificationKey(consumer, provider, key));
+			this.#failedNotifications.delete(this.#notificationKey(scope, provider, key));
 			for (const subscription of [...this.#subscriptions]) {
 				const dependency = subscription.entry.descriptor.dependencies.find(
 					(value) => value.alias === subscription.alias,
 				);
 				if (
 					subscription.consumer === consumer &&
+					subscription.scope === scope &&
 					apiKey(subscription.contract) === key &&
 					dependency &&
-					this.#entries.get(dependency.providerSlot)?.activation === provider
+					resolveProvider(this.#entries, subscription.entry, dependency, scope.openingId)
+						?.activation === provider
 				) {
 					this.#enqueue(subscription);
 				}
@@ -236,7 +279,7 @@ export class ComponentApiManager {
 			return connection.facade;
 		} catch (error) {
 			if (this.#notifying) {
-				this.#failedNotifications.add(this.#notificationKey(consumer, provider, key));
+				this.#failedNotifications.add(this.#notificationKey(scope, provider, key));
 			}
 			this.#mark(connection);
 			this.#drain(connection);
@@ -249,8 +292,8 @@ export class ComponentApiManager {
 		this.#subscriptions.delete(subscription);
 		this.#pending.delete(subscription);
 	}
-	#notificationKey(consumer: Activation, provider: Activation, key: string): string {
-		return JSON.stringify([consumer.id, provider.id, key]);
+	#notificationKey(scope: ConnectionScope, provider: Activation, key: string): string {
+		return JSON.stringify([scope.id, provider.id, key]);
 	}
 	#enqueue(subscription: Subscription): void {
 		this.#pending.add(subscription);
@@ -273,31 +316,31 @@ export class ComponentApiManager {
 		}
 	}
 	#deliver(subscription: Subscription): void {
-		const { entry, consumer, alias, contract } = subscription;
-		if (!this.#subscriptions.has(subscription) || consumer.phase === 'stopped') {
+		const { entry, consumer, alias, contract, scope } = subscription;
+		if (!this.#subscriptions.has(subscription) || consumer.phase === 'stopped' || !scope.isLive()) {
 			return;
 		}
 		let resolved = false;
 		try {
-			const provider = this.#target(entry, consumer, alias, contract);
+			const provider = this.#target(entry, consumer, alias, contract, scope);
 			if (subscription.last === provider) {
 				return;
 			}
 			if (provider) {
-				const constructing = this.#find(consumer, provider, apiKey(contract));
+				const constructing = this.#find(consumer, provider, apiKey(contract), scope);
 				if (constructing && !constructing.facade) {
 					return;
 				}
 				// A failed factory can queue self-subscriptions. Retry only on a later pass or get.
 				if (
 					!constructing &&
-					this.#failedNotifications.has(this.#notificationKey(consumer, provider, apiKey(contract)))
+					this.#failedNotifications.has(this.#notificationKey(scope, provider, apiKey(contract)))
 				) {
 					return;
 				}
 			}
 			subscription.last = provider;
-			const facade = this.#get(entry, consumer, alias, contract);
+			const facade = this.#get(entry, consumer, alias, contract, scope);
 			resolved = true;
 			if (this.#subscriptions.has(subscription)) {
 				void Promise.resolve(subscription.listener(facade)).catch(() => {
@@ -336,6 +379,18 @@ export class ComponentApiManager {
 		}
 		for (const connection of this.#connections) {
 			if (connection.consumer === activation || connection.provider === activation) {
+				this.#mark(connection);
+			}
+		}
+	}
+	revokeScope(scope: ConnectionScope): void {
+		for (const subscription of [...this.#subscriptions]) {
+			if (subscription.scope === scope) {
+				this.#remove(subscription);
+			}
+		}
+		for (const connection of this.#connections) {
+			if (connection.scope === scope) {
 				this.#mark(connection);
 			}
 		}

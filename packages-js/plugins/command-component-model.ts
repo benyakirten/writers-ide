@@ -6,6 +6,9 @@ import type {
 	ComponentApiConnection,
 	FrontendContributions,
 	PluginLocale,
+	ProjectReference,
+	ProjectConnections,
+	ComponentIdentity,
 } from './frontend';
 import type { PluginApiIdentity } from './index';
 import { apiDeclarations, apiKey, captureIdentity } from './component-api-declarations';
@@ -21,7 +24,10 @@ export type CommandContext = {
 	readonly tasks: TaskService;
 	readonly locale: PluginLocale;
 	readonly contributions: Pick<FrontendContributions<never>, 'command'>;
-};
+} & (
+	| { readonly project: ProjectReference; readonly projects: null }
+	| { readonly project: null; readonly projects: ProjectConnections }
+);
 export type Declaration = {
 	readonly id: string;
 	readonly contractId: string;
@@ -29,11 +35,16 @@ export type Declaration = {
 };
 export type Dependency = {
 	readonly alias: string;
-	readonly providerSlot: string;
-	readonly optional?: boolean;
 	readonly apis?: readonly PluginApiIdentity[];
 	readonly commands: readonly (Declaration & { readonly alias: string })[];
-};
+} & (
+	| { readonly binding?: 'instance'; readonly providerSlot: string; readonly optional?: boolean }
+	| {
+			readonly binding: 'selected-project';
+			readonly provider: ComponentIdentity;
+			readonly optional: true;
+	  }
+);
 // Slots are already selected by the host. These are not package discovery inputs.
 export type ComponentDescriptor = {
 	readonly slotId: string;
@@ -115,9 +126,39 @@ export function capture(input: ComponentDescriptor): ComponentDescriptor {
 	const dependencies = Object.freeze(
 		input.dependencies.map((dependency) => {
 			text(dependency.alias, 'Dependency alias', true);
-			text(dependency.providerSlot, 'Provider slot');
-			if (dependency.providerSlot === input.slotId) {
-				throw new Error('Self-dependency is forbidden');
+			let target;
+			if (dependency.binding === 'selected-project') {
+				if (
+					identity.projectOpeningId !== null ||
+					dependency.optional !== true ||
+					'providerSlot' in dependency
+				) {
+					throw new Error(
+						'Selected-project dependencies require an optional application consumer and no provider slot',
+					);
+				}
+				const provider = captureIdentity({ ...dependency.provider, projectOpeningId: null });
+				target = {
+					binding: 'selected-project' as const,
+					provider: Object.freeze({
+						packageId: provider.packageId,
+						componentId: provider.componentId,
+					}),
+					optional: true as const,
+				};
+			} else {
+				if (dependency.binding !== undefined && dependency.binding !== 'instance') {
+					throw new Error('Invalid dependency binding');
+				}
+				text(dependency.providerSlot, 'Provider slot');
+				if (dependency.providerSlot === input.slotId) {
+					throw new Error('Self-dependency is forbidden');
+				}
+				target = {
+					binding: 'instance' as const,
+					providerSlot: dependency.providerSlot,
+					optional: dependency.optional ?? false,
+				};
 			}
 			if (dependency.optional !== undefined && typeof dependency.optional !== 'boolean') {
 				throw new Error('Optional must be a boolean');
@@ -135,8 +176,7 @@ export function capture(input: ComponentDescriptor): ComponentDescriptor {
 			);
 			return Object.freeze({
 				alias: dependency.alias,
-				providerSlot: dependency.providerSlot,
-				optional: dependency.optional ?? false,
+				...target,
 				commands: requirements,
 				apis: apiDeclarations(dependency.apis),
 			});
@@ -147,7 +187,11 @@ export function capture(input: ComponentDescriptor): ComponentDescriptor {
 		'dependency alias',
 	);
 	unique(
-		dependencies.map((value) => value.providerSlot),
+		dependencies.map((value) =>
+			value.binding === 'selected-project'
+				? JSON.stringify([value.binding, value.provider.packageId, value.provider.componentId])
+				: JSON.stringify(['instance', value.providerSlot]),
+		),
 		'dependency target',
 	);
 	return Object.freeze({
@@ -248,8 +292,13 @@ export function activationPlan(entries: ReadonlyMap<string, Entry>, target: stri
 		visiting.add(frame.id);
 		path.push(frame.id);
 		stack.push({ id: frame.id, exit: true });
-		const dependencies = entry.descriptor.dependencies.filter((value) => !value.optional);
+		const dependencies = entry.descriptor.dependencies.filter(
+			(value) => value.binding !== 'selected-project' && !value.optional,
+		);
 		for (const dependency of [...dependencies].reverse()) {
+			if (dependency.binding === 'selected-project') {
+				continue;
+			}
 			const provider = entries.get(dependency.providerSlot);
 			if (!provider || !compatible(provider, dependency)) {
 				throw new Error('Required provider is missing or incompatible');
@@ -289,7 +338,10 @@ export function removalPlan(
 				([, entry]) =>
 					entry.status === 'active' &&
 					entry.descriptor.dependencies.some(
-						(dependency) => !dependency.optional && dependency.providerSlot === frame.id,
+						(dependency) =>
+							dependency.binding !== 'selected-project' &&
+							!dependency.optional &&
+							dependency.providerSlot === frame.id,
 					),
 			)
 			.map(([id]) => id)
