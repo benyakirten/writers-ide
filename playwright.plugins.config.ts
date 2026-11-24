@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
 	testDir: 'e2e',
-	testMatch: 'plugin-dependencies.test.ts',
+	testMatch: ['plugin-dependencies.test.ts', 'plugin-presentations.test.ts'],
 	forbidOnly: Boolean(process.env.CI),
 	workers: process.env.CI ? 2 : undefined,
 	reporter: 'list',

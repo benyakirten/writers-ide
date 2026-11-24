@@ -4,7 +4,7 @@ import {
 	type TaskService,
 	type WorkerTaskOptions,
 } from '@writers-ide/tasks';
-import type { PluginLocale, ProjectReference } from './frontend';
+import type { ActivationIdentity, PluginLocale, ProjectReference } from './frontend';
 import { ComponentProjectRegistry } from './component-project-registry';
 import { ComponentProjectConnections } from './component-project-connections';
 import {
@@ -18,7 +18,7 @@ import { createCommandDispatcher } from './command-dispatcher';
 import { ComponentApiManager } from './component-api-manager';
 import { apiKey } from './component-api-declarations';
 import type { CommandInvoker, CommandRegistration } from './commands';
-import type { Dispose } from './index';
+import type { Dispose, ToolbarContribution, ViewContribution } from './index';
 import {
 	activationPlan,
 	capture,
@@ -34,6 +34,17 @@ import {
 	type Entry,
 } from './command-component-model';
 
+export type PresentationRecord<Presentation = unknown> = {
+	readonly id: string;
+	readonly placementId: string;
+	readonly identity: ActivationIdentity;
+	readonly project: ProjectReference | null;
+	readonly visible: boolean;
+} & (
+	| { readonly kind: 'toolbar'; readonly contribution: ToolbarContribution<Presentation> }
+	| { readonly kind: 'view'; readonly contribution: ViewContribution<Presentation> }
+);
+
 type Snapshot = {
 	readonly slotId: string;
 	readonly status: Entry['status'];
@@ -47,8 +58,19 @@ type Options = NonNullable<Parameters<typeof createCommandDispatcher>[0]> & {
 let nextInstance = 0;
 
 /** Internal trusted-descriptor harness. No package loading, persistence or native authority. */
-export class CommandComponentHost {
-	readonly #entries = new Map<string, Entry>();
+export class CommandComponentHost<Presentation = unknown> {
+	readonly #entries = new Map<string, Entry<Presentation>>();
+	readonly #presentations = new WeakMap<
+		Activation,
+		Map<string, PresentationRecord<Presentation>>
+	>();
+	readonly #presentationListeners = new Set<
+		(snapshot: readonly PresentationRecord<Presentation>[]) => void
+	>();
+	readonly #pendingPresentationListeners = new Set<
+		(snapshot: readonly PresentationRecord<Presentation>[]) => void
+	>();
+	#deliveringPresentations = false;
 	readonly #dispatcher;
 	readonly #locale: PluginLocale;
 	readonly #workQueue: WorkQueue;
@@ -114,7 +136,7 @@ export class CommandComponentHost {
 		}
 	}
 
-	register(descriptor: ComponentDescriptor): Snapshot {
+	register(descriptor: ComponentDescriptor<Presentation>): Snapshot {
 		return this.#mutate(() => {
 			const captured = capture(descriptor);
 			if (this.#entries.has(captured.slotId)) {
@@ -150,6 +172,47 @@ export class CommandComponentHost {
 		this.#deliver(() => subscription(this.list()));
 		return () => {
 			this.#listeners.delete(subscription);
+		};
+	}
+
+	presentations(): readonly PresentationRecord<Presentation>[] {
+		const records: PresentationRecord<Presentation>[] = [];
+		for (const entry of this.#entries.values()) {
+			const activation = entry.activation;
+			if (activation?.phase !== 'active') {
+				continue;
+			}
+			for (const record of this.#presentations.get(activation)?.values() ?? []) {
+				records.push(
+					Object.freeze({
+						...record,
+						visible: record.project === null || record.project === this.#projects.selected(),
+					}),
+				);
+			}
+		}
+		return Object.freeze(records);
+	}
+
+	subscribePresentations(
+		listener: (snapshot: readonly PresentationRecord<Presentation>[]) => void,
+	): Dispose {
+		if (this.#disposed) {
+			throw new Error('Component host is disposed');
+		}
+		if (typeof listener !== 'function') {
+			throw new TypeError('Presentation listener must be a function');
+		}
+		const subscription = (snapshot: readonly PresentationRecord<Presentation>[]) =>
+			listener(snapshot);
+		this.#presentationListeners.add(subscription);
+		this.#pendingPresentationListeners.add(subscription);
+		if (!this.#busy) {
+			this.#drainPresentations();
+		}
+		return () => {
+			this.#presentationListeners.delete(subscription);
+			this.#pendingPresentationListeners.delete(subscription);
 		};
 	}
 
@@ -239,7 +302,7 @@ export class CommandComponentHost {
 		});
 	}
 
-	#entry(id: string): Entry {
+	#entry(id: string): Entry<Presentation> {
 		const entry = this.#entries.get(id);
 		if (!entry) {
 			throw new Error('Component slot is not registered');
@@ -266,11 +329,38 @@ export class CommandComponentHost {
 						this.#deliver(() => listener(this.list()));
 					}
 				}
+				for (const listener of this.#presentationListeners) {
+					this.#pendingPresentationListeners.add(listener);
+				}
+				this.#drainPresentations();
+				if (this.#disposed) {
+					this.#presentationListeners.clear();
+				}
 			} finally {
 				this.#busy = false;
 			}
 		}
 	}
+	#drainPresentations(): void {
+		if (this.#deliveringPresentations) {
+			return;
+		}
+		this.#deliveringPresentations = true;
+		try {
+			const snapshot = this.presentations();
+			// Nested initial subscriptions join the same queue, never the callback stack.
+			for (const listener of this.#pendingPresentationListeners) {
+				this.#pendingPresentationListeners.delete(listener);
+				if (this.#presentationListeners.has(listener)) {
+					this.#deliver(() => listener(snapshot));
+				}
+			}
+		} finally {
+			this.#pendingPresentationListeners.clear();
+			this.#deliveringPresentations = false;
+		}
+	}
+
 	#callback<T>(callback: () => T): T {
 		this.#callbacks++;
 		try {
@@ -395,7 +485,7 @@ export class CommandComponentHost {
 		} satisfies TaskService);
 	}
 
-	#start(entry: Entry): void {
+	#start(entry: Entry<Presentation>): void {
 		nextInstance++;
 		const id = `command-component-activation-${nextInstance}`;
 		const activation: Activation = {
@@ -406,6 +496,7 @@ export class CommandComponentHost {
 			cleanups: new Set(),
 			publications: new Map(),
 			seen: new Set(),
+			presentationIds: new Set(),
 			listeners: new Set(),
 			phase: 'setup',
 			invalid: false,
@@ -448,7 +539,7 @@ export class CommandComponentHost {
 				project === null
 					? { project: null, projects: this.#connections.context(entry, activation, owned) }
 					: { project, projects: null };
-			const context: CommandContext = Object.freeze({
+			const context: CommandContext<Presentation> = Object.freeze({
 				...projectContext,
 				identity: activation.identity,
 				apis: this.#apis.context(entry, activation),
@@ -458,6 +549,10 @@ export class CommandComponentHost {
 				locale,
 				commands: this.#invoker(entry, activation),
 				contributions: Object.freeze({
+					toolbar: (contribution: ToolbarContribution<Presentation>) =>
+						this.#publishPresentation(entry, activation, project, 'toolbar', contribution),
+					view: (contribution: ViewContribution<Presentation>) =>
+						this.#publishPresentation(entry, activation, project, 'view', contribution),
 					command: <AI, AO, RI, RO>(registration: CommandRegistration<AI, AO, RI, RO>) =>
 						this.#publish(
 							entry,
@@ -491,6 +586,116 @@ export class CommandComponentHost {
 			entry.status = 'failed';
 			entry.errors.push('activation-failed');
 			this.#bindingsChanged();
+			throw error;
+		}
+	}
+
+	#publishPresentation(
+		entry: Entry<Presentation>,
+		activation: Activation,
+		project: ProjectReference | null,
+		kind: 'toolbar' | 'view',
+		input: ToolbarContribution<Presentation> | ViewContribution<Presentation>,
+	): Dispose {
+		try {
+			if (activation.phase !== 'setup' || this.#callbacks > 0) {
+				throw new Error('UI publication is only allowed during synchronous activation');
+			}
+			if (!entry.descriptor.capabilities.includes(`contributions.${kind}`)) {
+				throw new Error('UI contribution capability required');
+			}
+			const id = input.id;
+			text(id, 'Contribution ID');
+			const key = JSON.stringify([kind, id]);
+			let records = this.#presentations.get(activation);
+			if (!records) {
+				records = new Map();
+				this.#presentations.set(activation, records);
+			}
+			// Keep consumed IDs after early disposal, just as for command publications.
+			if (activation.presentationIds.has(key)) {
+				throw new Error('Duplicate UI publication');
+			}
+			// Reserve before reading more author getters. Reentrant attempts must not overwrite it.
+			activation.presentationIds.add(key);
+			const name = input.name;
+			if (typeof name !== 'string' || name.trim().length === 0) {
+				throw new Error('Contribution name must be nonempty');
+			}
+			let captured;
+			if (kind === 'toolbar') {
+				const toolbar = input as ToolbarContribution<Presentation>;
+				const orientation = (value: ToolbarContribution<Presentation>['horizontal']) => {
+					if (!value || !('presentation' in value)) {
+						throw new Error('Toolbar orientation requires presentation and size 1, 2 or 3');
+					}
+					const size = value.size;
+					const presentation = value.presentation;
+					if (![1, 2, 3].includes(size)) {
+						throw new Error('Toolbar orientation requires presentation and size 1, 2 or 3');
+					}
+					return Object.freeze({ presentation, size });
+				};
+				captured = {
+					kind,
+					contribution: Object.freeze({
+						id,
+						name,
+						horizontal: orientation(toolbar.horizontal),
+						vertical: orientation(toolbar.vertical),
+					}),
+				};
+			} else {
+				if (!('presentation' in input)) {
+					throw new Error('View presentation required');
+				}
+				captured = {
+					kind,
+					contribution: Object.freeze({
+						id,
+						name,
+						presentation: input.presentation,
+					}),
+				};
+			}
+			if (activation.invalid) {
+				throw new Error('Invalid UI publication during setup');
+			}
+			const record: PresentationRecord<Presentation> = Object.freeze({
+				...captured,
+				id: JSON.stringify([activation.id, kind, id]),
+				placementId: JSON.stringify([
+					activation.identity.packageId,
+					activation.identity.componentId,
+					kind,
+					id,
+					project?.id ?? null,
+				]),
+				identity: activation.identity,
+				project,
+				visible: project === null || project === this.#projects.selected(),
+			});
+			records.set(key, record);
+			let live = true;
+			return () => {
+				if (!live || activation.phase === 'stopped') {
+					return;
+				}
+				const remove = () => {
+					live = false;
+					records.delete(key);
+				};
+				if (activation.phase === 'setup') {
+					if (this.#callbacks > 0) {
+						this.#assertIdle();
+					}
+					remove();
+				} else {
+					this.#mutate(remove, true);
+				}
+			};
+		} catch (error) {
+			activation.invalid = true;
 			throw error;
 		}
 	}
@@ -594,6 +799,8 @@ export class CommandComponentHost {
 			return;
 		}
 		activation.phase = 'stopped';
+		this.#presentations.get(activation)?.clear();
+		this.#presentations.delete(activation);
 		entry.status = 'disabled';
 		this.#apis.revoke(activation);
 		this.#connections.revokeOwner(activation);

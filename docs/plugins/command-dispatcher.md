@@ -85,7 +85,7 @@ A host slot identifies a component instance that the host has already selected. 
 
 Construct the harness with an explicit host-owned `locale` source implementing `PluginLocale`. The source provides the current UI language/direction and immediate/change subscriptions. No application locale is guessed. An optional `workQueue` supplies the embedding host's shared cooperative scheduler; otherwise the standalone harness creates one queue shared by its activations. Application assembly must pass the pagination queue when these components join the application's scheduling budget.
 
-Host code calls `register(descriptor)` with a slot ID, explicit package/component/project-opening identity, declared APIs/commands, exact provider-slot dependencies, command capability and synchronous activation callback. The harness copies and freezes declaration data. It checks applicable identifier, list-size, duplicate and self-dependency rules. This is not parsing `manifest.toml`, matching package versions or selecting project scopes. Planning is iterative but synchronous and can scan the full slot catalogue. The harness does not yet provide catalogue budgets or cooperative scheduling.
+Host code calls `register(descriptor)` with a slot ID, explicit package/component/project-opening identity, declared APIs/commands, exact provider-slot dependencies, contribution capabilities and synchronous activation callback. The harness copies and freezes declaration data. It checks applicable identifier, list-size, duplicate and self-dependency rules. This is not parsing `manifest.toml`, matching package versions or selecting project scopes. Planning is iterative but synchronous and can scan the full slot catalogue. The harness does not yet provide catalogue budgets or cooperative scheduling.
 
 ### Activation and publication
 
@@ -101,9 +101,9 @@ Each activation gets a fresh host-generated instance ID. The harness calls the d
 - `tasks`: the existing activation-owned `TaskService` over the host's cooperative queue.
 - `locale`: an activation-owned `PluginLocale` adapter over the host's UI locale source.
 - `project` and `projects`: scope-correct project reference/connection services, described in the [project guide](project-connections.md#context-scope).
-- `contributions.command(registration)`: the generic SDK command-registration signature.
+- `contributions`: the generic SDK toolbar, view and command registration methods.
 
-This is deliberately not a complete `FrontendContext`. It supplies no toolbar/view registration or native services. It now includes the approved project/application context distinction: a fixed `project` with `projects: null`, or `project: null` with the independent project-connection service.
+This is deliberately not a complete `FrontendContext`. It supplies no native services. It now includes the approved project/application context distinction: a fixed `project` with `projects: null`, or `project: null` with the independent project-connection service.
 
 Every declared API and command must be published before setup succeeds. API factories are staged alongside commands, so a missing publication rolls back both kinds. Catching an invalid API publication still fails setup. Factories themselves run lazily when a consumer requests the API.
 
@@ -128,6 +128,28 @@ The complete teardown plan is marked revoked before abort events or owned cleanu
 `get` and `list` return frozen status snapshots. `subscribe` immediately delivers snapshots and returns an early disposer. Activation and cleanup failures use simple host-owned codes. This is not the production plugin-management UI or its persistence model.
 
 Lifecycle changes during activation, notifications, diagnostics or cleanup are guarded. Callers must defer those changes until the callback returns. This includes disposing staged publications from an immediate availability callback. Ordinary direct disposal during setup is allowed, but leaves setup invalid because the promised publication is missing.
+
+## UI contributions and workspace mounting
+
+The internal harness accepts a presentation type, such as `CommandComponentHost<SveltePresentation>`. During synchronous activation, a component can call `context.contributions.toolbar(...)` or `view(...)`. Each call needs its corresponding capability. Toolbar contributions supply horizontal and vertical presentations with sizes from 1 to 3. View contributions supply one presentation. Registration does not mount a component or open a tab.
+
+UI registrations stay private until activation succeeds. Failed setup publishes none. Invalid registration makes setup fail even if the author catches the exception. IDs are local to each contribution kind within an activation. Two components may both register `formatting`, and one component may use that ID for both a toolbar and a view. Disposers remove only their own registration and are idempotent. A disposed ID cannot be registered again during that activation.
+
+Host code calls `presentations()` or `subscribePresentations(listener)` to receive frozen registration records. The subscription delivers the current records, then completed changes. A subscription created during a callback receives its initial notice after that callback returns. Exceptions and asynchronous rejections do not stop other observers. Lifecycle mutations from observers are rejected.
+
+Each record contains:
+
+- `id`: runtime identity built from activation ID, contribution kind and local ID.
+- `placementId`: stable identity built from package, component, kind, local ID and project registration ID. Application contributions use a null project association.
+- `identity` and `project`: the fixed activation and project-opening metadata.
+- `kind` and `contribution`: the captured toolbar or view registration.
+- `visible`: true for application UI, or when the contribution's project opening is selected.
+
+The workspace owns placement and open-tab records separately from registrations. It mounts only visible presentations. Switching projects unmounts the previous project's UI without ending its activation, services or background tasks. Returning mounts fresh presentation instances. Component-local state resets. State that must survive belongs outside the presentation instance, usually in activation-owned state passed through props. Application UI remains mounted. Project closure ends the affected activations and removes their registrations.
+
+Saved placement uses `placementId`, not the temporary runtime ID. Removing a registration must not delete placement or open-tab records. A restored registration can use those records again. This slice supplies identities and visibility, not persistent layout storage or a public open-view API.
+
+The [browser fixture](../../e2e/fixtures/plugins/PresentationsFixture.svelte) demonstrates a small host-owned workspace. Its explicit buttons open registered views. It retains placement and open-tab records in memory and renders through the application's `PluginPresentation.svelte` boundary under one host-owned tooltip provider. It tests project switching, orientation remounts, focus removal, rollback, reactivation and render failure isolation. This is fixture evidence, not integration with the application's bar and tab registries. Boundaries contain render/effect failures, not arbitrary event handlers or asynchronous JavaScript.
 
 ## Managed tasks and UI locale
 

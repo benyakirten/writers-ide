@@ -15,7 +15,7 @@ import { apiDeclarations, apiKey, captureIdentity } from './component-api-declar
 import type { Dispose } from './index';
 import type { CommandProviderBinding } from './command-dispatcher';
 
-export type CommandContext = {
+export type CommandContext<Presentation = unknown> = {
 	readonly identity: ActivationIdentity;
 	readonly apis: ComponentApis;
 	readonly signal: AbortSignal;
@@ -23,7 +23,7 @@ export type CommandContext = {
 	readonly commands: CommandInvoker;
 	readonly tasks: TaskService;
 	readonly locale: PluginLocale;
-	readonly contributions: Pick<FrontendContributions<never>, 'command'>;
+	readonly contributions: FrontendContributions<Presentation>;
 } & (
 	| { readonly project: ProjectReference; readonly projects: null }
 	| { readonly project: null; readonly projects: ProjectConnections }
@@ -46,14 +46,18 @@ export type Dependency = {
 	  }
 );
 // Slots are already selected by the host. These are not package discovery inputs.
-export type ComponentDescriptor = {
+export type ComponentDescriptor<Presentation = unknown> = {
 	readonly slotId: string;
 	readonly identity: Omit<ActivationIdentity, 'activationId'>;
 	readonly provides?: readonly PluginApiIdentity[];
 	readonly commands: readonly Declaration[];
 	readonly dependencies: readonly Dependency[];
-	readonly capabilities: readonly 'contributions.command'[];
-	readonly activate: (context: CommandContext) => void | Dispose;
+	readonly capabilities: readonly (
+		| 'contributions.command'
+		| 'contributions.toolbar'
+		| 'contributions.view'
+	)[];
+	readonly activate: (context: CommandContext<Presentation>) => void | Dispose;
 };
 export type Publication = { binding: CommandProviderBinding; controller: AbortController };
 export type Activation = {
@@ -64,12 +68,13 @@ export type Activation = {
 	cleanups: Set<Dispose>;
 	publications: Map<string, Publication>;
 	seen: Set<string>;
+	presentationIds: Set<string>;
 	listeners: Set<Dispose>;
 	phase: 'setup' | 'active' | 'stopped';
 	invalid: boolean;
 };
-export type Entry = {
-	descriptor: ComponentDescriptor;
+export type Entry<Presentation = unknown> = {
+	descriptor: ComponentDescriptor<Presentation>;
 	status: 'disabled' | 'active' | 'failed';
 	errors: string[];
 	activation?: Activation;
@@ -105,14 +110,22 @@ function declaration(value: Declaration): Declaration {
 	}
 	return Object.freeze({ id: value.id, contractId: value.contractId, major: value.major });
 }
-export function capture(input: ComponentDescriptor): ComponentDescriptor {
+export function capture<Presentation>(
+	input: ComponentDescriptor<Presentation>,
+): ComponentDescriptor<Presentation> {
 	text(input.slotId, 'Host slot');
 	const identity = captureIdentity(input.identity);
 	const provides = apiDeclarations(input.provides);
 	list(input.commands, 32, 'Commands');
 	list(input.dependencies, 64, 'Dependencies');
-	list(input.capabilities, 1, 'Capabilities');
-	if (input.capabilities.some((value) => value !== 'contributions.command')) {
+	list(input.capabilities, 3, 'Capabilities');
+	unique(input.capabilities, 'capability');
+	if (
+		input.capabilities.some(
+			(value) =>
+				!['contributions.command', 'contributions.toolbar', 'contributions.view'].includes(value),
+		)
+	) {
 		throw new Error('Unsupported capability');
 	}
 	if (typeof input.activate !== 'function') {

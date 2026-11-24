@@ -39,6 +39,14 @@ The internal activation context preserves the approved scope distinction:
 
 The project reference's opening ID matches `context.identity.projectOpeningId`. An application activation keeps that identity field `null`, including while it uses a project connection. Selection does not change either activation's identity.
 
+## Project UI visibility
+
+The internal host associates each toolbar and view registration with its activation's fixed project opening. Only the selected project's presentations are visible. Application-owned presentations remain visible without a selected project.
+
+The workspace unmounts a project's UI when it is deselected. The activation and its services keep running. Returning to the project mounts fresh UI instances, so component-local state resets. Keep state that must survive in activation-owned objects passed through props. The workspace retains placement and open-tab records separately. Registering a view does not open a tab.
+
+This policy is implemented by internal visibility records and demonstrated in a browser fixture. Production workspace routing and persistent layout storage remain separate work. See [UI contributions and mounting](command-dispatcher.md#ui-contributions-and-workspace-mounting).
+
 ## Independent leases
 
 `context.projects.connect(reference)` creates a `ProjectApiConnection`. Here, a **lease** means a connection with its own lifetime and cleanup. It exposes:

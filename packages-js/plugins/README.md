@@ -4,6 +4,8 @@
 
 This guide is for authors of trusted plugins bundled with the application. The package is private to this workspace, and its API is still evolving. External installation is not implemented. The planned external SDK will expose a reviewed set of author-facing exports, not automatically every export in these workspace packages. Application setup APIs will remain separate. The [author SDK assembly](../../docs/plugins/sdk-export-review.md#approved-sdk-assembly) approves root frontend/command contracts, `/svelte` presentation and context/entry types, and `/native` service contracts. Host construction remains internal. These author types and helpers are now source-exported alongside legacy bundled types. The current host and bundled imports shown below are unchanged: it does not supply `FrontendContext` or implement its locale, native, project or typed command-invocation services. The curated external profile is not shipped. See the [runtime profile proposal](../../docs/plugins/package-api-proposal.md#runtime-profile-inventory). The [safety section](#boundaries-and-next-steps) explains what the current host does and does not protect.
 
+The separate internal component harness now tests typed commands, provider APIs, tasks, locale, project connections and UI contribution routing together. Its UI IDs are component-scoped. Inactive-project UI unmounts while its activation keeps running. These rules are not yet wired into the bundled host used by this guide's examples. See the [internal UI guide](../../docs/plugins/command-dispatcher.md#ui-contributions-and-workspace-mounting) for the implemented boundary and browser fixture.
+
 ## What can a plugin do today?
 
 Declare the capabilities your plugin uses in its manifest:
