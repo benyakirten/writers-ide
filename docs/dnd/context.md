@@ -49,6 +49,16 @@ Feature state should live outside presentation instances. Stable placement IDs d
 
 Relocation menus use the same validated transfer API. They may choose a fitting final bar or create a new one as a convenience. Pointer drops require an explicit gap to create a bar. Older directional item nudges remain separate operations.
 
+## Project-owned visibility in the shared workspace
+
+The opt-in [application component assembly](../plugins/command-dispatcher.md#internal-application-assembly) uses the approved single shared workspace. Project selection filters project-owned UI; it does not swap layout models. The default bundled host remains unchanged.
+
+The application registries retain visibility ownership when a component is disabled. This keeps inactive-project toolbar placeholders and error tabs hidden. Selected-project disabled placeholders remain visible. Identity-based removal deletes only the adapter's own live registration, while preserving toolbar costs, placements and tab records.
+
+Production bar rendering hides inactive item controls and their insertion gaps. Non-empty docked and floating bars with no visible items also hide their shells. Truly empty bars remain visible for normal layout use. Visible items keep their original IDs and insertion indexes. Capacity still counts all underlying items, including hidden and disabled ones. This prevents project switching from creating temporary capacity that would overfill a bar when another project's UI returns. Filtering changes rendering, not transfer accounting or stored order.
+
+The opt-in browser fixture uses production `MainView`, docked bars and floating bars with these adapters. It inherits the existing presentation and tooltip boundaries. Layout persistence is not implemented. Separate full per-project layouts remain a [deferred investigation](../plugins/implementation-plan.md#deferred-work-and-future-candidates), not a promised alternative.
+
 ## Interaction and feedback
 
 The installed `@dnd-kit-svelte` packages handle drag gestures, including floating movement. Committed layout state does not change during hover. Only a lightweight preview moves. This avoids mounting duplicate feature components and subscriptions. It also avoids repeatedly resizing the editor and triggering pagination during a drag.

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import Registry from '../state/bar-item-registry.svelte';
 	import DockDraggable from '$lib/dnd/DockDraggable.svelte';
 	import DockTarget from '$lib/dnd/DockTarget.svelte';
 	import HorizontalItemRenderer from './HorizontalItemRenderer.svelte';
@@ -14,19 +14,24 @@
 
 	let { bar, items, index }: { bar: FloatingBar; items: BarItemData[]; index: number } = $props();
 
-	let floater: HTMLElement;
-	let resizeObserver: ResizeObserver;
+	const visibleItemCount = $derived(items.filter((item) => Registry.isVisible(item.id)).length);
+	let floater = $state<HTMLElement>();
 	let workbenchHeight = $state<number | null>(null);
 
-	onMount(() => {
-		resizeObserver = new ResizeObserver((entries) => {
+	$effect(() => {
+		const element = floater;
+		if (!element) {
+			return;
+		}
+		const barId = bar.id;
+		const resizeObserver = new ResizeObserver((entries) => {
 			for (const item of entries) {
 				if (!(item.target instanceof HTMLElement)) {
 					continue;
 				}
 				const { clientWidth, clientHeight } = item.target;
-				if (item.target === floater) {
-					FloaterBarState.updateMeasurements(bar.id, clientWidth, clientHeight);
+				if (item.target === element) {
+					FloaterBarState.updateMeasurements(barId, clientWidth, clientHeight);
 				} else {
 					workbenchHeight = clientHeight;
 				}
@@ -35,7 +40,7 @@
 
 		// Changing the box doesn't seem to work.
 		// TODO: Figure out why a border is a problem but not an outline.
-		resizeObserver.observe(floater, { box: 'border-box' });
+		resizeObserver.observe(element, { box: 'border-box' });
 		if (FloaterBarState.root) {
 			workbenchHeight = FloaterBarState.root.clientHeight;
 			resizeObserver.observe(FloaterBarState.root);
@@ -90,86 +95,92 @@
 	}
 </script>
 
-<DockDraggable
-	source={{ kind: 'bar', location: 'floating', barId: bar.id }}
-	style={`position: absolute; left: ${bar.position.left}px; top: ${bar.position.top}px; z-index: ${bar.z}`}
->
-	{#snippet children(handle)}
-		<div
-			bind:this={floater}
-			class="floater"
-			style:width="{bar.position.width}px"
-			style:height="{bar.position.height}px"
-			style:min-width="{FloaterBarState.MIN_WIDTH_PX}px"
-			style:min-height="{FloaterBarState.MIN_HEIGHT_PX}px"
-			style:max-width="{FloaterBarState.MAX_WIDTH_PX}px"
-			style:max-height={workbenchHeight === null
-				? undefined
-				: `${(workbenchHeight * FloaterBarState.MAX_HEIGHT_PERCENT) / 100}px`}
-			onfocusin={() => FloaterBarState.focus(bar.id)}
-			onpointerdowncapture={() => FloaterBarState.focus(bar.id)}
-		>
-			<DockTarget
-				id={JSON.stringify(['bar-interior', 'floating', bar.id])}
-				target={{ kind: 'bar', location: 'floating', barId: bar.id, index: items.length }}
-				style="height: 100%; display: grid; grid-template-rows: auto 1fr; grid-template-columns: 100%"
+{#if items.length === 0 || visibleItemCount > 0}
+	<DockDraggable
+		source={{ kind: 'bar', location: 'floating', barId: bar.id }}
+		style={`position: absolute; left: ${bar.position.left}px; top: ${bar.position.top}px; z-index: ${bar.z}`}
+	>
+		{#snippet children(handle)}
+			<div
+				bind:this={floater}
+				class="floater"
+				style:width="{bar.position.width}px"
+				style:height="{bar.position.height}px"
+				style:min-width="{FloaterBarState.MIN_WIDTH_PX}px"
+				style:min-height="{FloaterBarState.MIN_HEIGHT_PX}px"
+				style:max-width="{FloaterBarState.MAX_WIDTH_PX}px"
+				style:max-height={workbenchHeight === null
+					? undefined
+					: `${(workbenchHeight * FloaterBarState.MAX_HEIGHT_PERCENT) / 100}px`}
+				onfocusin={() => FloaterBarState.focus(bar.id)}
+				onpointerdowncapture={() => FloaterBarState.focus(bar.id)}
 			>
-				<div class="menu">
-					<FloaterBarTitle {index} title={bar.title} id={bar.id} />
-					<button
-						type="button"
-						disabled={!bar.data.canOrient(!bar.data.isVertical)}
-						title="Switch toolbar orientation (maximum 3 units)"
-						onclick={() => FloaterBarState.setOrientation(bar.id, !bar.data.isVertical)}
-					>
-						{bar.data.isVertical ? 'Horizontal' : 'Vertical'}
-					</button>
-					<BarMenu
-						onminimize={() => FloaterBarState.update(bar.id, 'minimized', true)}
-						onclose={() => FloaterBarState.remove(bar.id)}
-						{handle}
-						position="floating"
-						canMoveForward={false}
-						{index}
-					/>
-				</div>
-				<div
-					class="items"
-					class:horizontal={!bar.data.isVertical}
-					style:--insertion-space={`${(items.length + 1) * 16}px`}
+				<DockTarget
+					id={JSON.stringify(['bar-interior', 'floating', bar.id])}
+					target={{ kind: 'bar', location: 'floating', barId: bar.id, index: items.length }}
+					style="height: 100%; display: grid; grid-template-rows: auto 1fr; grid-template-columns: 100%"
 				>
-					{#each items as item, itemIndex (item.id)}
-						{@const moveDetails = determineMoveDetails(itemIndex, items.length)}
+					<div class="menu">
+						<FloaterBarTitle {index} title={bar.title} id={bar.id} />
+						<button
+							type="button"
+							disabled={!bar.data.canOrient(!bar.data.isVertical)}
+							title="Switch toolbar orientation (maximum 3 units)"
+							onclick={() => FloaterBarState.setOrientation(bar.id, !bar.data.isVertical)}
+						>
+							{bar.data.isVertical ? 'Horizontal' : 'Vertical'}
+						</button>
+						<BarMenu
+							onminimize={() => FloaterBarState.update(bar.id, 'minimized', true)}
+							onclose={() => FloaterBarState.remove(bar.id)}
+							{handle}
+							position="floating"
+							canMoveForward={false}
+							{index}
+						/>
+					</div>
+					<div
+						class="items"
+						class:horizontal={!bar.data.isVertical}
+						style:--insertion-space={`${(visibleItemCount + 1) * 16}px`}
+					>
+						{#each items as item, itemIndex (item.id)}
+							{#if Registry.isVisible(item.id)}
+								{@const moveDetails = determineMoveDetails(itemIndex, items.length)}
+								<DockTarget
+									id={JSON.stringify(['bar-boundary', 'floating', bar.id, itemIndex])}
+									target={{ kind: 'bar', location: 'floating', barId: bar.id, index: itemIndex }}
+									style={bar.data.isVertical
+										? 'height: 16px; width: 100%'
+										: 'width: 16px; min-width: 16px; height: 100%'}
+								/>
+								{@const Renderer = bar.data.isVertical
+									? VerticalItemRenderer
+									: HorizontalItemRenderer}
+								<Renderer
+									barId={bar.id}
+									{...item}
+									onremove={() => TransferHandler.remove('floating', bar.id, item.id)}
+									position="floating"
+									{moveDetails}
+									onmove={(direction) => handleItemMove(direction, item.id, itemIndex)}
+									onrelocate={(to) => handleItemRelocate(to, item.id)}
+								/>
+							{/if}
+						{/each}
 						<DockTarget
-							id={JSON.stringify(['bar-boundary', 'floating', bar.id, itemIndex])}
-							target={{ kind: 'bar', location: 'floating', barId: bar.id, index: itemIndex }}
+							id={JSON.stringify(['bar-boundary', 'floating', bar.id, items.length])}
+							target={{ kind: 'bar', location: 'floating', barId: bar.id, index: items.length }}
 							style={bar.data.isVertical
 								? 'height: 16px; width: 100%'
 								: 'width: 16px; min-width: 16px; height: 100%'}
 						/>
-						{@const Renderer = bar.data.isVertical ? VerticalItemRenderer : HorizontalItemRenderer}
-						<Renderer
-							barId={bar.id}
-							{...item}
-							onremove={() => TransferHandler.remove('floating', bar.id, item.id)}
-							position="floating"
-							{moveDetails}
-							onmove={(direction) => handleItemMove(direction, item.id, itemIndex)}
-							onrelocate={(to) => handleItemRelocate(to, item.id)}
-						/>
-					{/each}
-					<DockTarget
-						id={JSON.stringify(['bar-boundary', 'floating', bar.id, items.length])}
-						target={{ kind: 'bar', location: 'floating', barId: bar.id, index: items.length }}
-						style={bar.data.isVertical
-							? 'height: 16px; width: 100%'
-							: 'width: 16px; min-width: 16px; height: 100%'}
-					/>
-				</div>
-			</DockTarget>
-		</div>
-	{/snippet}
-</DockDraggable>
+					</div>
+				</DockTarget>
+			</div>
+		{/snippet}
+	</DockDraggable>
+{/if}
 
 <style>
 	.floater {

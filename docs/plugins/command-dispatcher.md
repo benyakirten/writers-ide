@@ -8,6 +8,18 @@ The internal component harness connects provider APIs and typed application comm
 
 The dispatcher implements execution and availability. The internal harness adds synchronous activation, API/command publication checks, provider connections and required-consumer lifecycle planning. The harness also implements in-memory project references, selection and independent leases. Neither module implements manifest-to-runtime assembly, the application's project UI/persistence, external loading, native authorization, settings persistence or a settings menu. Creating a dispatcher or harness does not grant permission to run external code.
 
+## Internal application assembly
+
+[`createApplicationComponentHost`](../../src/lib/plugins/application-component-host.svelte.ts) assembles `CommandComponentHost<SveltePresentation>` with the application's real bar and tab registries. It is an internal application import, not an SDK host export. The default bundled host and Basic Menu remain unchanged. The new assembly is opt-in and is exercised by the [application browser fixture](../../e2e/fixtures/plugins/ApplicationFixture.svelte).
+
+Application composition code can import it from `$lib/plugins/application-component-host.svelte`. Create one assembly for the workspace lifetime before registering trusted, application-selected component descriptors. The returned object supplies `host`, `bars`, `views`, a reactive `errors` getter and `dispose()`. Use `host.register(descriptor)` and `host.activate(slotId)` for those descriptors. Host code explicitly opens/selects in-memory projects and creates toolbar placements or tab records; registration alone does not create them. Do not use this helper to import arbitrary external modules.
+
+By default, `bars` and `views` are the shared `BarItemRegistry` and `TabStateRegistry` instances. Options can supply other registries. The host uses the application's shared `workQueue` unless an explicit queue is supplied. `createApplicationLocale` reads the real `LocaleManager`; its supported English (`en`) and French (`fr`) locales both use `ltr` direction. The assembly owns this locale adapter and its presentation subscription. The embedding workspace must call `dispose()` at teardown. Disposal revokes host activations, removes owned live registry entries, releases visibility ownership and disposes the locale adapter. It does not dispose the shared queue or delete layout/tab records.
+
+Adapter failures appear in `errors` as host-only records containing placement ID, runtime ID, contribution kind and the original error. They are not plugin diagnostics, persisted records or native authority. Cleanup removes a registry entry only if it is still the same object registered by this adapter. A foreign replacement is not removed.
+
+The assembly does not implement external imports, a loader, manifest-to-runtime integration, native services, settings persistence, persistent project registration or layout persistence.
+
 ## What the host supplies
 
 `createCommandDispatcher(options)` creates an independent dispatcher for one workspace window. Options can supply a reservation ledger, a monotonic clock, a metadata diagnostic observer and an explicit raw-error inspection observer. Without a ledger, it creates one with the approved defaults. No diagnostic storage or logging UI is created.
@@ -91,7 +103,7 @@ Host code calls `register(descriptor)` with a slot ID, explicit package/componen
 
 Host code calls `activate(slotId)` to enable a registered component. The harness checks the complete required dependency closure before calling any activation function. Missing/incompatible providers and required cycles fail this check. Required providers activate first. Optional providers are never enabled by lookup or consumer activation. A failed component does not stop unrelated active siblings or already-successful providers.
 
-Each activation gets a fresh host-generated instance ID. The harness calls the descriptor's activation callback with only:
+Each activation gets a fresh host-generated instance ID. `CommandContext<Presentation>` aliases the SDK's `FrontendContext<Presentation>`. The harness calls the descriptor's activation callback with a frozen context containing:
 
 - `identity`: frozen `ActivationIdentity` metadata. The host supplies package/component identity and a fixed project-opening ID or `null`; the harness adds a fresh activation ID.
 - `apis`: alias-based `ComponentApis` for publication and live provider connections.
@@ -102,8 +114,9 @@ Each activation gets a fresh host-generated instance ID. The harness calls the d
 - `locale`: an activation-owned `PluginLocale` adapter over the host's UI locale source.
 - `project` and `projects`: scope-correct project reference/connection services, described in the [project guide](project-connections.md#context-scope).
 - `contributions`: the generic SDK toolbar, view and command registration methods.
+- `native`: a frozen `{ projectFiles: null, externalLinks: null }` group.
 
-This is deliberately not a complete `FrontendContext`. It supplies no native services. It now includes the approved project/application context distinction: a fixed `project` with `projects: null`, or `project: null` with the independent project-connection service.
+This is a complete, typed `FrontendContext` with both native service groups unavailable. It grants no native authority. It preserves the project/application distinction: a fixed `project` with `projects: null`, or `project: null` with the independent project-connection service.
 
 Every declared API and command must be published before setup succeeds. API factories are staged alongside commands, so a missing publication rolls back both kinds. Catching an invalid API publication still fails setup. Factories themselves run lazily when a consumer requests the API.
 
@@ -149,7 +162,11 @@ The workspace owns placement and open-tab records separately from registrations.
 
 Saved placement uses `placementId`, not the temporary runtime ID. Removing a registration must not delete placement or open-tab records. A restored registration can use those records again. This slice supplies identities and visibility, not persistent layout storage or a public open-view API.
 
-The [browser fixture](../../e2e/fixtures/plugins/PresentationsFixture.svelte) demonstrates a small host-owned workspace. Its explicit buttons open registered views. It retains placement and open-tab records in memory and renders through the application's `PluginPresentation.svelte` boundary under one host-owned tooltip provider. It tests project switching, orientation remounts, focus removal, rollback, reactivation and render failure isolation. This is fixture evidence, not integration with the application's bar and tab registries. Boundaries contain render/effect failures, not arbitrary event handlers or asynchronous JavaScript.
+The approved application policy uses one shared workspace and filters project-owned UI. The application adapter registers each stable placement as `component:${placementId}`. It retains project visibility ownership even after a contribution is disabled. This prevents a disabled view from appearing as an error tab in another project. Toolbar removal also retains declared capacity costs. Neither removal nor selection deletes placements or tab records.
+
+`MainView` filters inactive tabs. Docked and floating bars filter inactive item controls and insertion gaps. A non-empty bar whose items are all invisible has no visible shell. Truly empty bars and disabled placeholders belonging to the selected project remain visible. Filtering preserves underlying IDs, insertion indexes and capacity costs. Hidden items therefore do not create spare capacity. Application presentations keep their registry object identity and do not remount on unrelated host snapshots. See the [docking rationale](../dnd/context.md#project-owned-visibility-in-the-shared-workspace).
+
+The [presentation fixture](../../e2e/fixtures/plugins/PresentationsFixture.svelte) covers the presentation boundary. The [application fixture](../../e2e/fixtures/plugins/ApplicationFixture.svelte) opts into the assembly and uses production `MainView`, docked bars and floating bars. These render through the existing `PluginPresentation.svelte` boundary and inherit the surrounding tooltip tree; the adapter adds no duplicate renderer or tooltip provider. Browser coverage includes project switching, disabled placeholders, teardown/reactivation, stable application mounts and retained workspace records. Boundaries contain render/effect failures, not arbitrary event handlers or asynchronous JavaScript. Separate full per-project layouts remain a [deferred investigation](implementation-plan.md#deferred-work-and-future-candidates), not an implemented or promised feature.
 
 ## Managed tasks and UI locale
 

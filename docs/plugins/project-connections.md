@@ -2,7 +2,7 @@
 
 An application-scoped component can keep running while a project opens, closes or changes selection. It uses an explicit project connection to reach a project's declared provider APIs and commands. A project-scoped component instead stays bound to its own project opening.
 
-The internal component harness implements these contracts. It is not wired to the application's project UI, persistent registrations, filesystem or external loader. The exported author interfaces are in [`frontend.ts`](../../packages-js/plugins/frontend.ts).
+The internal component harness implements these contracts. An opt-in [application assembly](command-dispatcher.md#internal-application-assembly) connects it to production bar/tab registries, the shared work queue and UI locale. It does not replace the default bundled host or implement project-management UI, persistent registrations, filesystem access or an external loader. The exported author interfaces are in [`frontend.ts`](../../packages-js/plugins/frontend.ts).
 
 ## Project references
 
@@ -16,7 +16,7 @@ A reference contains no filesystem path, file access, manuscript contents or nat
 
 ### Internal host controls
 
-The harness supplies these control methods for tests and future application adapters:
+The harness supplies these internal control methods for tests and trusted application composition:
 
 | Method                           | Behavior                                                                                                                                      |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -37,6 +37,8 @@ The internal activation context preserves the approved scope distinction:
 | Project-scoped     | Its fixed host-issued `ProjectReference` | `null`               |
 | Application-scoped | `null`                                   | `ProjectConnections` |
 
+The activation context is a complete, typed `FrontendContext`. Its frozen `native` group is `{ projectFiles: null, externalLinks: null }` in both scopes; it confers no native authority.
+
 The project reference's opening ID matches `context.identity.projectOpeningId`. An application activation keeps that identity field `null`, including while it uses a project connection. Selection does not change either activation's identity.
 
 ## Project UI visibility
@@ -45,7 +47,7 @@ The internal host associates each toolbar and view registration with its activat
 
 The workspace unmounts a project's UI when it is deselected. The activation and its services keep running. Returning to the project mounts fresh UI instances, so component-local state resets. Keep state that must survive in activation-owned objects passed through props. The workspace retains placement and open-tab records separately. Registering a view does not open a tab.
 
-This policy is implemented by internal visibility records and demonstrated in a browser fixture. Production workspace routing and persistent layout storage remain separate work. See [UI contributions and mounting](command-dispatcher.md#ui-contributions-and-workspace-mounting).
+The approved policy uses one shared workspace filtered by project ownership. The opt-in application assembly implements it through production bar/tab registries and renderers. Visibility ownership survives disablement, so another project's disabled views do not appear as error tabs. Placement IDs, tab records, insertion indexes and toolbar costs remain unchanged by filtering. Application presentations do not remount on unrelated snapshots. The browser fixture exercises this production path. Persistent layout storage is not implemented. Separate full per-project layouts are a [deferred investigation](implementation-plan.md#deferred-work-and-future-candidates), not promised or implemented. See [UI contributions and mounting](command-dispatcher.md#ui-contributions-and-workspace-mounting).
 
 ## Independent leases
 

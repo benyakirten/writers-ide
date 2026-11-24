@@ -7,10 +7,14 @@
 </script>
 
 <div class="main-view">
-	<SortableContext items={TabState.windows.map((w) => w.id)}>
+	<SortableContext
+		items={TabState.windows.filter((w) => TabRegistry.isVisible(w.name)).map((w) => w.id)}
+	>
 		{#each TabState.windows as { name, id, data }, index (id)}
-			{@const Component = TabRegistry.get(name)}
-			<Tab {id} {index} {Component} {data} plugin={TabRegistry.items[name]?.plugin} />
+			{#if TabRegistry.isVisible(name)}
+				{@const Component = TabRegistry.get(name)}
+				<Tab {id} {index} {Component} {data} plugin={TabRegistry.items[name]?.plugin} />
+			{/if}
 		{/each}
 	</SortableContext>
 </div>

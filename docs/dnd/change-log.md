@@ -51,6 +51,12 @@ These changes preserve docking identity, placement, orientation costs, cleanup a
 
 The pagination and docking guides also explain terms and state ownership in shorter sentences. This editorial revision changes no runtime behavior.
 
+The opt-in application component assembly now connects the internal host to real bar/tab registries, the shared application queue and real UI locale source. The owner approved one shared workspace filtered by project ownership. Disabled contributions retain visibility ownership as well as toolbar costs. This prevents inactive-project placeholders and error tabs from leaking into the selected project. Identity-based removal protects replacement registrations and preserves placement and tab records.
+
+Production renderers filter inactive tabs, item controls and insertion gaps. Non-empty docked/floating shells hide when all items are invisible. Truly empty bars and selected-project disabled placeholders remain visible. Filtering preserves underlying IDs, insertion indexes and capacity costs. Hidden items still consume capacity, preventing a later project switch from overfilling a bar. Application presentations stay mounted across unrelated host snapshots. The opt-in browser fixture uses production `MainView`, docked bars and floating bars, with the existing presentation/tooltip tree and no duplicate renderer. The default bundled host and Basic Menu are unchanged. See the [plugin entry](../plugins/change-log.md#internal-ui-routing-and-opt-in-application-assembly).
+
+Separate full per-project layouts remain a deferred investigation, not promised or implemented. This assembly adds no layout persistence, external imports/loader, manifest-to-runtime native integration, native authority, settings persistence or persistent project registrations.
+
 #### Tests and recorded validation
 
 `src/lib/testing/layout-library.svelte.test.ts` and `components-library.svelte.test.ts` add library integration and independence coverage. Existing state/transfer tests and browser docking regressions remain.
@@ -63,7 +69,7 @@ Validation recorded after the feature-neutral contract correction passed:
 
 Type checking remained blocked by the pre-existing `Modal.svelte` typing error and five old generic DnD warnings. These are historical results for that correction. They are not new totals or checks rerun for this editorial revision. The [plugin entry](../plugins/change-log.md) records later cumulative branch outcomes and limits.
 
-Editorial validation passed Oxfmt, preserved heading-anchor checks, local file-link and fragment checks, and whitespace checks. No runtime tests were rerun.
+Application assembly validation passed all 1,235 application unit tests, 476 SDK tests and SDK TypeScript checking. Browser validation passed 40 plugin tests, 22 smoke tests and 78 docking tests across Chromium and WebKit. Lint, production build and whitespace checks passed. The existing `Modal.svelte:4` error and five DnD warnings still block `pnpm check`. These results do not verify packaged runtimes or native integration.
 
 #### Limits
 

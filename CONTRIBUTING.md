@@ -200,13 +200,13 @@ pnpm exec playwright show-report browser-report
 
 The suites have different purposes:
 
-| Command                | Coverage                                                                                                                        |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `test:smoke`           | Startup, fonts, typing, selection, formatting, undo, menus, focus, visible page geometry, locale fallback and plugin management |
-| `test:tasks`           | Shared task ownership, emitted worker modules, buffer transfers, cancellation and worker errors                                 |
-| `test:plugins`         | Provider dependencies, API removal, error messages and confirmation before dependent plugins are disabled                       |
-| `test:word-processing` | Public editor access, independent formatting, history, worker results, input rules, mapped decorations and behavior failures    |
-| `test:e2e`             | The full app suite, including pagination, docking and stylesheet compatibility                                                  |
+| Command                | Coverage                                                                                                                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `test:smoke`           | Startup, fonts, typing, selection, formatting, undo, menus, focus, visible page geometry, locale fallback and plugin management           |
+| `test:tasks`           | Shared task ownership, emitted worker modules, buffer transfers, cancellation and worker errors                                           |
+| `test:plugins`         | Provider dependencies, removal/consent, presentation lifetimes and opt-in application assembly with project-filtered production bars/tabs |
+| `test:word-processing` | Public editor access, independent formatting, history, worker results, input rules, mapped decorations and behavior failures              |
+| `test:e2e`             | The full app suite, including pagination, docking and stylesheet compatibility                                                            |
 
 `test:smoke` includes the dedicated pagination-selection regressions.
 They check carets through page creation and forward/reversed ranges through formatting, reflow and undo.

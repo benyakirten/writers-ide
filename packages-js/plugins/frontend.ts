@@ -85,7 +85,7 @@ export interface PluginLocale {
 	subscribe(listener: (locale: LocaleSnapshot) => void): Dispose;
 }
 
-/** Author contract only. The current bundled host does not supply this context. */
+/** Author context; supplied by the internal no-native harness, not the current bundled host. */
 export type FrontendContext<Presentation> = {
 	readonly identity: ActivationIdentity;
 	readonly signal: AbortSignal;

@@ -547,6 +547,8 @@ export class CommandComponentHost<Presentation = unknown> {
 				own: owned,
 				tasks,
 				locale,
+				// This harness has no native authority, in either activation scope.
+				native: Object.freeze({ projectFiles: null, externalLinks: null }),
 				commands: this.#invoker(entry, activation),
 				contributions: Object.freeze({
 					toolbar: (contribution: ToolbarContribution<Presentation>) =>

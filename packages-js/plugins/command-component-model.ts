@@ -1,13 +1,7 @@
-import type { TaskService } from '@writers-ide/tasks';
-import type { CommandInvoker } from './commands';
 import type {
 	ActivationIdentity,
-	ComponentApis,
 	ComponentApiConnection,
-	FrontendContributions,
-	PluginLocale,
-	ProjectReference,
-	ProjectConnections,
+	FrontendContext,
 	ComponentIdentity,
 } from './frontend';
 import type { PluginApiIdentity } from './index';
@@ -15,19 +9,7 @@ import { apiDeclarations, apiKey, captureIdentity } from './component-api-declar
 import type { Dispose } from './index';
 import type { CommandProviderBinding } from './command-dispatcher';
 
-export type CommandContext<Presentation = unknown> = {
-	readonly identity: ActivationIdentity;
-	readonly apis: ComponentApis;
-	readonly signal: AbortSignal;
-	readonly own: (dispose: Dispose) => Dispose;
-	readonly commands: CommandInvoker;
-	readonly tasks: TaskService;
-	readonly locale: PluginLocale;
-	readonly contributions: FrontendContributions<Presentation>;
-} & (
-	| { readonly project: ProjectReference; readonly projects: null }
-	| { readonly project: null; readonly projects: ProjectConnections }
-);
+export type CommandContext<Presentation = unknown> = FrontendContext<Presentation>;
 export type Declaration = {
 	readonly id: string;
 	readonly contractId: string;

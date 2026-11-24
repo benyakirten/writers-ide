@@ -4,7 +4,7 @@
 
 This guide is for authors of trusted plugins bundled with the application. The package is private to this workspace, and its API is still evolving. External installation is not implemented. The planned external SDK will expose a reviewed set of author-facing exports, not automatically every export in these workspace packages. Application setup APIs will remain separate. The [author SDK assembly](../../docs/plugins/sdk-export-review.md#approved-sdk-assembly) approves root frontend/command contracts, `/svelte` presentation and context/entry types, and `/native` service contracts. Host construction remains internal. These author types and helpers are now source-exported alongside legacy bundled types. The current host and bundled imports shown below are unchanged: it does not supply `FrontendContext` or implement its locale, native, project or typed command-invocation services. The curated external profile is not shipped. See the [runtime profile proposal](../../docs/plugins/package-api-proposal.md#runtime-profile-inventory). The [safety section](#boundaries-and-next-steps) explains what the current host does and does not protect.
 
-The separate internal component harness now tests typed commands, provider APIs, tasks, locale, project connections and UI contribution routing together. Its UI IDs are component-scoped. Inactive-project UI unmounts while its activation keeps running. These rules are not yet wired into the bundled host used by this guide's examples. See the [internal UI guide](../../docs/plugins/command-dispatcher.md#ui-contributions-and-workspace-mounting) for the implemented boundary and browser fixture.
+The separate internal component harness supplies a complete typed `FrontendContext`, including frozen `native: { projectFiles: null, externalLinks: null }` with no native authority. Its opt-in application assembly connects real bar/tab registries, the shared application queue and `LocaleManager` (`en`/`fr`, both `ltr`). One shared workspace filters project-owned UI while retaining placements, capacity and tab records. These rules are not wired into the default bundled host used by this guide's examples. The production-component browser fixture opts into the new assembly. See [internal caller setup and lifetime](../../docs/plugins/command-dispatcher.md#internal-application-assembly). There is no public SDK host constructor.
 
 ## What can a plugin do today?
 
@@ -294,11 +294,11 @@ The root exports `FrontendContext`, `FrontendEntry`, `FrontendContributions`, `C
 
 `definePluginCommand` checks a non-whitespace-only contract ID of at most 256 UTF-8 bytes and a positive safe-integer major. It freezes the descriptor without registering an implementation, executing a command or validating payloads. `CommandInvocationError` is an exported class extending `Error`, with required read-only `code` and `diagnosticId` fields. Its constructor takes `(code, message, diagnosticId)`. The diagnostic ID is an opaque correlation string, not a credential. `isCommandInvocationError` checks the Error representation, known code and string diagnostic ID; `/native`'s `isNativeServiceError` checks the native Error representation and known code. Both are nonthrowing and support other JavaScript realms, but authenticate neither origin nor authority.
 
-These SDK exports implement contracts and helpers, not the planned host services. An [internal dispatcher](../../docs/plugins/command-dispatcher.md) now implements execution, availability, validation/copying, reservations, cancellation and safe diagnostics against host-supplied test bindings. An [internal component lifecycle harness](../../docs/plugins/command-dispatcher.md#component-lifecycle-harness) now supplies checked publications and activation-owned dependency bindings to it. Its partial activation context contains identity, alias-based provider APIs, commands, command registration, managed tasks, UI locale, ownership and a signal. Provider connections, commands, tasks and locale subscriptions share activation and rollback lifetimes. The harness requires an explicit host locale source and can receive the application's shared cooperative queue. The harness also implements [project references and independent leases](../../docs/plugins/project-connections.md), with scope-correct `project`/`projects` context fields. Native services and application project UI/persistence remain unimplemented. Neither module has a public construction entry point or connection to the bundled host. The author context examples below still describe planned application integration. Typed-array payloads use [binary-only semantics](../../docs/plugins/command-contract.md#typed-array-binary-semantics-and-inspection-limits): custom properties are not inspected or copied. Authors should put metadata in a surrounding plain record. General reflection and responsiveness limitations remain. Separately, the internal Rust [manifest parser and static resolver](../../docs/plugins/manifest-resolution.md) now validate external declarations, snapshot membership and dependency eligibility. They are not SDK exports and have no application runtime callers. Static eligibility does not establish enablement, published implementations or grants. The examples in the planned-service sections below describe future host behavior. They cannot run against today's bundled `PluginContext`.
+These SDK exports define author contracts and helpers. Internal host services implement the no-native subset of available services through a complete context. An [internal dispatcher](../../docs/plugins/command-dispatcher.md) now implements execution, availability, validation/copying, reservations, cancellation and safe diagnostics against host-supplied test bindings. An [internal component lifecycle harness](../../docs/plugins/command-dispatcher.md#component-lifecycle-harness) now supplies checked publications and activation-owned dependency bindings to it. Its activation context aliases the full SDK `FrontendContext`, including identity, APIs, commands, contributions, tasks, locale, scope-correct project services, ownership, signal and frozen null native groups. Provider connections, commands, tasks and locale subscriptions share activation and rollback lifetimes. The harness requires an explicit host locale source; the opt-in application assembly supplies the real locale manager and shared cooperative queue. The harness also implements [project references and independent leases](../../docs/plugins/project-connections.md), with scope-correct `project`/`projects` context fields. Native services and application project UI/persistence remain unimplemented. Neither module has a public construction entry point or connection to the bundled host. The context examples below apply to the internal component assembly, not the unchanged bundled host. Typed-array payloads use [binary-only semantics](../../docs/plugins/command-contract.md#typed-array-binary-semantics-and-inspection-limits): custom properties are not inspected or copied. Authors should put metadata in a surrounding plain record. General reflection and responsiveness limitations remain. Separately, the internal Rust [manifest parser and static resolver](../../docs/plugins/manifest-resolution.md) now validate external declarations, snapshot membership and dependency eligibility. They are not SDK exports and have no application runtime callers. Static eligibility does not establish enablement, published implementations or grants. The examples in the planned-service sections below describe future host behavior. They cannot run against today's bundled `PluginContext`.
 
-## Planned alias-based provider API
+## Alias-based provider API
 
-**Exported contract and internal harness implementation; application assembly pending:** `ComponentApis` is exported from `@writers-ide/plugins` for the future `FrontendContext.apis`. It keeps three operations: `provide(contract, factory)`, `get(alias, contract)` and `subscribe(alias, contract, listener)`.
+**Exported contract and opt-in assembly implemented:** `ComponentApis` is exported from `@writers-ide/plugins` for `FrontendContext.apis`. It keeps three operations: `provide(contract, factory)`, `get(alias, contract)` and `subscribe(alias, contract, listener)`.
 
 A provider calls `provide()` during its synchronous activation to publish a manifest-declared contract. The host calls its factory with a consumer-scoped `ComponentApiConnection`. The factory returns the actual implementation. Provider and consumer import the contract from a shared library; the identity contains no implementation.
 
@@ -306,9 +306,9 @@ A consumer uses its manifest dependency alias, not a constructed activation ID o
 
 `subscribe()` delivers immediately, then when availability changes. It belongs to activation lifetime and returns an idempotent early-release handle. Releasing it stops those notifications without revoking connections still used elsewhere. Required providers resolve before activation; lookup does not activate providers on demand. Selected-project integrations must use an explicit project connection. See the [exact interface](../../docs/plugins/package-api-proposal.md#4-the-activation-context).
 
-## Planned application project connections
+## Application project connections
 
-**Exported contracts; services not implemented:** future application-scoped components receive `context.projects`. The `ProjectConnections` interface has `subscribeSelected(listener): Dispose` and `connect(project): ProjectApiConnection`. Both interfaces are exported from `@writers-ide/plugins`.
+**Implemented in the internal harness and opt-in assembly:** application-scoped components receive `context.projects`. Project references are in memory; project-management UI and persistent registration are not implemented. The `ProjectConnections` interface has `subscribeSelected(listener): Dispose` and `connect(project): ProjectApiConnection`. Both interfaces are exported from `@writers-ide/plugins`.
 
 The host calls the selection listener immediately, then on changes, with a host-issued project reference or `null`. The subscription is activation-owned. A connection remains fixed to its project opening; selection changes do not retarget it.
 
@@ -334,7 +334,7 @@ The connection supplies `project`, `signal`, shared application `commands`, prov
 
 Disposal revokes that lease's facades and subscriptions and aborts its signal. Project closure and consumer teardown do the same. Provider absence alone leaves the connection available for later provider arrival. The explicit switching above is author code, not a built-in switching helper. Project-scoped components receive `context.projects = null` and use their fixed `context.project` plus ordinary declared dependencies. Application components receive `context.project = null` and this connection service. Project-to-other-project connections are future work, not an implicit consequence of this API. See the [context contract](../../docs/plugins/package-api-proposal.md#4-the-activation-context).
 
-## Planned project context
+## Project context
 
 The approved external context keeps scope explicit:
 
@@ -343,7 +343,7 @@ The approved external context keeps scope explicit:
 | Project          | Its fixed project reference | `null`                                                        |
 | Application      | `null`                      | Selected-project subscription and explicit connection service |
 
-**Exported type; host integration not implemented:** future project-scoped activations receive `context.project` as a host-issued `ProjectReference`. Application-scoped activations receive `null`. The type is an author export from `@writers-ide/plugins` with read-only string fields:
+**Implemented in the internal harness and opt-in assembly:** project-scoped activations receive `context.project` as a host-issued `ProjectReference`. Application-scoped activations receive `null`. The type is an author export from `@writers-ide/plugins` with read-only string fields:
 
 - `id`: the host's registered local project identity, retained when that registration reopens.
 - `openingId`: an opaque identifier for this live opening, replaced on close/reopen.
@@ -353,9 +353,9 @@ The reference stays bound to the activation's project opening. Selecting another
 
 Do not reconstruct references from saved fields. APIs accepting project references validate the host-issued object and live opening; matching strings alone do not grant access. Application components use the approved project-connection API described above rather than treating `context.project` as the currently selected project.
 
-## Planned connection endpoint metadata
+## Connection endpoint metadata
 
-**Exported contract; host integration not implemented:** future provider API factories will receive `ComponentApiConnection`, an extension of the current `PluginApiConnection`. It keeps the current `consumerId`, `signal`, `own`, `guard` and `reportError` operations and adds read-only `consumer` and `provider` activation identities.
+**Implemented in the internal harness and opt-in assembly:** provider API factories receive `ComponentApiConnection`, an extension of the current `PluginApiConnection`. It keeps the current `consumerId`, `signal`, `own`, `guard` and `reportError` operations and adds read-only `consumer` and `provider` activation identities.
 
 Each identity contains stable `packageId`/`componentId`, temporary `activationId` and `projectOpeningId`. The latter is `null` for an application-scoped endpoint, even when its peer belongs to a project. The `ComponentIdentity` and `ActivationIdentity` data types are also author exports from `@writers-ide/plugins`.
 
@@ -480,9 +480,9 @@ Native setup/authorization failures reject. The host establishes the subscriptio
 
 The host also owns the subscription for the activation lifetime. Cancellation, access revocation or project closure stops it even if the author drops `stop`. Cancellation while setup is pending must not leak a late-created subscription. Native setup started during activation waits behind the activation gate. Do not make `activate()` async or await this directly there; use managed async work. See the [subscription plan](../../docs/plugins/file-index-plan.md#approved-asynchronous-subscription).
 
-## Planned UI locale API
+## UI locale API
 
-**Exported contracts; locale service not implemented:** the future external host will supply `context.locale` with `snapshot()` and `subscribe(listener)`. The `LocaleSnapshot` type contains read-only `languageTag: string` and `direction: 'ltr' | 'rtl'`. The `PluginLocale` interface describes the service. Both types are exported from `@writers-ide/plugins`.
+**Implemented in the internal harness and opt-in assembly:** `context.locale` supplies `snapshot()` and `subscribe(listener)`. The application source reads `LocaleManager`; English (`en`) and French (`fr`) both use `ltr` direction. The default bundled host does not supply this service. The `LocaleSnapshot` type contains read-only `languageTag: string` and `direction: 'ltr' | 'rtl'`. The `PluginLocale` interface describes the service. Both types are exported from `@writers-ide/plugins`.
 
 This is the application UI locale, not the language of a document or selection. Plugins own their translations and fallback choices. They may use their own catalogs, `Intl`, supported libraries or declared provider services. The host does not expose its private generated message functions.
 
