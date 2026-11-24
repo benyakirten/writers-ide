@@ -86,6 +86,8 @@ type FileIndexEntry = {
 
 `path` is project-relative. `kind` identifies a file, directory or an identified unsupported entry. `sizeBytes` is the observed file size; use null for directories, unsupported entries or unavailable metadata. `modifiedAt` is the observed file/directory modification time in Unix-epoch milliseconds; use null when unavailable or unsupported. Do not substitute zero for unknown values.
 
+**Approved hard-link classification; not implemented:** classify regular files detected to have multiple hard links as `unsupported`. Keep the project-relative name discoverable, with null size and modification time under the existing unsupported-entry rules. Expose no contents or link targets. One unsupported entry does not fail the listing. Do not apply regular-file link-count rules to directories. This adds no detailed unsupported-reason field. Saved-file reads independently validate the live target and reject detected multiple hard links with `unsupported-entry`.
+
 These are cached observations, not guaranteed current properties. Metadata inspection failures remain visible through index uncertainty/error reporting; they are not a reason to classify an unknown entry as unsupported or declare its deletion. Modification time does not prove unchanged contents. Saved reads still validate the actual target and grants.
 
 The entry exposes no file contents, link target, checksum or stable application-document ID. A path is a filesystem location and may change on rename. Entry and query/page contracts are approved, but no database schema is selected.
