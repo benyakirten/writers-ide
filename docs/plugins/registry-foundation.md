@@ -4,7 +4,7 @@
 
 The registry stores host-owned plugin installation records, component choices, project registrations and permission decisions. It does not store project documents. Immutable package files stay in separate installation directories.
 
-The [implementation plan](implementation-plan.md#next-review-registry-foundation) defines this slice. Its first eventual implementation is internal Rust code with tests. It exposes no management IPC, issues no live activation credentials, reads no project files, builds no file index and enables no external plugin loading.
+The [implementation plan](implementation-plan.md#next-review-registry-foundation) defines this slice. Start the final review with the [consolidated implementation proposal](registry-implementation-review.md) and [assembled SQL schema](registry-schema-review.md). Both are proposals, not implementation approval. Its first eventual implementation is internal Rust code with tests. It exposes no management IPC, issues no live activation credentials, reads no project files, builds no file index and enables no external plugin loading.
 
 ## Approved package and artifact separation
 
@@ -382,7 +382,9 @@ Keep display names, descriptions, activation scopes and defaults in `artifact_co
 
 ## Approved host-settings storage
 
-Store application-wide registry settings in one required `host_settings` row with explicit typed columns. The initial logical fields are `permission_mode` and `repair_conflict_policy`. Constrain each to its recognized values. New settings can add typed columns through supported schema migrations.
+Store application-wide registry settings in one required `host_settings` row with explicit typed columns. The initial logical fields are `permission_mode` and `repair_conflict_policy`. Constrain each to its recognized values. The owner approved limiting this foundation's settings to these two fields. Additional settings use typed migrations in their Part 4 feature-integration slices, not generic JSON or key/value storage.
+
+Command resource settings require persistence, loading into the dispatcher, change distribution and a settings menu before the external command/runtime and settings integration slice is complete. The blocked-activation preference requires persistence, activation-lifecycle wiring and a management toggle before plugin lifecycle/management integration is complete. Both are required before Part 4 is complete. The internal registry foundation can finish without them; the corresponding feature slices cannot. This does not cancel approved preference semantics or choose numerical defaults.
 
 Use the already approved defaults on fresh initialization: Secure mode and Repair and keep the update. Preserve saved choices on ordinary startup. After successful initialization/migration, a missing required settings row is an invalid registry state, not permission to silently regenerate defaults. Restore still follows its separate rule of selecting Secure mode and leaving recovered approvals inactive.
 
@@ -445,7 +447,13 @@ Keep one recovered review row per component, operation/resource pair and coverag
 
 The current `permission_approvals` table retains its existing single `source` field. The recovered flags do not change automatic-to-explicit promotion or denial precedence. Exact physical columns, constraints and restore normalization remain under review.
 
-Keep recovered review data distinct from current approvals in queries and pure permission evaluation. This is a persistence boundary, not a new native permission or plugin API. Remaining physical schema/index definitions, consumption rules and restore contracts remain under review. No backup restoration or native authorization implementation is added.
+Keep recovered review data distinct from current approvals in queries and pure permission evaluation. This is a persistence boundary, not a new native permission or plugin API. Remaining physical schema/index definitions and restore contracts remain under review. No backup restoration or native authorization implementation is added.
+
+### Approved recovered-candidate consumption
+
+When explicit review of a recovered candidate succeeds, save the current permission decision and remove the matching candidate in one transaction. Match its exact stable component, operation/resource pair, coverage scope and project registration for project coverage. Reviewing one project does not consume another project's candidate or an application-wide candidate. A failed save preserves the candidate.
+
+Automatic Trust-mode processing alone does not consume recovered candidates. Preserve the existing denial-precedence and explicit denial-clearing rules; candidate consumption does not itself clear a denial. Audit logging remains separate future work.
 
 ## Approved dropped-requirement cleanup
 
@@ -466,13 +474,13 @@ Use two tables for saved choices:
 
 No project-override row means Inherit. Choosing Inherit removes the override. The application-level choice is saved configuration, not a live reference to the latest manifest default. Existing first-configuration rules determine its initial value.
 
-Project overrides apply only to project-scoped components. The Rust service validates the applicable accepted declaration; a stable identity alone contains no activation scope. Exact keys, column types and constraints still need review. Scope changes follow the review and applicability rules below; their persisted review-state representation remains open.
+Project overrides apply only to project-scoped components. The Rust service validates the applicable accepted declaration; a stable identity alone contains no activation scope. Exact keys, column types and constraints still need review. Scope changes follow the review and applicability rules below. Outstanding scope blockers are derived from the selected declaration and reviewed baseline.
 
 ## Approved activation-scope changes
 
 An update may change a component's activation scope without changing its stable component ID. Require explicit review of the new lifetime and enablement effects before the changed component activates. This can be part of the normal update review rather than a separate prompt. Updates remain restart-staged; do not retarget an existing activation.
 
-An outstanding scope review blocks the changed component's activation, not selection of the entire package. After normal package checks, the update can become selected and unaffected components can activate if their own checks pass. Keep the changed component and its required dependents stopped, and explain the outstanding review in management UI. Persist enough review state to preserve the blocker across restarts; selecting a release is not scope acknowledgement. Exact persistence fields remain under review.
+An outstanding scope review blocks the changed component's activation, not selection of the entire package. After normal package checks, the update can become selected and unaffected components can activate if their own checks pass. Keep the changed component and its required dependents stopped, and explain the outstanding review in management UI. Derive the blocker from the selected declaration and saved reviewed baseline. For an installed component, a missing baseline requires initial review; a different selected scope requires scope-change review. A matching scope has no scope-review blocker. Do not store a separate mutable blocked flag. This calculation survives restart through the underlying saved facts. Selecting a release is not scope acknowledgement. Exact physical constraints remain under review.
 
 A newer update may become selected while scope review is still outstanding. Replace the pending review target with the newly selected release and evaluate its scope against the component's last reviewed scope. Do not treat the earlier unreviewed selected scope as the baseline. If the new target still needs scope review, keep the component blocked until that target is reviewed. Unaffected components still undergo their own update and activation checks. Exact baseline and pending-target storage remain under review.
 
@@ -585,7 +593,13 @@ Use the approved dedicated Rust worker with `rusqlite`, bundled SQLite, WAL mode
 
 Registry transactions do not publish package files. Durable publication into a new immutable directory precedes the transaction that records acceptance. The foundation must not treat an arbitrary candidate integrity record as trusted acceptance merely because it has been inserted into a table. The internal acceptance contract still needs review.
 
-Each installation change rechecks its expected state inside the committing transaction. If that state has changed, reject the outdated operation without partial changes or overwriting the newer decision. Management UI refreshes the plan automatically and requires renewed confirmation if the revised action changes what the user would approve. Do not silently resubmit a changed action. Exact comparison mechanics and Rust request/error types remain under review.
+Each installation change rechecks its expected state inside the committing transaction. If that state has changed, reject the outdated operation without partial changes or overwriting the newer decision. Management UI refreshes the plan automatically and requires renewed confirmation if the revised action changes what the user would approve. Do not silently resubmit a changed action. Use the approved installation revision below. Exact Rust request/error types remain under review.
+
+### Approved installation revision
+
+Retain a monotonic installation revision per package across uninstall. Advance it atomically with every committed installation-state change. A reviewed action records the revision it examined. Reject a mismatching revision with `Conflict` before committing changes, even if the installation pointers have changed away and back to the reviewed values.
+
+Uninstall must not erase or reset the revision. It is separate from project `location_revision` and component `scope_revision`. The draft schema stores it on the retained package row; exact placement and initial value remain part of final mechanical review. Checked increments must not wrap or partially mutate state.
 
 A committed selection survives a crash before plugin activation. At the next launch, verify the selected artifact and apply normal activation checks again. Selection does not claim successful activation. Do not automatically restore an older artifact because activation confirmation is missing, and do not add such a confirmation marker for rollback in the initial model. Activation-health-based rollback is a possible future feature requiring separate design approval. A crash before the selection commit leaves the prior state intact.
 
@@ -727,9 +741,9 @@ These are internal Rust categories, not plugin-facing native codes. Exact varian
 
 ## Remaining review groups
 
-**Current questions:** internal Rust contracts, through individual A/B decisions. This does not finalize the earlier schema groups; remaining physical constraints and assembled SQL still require review. Project-registration policies above are approved; exact path/identity encodings and remaining physical constraints still need review. The [artifact and installation review](registry-artifacts.md) records earlier individual decisions; remaining physical constraints still require final schema review. The owner approved deriving artifact directories from their IDs and a versioned layout beneath a host-owned root, rather than storing per-artifact absolute paths. Retaining the verified package display name and description with each artifact is also approved. The manager can display those labels even when installation files are missing or damaged. They grant no loading authority. Other new recommendations remain unapproved. No registry implementation has begun.
+**Current review:** the [consolidated implementation proposal](registry-implementation-review.md) assembles scope, Rust contracts, publication requirements and the four resolved focused behavioral decisions. The [schema review](registry-schema-review.md) supplies proposed SQL. Review actual behavior gaps through small A/B questions, then obtain final schema/contract sign-off. Routine plumbing does not need individual preference questions. This does not finalize the earlier schema groups; remaining physical constraints and assembled SQL still require review. Project-registration policies above are approved; exact path/identity encodings and remaining physical constraints still need review. The [artifact and installation review](registry-artifacts.md) records earlier individual decisions; remaining physical constraints still require final schema review. The owner approved deriving artifact directories from their IDs and a versioned layout beneath a host-owned root, rather than storing per-artifact absolute paths. Retaining the verified package display name and description with each artifact is also approved. The manager can display those labels even when installation files are missing or damaged. They grant no loading authority. Other new recommendations remain unapproved. No registry implementation has begun.
 
-Organize the remaining registry foundation into six topic groups. Review decisions through small A/B questions, as requested by the owner. Handle routine implementation details independently. Six is the number of topic groups, not a count of remaining questions; the individual question count is not yet established.
+The six topic groups below organize coverage, not a sequence of additional question rounds. The consolidated review separates owner decisions, technical investigation, mechanical review and deferred integration. The four focused behavioral questions are resolved. Final schema/contract and implementation-scope sign-off remains required; new behavior gaps must be explained rather than silently resolved.
 
 1. **Artifacts and installation transitions.** Complete artifact metadata and location representation, integrity-record format metadata, same-package references, staged-only first installs, startup promotion and pending-repair transitions. Include remaining package/component/file-table constraints.
 2. **Project registrations.** Define persistent project keys, stored location/identity data and relink associations. Keep actual filesystem validation and native access outside this initial implementation boundary.
