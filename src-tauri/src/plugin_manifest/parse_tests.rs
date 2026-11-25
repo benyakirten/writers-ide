@@ -41,15 +41,38 @@ fn dependency(extra: &str) -> String {
     format!("\n[[components.dependencies]]\nalias = \"provider\"\npackage = \"@example/services\"\ncomponent = \"service\"\n{extra}\n")
 }
 
+fn documentation_manifests(documentation: &str) -> Vec<&str> {
+    documentation
+        .split("```toml")
+        .skip(1)
+        .filter_map(|block| {
+            block
+                .strip_prefix("\r\n")
+                .or_else(|| block.strip_prefix('\n'))
+        })
+        .map(|block| block.split("```").next().unwrap())
+        .filter(|block| block.lines().next() == Some("manifest_version = 1"))
+        .collect()
+}
+
+#[test]
+fn documentation_manifest_extraction_accepts_lf_and_crlf() {
+    let documentation = include_str!("../../../docs/plugins/package-api-proposal.md");
+    let lf = documentation.replace("\r\n", "\n");
+    let crlf = lf.replace('\n', "\r\n");
+    let lf_examples = documentation_manifests(&lf);
+    let crlf_examples = documentation_manifests(&crlf);
+    assert_eq!(lf_examples.len(), 2);
+    assert_eq!(crlf_examples.len(), 2);
+    let lf_manifests: Vec<_> = lf_examples.into_iter().map(parsed).collect();
+    let crlf_manifests: Vec<_> = crlf_examples.into_iter().map(parsed).collect();
+    assert_eq!(lf_manifests, crlf_manifests);
+}
+
 #[test]
 fn complete_documentation_manifests_parse() {
     let documentation = include_str!("../../../docs/plugins/package-api-proposal.md");
-    let examples: Vec<_> = documentation
-        .split("```toml\n")
-        .skip(1)
-        .map(|block| block.split("```").next().unwrap())
-        .filter(|block| block.starts_with("manifest_version = 1\n"))
-        .collect();
+    let examples = documentation_manifests(documentation);
     assert_eq!(examples.len(), 2);
     let menu = parsed(examples[0]);
     assert_eq!(menu.package.canonical_id(), "@writers-ide/basic-menu");

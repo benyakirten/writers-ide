@@ -339,7 +339,7 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 ```
 
-The [registry guide](plugins/registry-implementation-review.md#source-tests-and-validation) links the test-only publication harness, worker regressions and evidence limits. The [Native Registry workflow](../.github/workflows/native_registry.yml) configures stable Rust checks on macOS 15, Windows latest and Ubuntu 24.04. Remote execution is unverified; Windows/Linux and minimum-macOS evidence remain missing. Windows integrated publication deliberately stops at an unsupported directory barrier. Library runtime/barrier tests do not prove power-loss durability, production publication or packaged native authorization. The [plugin changelog](plugins/change-log.md#native-registry-design) records parent-run macOS validation.
+The [registry guide](plugins/registry-implementation-review.md#source-tests-and-validation) links the test-only publication harness, worker regressions and evidence limits. The [Native Registry workflow](../.github/workflows/native_registry.yml) configures stable Rust checks on macOS 15, Windows latest and Ubuntu 24.04. The [plugin changelog](plugins/change-log.md#native-registry-design) records verified per-platform CI results and remaining failures; minimum-macOS evidence is separate. Windows integrated publication deliberately stops at an unsupported directory barrier. Library runtime/barrier tests do not prove power-loss durability, production publication or packaged native authorization. Local regression results are recorded there too.
 
 Choose checks that exercise the changed behavior:
 
