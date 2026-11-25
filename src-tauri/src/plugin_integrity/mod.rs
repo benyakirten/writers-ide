@@ -44,6 +44,38 @@ pub(crate) struct IntegrityRecord {
     files: BTreeMap<String, FileDigest>,
 }
 
+/// Database-independent file metadata. Construction does not verify file bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct IntegrityEntry {
+    pub path: String,
+    pub byte_length: u64,
+    pub sha256: [u8; 32],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum IntegrityBuildError<E> {
+    Source(E),
+    InvalidRecord(IntegrityError),
+}
+
+impl<E: fmt::Display> fmt::Display for IntegrityBuildError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Source(error) => write!(formatter, "cannot read integrity entry: {error}"),
+            Self::InvalidRecord(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for IntegrityBuildError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Source(error) => Some(error),
+            Self::InvalidRecord(error) => Some(error),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct FileDigest {
     byte_length: u64,
@@ -106,6 +138,62 @@ where
 }
 
 impl IntegrityRecord {
+    /// Validate incrementally, without collecting or reading beyond the first failure.
+    pub(crate) fn from_entries<E>(
+        version: u32,
+        entries: impl IntoIterator<Item = Result<IntegrityEntry, E>>,
+        limits: &IntegrityLimits,
+    ) -> Result<Self, IntegrityBuildError<E>> {
+        use IntegrityBuildError::{InvalidRecord, Source};
+        if version != RECORD_VERSION {
+            return Err(InvalidRecord(IntegrityError::UnsupportedVersion(version)));
+        }
+        let mut files = BTreeMap::new();
+        let mut total = 0_u64;
+        for entry in entries {
+            let entry = entry.map_err(Source)?;
+            if files.len() >= limits.max_files {
+                return Err(InvalidRecord(limit("", "max_files")));
+            }
+            validate_entry(&entry.path, entry.byte_length, &mut total, limits)
+                .map_err(InvalidRecord)?;
+            if files.contains_key(&entry.path) {
+                return Err(InvalidRecord(IntegrityError::MalformedRecord(
+                    "duplicate package file path".to_owned(),
+                )));
+            }
+            files.insert(
+                entry.path,
+                FileDigest {
+                    byte_length: entry.byte_length,
+                    sha256: encode_digest(entry.sha256),
+                },
+            );
+        }
+        Ok(Self {
+            format_version: version,
+            files,
+        })
+    }
+
+    pub(crate) fn format_version(&self) -> u32 {
+        self.format_version
+    }
+
+    /// Returns owned metadata; changing an item cannot change this record.
+    pub(crate) fn entries(&self) -> impl ExactSizeIterator<Item = IntegrityEntry> + '_ {
+        self.files.iter().map(|(path, digest)| IntegrityEntry {
+            path: path.clone(),
+            byte_length: digest.byte_length,
+            sha256: decode_digest(&digest.sha256),
+        })
+    }
+
+    /// Content identity under the frozen `writers-ide.file-set/1` encoding.
+    pub(crate) fn fingerprint(&self) -> [u8; 32] {
+        file_set_fingerprint(self.entries())
+    }
+
     /// Parse host-supplied records, not a checksum file discovered in a package.
     pub(crate) fn from_json(
         bytes: &[u8],
@@ -139,16 +227,7 @@ impl IntegrityRecord {
         }
         let mut total = 0_u64;
         for (path, digest) in &self.files {
-            validate_path(path, limits)?;
-            if digest.byte_length > limits.max_file_bytes {
-                return Err(limit(path, "max_file_bytes"));
-            }
-            total = total
-                .checked_add(digest.byte_length)
-                .ok_or_else(|| limit(path, "max_total_bytes"))?;
-            if total > limits.max_total_bytes {
-                return Err(limit(path, "max_total_bytes"));
-            }
+            validate_entry(path, digest.byte_length, &mut total, limits)?;
             if digest.sha256.len() != 64
                 || !digest
                     .sha256
@@ -178,6 +257,14 @@ impl VerifiedPackage {
         self.fingerprint
     }
 
+    /// Derive metadata from the retained verified buffers, never from source paths.
+    pub(crate) fn integrity_record(
+        &self,
+        limits: &IntegrityLimits,
+    ) -> Result<IntegrityRecord, IntegrityError> {
+        record_from_bytes(&self.files, limits)
+    }
+
     /// File payload bytes only; this does not measure allocation or runtime overhead.
     pub(crate) fn byte_length(&self) -> u64 {
         self.byte_length
@@ -199,23 +286,7 @@ pub(crate) fn create_record(
     limits: &IntegrityLimits,
 ) -> Result<IntegrityRecord, IntegrityError> {
     let files = filesystem::read_package(root, limits)?;
-    let record = IntegrityRecord {
-        format_version: RECORD_VERSION,
-        files: files
-            .iter()
-            .map(|(path, bytes)| {
-                (
-                    path.clone(),
-                    FileDigest {
-                        byte_length: bytes.len() as u64,
-                        sha256: sha256(bytes),
-                    },
-                )
-            })
-            .collect(),
-    };
-    record.validate(limits)?;
-    Ok(record)
+    record_from_bytes(&files, limits)
 }
 
 /// Verify against an already accepted host record and return only checked bytes.
@@ -254,18 +325,79 @@ pub(crate) fn verify_package(
             .checked_add(actual_length)
             .ok_or_else(|| limit(path, "max_total_bytes"))?;
     }
-    // Hash the checked record, not caller-chosen package names or versions. BTreeMap
-    // ordering and typed serialization make equivalent parsed records identical.
-    let fingerprint = Sha256::new()
-        .chain_update(b"writers-ide.verified-package.v1\0")
-        .chain_update(record.to_json()?)
-        .finalize()
-        .into();
+    let fingerprint = record.fingerprint();
     Ok(VerifiedPackage {
         files,
         fingerprint,
         byte_length,
     })
+}
+
+fn record_from_bytes(
+    files: &BTreeMap<String, Vec<u8>>,
+    limits: &IntegrityLimits,
+) -> Result<IntegrityRecord, IntegrityError> {
+    let entries = files.iter().map(|(path, bytes)| {
+        Ok::<_, std::convert::Infallible>(IntegrityEntry {
+            path: path.clone(),
+            byte_length: bytes.len() as u64,
+            sha256: Sha256::digest(bytes).into(),
+        })
+    });
+    IntegrityRecord::from_entries(RECORD_VERSION, entries, limits).map_err(|error| match error {
+        IntegrityBuildError::InvalidRecord(error) => error,
+        IntegrityBuildError::Source(never) => match never {},
+    })
+}
+
+fn validate_entry(
+    path: &str,
+    byte_length: u64,
+    total: &mut u64,
+    limits: &IntegrityLimits,
+) -> Result<(), IntegrityError> {
+    validate_path(path, limits)?;
+    if byte_length > limits.max_file_bytes {
+        return Err(limit(path, "max_file_bytes"));
+    }
+    *total = total
+        .checked_add(byte_length)
+        .ok_or_else(|| limit(path, "max_total_bytes"))?;
+    if *total > limits.max_total_bytes {
+        return Err(limit(path, "max_total_bytes"));
+    }
+    Ok(())
+}
+
+fn encode_digest(digest: [u8; 32]) -> String {
+    use std::fmt::Write;
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        write!(encoded, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+    encoded
+}
+
+fn decode_digest(digest: &str) -> [u8; 32] {
+    // Records are private and validated before they are exposed to callers.
+    std::array::from_fn(|index| {
+        u8::from_str_radix(&digest[index * 2..index * 2 + 2], 16)
+            .expect("record contains a validated SHA-256 digest")
+    })
+}
+
+/// Entries must already be validated, unique and sorted by exact UTF-8 path bytes.
+fn file_set_fingerprint(entries: impl ExactSizeIterator<Item = IntegrityEntry>) -> [u8; 32] {
+    let mut hash = Sha256::new();
+    hash.update(b"writers-ide.file-set/1\0");
+    hash.update((entries.len() as u64).to_be_bytes());
+    for entry in entries {
+        hash.update((entry.path.len() as u64).to_be_bytes());
+        hash.update(entry.path.as_bytes());
+        hash.update(entry.byte_length.to_be_bytes());
+        hash.update(entry.sha256);
+    }
+    hash.finalize().into()
 }
 
 fn sha256(bytes: &[u8]) -> String {

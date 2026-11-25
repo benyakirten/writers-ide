@@ -1,10 +1,10 @@
 # Plugin registry foundation
 
-**Status: design review in progress; not implemented.** This guide records the approved registry table responsibilities. Exact columns, constraints and internal Rust service contracts still need review. Approval of this guide's current decisions does not authorize unresolved designs.
+**Status: owner-approved internal foundation, implemented / unmerged.** This guide records the registry responsibilities and invariants implemented in native Rust. Application installation, loading, native authority and recovery orchestration are not integrated.
 
 The registry stores host-owned plugin installation records, component choices, project registrations and permission decisions. It does not store project documents. Immutable package files stay in separate installation directories.
 
-The [implementation plan](implementation-plan.md#next-review-registry-foundation) defines this slice. Start the final review with the [consolidated implementation proposal](registry-implementation-review.md) and [assembled SQL schema](registry-schema-review.md). Both are proposals, not implementation approval. Its first eventual implementation is internal Rust code with tests. It exposes no management IPC, issues no live activation credentials, reads no project files, builds no file index and enables no external plugin loading.
+The [implementation plan](implementation-plan.md#internal-registry-foundation) separates the completed internal slice from remaining Part 4 work. The [implementation review](registry-implementation-review.md) describes the actual Rust operations and their limits. The [schema baseline](registry-schema-review.md) links the authoritative SQL. Owner sign-off covers this internal database/integrity slice, not real publication or application integration.
 
 ## Approved package and artifact separation
 
@@ -21,11 +21,11 @@ Separate package identity, version history, accepted installations and their fil
 
 A canonical package identity is `name` or `@namespace/name`. The existing manifest parser derives it from validated fields. It identifies a package, not a verified publisher.
 
-Version history enforces the approved rule that a known package/version cannot acquire different accepted contents. Identical file-set fingerprints are not a version conflict. ZIP compression is not part of file-set identity. The shared binary `writers-ide.file-set/1` fingerprint specification is approved below. Full-version identity is approved below; exact database key definitions remain open.
+Version history enforces the approved rule that a known package/version cannot acquire different accepted contents. Identical file-set fingerprints are not a version conflict. ZIP compression is not part of file-set identity. The shared binary `writers-ide.file-set/1` fingerprint specification is approved below. Full-version identity and database keys are implemented as described below.
 
 An artifact identifies an accepted installation, not merely a version label. Acceptance must not rewrite another artifact's accepted metadata. Multiple artifact records can reference the same version history when their accepted contents match. This supports repair; it does not implement multiple-version loading.
 
-These are approved table responsibilities, not final SQL declarations. Package/component local key types are approved below. Remaining entity-key representations, column details and constraints remain open.
+These responsibilities are implemented in the [schema baseline](registry-schema-review.md) and authoritative `schema.sql`.
 
 ## Approved local package and component keys
 
@@ -39,7 +39,7 @@ The keys are local to one registry, not globally unique across independently cre
 
 Use `INTEGER PRIMARY KEY AUTOINCREMENT` for the persistent local project-registration key. Normal allocation must not reuse previously committed IDs. The key identifies one host-managed registration within this registry, not a globally portable project identity. Keep it separate from temporary live-opening identities and native credentials.
 
-The plugin-facing `ProjectReference.id` is an opaque, registry-namespace-qualified string representation of the registration key. It does not require a separately generated random public ID per project. Authors may compare IDs but must not parse them or depend on a particular encoding. Reopening the same registration preserves its ID; IDs are local to the registry. Exact encoding is an implementation detail. Remaining registration columns still need review. Possessing or guessing an ID grants no authority. Validating the approved location and checking host-issued live references remain separate requirements. This decision does not make grants portable between registries.
+The plugin-facing `ProjectReference.id` is an opaque, registry-namespace-qualified string representation of the registration key. It does not require a separately generated random public ID per project. Authors may compare IDs but must not parse them or depend on a particular encoding. Reopening the same registration preserves its ID; IDs are local to the registry. Exact encoding is an implementation detail. Registration columns are implemented; public string encoding and application reference mapping remain open. Possessing or guessing an ID grants no authority. Validating the approved location and checking host-issued live references remain separate requirements. This decision does not make grants portable between registries.
 
 ## Approved complete-registration commit
 
@@ -53,11 +53,11 @@ Retain a project display name directly in `project_registrations`. Management sc
 
 Treat the saved name as a cache of the project's current display name, not a separate local nickname. The host supplies it during registration. When opening a validated project, refresh the saved label if the host obtains its current name. Use the directory name as a fallback when no project title is available. Preserve the last known name while the directory is unavailable. This does not choose a project-file format or require plugins to read metadata.
 
-The name is a human-readable label, not project identity, a permission key or proof that a location is approved. Name changes must not transfer registrations or recover grants. A separate user-defined local alias is a future candidate, not part of this field. Exact column constraints and metadata-source integration remain under review.
+The name is a human-readable label, not project identity, a permission key or proof that a location is approved. Name changes must not transfer registrations or recover grants. A separate user-defined local alias is a future candidate, not part of this field. Column constraints are implemented; the real project metadata-source integration remains absent.
 
 ## Approved project-path representation
 
-Store the native project location losslessly in a binary column with an explicit encoding identifier. Do not restrict registered locations to paths representable as UTF-8. Rust owns encoding and decoding. The format must preserve native path data; exact encoding identifiers, byte formats and physical columns still need review.
+Store the native project location losslessly in a binary column with an explicit encoding identifier. Do not restrict registered locations to paths representable as UTF-8. Rust owns encoding and decoding. The format must preserve native path data; physical columns are implemented, but native encoding identifiers and byte formats remain open.
 
 Human-readable path text is for display, not the authoritative stored location. Never use lossy display conversion to reconstruct the path. Unknown encodings must not be guessed. The native location is not exposed through `ProjectReference`.
 
@@ -67,13 +67,13 @@ This representation requires encoding/decoding code and cross-platform tests. It
 
 Store directory-identity information as one versioned binary value in `project_registrations`, separate from the encoded path and location revision. Retain an explicit identity-scheme identifier and the identity bytes. Do not add platform-specific identifier columns to the initial schema. This is one native identity value, not a serialized registration document.
 
-Rust validates and interprets supported identity formats. Unknown formats must not count as a successful identity match. Exact scheme identifiers, byte formats and physical constraints still need review. The path encoding and identity scheme are independent and must not be substituted for each other.
+Rust validates and interprets supported identity formats. Unknown formats must not count as a successful identity match. Physical constraints are implemented; native scheme identifiers and byte formats remain open. The path encoding and identity scheme are independent and must not be substituted for each other.
 
 The native mechanisms and their limitations still require platform investigation and testing. Storing an identity does not prove that every replacement can be detected or replace safe filesystem access. This approval selects persistence representation, not a particular operating-system identity mechanism.
 
 ## Approved single current project location
 
-Store the current location directly in `project_registrations`, alongside the stable registration key. Keep its encoded path, directory-identity information and `location_revision` in that row. Do not introduce a separate one-to-one location table or location ID in the initial model. The versioned binary directory-identity representation is approved above; exact formats and remaining columns still need review.
+Store the current location directly in `project_registrations`, alongside the stable registration key. Keep its encoded path, directory-identity information and `location_revision` in that row. Do not introduce a separate one-to-one location table or location ID in the initial model. The versioned binary directory-identity representation is approved above; columns are implemented, but native formats remain open.
 
 Associate each project registration with one current approved location, not a collection of locations. Explicit reviewed relink replaces that association while preserving the registration key and its saved decisions. The old location no longer identifies the registration for reopening. This does not delete the old directory or authorize access to the new one without validation.
 
@@ -83,7 +83,7 @@ Keep the existing relink requirements: the registration must be closed in every 
 
 Store an incrementing `location_revision` on each project registration. Increment it with every committed relink, in the same transaction as the location association change. A prepared relink request records the revision it reviewed. Rust rechecks that revision before applying the request and rejects an outdated request without overwriting newer state.
 
-The revision detects an intervening relink even if the association changes from X to Y and back to X. Reopening an unchanged registration does not increment it. It is not a credential, a filesystem-change counter or a replacement for native location validation. Exact storage constraints and Rust request/error contracts remain part of the later schema and contract reviews.
+The revision detects an intervening relink even if the association changes from X to Y and back to X. Reopening an unchanged registration does not increment it. It is not a credential, a filesystem-change counter or a replacement for native location validation. Storage constraints and typed stale-revision checks are implemented. Native relink orchestration remains absent.
 
 ## Approved unavailable-project retention
 
@@ -97,7 +97,7 @@ Generate artifact IDs in trusted Rust code as random 128-bit values from a secur
 
 Allocate the ID during preparation, before filesystem publication and database acceptance. Use that identity through the installation lifecycle, without inserting a premature acceptance record or keeping a transaction open during preparation. Allocation alone grants no acceptance, loading authority or permissions.
 
-Keep artifact identity separate from the file-set fingerprint. Identical repair contents have the same content fingerprint but a fresh artifact ID. These IDs are lookup identities, not native credentials. Exact generator/service signatures remain open; no implementation is added by this approval.
+Keep artifact identity separate from the file-set fingerprint. Identical repair contents have the same content fingerprint but a fresh artifact ID. These IDs are lookup identities, not native credentials. `PreparedArtifact::from_verified` allocates IDs with `getrandom` before publication.
 
 ## Approved package identity columns
 
@@ -123,7 +123,7 @@ Namespace and name are the source of identity. Validate both with the existing m
 
 Treat namespace/name as stable identity fields, not mutable display labels. This approves no rename operation that transfers existing history or permissions to another identity. Version, artifact selection and permission state stay in their separate tables. A namespace does not authenticate a publisher or organization.
 
-An in-memory probe with local SQLite 3.54.1 checked scoped/unscoped generation and duplicate rejection. The Rust registry schema remains unimplemented; remaining SQL constraints still need review.
+The generated canonical identity and uniqueness constraints are implemented and covered by native schema/store tests.
 
 ## Approved version-history identity
 
@@ -133,24 +133,24 @@ For example, `1.0.0+build.1` and `1.0.0+build.2` have separate history records a
 
 Release identity is separate from dependency compatibility. The existing dependency matcher uses SemVer precedence and ignores build metadata, including for exact requirements. This decision does not change matching, introduce automatic version selection or enable multiple active versions.
 
-Do not use SQLite text ordering as semantic version precedence. Use the existing Rust SemVer model for compatibility and ordering decisions. The history column set below is approved. Reference key representations and physical uniqueness constraints remain open.
+Do not use SQLite text ordering as semantic version precedence. Use the existing Rust SemVer model for compatibility and ordering decisions. The history column set below is approved. Composite history keys and physical uniqueness constraints are implemented.
 
 ## Approved version-history columns
 
 Use the following `package_version_history` column set:
 
-| Column               | Approved role or type                                                                              |
-| -------------------- | -------------------------------------------------------------------------------------------------- |
-| `package_id`         | `INTEGER NOT NULL`, referencing the stable package key; exact foreign-key definition remains open. |
-| `version`            | `TEXT NOT NULL`, containing the complete canonical SemVer value.                                   |
-| `fingerprint_scheme` | `TEXT NOT NULL`, initially `writers-ide.file-set/1`.                                               |
-| `fingerprint`        | `BLOB NOT NULL`, constrained to exactly 32 bytes.                                                  |
+| Column               | Approved role or type                                                                        |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| `package_id`         | `INTEGER NOT NULL`, referencing the stable package key; restrictive foreign key implemented. |
+| `version`            | `TEXT NOT NULL`, containing the complete canonical SemVer value.                             |
+| `fingerprint_scheme` | `TEXT NOT NULL`, initially `writers-ide.file-set/1`.                                         |
+| `fingerprint`        | `BLOB NOT NULL`, constrained to exactly 32 bytes.                                            |
 
 Allow one row per `(package_id, version)`, using exact case-sensitive identity after strict SemVer parsing. Create history only during successful artifact acceptance, in the same transaction as the artifact's other records. Inspecting an unaccepted candidate must not reserve a version.
 
 Existing history requires matching accepted contents. Interpret its digest using the stored scheme; never compare different schemes as interchangeable or overwrite a stored scheme/digest to accept changed contents. Missing or unsupported scheme identifiers must not be treated as version 1.
 
-Keep history after uninstall and artifact cleanup until explicit registry reset. It stores no installation location, per-file records, user preferences or native authority. Accepted artifacts retain `package_id` and complete `version` and reference history through the composite pair `(package_id, version)`. Do not add a separate history-row ID for this relationship. Each artifact keeps its own immutable installation and integrity records. The composite reference is approved; exact SQL remains subject to final schema review.
+Keep history after uninstall and artifact cleanup until explicit registry reset. It stores no installation location, per-file records, user preferences or native authority. Accepted artifacts retain `package_id` and complete `version` and reference history through the composite pair `(package_id, version)`. Do not add a separate history-row ID for this relationship. Each artifact keeps its own immutable installation and integrity records. The composite reference and restrictive deletion are implemented.
 
 ## Approved restore version-history retention
 
@@ -160,7 +160,7 @@ This combines content-history records only. It does not merge current permission
 
 If current storage is missing or cannot be safely validated, allow explicit recovery from a validated backup. Explain that post-backup version-history records may be unrecoverable and require acknowledgement of that history loss. Do not present it as a normal history-preserving restore or claim that unknown records survived. Preserve any unreadable original for recovery. Apply the existing Secure-mode and inactive-recovered-approval rules.
 
-Trusted Rust code determines whether current storage can be safely validated; this is not a caller-supplied shortcut around conflict checks. Known accepted-content conflicts from a safely validated current registry still reject the initial restore. Exact loss-review, source-preservation, key-remapping and restoration contracts remain under review. No restore implementation is added.
+Trusted Rust code determines whether current storage can be safely validated; this is not a caller-supplied shortcut around conflict checks. Known accepted-content conflicts from a safely validated current registry still reject the initial restore. The private staging helper validates and merges available history without modifying source/current data. It validates pins independently and preserves every safely decoded pin even when another history row, namespace record or allocation counter is missing or malformed. Incomplete evidence requires loss acknowledgement and a fresh namespace. Readable unsupported schema versions, known namespace mismatches and known accepted-content conflicts still reject recovery. Resource-limit failures cannot be bypassed by acknowledging loss. History deleted without surviving evidence cannot be detected or reconstructed; do not claim it was preserved. Loss acknowledgement UI, generation publication and application recovery remain absent.
 
 ### Approved restore allocation-counter retention
 
@@ -168,7 +168,7 @@ When current allocation history can be safely validated, preserve the higher all
 
 For example, if current allocation reached 100 and the backup reached 60, new IDs must be above 100. Preserve allocation metadata without treating matching local IDs across source databases as matching entity identities. This does not merge current choices, approvals or installation selections into the restored configuration.
 
-This preserves the existing normal-allocation non-reuse rule when the necessary evidence is available. If current counters are missing or cannot be safely recovered, do not claim that unknown post-backup allocations were preserved. Use the fresh identity boundary below for that recovery case. Exact counter validation and key-remapping contracts remain under review.
+This preserves the existing normal-allocation non-reuse rule when the necessary evidence is available. If current counters are missing or cannot be safely recovered, do not claim that unknown post-backup allocations were preserved. Use the fresh identity boundary below for that recovery case. Counter validation and canonical history remapping are implemented in restore staging; application reference refresh remains absent.
 
 ### Approved identity boundary for unrecoverable counters
 
@@ -176,7 +176,7 @@ If current allocation history cannot be preserved during recovery, give the reco
 
 Keep restored integer keys and their foreign-key associations intact. Public IDs for restored projects change at this recovery boundary; external caches and saved ID-based references need refresh or explicit remapping. Ordinary creation establishes an identity namespace, and ordinary reopening preserves it. The namespace is not a permission credential or proof of publisher identity.
 
-This does not restore native credentials or approvals, revive old live references or replace native location validation. Exact namespace storage, encoding and Rust key contracts remain under review. Ordinary-restore eligibility is defined below.
+This does not restore native credentials or approvals, revive old live references or replace native location validation. The namespace is a random 16-byte value and internal project identity pairs it with the registration key. Public string encoding and application mapping remain open. Ordinary-restore eligibility is defined below.
 
 ### Approved ordinary-restore namespace boundary
 
@@ -196,11 +196,13 @@ Exact maintenance ownership types, restore/publication protocol and restart inte
 
 ### Approved staged restore preparation
 
+The private helper is implemented and tested with real files. It performs bounded full backup/result validation, merges validated history/counters and quarantines approvals in a new destination. It does not publish a generation or coordinate application recovery.
+
 Build the restored registry at a separate host-owned staging location using SQLite-aware copying. Apply required migrations, validated history/counter preservation, Secure mode, recovered-approval separation and any required identity-namespace change there. Validate the prepared result before publishing it as the current registry.
 
 Do not modify the current destination during preparation or alter the source backup. Preserve any unreadable original under the recovery policy. A preparation failure must not partially apply settings or installations to the current registry. Staging requires additional temporary disk space; it does not require holding the entire database in memory.
 
-The generation-directory layout below is approved. Exact publication, SQLite connection/checkpoint handling and crash recovery still need approval. A database-file rename alone is not an approved WAL-safe publication protocol. Normal startup checks still apply before returning a ready service. No restore implementation is added.
+The generation-directory layout below is approved. Exact publication, SQLite connection/checkpoint handling and crash recovery still need approval. A database-file rename alone is not an approved WAL-safe publication protocol. Normal startup checks still apply before returning a ready service. Restore staging is implemented; generation publication is not.
 
 ### Approved registry generation layout
 
@@ -242,7 +244,7 @@ The future UI must explain the resulting plan and require appropriate confirmati
 
 **Registry persistence preference:** use relational columns and tables. Use JSON only as a last resort, with a specific justification and design approval.
 
-Store the full accepted file set in `artifact_files`, not a JSON value on `accepted_artifacts`. Each file record belongs to an artifact and contains its accepted path, byte length and SHA-256 digest. Preserve the integrity record's format version on each accepted artifact as `integrity_record_version`, not in package/version history. Different copies of the same release can use different supported record formats without changing accepted content identity. Repairs still require matching accepted contents and a fresh artifact. The per-file column set and digest encoding below are approved. Identity-reference types and remaining physical constraints still need review.
+Store the full accepted file set in `artifact_files`, not a JSON value on `accepted_artifacts`. Each file record belongs to an artifact and contains its accepted path, byte length and SHA-256 digest. Preserve the integrity record's format version on each accepted artifact as `integrity_record_version`, not in package/version history. Different copies of the same release can use different supported record formats without changing accepted content identity. Repairs still require matching accepted contents and a fresh artifact. The per-file column set and digest encoding below are approved. Identity-reference types and physical constraints are implemented.
 
 Insert the artifact and its complete file set atomically. Do not expose partially accepted file sets or offer independent mutation of accepted file records. An existing artifact's acceptance remains immutable; repair creates a new artifact.
 
@@ -252,16 +254,16 @@ When loading an artifact, reconstruct the integrity record through bounded reads
 
 Use the following `artifact_files` column set:
 
-| Column        | Approved role or type                                                                               |
-| ------------- | --------------------------------------------------------------------------------------------------- |
-| `artifact_id` | `BLOB NOT NULL`, referencing the artifact's 16-byte key; exact foreign-key definition remains open. |
-| `path`        | `TEXT NOT NULL`, preserving the exact accepted package-relative path.                               |
-| `byte_length` | `INTEGER NOT NULL`, constrained to nonnegative values.                                              |
-| `sha256`      | `BLOB NOT NULL`, constrained to exactly 32 bytes of binary SHA-256 digest data.                     |
+| Column        | Approved role or type                                                                         |
+| ------------- | --------------------------------------------------------------------------------------------- |
+| `artifact_id` | `BLOB NOT NULL`, referencing the artifact's 16-byte key; restrictive foreign key implemented. |
+| `path`        | `TEXT NOT NULL`, preserving the exact accepted package-relative path.                         |
+| `byte_length` | `INTEGER NOT NULL`, constrained to nonnegative values.                                        |
+| `sha256`      | `BLOB NOT NULL`, constrained to exactly 32 bytes of binary SHA-256 digest data.               |
 
 Allow one row per `(artifact_id, path)`. Do not trim or case-fold accepted paths during persistence. Reject byte lengths that cannot be represented rather than truncating or wrapping them. Rust still validates the paths, lengths, digests and resource budgets.
 
-The digest constraint must reject non-BLOB values as well as incorrect lengths. The proposed predicate is `typeof(sha256) = 'blob' AND length(sha256) = 32`. Developers can inspect the digest using SQLite's `hex(sha256)`.
+The digest constraint must reject non-BLOB values as well as incorrect lengths. The implemented predicate is `typeof(sha256) = 'blob' AND length(sha256) = 32`. Developers can inspect the digest using SQLite's `hex(sha256)`.
 
 The existing integrity module represents per-file digests as lowercase hexadecimal strings. Convert losslessly at its entry boundary where needed. Binary persistence does not change SHA-256, accepted contents or verification strength. The complete file set remains immutable and is inserted atomically with its artifact.
 
@@ -288,9 +290,9 @@ Do not include ZIP compression, file timestamps, installation paths, artifact ID
 
 Use one shared helper for verified-package/snapshot content identity and registry version history. Persist the scheme identifier alongside the digest so its interpretation remains explicit. Do not make fingerprints depend on JSON serialization or integrity-record storage layout. A new immutable repair installation with identical accepted contents retains the same content fingerprint, while its artifact identity remains separate.
 
-This changes current internal package-fingerprint values. Implement fixed test vectors and regression checks for integrity, snapshot and resource consumers. Individual file SHA-256 hashes are unchanged. A fingerprint still grants no authority and authenticates no publisher.
+The shared implementation uses this binary encoding for integrity-record, verified-package and snapshot fingerprints. Individual file SHA-256 hashes and integrity-record JSON encoding are unchanged. Fixed vectors and integrity/resource regression tests cover the calculation. A fingerprint grants no authority and authenticates no publisher.
 
-The current source still computes package fingerprints from deterministic JSON serialization. The binary helper and affected-test updates remain unimplemented; the specification above is approved.
+The binary calculation is implemented in [`plugin_integrity/mod.rs`](../../src-tauri/src/plugin_integrity/mod.rs). `IntegrityRecord::fingerprint()` and verified-package fingerprint construction use the same helper.
 
 ### Reference vectors
 
@@ -301,15 +303,15 @@ These are fingerprint-format vectors, not complete installable packages. The dig
 | Empty file set           | 31 bytes             | `bb1fce0a61739db749f572861750a86908166d0f948676669e1b5eca47a0807d` |
 | `a.txt` containing `abc` | 84 bytes             | `616f6edea51ec2663dc8e6377974436346b235cbc28cf46729ce00134065d0b0` |
 
-The vectors were calculated with Python's SHA-256 implementation from the specified fields. Future Rust tests must reproduce them. Input enumeration order must not change a fingerprint.
+Rust tests reproduce these independently calculated vectors. Input enumeration order does not change a fingerprint.
 
 ## Approved integrity-module boundary
 
-Add a database-independent entry API to the existing integrity module. It constructs an `IntegrityRecord` from a format version and an iterator of file entries. Enforce limits during construction, reject duplicate paths and apply the integrity module's existing validation rules. Expose entries through a read-only iterator so the registry can persist them without JSON.
+The integrity module implements `IntegrityRecord::from_entries(version, entries, limits)`. It constructs a record from a fallible entry iterator, enforces limits incrementally and rejects duplicate or invalid paths. `entries()` returns an exact-size iterator of owned metadata copies, so changing an item cannot mutate the record. `format_version()` and `fingerprint()` expose validated metadata. Trusted native preparation uses `VerifiedPackage::integrity_record(limits)` to derive the record from retained verified buffers, not reopened source files.
 
 The registry translates SQL rows to and from these entries. The integrity module remains responsible for interpreting and validating records. It must not depend on SQLite or `rusqlite`.
 
-Use fixed-size binary SHA-256 digests (`[u8; 32]`) at the new constructor and read-only iteration boundary. Entries also carry the accepted path and byte length. The integrity module owns any conversion to its existing internal hexadecimal representation. This does not change the existing JSON record format or require an internal storage rewrite. The registry must reject malformed database digest values rather than truncate or pad them into this type. Remaining entry details and exact method signatures still need review.
+Use fixed-size binary SHA-256 digests (`[u8; 32]`) at the new constructor and read-only iteration boundary. Entries also carry the accepted path and byte length. The integrity module owns any conversion to its existing internal hexadecimal representation. This does not change the existing JSON record format or require an internal storage rewrite. The registry must reject malformed database digest values rather than truncate or pad them into this type. The implemented entry has an owned `String` path, `u64` byte length and `[u8; 32]` digest.
 
 Allow the constructor to consume a fallible iterator whose items are `Result<IntegrityEntry, E>`. Read and validate entries incrementally. Stop on a source-reading error or an integrity-validation failure, preserving the distinction between those cases. The source error type is generic, so the integrity module does not depend on the registry or SQLite. The registry need not build a second complete entry collection before construction. Ordinary collections can be adapted into successful items.
 
@@ -322,7 +324,7 @@ enum IntegrityBuildError<E> {
 }
 ```
 
-The constructor returns `Result<IntegrityRecord, IntegrityBuildError<E>>`. Preserve the original source error in `Source(E)` rather than requiring a boxed trait object. The registry translates these failures into its own domain error; the integrity module does not return or depend on `RegistryError`. Exact constructor signatures, trait bounds and source-error translation remain under review.
+The constructor returns `Result<IntegrityRecord, IntegrityBuildError<E>>`. Preserve the original source error in `Source(E)` rather than requiring a boxed trait object. The registry translates these failures into its own domain error; the integrity module does not return or depend on `RegistryError`. The implemented constructor takes `IntoIterator<Item = Result<IntegrityEntry, E>>`; the registry owns domain-error translation.
 
 A structurally valid record is not proof of trusted acceptance and does not verify package bytes. Acceptance and byte verification retain their separate boundaries. These entry operations are internal Rust APIs, not plugin-facing SDK exports.
 
@@ -330,9 +332,9 @@ The lightweight version history retains its fingerprint after artifact cleanup. 
 
 ## Approved artifact-linked declarations
 
-Persist the registry-relevant component metadata and native permission requirements as normalized, immutable rows linked to the accepted artifact. The retained fields include component names, activation scopes, initial enablement defaults and package/component permission requirements referencing the shared native permission catalog. This does not approve mirroring every manifest field. The component-metadata column set and permission-declaration tables below are approved. Exact identity-reference types and physical constraints still need review.
+Persist the registry-relevant component metadata and native permission requirements as normalized, immutable rows linked to the accepted artifact. The retained fields include component names, activation scopes, initial enablement defaults and package/component permission requirements referencing the shared native permission catalog. This does not approve mirroring every manifest field. The component-metadata column set and permission-declaration tables below are approved. Reference types and physical constraints are implemented.
 
-Derive these rows from the exact verified manifest. Record them atomically with the artifact and its full integrity file set. Acceptance must prevent a declaration set from being associated with different manifest bytes. The owned prepared-bundle input and matching typed publication-receipt requirement described below are approved. Exact fields and matching/validation contracts remain open.
+Derive these rows from the exact verified manifest. Record them atomically with the artifact and its full integrity file set. Acceptance must prevent a declaration set from being associated with different manifest bytes. The owned prepared-bundle input and matching typed publication-receipt requirement described below are approved. Fields and receipt matching are implemented; the receipt constructor is test-only until a durable publisher exists.
 
 User enablement choices and permission decisions stay separate and belong to stable package/component identities. Artifact-linked declarations describe a version's requirements, not the user's consent or the component's current availability. Their retention follows the artifact, not retained permission denials.
 
@@ -344,15 +346,15 @@ Use `artifact_components` for accepted, version-specific component metadata:
 
 | Column             | Approved role or type                                                                                   |
 | ------------------ | ------------------------------------------------------------------------------------------------------- |
-| `artifact_id`      | `BLOB NOT NULL`, referencing the artifact's 16-byte key; exact foreign-key definition remains open.     |
-| `component_id`     | `INTEGER NOT NULL`, referencing the stable component key; exact foreign-key definition remains open.    |
+| `artifact_id`      | `BLOB NOT NULL`, referencing the artifact's 16-byte key; restrictive foreign key implemented.           |
+| `component_id`     | `INTEGER NOT NULL`, referencing the stable component key; restrictive foreign key implemented.          |
 | `display_name`     | `TEXT NOT NULL`, retaining the accepted human-readable name.                                            |
 | `description`      | `TEXT NOT NULL`, retaining the accepted description.                                                    |
 | `kind`             | Constrained `TEXT NOT NULL`; initially only `frontend`.                                                 |
 | `activation_scope` | Constrained `TEXT NOT NULL`: `project` or `application`.                                                |
 | `default_enabled`  | `INTEGER NOT NULL`, constrained to `0` or `1`; the author's initial suggestion, not current enablement. |
 
-Allow one declaration per `(artifact_id, component_id)`. Require the artifact and stable component to belong to the same package. Enforce this in Rust and with a SQLite trigger on child insertion or association update. Keep the existing columns rather than adding `package_id` to this table. Parent package associations remain immutable; the trigger does not by itself prevent parent reassignment. Final schema review must cover those parent invariants. Exact trigger SQL, reference encodings and foreign-key definitions remain open. Accept these immutable rows atomically with the artifact, file records and permission declarations.
+Allow one declaration per `(artifact_id, component_id)`. Require the artifact and stable component to belong to the same package. Enforce this in Rust and with a SQLite trigger on child insertion or association update. Keep the existing columns rather than adding `package_id` to this table. Parent package associations remain immutable; the trigger does not by itself prevent parent reassignment. The schema implements those parent invariants, trigger SQL and foreign keys. Accept these immutable rows atomically with the artifact, file records and permission declarations.
 
 File hashes belong to `artifact_files`, not this table. The artifact association binds component metadata to the exact verified manifest described by those file records. Keep current enablement and permission decisions in their separate tables.
 
@@ -362,7 +364,7 @@ This initial column set does not mirror entry paths, styles, runtime profiles, p
 
 Use a `components` table to represent stable package/component identities. Artifact-linked declarations, user enablement choices and permission decisions reference these identities. Keep a component identity while retained artifacts or user records require it, including denials that survive uninstall.
 
-Names, activation scopes, requirements and manifest defaults belong to artifact-linked declarations, not the stable component row. The existence of a component row does not mean installed, available, enabled or authorized. The column set below is approved; exact foreign-key definitions and remaining physical constraints remain open.
+Names, activation scopes, requirements and manifest defaults belong to artifact-linked declarations, not the stable component row. The existence of a component row does not mean installed, available, enabled or authorized. The column set and restrictive foreign keys are implemented.
 
 Natural composite keys remain a valid relational design. Repeating a package/component key in related tables is not itself denormalization. The reason for a stable parent row is its independent lifetime and the common foreign-key target it provides. Use the approved integer surrogate keys for references while retaining natural identity uniqueness.
 
@@ -378,7 +380,7 @@ Use the following `components` column set:
 
 Require uniqueness of `(package_id, local_id)`. Validate the local ID with the existing manifest component-ID rules and compare exact values. Treat package association and local ID as stable identity fields. Do not rename or move a row in place and thereby transfer its retained choices or permissions.
 
-Keep display names, descriptions, activation scopes and defaults in `artifact_components`. A publisher may change a display name in a new artifact without changing `local_id`. Retain identity while accepted declarations or user records reference it. Exact foreign-key actions and remaining physical constraints still need review.
+Keep display names, descriptions, activation scopes and defaults in `artifact_components`. A publisher may change a display name in a new artifact without changing `local_id`. Retain identity while accepted declarations or user records reference it. Restrictive foreign keys and physical constraints are implemented.
 
 ## Approved host-settings storage
 
@@ -388,11 +390,11 @@ Command resource settings require persistence, loading into the dispatcher, chan
 
 Use the already approved defaults on fresh initialization: Secure mode and Repair and keep the update. Preserve saved choices on ordinary startup. After successful initialization/migration, a missing required settings row is an invalid registry state, not permission to silently regenerate defaults. Restore still follows its separate rule of selecting Secure mode and leaving recovered approvals inactive.
 
-Rust methods remain typed. This table is host configuration, not plugin-owned settings storage or a direct plugin database API. Exact singleton-key encoding, column encodings and final SQL remain under review.
+Rust methods remain typed. This table is host configuration, not plugin-owned settings storage or a direct plugin database API. The required singleton and constrained setting encodings are implemented.
 
 ## Approved native permission catalog
 
-Use a host-owned `native_permissions` table for recognized operation/resource pairs. Use `(operation, resource)` as its composite key, without a separate integer permission ID. Artifact requirements, approvals and denials store both values and reference the catalog through composite foreign keys. Preserve exact validated text values. Final SQL, remaining physical constraints and migration details remain open.
+Use a host-owned `native_permissions` table for recognized operation/resource pairs. Use `(operation, resource)` as its composite key, without a separate integer permission ID. Artifact requirements, approvals and denials store both values and reference the catalog through composite foreign keys. Preserve exact validated text values. Catalog SQL and constraints are implemented; no predecessor schema migration is registered.
 
 The initial vocabulary is `project.files.list` with `project`, `project.files.read` with `project`, and `external.open` with `http-https`. Application initialization and migrations maintain the catalog. A plugin cannot add entries or register an arbitrary native operation through its manifest. Unsupported declarations are rejected rather than inserted automatically.
 
@@ -413,7 +415,7 @@ A component-level requirement must belong to a component declared by that artifa
 
 Compute effective requirements as the deduplicated union of package and component declarations. Reject duplicates within a declaration level. The same permission at package and component levels is valid and remains one effective requirement. The existing Rust manifest model already defines this union.
 
-This preserves declaration origin for review without repeating common requirements for every component. It does not create package-wide consent: approvals still cover explicitly reviewed components. Current activation-scope restrictions remain unchanged. Exact keys, column types and foreign-key definitions remain open.
+This preserves declaration origin for review without repeating common requirements for every component. It does not create package-wide consent: approvals still cover explicitly reviewed components. Current activation-scope restrictions remain unchanged. Keys, column types and foreign keys are implemented.
 
 ## Approved permission tables
 
@@ -427,13 +429,13 @@ An approval and a matching denial may coexist. Effective-access evaluation appli
 
 Keep at most one approval per stable component, operation/resource pair and coverage scope. For project coverage, the project registration is part of that identity. When reviewed explicit approval replaces automatic approval for the same identity, update the existing row's source to explicit after durable save. Automatic processing must never downgrade explicit approval. Decisions at other scopes are unchanged, and matching denials retain precedence unless separately cleared through review.
 
-Use two filtered (partial) unique indexes in each permission-decision table. For application coverage, require uniqueness by component and permission. For project coverage, require uniqueness by component, permission and project registration. Do not substitute a reserved project-key value for null. Apply these rules independently to approvals and denials so a matching approval and denial can coexist. Permission references use the approved operation/resource pair, so permission identity in these indexes includes both fields. Exact SQL remains under review.
+Use two filtered (partial) unique indexes in each permission-decision table. For application coverage, require uniqueness by component and permission. For project coverage, require uniqueness by component, permission and project registration. Do not substitute a reserved project-key value for null. Apply these rules independently to approvals and denials so a matching approval and denial can coexist. Permission references use the approved operation/resource pair, so permission identity in these indexes includes both fields. The SQL is implemented.
 
 Identify a permission decision by its table (approval or denial), stable component, operation/resource pair, coverage scope and project registration when project-specific. Do not add a separate persistent decision ID. SQLite internal row IDs are not part of the service contract. Management operations still require caller validation and reviewed-state checks; knowledge of a decision's identity grants no authority.
 
 The row represents current approval, not its history. When logging is added, record automatic-to-explicit promotion as an audit event. Logging remains deferred; event fields, storage and retention are not selected by this decision.
 
-This separation reflects different fields and lifetimes, not an established performance advantage. The coverage column names and valid combinations above are approved. The filtered uniqueness strategy above is approved. The logical decision key above is approved. Remaining physical constraints and final index SQL remain open. Package/component integer key types are approved above. Other illustrative key types and example SQL are not final schema declarations.
+This separation reflects different fields and lifetimes, not an established performance advantage. The coverage column names and valid combinations above are approved. The filtered uniqueness strategy above is approved. The logical decision key above is approved. Physical constraints, indexes and typed keys are implemented in the schema baseline.
 
 ## Approved recovered-approval separation
 
@@ -445,9 +447,9 @@ Enabling Trust mode after restoration does not discard recovered review records.
 
 Keep one recovered review row per component, operation/resource pair and coverage, including project registration for project coverage. Record two source facts: `had_explicit_approval` and `had_automatic_approval`. Combine matching facts when restoring, so both flags can be true. Require at least one source flag. The flags describe information present in the restored data, not which source was latest or a new approval. They never provide coverage.
 
-The current `permission_approvals` table retains its existing single `source` field. The recovered flags do not change automatic-to-explicit promotion or denial precedence. Exact physical columns, constraints and restore normalization remain under review.
+The current `permission_approvals` table retains its existing single `source` field. The recovered flags do not change automatic-to-explicit promotion or denial precedence. Physical columns, constraints and restore normalization are implemented.
 
-Keep recovered review data distinct from current approvals in queries and pure permission evaluation. This is a persistence boundary, not a new native permission or plugin API. Remaining physical schema/index definitions and restore contracts remain under review. No backup restoration or native authorization implementation is added.
+Keep recovered review data distinct from current approvals in queries and pure permission evaluation. This is a persistence boundary, not a new native permission or plugin API. Schema/index definitions and private restore staging are implemented. Generation publication and native authorization remain absent.
 
 ### Approved recovered-candidate consumption
 
@@ -461,7 +463,7 @@ When a new version becomes selected, remove a continuing component's approvals f
 
 Compare the deduplicated union of package and component requirements. Preserve approvals when a permission remains required through either declaration level. Preserve explicit denials and unrelated components' decisions. If a later update or explicit restoration requires the removed permission again, normal approval rules apply; retaining an older artifact does not preserve those removed approvals.
 
-If the newly selected version removes a component entirely, remove all of that component's native approvals at selection, not staging. Preserve its stable identity, explicit denials, application-level enablement choice and project overrides. A later version or explicit restoration that brings it back reuses saved enablement choices but must satisfy normal native approval rules again. Keep unrelated components' decisions unchanged. Commit removed-component cleanup with the selection change. Exact transaction operations and Rust contracts remain under review.
+If the newly selected version removes a component entirely, remove all of that component's native approvals at selection, not staging. Preserve its stable identity, explicit denials, application-level enablement choice and project overrides. A later version or explicit restoration that brings it back reuses saved enablement choices but must satisfy normal native approval rules again. Keep unrelated components' decisions unchanged. Commit removed-component cleanup with the selection change. Typed cleanup transactions are implemented.
 
 ## Approved enablement tables
 
@@ -474,15 +476,15 @@ Use two tables for saved choices:
 
 No project-override row means Inherit. Choosing Inherit removes the override. The application-level choice is saved configuration, not a live reference to the latest manifest default. Existing first-configuration rules determine its initial value.
 
-Project overrides apply only to project-scoped components. The Rust service validates the applicable accepted declaration; a stable identity alone contains no activation scope. Exact keys, column types and constraints still need review. Scope changes follow the review and applicability rules below. Outstanding scope blockers are derived from the selected declaration and reviewed baseline.
+Project overrides apply only to project-scoped components. The Rust service validates the applicable accepted declaration; a stable identity alone contains no activation scope. Keys, column types and constraints are implemented. Scope changes follow the review and applicability rules below. Outstanding scope blockers are derived from the selected declaration and reviewed baseline.
 
 ## Approved activation-scope changes
 
 An update may change a component's activation scope without changing its stable component ID. Require explicit review of the new lifetime and enablement effects before the changed component activates. This can be part of the normal update review rather than a separate prompt. Updates remain restart-staged; do not retarget an existing activation.
 
-An outstanding scope review blocks the changed component's activation, not selection of the entire package. After normal package checks, the update can become selected and unaffected components can activate if their own checks pass. Keep the changed component and its required dependents stopped, and explain the outstanding review in management UI. Derive the blocker from the selected declaration and saved reviewed baseline. For an installed component, a missing baseline requires initial review; a different selected scope requires scope-change review. A matching scope has no scope-review blocker. Do not store a separate mutable blocked flag. This calculation survives restart through the underlying saved facts. Selecting a release is not scope acknowledgement. Exact physical constraints remain under review.
+An outstanding scope review blocks the changed component's activation, not selection of the entire package. After normal package checks, the update can become selected and unaffected components can activate if their own checks pass. Keep the changed component and its required dependents stopped, and explain the outstanding review in management UI. Derive the blocker from the selected declaration and saved reviewed baseline. For an installed component, a missing baseline requires initial review; a different selected scope requires scope-change review. A matching scope has no scope-review blocker. Do not store a separate mutable blocked flag. This calculation survives restart through the underlying saved facts. Selecting a release is not scope acknowledgement. Physical constraints are implemented.
 
-A newer update may become selected while scope review is still outstanding. Replace the pending review target with the newly selected release and evaluate its scope against the component's last reviewed scope. Do not treat the earlier unreviewed selected scope as the baseline. If the new target still needs scope review, keep the component blocked until that target is reviewed. Unaffected components still undergo their own update and activation checks. Exact baseline and pending-target storage remain under review.
+A newer update may become selected while scope review is still outstanding. Replace the pending review target with the newly selected release and evaluate its scope against the component's last reviewed scope. Do not treat the earlier unreviewed selected scope as the baseline. If the new target still needs scope review, keep the component blocked until that target is reviewed. Unaffected components still undergo their own update and activation checks. Baseline and pending-target storage are implemented.
 
 If the newly selected release returns to the last reviewed scope before the unreviewed scope ever activates, clear the scope-review blocker without another acknowledgement. The manager may explain that the pending scope change no longer applies. Do not automatically enable the component or bypass normal dependency, native-permission and other activation checks. Resolving this blocker does not clear unrelated blockers.
 
@@ -496,11 +498,11 @@ Advance the last-reviewed-scope baseline once both the matching accepted target 
 
 Retain the last reviewed scope with the stable component identity across uninstall. Discard pending transition acknowledgements associated with the removed installation. On reinstall, compare the declared scope with the retained baseline and require review of a different scope before activation. Retaining the baseline is not approval of a future transition and restores no native permissions.
 
-Store the baseline in a separate `component_scope_state` table, with at most one row per stable component. Its logical fields are `component_id`, `last_reviewed_scope` and `scope_revision`. Keep `components` focused on stable identity and `artifact_components` on the release's declared scope. Pending transition acknowledgements remain separate from the baseline. The existence of a component identity does not establish a reviewed scope. Establish the first baseline through normal installation or enablement review. Show whether the component runs per project or per window. Save the baseline only after the initial scope is acknowledged and the matching release is selected. The review can share an existing confirmation screen; it need not be a separate popup. A component without that acknowledgement remains blocked from activation. This is distinct from native permission acknowledgement; components with no native requirements gain no native-permission prompt. Exact column constraints remain under review.
+Store the baseline in a separate `component_scope_state` table, with at most one row per stable component. Its logical fields are `component_id`, `last_reviewed_scope` and `scope_revision`. Keep `components` focused on stable identity and `artifact_components` on the release's declared scope. Pending transition acknowledgements remain separate from the baseline. The existence of a component identity does not establish a reviewed scope. Establish the first baseline through normal installation or enablement review. Show whether the component runs per project or per window. Save the baseline only after the initial scope is acknowledged and the matching release is selected. The review can share an existing confirmation screen; it need not be a separate popup. A component without that acknowledgement remains blocked from activation. This is distinct from native permission acknowledgement; components with no native requirements gain no native-permission prompt. Column constraints are implemented.
 
 Do not create a placeholder `component_scope_state` row for a never-reviewed component. Every baseline row contains an established reviewed scope and its revision. Absence of a row means initial scope acknowledgement is still required before activation. A saved acknowledgement for a staged first installation remains in the separate pending record until the matching release is selected; it is not yet a baseline.
 
-Store an incrementing `scope_revision` alongside the reviewed baseline. Advance it whenever that baseline changes. Prepared reviews and staged acknowledgements record the baseline revision they reviewed. Rust rejects an acknowledgement based on an older revision, even if the scope changed away and back to the same value. Ordinary restarts and repairs that preserve the baseline do not increment it. The revision identifies baseline state, not authority or plugin execution. Exact initialization, physical constraints and request contracts remain under review.
+Store an incrementing `scope_revision` alongside the reviewed baseline. Advance it whenever that baseline changes. Prepared reviews and staged acknowledgements record the baseline revision they reviewed. Rust rejects an acknowledgement based on an older revision, even if the scope changed away and back to the same value. Ordinary restarts and repairs that preserve the baseline do not increment it. The revision identifies baseline state, not authority or plugin execution. Revisions start at 1, reject exhaustion and use typed expected-state checks.
 
 Retain at most one pending scope acknowledgement per component. It records a completed review for a target transition not yet applied, unlike an outstanding review the user has not completed. Bind it to the target release and reviewed baseline revision. Replacing the target with a different release invalidates the old acknowledgement; the new target needs its own review if its scope requires one. A matching repair of the same accepted release may retain the acknowledgement. This is current transition state, not a history of reviewed candidate versions.
 
@@ -520,7 +522,7 @@ Database checks require both source fields to be null for initial review. For sc
 
 Rust must additionally verify baseline absence for initial review, matching baseline scope/revision for a change, and the component's actual target declaration and scope. It must also validate the target against the reviewed installation action. Apply an acknowledgement and remove its pending row in the same transaction as establishing or advancing the baseline. Final assembled SQL and remaining physical constraints still require review.
 
-This review record is separate from native permission approvals. It grants no native access and cannot convert project-specific approvals into application-wide coverage. Remaining physical constraints and exact transition-validation contracts still need approval. This policy does not define an automatic settings migration.
+This review record is separate from native permission approvals. It grants no native access and cannot convert project-specific approvals into application-wide coverage. Physical constraints and transition-validation contracts are implemented. This policy does not define an automatic settings migration.
 
 ## Approved enablement retention
 
@@ -528,19 +530,19 @@ Keep application-level enablement choices and per-project overrides after uninst
 
 This does not authorize code to run while uninstalled or restore removed native approvals. Reinstallation still requires installation review and the normal activation checks. Retained denials remain effective. Existing first-configuration rules still apply; updates must not silently enable newly added components.
 
-Uninstall removes code, not the user's enablement configuration. A separate explicit configuration-reset action remains a future candidate, not part of this decision. Exact enablement keys, column types and constraints still need review.
+Uninstall removes code, not the user's enablement configuration. A separate explicit configuration-reset action remains a future candidate, not part of this decision. Enablement keys, columns and constraints are implemented.
 
 ## Approved artifact-selection ownership
 
 Use a separate `package_installation_state` table rather than selection columns on `packages`. It holds one row per package with installation state. Its conceptual fields are the package association and selected, staged, retained-previous and pending-repair artifact references.
 
-Each referenced artifact must belong to that package. Enforce this ownership invariant in both Rust validation and SQLite constraints, not only in service code. Staged-only nullability is approved below. Exact keys, foreign-key definitions, remaining nullability and transition constraints remain open. First-install eligibility is approved below. Startup promotion and exact state constraints still need review before the schema is final.
+Each referenced artifact must belong to that package. Enforce this ownership invariant in both Rust validation and SQLite constraints, not only in service code. Staged-only nullability is approved below. Keys, ownership foreign keys, nullability and transitions are implemented. First-install eligibility is approved below. Promotion policy and state constraints are implemented; runtime prerequisites remain test-only.
 
 When a normal different-version update succeeds at startup without a pending repair, select the staged artifact, clear staged and move old selected to previous. Replace any older previous reference. That older artifact is eligible for cleanup only when no retained reference or runtime use requires it. Same-version repair preserves previous instead. For explicit different-version restoration without pending repair, stage previous for restart. After successful startup checks, swap selected and previous and clear staged. The retained copy must still pass verification and normal activation checks before later use. This is not automatic rollback. If a pending repair exists, explicit restoration instead uses the verified repaired copy as previous, as described below.
 
 The stable package row may remain after uninstall because retained history or denials reference it. Remove installation state independently. This does not delete retained history or denials, or authorize artifact cleanup while another required reference exists.
 
-If a staged installation fails its startup integrity, manifest or host/runtime compatibility check, leave the installation references unchanged and keep the affected package stopped. Do not automatically run the selected or previous copy, substitute a pending repair, or cancel the update. Report the problem and require an explicit recovery action. Required dependents may also be blocked. Other packages still undergo their own dependency and activation checks. Normal verification and activation rules apply to any recovery target.
+If a staged installation fails package-fatal startup validation, such as its integrity or manifest check, leave the installation references unchanged and keep the affected package stopped. An unsupported component runtime profile is not a package-fatal failure: an otherwise valid package may still be selected. Block that component and its required dependents while leaving compatible siblings eligible, under the [approved profile policy](implementation-plan.md#frontend-runtime-compatibility). Do not automatically run the selected or previous copy, substitute a pending repair, or cancel the update. Report the problem and require an explicit recovery action. Required dependents may also be blocked. Other packages still undergo their own dependency and activation checks. Normal verification and activation rules apply to any recovery target.
 
 ## Approved pending-repair reference
 
@@ -552,7 +554,7 @@ If the user replaces the staged update with explicit different-version restorati
 
 If the user cancels the staged update, preserve the repair by moving its reference to staged and clearing pending repair. Leave selected and previous unchanged. Explain that the repair remains scheduled for restart. Offer a separate Cancel all pending changes action to clear both pending targets without changing selected or previous.
 
-Do not repurpose the selected, staged or previous references to hold the pending repair while retaining the staged update. This is package-owned transition state, not a general operation queue or multiple-version loading feature. Exact nullability, reference constraints and transition rules remain open.
+Do not repurpose the selected, staged or previous references to hold the pending repair while retaining the staged update. This is package-owned transition state, not a general operation queue or multiple-version loading feature. Nullability, reference constraints and transition rules are implemented.
 
 ## Approved first-install eligibility
 
@@ -560,7 +562,7 @@ A new package may become selected without restarting if no code from that packag
 
 If code from the package was imported earlier in the process, require restart even if the package was subsequently uninstalled. Updates and repairs remain restart-staged. The eventual host must establish this process-wide import history; the internal registry foundation does not load modules or infer that history from database rows alone.
 
-The no-prior-import check is a runtime eligibility gate, not a persisted credential or permission grant. Represent a first installation or reinstall awaiting restart with a row in `package_installation_state`: selected is null, staged is required, and previous/pending repair are null. Do not use a separate pending-installation table. An uninstalled package has no installation-state row; reject all-null rows. Canceling a staged-only installation follows uninstall policy: remove its installation-state row and native approvals, but preserve version history, explicit denials and saved enablement choices. Physical cleanup remains separate. A later installation must satisfy permission approval rules again. Concrete service inputs, promotion rules and exact cancellation transaction mechanics remain open.
+The no-prior-import check is a runtime eligibility gate, not a persisted credential or permission grant. Represent a first installation or reinstall awaiting restart with a row in `package_installation_state`: selected is null, staged is required, and previous/pending repair are null. Do not use a separate pending-installation table. An uninstalled package has no installation-state row; reject all-null rows. Canceling a staged-only installation follows uninstall policy: remove its installation-state row and native approvals, but preserve version history, explicit denials and saved enablement choices. Physical cleanup remains separate. A later installation must satisfy permission approval rules again. Typed inputs, promotion policy and cancellation transactions are implemented; process-wide import tracking remains absent.
 
 ## Repair example
 
@@ -575,11 +577,11 @@ Package: @org/research
     Artifact B -> repaired installation directory
 ```
 
-Both artifacts must match fingerprint X. Selection of the repaired artifact remains restart-staged under the approved repair policy. When the same-version repair is successfully selected, clear its staged reference and preserve the existing previous artifact. Do not replace previous with the damaged copy being repaired. Cleanup of that damaged artifact still requires that no retained reference or runtime use needs it. Their storage belongs to `package_installation_state`; remaining transition constraints still need review.
+Both artifacts must match fingerprint X. Selection of the repaired artifact remains restart-staged under the approved repair policy. When the same-version repair is successfully selected, clear its staged reference and preserve the existing previous artifact. Do not replace previous with the damaged copy being repaired. Cleanup of that damaged artifact still requires that no retained reference or runtime use needs it. Their storage belongs to `package_installation_state`; transition constraints are implemented.
 
 ## Cleanup and retained history
 
-Use explicit transactional cleanup rather than cascading artifact deletion. Rust deletes artifact-owned file records, component metadata and permission requirements, then the artifact, in one transaction. Restrictive foreign keys block deletion while installation pointers or any remaining child rows reference it. This database operation does not delete physical files or remove stable identities, version history or user decisions as a side effect. Exact permission-table cleanup details remain under review.
+Use explicit transactional cleanup rather than cascading artifact deletion. Rust deletes artifact-owned file records, component metadata and permission requirements, then the artifact, in one transaction. Restrictive foreign keys block deletion while installation pointers or any remaining child rows reference it. This database operation does not delete physical files or remove stable identities, version history or user decisions as a side effect. Permission-declaration cleanup commits with artifact removal.
 
 After uninstall and safe cleanup, remove artifact records whose installations are no longer retained. Keep the lightweight package/version/fingerprint history. That history retains no installation location, executable files or permission authority.
 
@@ -591,19 +593,19 @@ Retained history does not authorize reinstall or activation. Package bytes still
 
 Use the approved dedicated Rust worker with `rusqlite`, bundled SQLite, WAL mode and `synchronous=FULL`. The worker serializes registry operations through bounded admission. This does not choose the storage or concurrency model for project documents, history or the file metadata index.
 
-Registry transactions do not publish package files. Durable publication into a new immutable directory precedes the transaction that records acceptance. The foundation must not treat an arbitrary candidate integrity record as trusted acceptance merely because it has been inserted into a table. The internal acceptance contract still needs review.
+Registry transactions do not publish package files. Durable publication into a new immutable directory precedes the transaction that records acceptance. The foundation must not treat an arbitrary candidate integrity record as trusted acceptance merely because it has been inserted into a table. The internal acceptance contract requires prepared metadata and a matching receipt; only tests can construct the receipt until publication is integrated.
 
-Each installation change rechecks its expected state inside the committing transaction. If that state has changed, reject the outdated operation without partial changes or overwriting the newer decision. Management UI refreshes the plan automatically and requires renewed confirmation if the revised action changes what the user would approve. Do not silently resubmit a changed action. Use the approved installation revision below. Exact Rust request/error types remain under review.
+Each installation change rechecks its expected state inside the committing transaction. If that state has changed, reject the outdated operation without partial changes or overwriting the newer decision. Management UI refreshes the plan automatically and requires renewed confirmation if the revised action changes what the user would approve. Do not silently resubmit a changed action. Use the approved installation revision below. Typed requests and domain errors are implemented.
 
 ### Approved installation revision
 
 Retain a monotonic installation revision per package across uninstall. Advance it atomically with every committed installation-state change. A reviewed action records the revision it examined. Reject a mismatching revision with `Conflict` before committing changes, even if the installation pointers have changed away and back to the reviewed values.
 
-Uninstall must not erase or reset the revision. It is separate from project `location_revision` and component `scope_revision`. The draft schema stores it on the retained package row; exact placement and initial value remain part of final mechanical review. Checked increments must not wrap or partially mutate state.
+Uninstall must not erase or reset the revision. It is separate from project `location_revision` and component `scope_revision`. The schema stores it on the retained package row, initially 1. Checked increments must not wrap or partially mutate state.
 
 A committed selection survives a crash before plugin activation. At the next launch, verify the selected artifact and apply normal activation checks again. Selection does not claim successful activation. Do not automatically restore an older artifact because activation confirmation is missing, and do not add such a confirmation marker for rollback in the initial model. Activation-health-based rollback is a possible future feature requiring separate design approval. A crash before the selection commit leaves the prior state intact.
 
-Keep database-library types behind Rust domain operations. Frontend and plugin APIs receive neither SQL access nor a registry connection. The concrete internal Rust request and result types remain open.
+Keep database-library types behind Rust domain operations. Frontend and plugin APIs receive neither SQL access nor a registry connection. Concrete internal request/result types are implemented; see the implementation review.
 
 ## Approved internal Rust entry points
 
@@ -615,7 +617,7 @@ The worker may use private message types, including an internal request enum. Ke
 
 Use one shared `RegistryError` enum as the error type across these methods. Its variants distinguish domain failures and may carry operation context and underlying causes for host diagnostics. Do not expose raw SQLite errors as the service's error contract. Not every variant needs to apply to every operation. This internal enum is not automatically the plugin-facing native error vocabulary.
 
-Exact method names, signatures, request/result types and error payloads remain under review. The error categories below are approved. The entry-point approval does not select the illustrative method names used in discussion. No registry implementation is added.
+The internal methods and records are implemented in [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs) and [`model.rs`](../../src-tauri/src/plugin_registry/model.rs). See the [operation summary](registry-implementation-review.md#internal-rust-contract-shape). These are private host contracts, not a plugin SDK or management IPC.
 
 ### Approved installation-transition ownership
 
@@ -623,15 +625,17 @@ Callers request semantic installation actions, such as staging an update or appl
 
 Keep this policy calculation in one place. Future management-plan previews can reuse it rather than independently reproduce transition rules. Apply the result atomically after expected-state validation. Required file-publication, user-review and runtime-eligibility inputs remain separate gates; this decision does not give the registry filesystem or activation responsibilities.
 
-Exact action request/result types, trusted-input contracts and preview signatures remain under review. This is an internal Rust responsibility boundary, not a new plugin API.
+`InstallationAction`, `InstallationExpectation` and the shared calculator are implemented in [`transitions.rs`](../../src-tauri/src/plugin_registry/transitions.rs). Production previews and runtime prerequisite providers remain unimplemented.
 
 ### Approved registry readiness
 
 Return a usable registry handle only after opening, schema checks and required initialization or supported migration succeed. Application startup awaits that result. Do not expose an initializing handle that admits ordinary requests before readiness. If initialization fails, return an error rather than a usable service handle.
 
-The host can show its setting-up UI while awaiting readiness. Progress reporting does not require access to partially initialized registry operations. Readiness means initialization completed, not that the service can never fail or shut down later. Existing backup, migration and recovery policies still apply. Registry initialization must finish before external plugin loading. Exact open options, startup errors and progress contracts remain under review.
+The host can show its setting-up UI while awaiting readiness. Progress reporting does not require access to partially initialized registry operations. Readiness means initialization completed, not that the service can never fail or shut down later. Existing backup, migration and recovery policies still apply. Registry initialization must finish before external plugin loading. Library readiness is implemented; application progress reporting remains open.
 
 ### Approved normal schema migration
+
+The private reviewed-static-chain helper is implemented and tested with synthetic `1 -> 2` fixtures. Actual opening supports only schema `1`; no prior shipped migration is registered. Unknown schemas reject. The policy below constrains future supported migrations.
 
 Before a supported schema upgrade, complete the required SQLite-aware backup. Keep ordinary registry operations unavailable during migration. Apply the supported migration steps to the current database in one SQLite transaction, rather than preparing and publishing a new generation. Roll back on failure before commit. Complete required validation before returning a usable service, and preserve the backup for recovery.
 
@@ -643,7 +647,7 @@ Run SQLite's full `integrity_check` before returning a ready registry handle. Al
 
 Perform this work on the backend registry worker. It may delay readiness, so the application can show its setting-up UI while waiting. Startup cost has not been measured. This registry stores host-management data, not manuscript contents; these checks do not scan project documents or verify plugin installation files.
 
-Do not return a ready handle if required validation fails or cannot complete. Apply existing corruption, unsupported-schema and recovery policies without silently resetting storage. Passing these checks does not prove every application value is semantically correct or replace package-file integrity verification. Exact check sequencing, reporting bounds and failure translation remain under review.
+Do not return a ready handle if required validation fails or cannot complete. Apply existing corruption, unsupported-schema and recovery policies without silently resetting storage. Passing these checks does not prove every application value is semantically correct or replace package-file integrity verification. Library checks and explicit resource bounds are implemented. Startup cost and application reporting remain unmeasured or unintegrated.
 
 ### Approved separate registry creation
 
@@ -655,13 +659,15 @@ Users need not manually create a database on a fresh installation. However, this
 
 Fresh creation must refuse an existing destination without modifying it, including an apparently empty or zero-byte file. Use non-overwriting creation semantics rather than a path-existence check followed by an operation that could overwrite a file created in between. Do not implicitly repurpose an existing file. An unfinished file from an earlier initialization attempt requires separately defined recovery based on evidence of that attempt.
 
-Exact creation/open signatures and explicit interrupted-initialization recovery procedures remain under review. This is an internal Rust startup contract, not new management IPC or implemented first-run UI.
+Create/open signatures are implemented. First-run generation selection and interrupted-initialization recovery remain unimplemented. This is an internal Rust startup contract, not new management IPC or implemented first-run UI.
 
 ### Approved application-owned lifecycle
 
+The internal owner/handle split is implemented. Canonical destination ownership uses a persistent `.registry-lock` sidecar and `File::try_lock`, separate from SQLite byte-range locks. This is not application single-instance detection or launch forwarding.
+
 Application startup/shutdown code owns the registry lifecycle. Ordinary windows and background operations use operation handles, not lifecycle ownership. Holding or dropping an operation handle does not start or stop the registry. Do not tie shutdown to the last operation handle being dropped.
 
-The application owner explicitly stops admission, finishes admitted writes under their existing validation/transaction rules, and awaits worker cleanup and termination. It need not wait for every operation handle to be dropped. Retained handles cannot admit new work after admission closes; this does not cancel already-admitted writes. These are internal Rust responsibilities, not plugin or frontend shutdown capabilities. Exact lifecycle method signatures remain under review.
+The application owner explicitly stops admission, finishes admitted writes under their existing validation/transaction rules, and awaits worker cleanup and termination. It need not wait for every operation handle to be dropped. Retained handles cannot admit new work after admission closes; this does not cancel already-admitted writes. These are internal Rust responsibilities, not plugin or frontend shutdown capabilities. The library lifecycle is implemented; application startup/shutdown wiring remains absent.
 
 If the application drops the lifecycle owner without awaiting shutdown, close admission and signal the worker to follow the shutdown policy without blocking the dropping thread. The worker retains registry ownership until draining and cleanup finish. Do not synchronously join from the destructor or release ownership early. This is only a fallback: application code must still await explicit shutdown before exiting to know finalization completed. It does not guarantee completion through a crash or force quit.
 
@@ -669,13 +675,13 @@ If the application drops the lifecycle owner without awaiting shutdown, close ad
 
 After closing admission, reject queued standalone reads that have not started with `RegistryError::Unavailable`, even if their callers are still waiting. Let the current bounded operation finish and clean up normally. Process remaining admitted writes under their normal validation and commit/failure rules, then await worker cleanup and termination. Preserve the relative admission order of those writes.
 
-This does not skip SQL reads needed inside an admitted write. Those remain part of its validation and transaction. Complete any application shutdown preparation that needs standalone registry reads before closing admission. This changes no plugin cancellation API or protected native-service rule. Exact shutdown result and failure-reporting contracts remain under review.
+This does not skip SQL reads needed inside an admitted write. Those remain part of its validation and transaction. Complete any application shutdown preparation that needs standalone registry reads before closing admission. This changes no plugin cancellation API or protected native-service rule. The owner awaits `shutdown()` completion; application shutdown status UI remains future work.
 
 ### Approved unexpected-worker failure
 
 If the registry worker panics or otherwise terminates unexpectedly, stop admission and make the existing service unavailable. Report affected requests without automatically replaying writes. If a write's commit outcome cannot be established, report `OutcomeUnknown` rather than claim it failed without changes.
 
-Require controlled reopening or recovery before further registry operations. Do not automatically replace the worker and revive the service. Never silently reset the database or bypass existing recovery and native-authority rules. This policy concerns unexpected worker termination, not every validation failure or handled storage error. Exact failure detection, pending-request classification and recovery integration remain under review.
+Require controlled reopening or recovery before further registry operations. Do not automatically replace the worker and revive the service. Never silently reset the database or bypass existing recovery and native-authority rules. This policy concerns unexpected worker termination, not every validation failure or handled storage error. Worker failure closes admission and classifies affected requests. Application recovery integration remains absent.
 
 ### Approved consistent read snapshots
 
@@ -685,37 +691,37 @@ End the transaction before returning the result. Do not expose a live database c
 
 If a read's result waiter disappears before execution starts, skip the queued read and release its resources. If execution has started, let the bounded read finish and clean up normally; discard its result if nobody is waiting. Do not add mid-query interruption semantics. This is internal waiter abandonment, not a new plugin cancellation API. Admitted writes keep their separate processing guarantee.
 
-A snapshot may become outdated after return. Writes still revalidate expected state before committing. Exact query methods, snapshot fields and resource limits remain under review. This is an internal Rust read contract, not a new frontend or plugin API.
+A snapshot may become outdated after return. Writes still revalidate expected state before committing. Purpose-specific snapshot methods and explicit `RegistryLimits` are implemented; production defaults remain open. This is an internal Rust read contract, not a new frontend or plugin API.
 
 ### Approved artifact-acceptance preparation
 
 Prepare registry metadata before submitting the acceptance write, outside the database queue. A shared trusted host-side helper derives integrity entries, the file-set fingerprint, and component/permission declarations from the same verified in-memory package snapshot. Reuse the existing [`parse_verified`](../../src-tauri/src/plugin_manifest/parse.rs) path to read the exact verified manifest and validate declared resource membership.
 
-Return one owned bundle with private fields; `PreparedArtifact` is an illustrative name, not a finalized type declaration. The worker receives that bundle, rechecks registry state and records acceptance atomically. Callers do not independently assemble declarations and file hashes. This keeps preparation out of the database queue and avoids requiring queued writes to retain all package-file bytes. Preparation remains bounded work; merely making a caller async does not offload it.
+`PreparedArtifact::from_verified` returns one owned private-field bundle. The worker receives it, rechecks registry state and records acceptance atomically. Callers do not independently assemble declarations and file hashes. Preparation remains synchronous bounded host work outside the database queue; async calling alone does not offload it.
 
 The bundle establishes data consistency, not acceptance or permission. It is not evidence that files were durably published. Durable immutable file publication must still precede acceptance, and neither a constructed integrity record nor a prepared bundle verifies filesystem publication. Acceptance also requires a separate typed publication receipt. Trusted publication code creates it only after successful durable publication. Bind the receipt to the same artifact and destination as the prepared bundle; acceptance must check that they match. Keep receipt construction private to that trusted path. This makes the ordering explicit in the internal Rust contract rather than leaving it only as a documented caller obligation.
 
 The receipt is a native host pipeline value, not a plugin SDK object, a frontend-supplied token, a new Tauri `invoke` command or a native permission credential. It is not a security boundary against compromised trusted host code. It does not make filesystem publication and the database transaction atomic or replace integrity verification before loading.
 
-The first registry library defines the receipt contract and tests it; it adds no real installer publication or orchestration. Exact fields, preparation signatures, matching checks and later native publisher integration remain under review. Routine private type names and plumbing do not require separate approval.
+The library checks receipt binding to artifact ID, fingerprint and destination. Only tests can construct `PublicationReceipt` until the real durable publisher exists. Installation/import, native project-location, closed-project and runtime-use prerequisites likewise have only test constructors. The foundation tests their contracts, not production enforcement.
 
 ### Approved registry queue overload
 
 If the registry work queue is full, reject the request immediately with `RegistryError::LimitExceeded`. Do not wait asynchronously for queue capacity or create another queue of waiting callers. This rejection happens before admission; the refused request performs no worker operation or database changes.
 
-Keep admission capacity bounded. Numerical defaults remain deferred. This decision does not select an automatic retry policy or change the lifetime of writes already admitted. It governs the internal registry queue, not HTTP concurrency or protected native-service scheduling. Exact queue accounting and admission mechanics remain under review.
+Keep admission capacity bounded. Numerical defaults remain deferred. This decision does not select an automatic retry policy or change the lifetime of writes already admitted. It governs the internal registry queue, not HTTP concurrency or protected native-service scheduling. The worker bounds pending queue entries and rejects before admission when capacity is reached.
 
 ### Approved ordinary-operation ordering
 
 Process ordinary registry reads and writes in successful admission order (FIFO). This worker accesses the host registry's SQLite database, not project documents. Give neither reads nor writes priority over queued ordinary work. Admission order means the actual queue order, not when callers created their futures.
 
-Skip abandoned queued reads under the separate read-lifetime rule. Do not interrupt an executing operation to run another. Shutdown admission controls and immediate native authorization restrictions do not wait behind ordinary registry work. Exact queue/control-path mechanics remain under review.
+Skip abandoned queued reads under the separate read-lifetime rule. Do not interrupt an executing operation to run another. Shutdown admission controls and immediate native authorization restrictions do not wait behind ordinary registry work. Queue ordering and admission closure are implemented in the worker.
 
 ### Approved admitted-write lifetime
 
 Once a registry write is admitted, continue processing it even if the caller drops its Rust future or the management window closes. The worker performs normal validation and either commits the coherent change or fails it. Losing the waiter is not a cancellation request and does not bypass expected-state checks. This is consistent with finishing admitted registry writes during normal shutdown.
 
-Cancel UI preparation before submission rather than relying on abandonment of an admitted write. A caller that later needs the outcome must check authoritative state; it must not assume that closing the window canceled the save. This is not a guarantee of completion through a crash or force quit. The normal async completion style is approved above. The exact admission boundary and method signatures still need review.
+Cancel UI preparation before submission rather than relying on abandonment of an admitted write. A caller that later needs the outcome must check authoritative state; it must not assume that closing the window canceled the save. This is not a guarantee of completion through a crash or force quit. The normal async completion style is approved above. Admission occurs when the worker queue accepts the operation; see the implemented service signatures.
 
 This rule applies to internal registry writes. It does not change cancellation or revocation rules for protected native service requests.
 
@@ -737,24 +743,13 @@ Use distinct `RegistryError` variants for these cases:
 
 A missing caller-requested record is `NotFound`. Missing data that violates a required registry relationship is an unsafe-state problem, not an ordinary lookup miss. Do not translate an uncertain write outcome into a confirmed failure. Check authoritative state rather than blindly repeating a write after `OutcomeUnknown`.
 
-These are internal Rust categories, not plugin-facing native codes. Exact variant payloads, source-error translation and completion/transaction contracts still require review. This decision adds no automatic retry policy or registry implementation.
+These categories and source-error translation are implemented in [`error.rs`](../../src-tauri/src/plugin_registry/error.rs), the store and worker. They are not plugin-facing native codes and introduce no automatic retry policy.
 
 ## Remaining review groups
 
-**Current review:** the [consolidated implementation proposal](registry-implementation-review.md) assembles scope, Rust contracts, publication requirements and the four resolved focused behavioral decisions. The [schema review](registry-schema-review.md) supplies proposed SQL. Review actual behavior gaps through small A/B questions, then obtain final schema/contract sign-off. Routine plumbing does not need individual preference questions. This does not finalize the earlier schema groups; remaining physical constraints and assembled SQL still require review. Project-registration policies above are approved; exact path/identity encodings and remaining physical constraints still need review. The [artifact and installation review](registry-artifacts.md) records earlier individual decisions; remaining physical constraints still require final schema review. The owner approved deriving artifact directories from their IDs and a versioned layout beneath a host-owned root, rather than storing per-artifact absolute paths. Retaining the verified package display name and description with each artifact is also approved. The manager can display those labels even when installation files are missing or damaged. They grant no loading authority. Other new recommendations remain unapproved. No registry implementation has begun.
+The owner approved the assembled schema, internal Rust contracts and bounded implementation scope. The six review groups covered artifacts/transitions, project registrations, permission/enablement schema, internal Rust APIs, persistence/worker mechanics and complete foundation sign-off. That internal slice is implemented. They are not six remaining approval rounds.
 
-The six topic groups below organize coverage, not a sequence of additional question rounds. The consolidated review separates owner decisions, technical investigation, mechanical review and deferred integration. The four focused behavioral questions are resolved. Final schema/contract and implementation-scope sign-off remains required; new behavior gaps must be explained rather than silently resolved.
-
-1. **Artifacts and installation transitions.** Complete artifact metadata and location representation, integrity-record format metadata, same-package references, staged-only first installs, startup promotion and pending-repair transitions. Include remaining package/component/file-table constraints.
-2. **Project registrations.** Define persistent project keys, stored location/identity data and relink associations. Keep actual filesystem validation and native access outside this initial implementation boundary.
-3. **Permission and enablement schema.** Complete catalog/declaration references, coverage keys, physical uniqueness constraints, requirement-change cleanup and persisted scope-change review. Specify pure evaluation of the already approved Secure/Trust, enablement and denial-precedence rules without reopening those policies.
-4. **Internal Rust contracts.** Propose domain types, integrity-entry interfaces, service operations, errors and acceptance/transaction boundaries. Preserve bounded construction and database-independent integrity validation.
-5. **Persistence and worker mechanics.** Specify concrete startup, schema initialization/migrations, backup/retention, unsafe-state reporting, queue admission and shutdown behavior for this internal library. Production numerical defaults remain deferred unless separately approved.
-6. **Complete foundation sign-off.** Review the assembled SQL schema, Rust contracts and implementation/test plan for consistency. Identify what is approved to implement and what remains gated for later integration.
-
-These six groups exclude management IPC/UI, live credentials, native project-file services, indexing, installation orchestration and external loading. Those remain later slices.
-
-Already approved policies remain requirements, not questions to reopen. See the [package specification](package-api-proposal.md#8-native-bootstrap-persistence-and-recovery) for those policies. Numerical limits and unresolved public or security contracts still require approval where identified in the plan.
+Real publication and generation switching, native location encodings and alias matching, management IPC/UI, live authorization, project-file services, indexing and external loading remain separate work. Additional settings retain their Part 4 completion gates. See the [implementation review](registry-implementation-review.md#remaining-integration-decisions) for those limits and [final sign-off](registry-implementation-review.md#final-sign-off-proposal) for the approved scope. New behavior gaps still require owner review.
 
 ## Existing source entry points
 
@@ -762,4 +757,7 @@ Already approved policies remain requirements, not questions to reopen. See the 
 - [`plugin_integrity/mod.rs`](../../src-tauri/src/plugin_integrity/mod.rs): accepted-record representation, strict deserialization and integrity verification. The record contains a format version and per-path byte lengths and SHA-256 digests.
 - [`plugin_resources/mod.rs`](../../src-tauri/src/plugin_resources/mod.rs): existing immutable snapshot identities and verified-buffer ownership. Snapshot identities are not activation credentials or automatically registry artifact IDs.
 
-These modules are existing internal foundations. None implements this registry schema or its worker.
+- [`plugin_registry/mod.rs`](../../src-tauri/src/plugin_registry/mod.rs), [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs) and [`schema.sql`](../../src-tauri/src/plugin_registry/schema.sql): internal service, dedicated worker and schema version 1.
+- The [implementation source/test map](registry-implementation-review.md#source-tests-and-validation) links transactions, decisions, validation, preparation, recovery and tests, with relevant Cargo commands.
+
+The application has no registry startup owner or commands yet. Tests exercise these internal contracts.

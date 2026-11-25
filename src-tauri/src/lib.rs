@@ -10,6 +10,10 @@ mod plugin_manifest;
 #[allow(dead_code)]
 mod plugin_resources;
 
+// Persistent internal records only; no installer, credentials or application wiring.
+#[allow(dead_code)]
+mod plugin_registry;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {

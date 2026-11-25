@@ -28,6 +28,9 @@ semver = "1.0.28"
 sha2 = "0.10.9"
 cap-std = "3.4.5"
 cap-fs-ext = "3.4.5"
+rusqlite = { version = "0.43.0", default-features = false, features = ["bundled", "backup"] }
+getrandom = "0.4.3"
+tokio = { version = "1", features = ["sync", "rt"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"

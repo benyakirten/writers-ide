@@ -1,6 +1,6 @@
 # Registry review 1: artifacts and installation transitions
 
-**Status: partially approved design proposal. Not implemented.** This document covers the first of six review groups in the [registry foundation guide](registry-foundation.md#remaining-review-groups). The owner is reviewing decisions through individual A/B questions. The derived installation-location approach, retained package display name/description and per-artifact integrity-record version are approved. Other recommendations remain unapproved unless explicitly marked. Implementation still requires the remaining reviews and final sign-off.
+**Status: owner-approved internal foundation, implemented / unmerged.** This guide describes artifact records and installation transitions in the native registry. The owner approved the assembled schema and bounded internal slice. The real publisher, import tracker, loader and management UI remain absent.
 
 The registry is the application's SQLite database for plugin installations and user decisions. An **artifact** is one accepted, immutable copy of a package. A repair creates a new artifact even when its contents match an existing copy. Package files live outside SQLite.
 
@@ -17,25 +17,25 @@ These requirements are not new questions:
 - Repair and keep the update is the default repair preference. A pending repaired copy becomes previous when the staged update is selected.
 - Selection is not activation or native permission. Dependencies, component choices, scope review and permission checks still apply.
 
-The [foundation guide](registry-foundation.md) contains the approved identity, fingerprint, file and component columns. Everything below is a recommendation for this review unless explicitly identified as already approved.
+The [foundation guide](registry-foundation.md) describes policy. The [schema baseline](registry-schema-review.md) and authoritative [`schema.sql`](../../src-tauri/src/plugin_registry/schema.sql) define physical constraints. The [implementation review](registry-implementation-review.md) explains typed operations and test-only prerequisites.
 
-## Proposed accepted-artifact columns
+## Implemented accepted-artifact columns
 
 Use this complete initial `accepted_artifacts` column set:
 
-| Column                     | Storage and meaning                                                                                                            | Decision status                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| `id`                       | `BLOB NOT NULL PRIMARY KEY`. Exactly 16 bytes. Identifies this immutable copy.                                                 | ID representation approved.                                     |
-| `package_id`               | `INTEGER NOT NULL`. References `packages(id)`.                                                                                 | Approved as part of the composite history reference.            |
-| `version`                  | `TEXT NOT NULL`. Complete canonical SemVer, including prerelease and build metadata.                                           | Approved as part of the composite history reference.            |
-| `integrity_record_version` | `INTEGER NOT NULL`. Positive format version for reconstructing this artifact's integrity record. Initially `1`.                | Per-artifact placement approved; physical constraints proposed. |
-| `storage_layout`           | `TEXT NOT NULL`. Initially `writers-ide.artifact-store/1`. Determines how to locate the artifact beneath the host-owned store. | Derived location approved; exact initial tag proposed.          |
-| `display_name`             | `TEXT NOT NULL`. Accepted package display name from the verified manifest.                                                     | Approved.                                                       |
-| `description`              | `TEXT NOT NULL`. Accepted package description from the verified manifest.                                                      | Approved.                                                       |
+| Column                     | Storage and meaning                                                                                                            | Decision status                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| `id`                       | `BLOB NOT NULL PRIMARY KEY`. Exactly 16 bytes. Identifies this immutable copy.                                                 | ID representation approved.                          |
+| `package_id`               | `INTEGER NOT NULL`. References `packages(id)`.                                                                                 | Approved as part of the composite history reference. |
+| `version`                  | `TEXT NOT NULL`. Complete canonical SemVer, including prerelease and build metadata.                                           | Approved as part of the composite history reference. |
+| `integrity_record_version` | `INTEGER NOT NULL`. Positive format version for reconstructing this artifact's integrity record. Initially `1`.                | Implemented per-artifact format version.             |
+| `storage_layout`           | `TEXT NOT NULL`. Initially `writers-ide.artifact-store/1`. Determines how to locate the artifact beneath the host-owned store. | Implemented derived location and layout tag.         |
+| `display_name`             | `TEXT NOT NULL`. Accepted package display name from the verified manifest.                                                     | Approved.                                            |
+| `description`              | `TEXT NOT NULL`. Accepted package description from the verified manifest.                                                      | Approved.                                            |
 
-**Approved:** reference version history through a composite foreign key from `(package_id, version)` to `package_version_history(package_id, version)`. Keep package and complete version directly on the artifact; do not introduce a separate history-row ID for this reference. Exact SQL remains subject to final schema review.
+**Approved:** reference version history through a composite foreign key from `(package_id, version)` to `package_version_history(package_id, version)`. Keep package and complete version directly on the artifact; do not introduce a separate history-row ID for this reference. The SQL is implemented in `schema.sql`.
 
-The proposed unique `(package_id, id)` key lets installation references enforce package ownership. The ID remains globally unique within the registry.
+The unique `(package_id, id)` key lets installation references enforce package ownership. The ID remains globally unique within the registry.
 
 Keep the fingerprint and its scheme in version history, not repeated in each artifact. Same-version artifacts must pass the history comparison during acceptance. The full file set remains in `artifact_files`. **Approved:** retain the package display name and description from the exact verified manifest with each artifact. These labels can change between releases. The manager can show them even when files are missing or damaged. They are informational metadata, not publisher authentication or permission to load unverified files.
 
@@ -43,11 +43,11 @@ Do not add acceptance timestamps, ZIP-source paths, archive hashes or mutable he
 
 **Approved:** store the integrity-record format version on each artifact, not in package/version history. Different copies of the same accepted release may use different supported record formats. A format change does not permit changed package contents or bypass the history fingerprint check. Repairs still create new artifacts rather than mutate existing acceptance records.
 
-The integrity-record version, fingerprint scheme and storage-layout identifier serve different purposes. They describe record reconstruction, content hashing and physical location respectively. Never substitute one for another. Unknown values must not silently fall back to version 1. The exact unsupported-state error contract belongs to review 4; startup/recovery handling belongs to review 5.
+The integrity-record version, fingerprint scheme and storage-layout identifier serve different purposes. They describe record reconstruction, content hashing and physical location respectively. Never substitute one for another. Unknown values must not silently fall back to version 1. Unknown stored formats require recovery rather than fallback. Application recovery handling remains unintegrated.
 
 ## Approved installation-location approach
 
-**Approved:** derive each directory from the artifact ID and a versioned layout beneath a host-owned root. Do not store an arbitrary absolute path per artifact. The proposed `storage_layout` column carries the layout version; its exact initial identifier remains a proposal.
+**Approved:** derive each directory from the artifact ID and a versioned layout beneath a host-owned root. Do not store an arbitrary absolute path per artifact. The `storage_layout` column stores `writers-ide.artifact-store/1`.
 
 The application supplies one host-owned artifact-store root for the registry. Derive each location as:
 
@@ -67,13 +67,13 @@ This layout gives each repair its own directory. A collision must fail without o
 
 This is an on-disk layout, not the public module URL scheme. Deriving a path neither opens it safely nor verifies its contents. Filesystem publication, safe opening, cleanup and external loading remain later integration work.
 
-## Proposed keys and reference constraints
+## Implemented keys and reference constraints
 
-**Approved for installation pointers:** both Rust and SQLite enforce that selected, staged, previous and pending-repair artifacts belong to the installation state's package. Rust provides an understandable validation error. Database constraints also reject mismatched references. Exact SQL remains subject to final schema review. The artifact-component ownership trigger is separately approved below.
+**Approved for installation pointers:** both Rust and SQLite enforce that selected, staged, previous and pending-repair artifacts belong to the installation state's package. Rust provides an understandable validation error. Database constraints also reject mismatched references. The SQL is implemented in `schema.sql`. The artifact-component ownership trigger is separately approved below.
 
 Use exact, case-sensitive comparisons for canonical identifiers, component IDs, version strings and accepted paths. Do not trim or normalize values during persistence. Rust validates manifest identifiers, SemVer and package-relative paths before acceptance. SQLite enforces storage types, required values, uniqueness and relationships.
 
-| Table or relationship     | Proposed physical constraint                                                                                                                                                                                                        |
+| Table or relationship     | Implemented physical constraint                                                                                                                                                                                                     |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages`                | Keep approved integer key and unique generated canonical identity. Reject empty names and empty non-null namespaces. Rust enforces the complete manifest grammar.                                                                   |
 | `components`              | Unique `(package_id, local_id)`, foreign key to package, nonempty local ID.                                                                                                                                                         |
@@ -83,21 +83,21 @@ Use exact, case-sensitive comparisons for canonical identifiers, component IDs, 
 | `artifact_components`     | Primary key `(artifact_id, component_id)`, foreign keys to artifact and component. A database trigger rejects mismatched package ownership. Keep approved kind, scope and boolean constraints.                                      |
 | Installation pointers     | Composite foreign keys `(package_id, pointer)` to `accepted_artifacts(package_id, id)` for each non-null pointer.                                                                                                                   |
 
-**Approved for artifact-component ownership:** keep the existing column set and use a SQLite trigger, rather than adding `package_id` to `artifact_components`. On insertion or an association update, compare the referenced artifact's `package_id` with the referenced component's `package_id` and reject a mismatch. Rust also validates the association for clear errors. Foreign keys still require both parents to exist. Parent package associations must remain immutable; the child trigger alone does not prevent parent reassignment. The service offers no reassignment operation. Final schema review must include enforcement of those parent invariants and the exact trigger SQL.
+**Approved for artifact-component ownership:** keep the existing column set and use a SQLite trigger, rather than adding `package_id` to `artifact_components`. On insertion or an association update, compare the referenced artifact's `package_id` with the referenced component's `package_id` and reject a mismatch. Rust also validates the association for clear errors. Foreign keys still require both parents to exist. Parent package associations must remain immutable; the child trigger alone does not prevent parent reassignment. The service offers no reassignment operation. The schema implements parent identity and ownership triggers.
 
-Use integer type checks for integer data and BLOB type/length checks for IDs and digests. Use SQLite's binary text comparison for exact identity. Do not rely on SQLite coercion as validation. Final SQL syntax and all remaining permission-table references will be reviewed together in review 6.
+Use integer type checks for integer data and BLOB type/length checks for IDs and digests. Use SQLite's binary text comparison for exact identity. Do not rely on SQLite coercion as validation. The schema implements these constraints and permission references.
 
-**Approved:** use restrictive parent deletion rather than automatic cascading deletion for artifact cleanup. Rust explicitly deletes the artifact-owned file, component-metadata and permission-requirement rows, then the artifact, in one transaction. A remaining selected, staged, previous or pending-repair reference blocks deletion. Any overlooked child reference also blocks deletion rather than causing partial cleanup. This operation does not delete physical files or remove stable identities, version history or user decisions as a side effect. Exact permission-declaration cleanup details remain part of review 3.
+**Approved:** use restrictive parent deletion rather than automatic cascading deletion for artifact cleanup. Rust explicitly deletes the artifact-owned file, component-metadata and permission-requirement rows, then the artifact, in one transaction. A remaining selected, staged, previous or pending-repair reference blocks deletion. Any overlooked child reference also blocks deletion rather than causing partial cleanup. This operation does not delete physical files or remove stable identities, version history or user decisions as a side effect. The store deletes owned permission declarations in the same transaction.
 
 Accepted artifact metadata and child sets are immutable through the Rust service. Acceptance inserts complete sets; cleanup removes complete sets. No API independently edits a file hash, package association, version or accepted declaration. These rules do not claim protection against an external program that can rewrite the database.
 
-## Proposed installation-state columns and valid shapes
+## Implemented installation-state columns and valid shapes
 
-**Approved:** represent an installation awaiting its first selection in `package_installation_state`, not a separate pending-installation table. In this state, selected is null, staged is required, and previous/pending repair are null. An uninstalled package has no installation-state row. Reject all-null rows. This representation does not approve the remaining transition rules below.
+**Approved:** represent an installation awaiting its first selection in `package_installation_state`, not a separate pending-installation table. In this state, selected is null, staged is required, and previous/pending repair are null. An uninstalled package has no installation-state row. Reject all-null rows. The transitions below are also part of the approved implementation.
 
 Use `package_installation_state` with these columns:
 
-| Column                       | Proposed storage                                         |
+| Column                       | Implemented storage                                      |
 | ---------------------------- | -------------------------------------------------------- |
 | `package_id`                 | `INTEGER PRIMARY KEY`, referencing `packages(id)`.       |
 | `selected_artifact_id`       | Nullable 16-byte artifact BLOB. Abbreviated **S** below. |
@@ -105,7 +105,7 @@ Use `package_installation_state` with these columns:
 | `previous_artifact_id`       | Nullable 16-byte artifact BLOB. Abbreviated **P** below. |
 | `pending_repair_artifact_id` | Nullable 16-byte artifact BLOB. Abbreviated **R** below. |
 
-The letters are only notation for this guide. They are not proposed public API names.
+The letters are only notation for this guide. They are not public API names.
 
 - **Selected:** the accepted copy chosen for the package. It might be damaged or have no active components.
 - **Staged:** the copy intended to replace selected at the next eligible startup. It is not loaded merely because it is staged.
@@ -126,9 +126,9 @@ R requires S and T. R must differ from S, T and P. It must have the same full ve
 
 Use row checks for nullability and pointer equality. Use same-package composite foreign keys for ownership. Rust transaction logic checks relationships that require reading artifact versions, including R's version and T's different version. Treat invalid persisted relationships as unsafe registry state, not a request to guess a replacement. Concrete recovery handling remains review 5.
 
-## Proposed transition rules
+## Implemented transition rules
 
-**Approved:** each change checks the operation's expected installation state in the committing transaction. If another operation changed that state, reject the outdated operation without overwriting the newer decision or committing partial changes. The UI refreshes its plan automatically. If the revised action changes what the user would approve, require renewed confirmation rather than silently resubmitting it. The concrete Rust request/error types and comparison mechanism remain review 4. File verification and publication happen outside the short write transaction.
+**Approved:** each change checks the operation's expected installation state in the committing transaction. If another operation changed that state, reject the outdated operation without overwriting the newer decision or committing partial changes. The UI refreshes its plan automatically. If the revised action changes what the user would approve, require renewed confirmation rather than silently resubmitting it. The operation compares the expected installation revision and pointers and returns `Conflict` on stale state. File verification and publication happen outside the short write transaction.
 
 In this table, **X** means a newly accepted target or an already accepted, freshly verified restoration target. A target with unchanged healthy selected contents follows the existing no-op policy; it must not silently clear a staged update.
 
@@ -153,9 +153,9 @@ Targets in an update or restoration row have a different full version from S. Sa
 
 Any operation that would discard R must make that part of the reviewed action. Do not silently drop a pending repair when replacing or canceling another stage. Acceptance of a target and any associated state change happen atomically when performed as one operation. A failed state comparison must not leave a newly accepted target or newly reserved version from that operation.
 
-**Approved:** cancellation of a staged-only installation follows uninstall policy. Remove the installation-state row and native permission approvals. Preserve version history, explicit denials and saved enablement choices. Physical cleanup happens separately when safe. A later installation must satisfy the permission approval rules again. Exact permission-row updates and transaction coordination remain review 3. This proposal does not authorize physical deletion of running or retained package files.
+**Approved:** cancellation of a staged-only installation follows uninstall policy. Remove the installation-state row and native permission approvals. Preserve version history, explicit denials and saved enablement choices. Physical cleanup happens separately when safe. A later installation must satisfy the permission approval rules again. Permission cleanup commits with the installation change. This implementation does not delete running or retained package files.
 
-## Proposed startup promotion
+## Implemented startup promotion
 
 Promotion replaces S with T. It does not execute plugin code or issue authority.
 
@@ -163,7 +163,7 @@ Promotion replaces S with T. It does not execute plugin code or issue authority.
 
 **Approved for explicit different-version restoration without pending repair:** stage the previous artifact for restart. After successful startup verification, make it selected, move the old selected artifact to previous and clear staged. This swaps selected and previous; it does not authorize automatic rollback. The retained copy still requires verification and normal activation checks before any later use. Restoration with a pending repair follows the approved preservation rule below.
 
-**Approved for same-version repair:** after successful promotion, select the repaired artifact, clear the staged target and preserve the previous artifact reference. Do not replace previous with the damaged copy being repaired. The damaged artifact is eligible for cleanup only when no retained reference or runtime use still requires it. The other promotion and failure rules below remain proposed unless separately approved.
+**Approved for same-version repair:** after successful promotion, select the repaired artifact, clear the staged target and preserve the previous artifact reference. Do not replace previous with the damaged copy being repaired. The damaged artifact is eligible for cleanup only when no retained reference or runtime use still requires it. The remaining promotion and failure rules below are implemented too.
 
 The host must not promote a stage in a process that has already imported code from that package. For packages previously imported, the restart boundary must create a fresh application process. Merely reopening a window or creating a new frontend host in the same process is insufficient. This makes the approved process-wide import restriction explicit. Cross-platform relaunch and queued-launch handoff remain later integration work.
 
@@ -172,12 +172,12 @@ The host must not promote a stage in a process that has already imported code fr
 At eligible startup:
 
 1. Read the expected installation row.
-2. Verify T's actual files against its accepted integrity record. Parse and validate the exact verified manifest and its binding to accepted declarations. Check the host/runtime compatibility needed to select it. Do not run package code during this check.
+2. Verify T's actual files against its accepted integrity record. Parse and validate the exact verified manifest and its binding to accepted declarations. Check package-fatal validity without running package code. Unsupported component runtime profiles are activation blockers, not package-selection failures. An otherwise valid update may be selected while unsupported components and their required dependents stay blocked. Compatible siblings remain eligible under the approved profile policy.
 3. Check the new previous copy according to the table below. For an update or restoration with pending repair, verify R before promoting it as the repaired previous copy. Ordinary previous metadata is not a promise that its files are healthy.
 4. In a short transaction, recheck the expected state and the registry relationships. Commit all pointer changes together.
 5. Only then evaluate component activation. Missing dependencies, disabled components and missing approvals can block individual components without rewriting the selected artifact. **Approved for outstanding scope review:** selection can proceed after normal package checks, but the changed component and its required dependents remain stopped until review. Unaffected components can activate if their own checks pass. Persist the blocker across restarts and explain it in management UI; selection is not scope acknowledgement.
 
-The initial library does not perform filesystem preflight or track imports. Its eventual internal caller contract must represent those prerequisites without treating arbitrary plugin input as proof. Review 4 will propose that contract.
+The library does not perform filesystem preflight or track imports. `InstallationPrerequisites` binds exact verified artifact IDs and fresh-process eligibility, but its constructor is test-only. Real verification and process-wide import tracking must supply those facts during later integration.
 
 | State before promotion       | State after promotion                                                                                             |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -186,9 +186,9 @@ The initial library does not perform filesystem preflight or track imports. Its 
 | Different-version T, with R  | S = old T; P = old R; T/R = null. The repaired selected version becomes previous.                                 |
 | Same-version repair in T     | S = old T; preserve P; T/R = null. Do not replace a useful previous version with the damaged copy being repaired. |
 
-**Approved for a failed staged startup check:** leave the installation pointers unchanged and report the blocker. Do not load T, automatically cancel the update, run S as a fallback, select P or substitute R for S. Keep the affected package stopped until an explicit recovery action resolves it. Recovery can offer cancellation or repair; any subsequently selected code still requires verification and normal activation checks. Required dependents may also be blocked. This avoids silently executing a version other than the one the user expected. Other packages still undergo their own dependency and activation checks.
+**Approved for a failed package-fatal staged startup check:** leave the installation pointers unchanged and report the blocker. Do not load T, automatically cancel the update, run S as a fallback, select P or substitute R for S. Keep the affected package stopped until an explicit recovery action resolves it. Recovery can offer cancellation or repair; any subsequently selected code still requires verification and normal activation checks. Required dependents may also be blocked. This avoids silently executing a version other than the one the user expected. Other packages still undergo their own dependency and activation checks.
 
-**Approved for a failed state comparison:** the outdated operation leaves the current pointers unchanged and reports the conflict. Refresh the plan as described above; do not apply the stale action or select a fallback. This does not undo the newer operation. The exact concurrency/error contract remains review 4.
+**Approved for a failed state comparison:** the outdated operation leaves the current pointers unchanged and reports the conflict. Refresh the plan as described above; do not apply the stale action or select a fallback. This does not undo the newer operation. The internal service reports stale reviewed state as `Conflict`.
 
 **Approved:** a crash after the pointer commit but before activation leaves the new S selected for the next startup. Verify it again and apply the normal activation checks. Do not infer successful activation from selection or automatically restore the older version because activation confirmation is missing. The initial model does not add an activation-confirmation marker for automatic rollback. A crash before the commit leaves the prior row intact. Activation-health-based rollback remains a possible future feature requiring separate design approval.
 
@@ -222,7 +222,7 @@ If B fails verification, none of these pointers change and this package does not
 
 ## Cleanup boundary and tradeoffs
 
-This proposal keeps acceptance, selection and activation separate. That costs several explicit transition cases. It preserves the selected copy, pending update and repair without overwriting files or losing the user's chosen update.
+The registry keeps acceptance, selection and activation separate. That costs several explicit transition cases. It preserves the selected copy, pending update and repair without overwriting files or losing the user's chosen update.
 
 A removed pointer does not authorize physical deletion. Runtime users, ongoing preparations and other retained references can still need an artifact. Later installer/loader integration must track those uses and coordinate cleanup. An unreferenced artifact record alone is not proof that its directory is safe to delete.
 
@@ -230,11 +230,11 @@ The first registry library provides transactional record operations and invarian
 
 ## Review checklist
 
-Review the remaining decisions through individual A/B questions. This list groups the topics; it is not a request for approval of the whole document:
+The owner approved the internal records and transitions described here. Tests cover the following responsibilities; production orchestration remains separate:
 
 1. The accepted-artifact columns, including package labels, record-format metadata and derived versioned storage location.
 2. The concrete keys, restrictive deletion and same-package ownership checks.
 3. The allowed installation-state shapes and update, repair, cancellation, restoration and uninstall transitions.
 4. The startup promotion rules, fresh-process requirement and stop-without-fallback behavior on failed preflight.
 
-Project-registration details are review 2. Permission and scope-review persistence are review 3. Rust contracts, worker mechanics and assembled-schema sign-off follow in reviews 4–6. None of those unresolved details is approved by accepting this proposal.
+Project-registration records, permission/scope persistence and the worker are also implemented. Native location encodings, publication, process-wide import tracking, runtime-use accounting and application integration remain open. Selection never grants activation or native authority.

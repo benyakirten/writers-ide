@@ -1,0 +1,351 @@
+use std::{
+    collections::VecDeque,
+    panic::{catch_unwind, AssertUnwindSafe},
+    path::PathBuf,
+    sync::{Arc, Condvar, Mutex},
+    thread::{self, JoinHandle},
+};
+use tokio::sync::oneshot;
+
+use super::{
+    error::{RegistryError, Result},
+    model::*,
+    preparation::*,
+    store::{ArtifactTarget, Store},
+    transitions::{InstallationAction, InstallationExpectation},
+};
+
+trait Work: Send {
+    fn is_read(&self) -> bool;
+    fn execute(self: Box<Self>, store: &mut Store);
+    fn reject(self: Box<Self>);
+}
+
+struct Operation<F, T> {
+    read: bool,
+    run: F,
+    reply: oneshot::Sender<Result<T>>,
+}
+impl<F, T> Work for Operation<F, T>
+where
+    F: FnOnce(&mut Store) -> Result<T> + Send + 'static,
+    T: Send + 'static,
+{
+    fn is_read(&self) -> bool {
+        self.read
+    }
+    fn execute(self: Box<Self>, store: &mut Store) {
+        if self.read && self.reply.is_closed() {
+            return;
+        }
+        let result = (self.run)(store);
+        let _ = self.reply.send(result);
+    }
+    fn reject(self: Box<Self>) {
+        let _ = self.reply.send(Err(RegistryError::Unavailable(
+            "worker stopped before execution".into(),
+        )));
+    }
+}
+
+struct State {
+    accepting: bool,
+    queue: VecDeque<Box<dyn Work>>,
+}
+struct Shared {
+    state: Mutex<State>,
+    wake: Condvar,
+    capacity: usize,
+}
+impl Shared {
+    fn close(&self) {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        state.accepting = false;
+        self.wake.notify_all();
+    }
+    fn failed(&self) {
+        let jobs = {
+            let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            state.accepting = false;
+            std::mem::take(&mut state.queue)
+        };
+        for job in jobs {
+            job.reject();
+        }
+        self.wake.notify_all();
+    }
+}
+
+pub(crate) struct Registry;
+pub(crate) struct RegistrySession {
+    pub owner: RegistryOwner,
+    pub handle: RegistryHandle,
+}
+#[derive(Clone)]
+pub(crate) struct RegistryHandle {
+    shared: Arc<Shared>,
+}
+pub(crate) struct RegistryOwner {
+    shared: Arc<Shared>,
+    finished: Option<oneshot::Receiver<Result<()>>>,
+    thread: Option<JoinHandle<()>>,
+}
+impl Drop for RegistryOwner {
+    fn drop(&mut self) {
+        self.shared.close();
+    }
+}
+impl RegistryOwner {
+    pub(crate) async fn shutdown(mut self) -> Result<()> {
+        self.shared.close();
+        let completion = self
+            .finished
+            .take()
+            .expect("owned completion")
+            .await
+            .unwrap_or_else(|_| Err(RegistryError::Unavailable("worker completion lost".into())));
+        // Cleanup has finished, but joining must still not block the executor thread.
+        if let Some(thread) = self.thread.take() {
+            tokio::task::spawn_blocking(move || thread.join())
+                .await
+                .map_err(|e| RegistryError::Unavailable(format!("worker join: {e}")))?
+                .map_err(|_| RegistryError::Unavailable("worker panicked".into()))?;
+        }
+        completion
+    }
+}
+
+impl Registry {
+    pub(crate) async fn create(
+        path: PathBuf,
+        limits: RegistryLimits,
+        queue_capacity: usize,
+    ) -> Result<RegistrySession> {
+        Self::start(path, limits, queue_capacity, true).await
+    }
+    pub(crate) async fn open(
+        path: PathBuf,
+        limits: RegistryLimits,
+        queue_capacity: usize,
+    ) -> Result<RegistrySession> {
+        Self::start(path, limits, queue_capacity, false).await
+    }
+    async fn start(
+        path: PathBuf,
+        limits: RegistryLimits,
+        capacity: usize,
+        create: bool,
+    ) -> Result<RegistrySession> {
+        limits.validate()?;
+        if capacity == 0 {
+            return Err(RegistryError::InvalidInput(
+                "queue capacity must be positive".into(),
+            ));
+        }
+        let shared = Arc::new(Shared {
+            state: Mutex::new(State {
+                accepting: true,
+                queue: VecDeque::new(),
+            }),
+            wake: Condvar::new(),
+            capacity,
+        });
+        let (ready, receive_ready) = oneshot::channel();
+        let (finished, receive_finished) = oneshot::channel();
+        let worker_shared = shared.clone();
+        let thread = thread::Builder::new()
+            .name("plugin-registry".into())
+            .spawn(move || {
+                let result = catch_unwind(AssertUnwindSafe(|| {
+                    let store = if create {
+                        Store::create(&path, limits)
+                    } else {
+                        Store::open(&path, limits)
+                    };
+                    let mut store = match store {
+                        Ok(store) => store,
+                        Err(error) => {
+                            let _ = ready.send(Err(error));
+                            return;
+                        }
+                    };
+                    // If startup's waiter is gone, no operation handle was issued.
+                    if ready.send(Ok(())).is_err() {
+                        return;
+                    }
+                    loop {
+                        let work = {
+                            let mut state = worker_shared
+                                .state
+                                .lock()
+                                .unwrap_or_else(|e| e.into_inner());
+                            while state.queue.is_empty() && state.accepting {
+                                state = worker_shared
+                                    .wake
+                                    .wait(state)
+                                    .unwrap_or_else(|e| e.into_inner());
+                            }
+                            match state.queue.pop_front() {
+                                Some(job) => {
+                                    if !state.accepting && job.is_read() {
+                                        drop(state);
+                                        job.reject();
+                                        continue;
+                                    }
+                                    job
+                                }
+                                None => break,
+                            }
+                        };
+                        work.execute(&mut store);
+                    }
+                    // Store and its exclusive destination lock drop before completion.
+                }));
+                worker_shared.failed();
+                let completion = result.map_err(|_| {
+                    RegistryError::Unavailable("registry worker terminated unexpectedly".into())
+                });
+                let _ = finished.send(completion);
+            })?;
+        // The guard also closes admission if the startup future is abandoned.
+        let owner = RegistryOwner {
+            shared: shared.clone(),
+            finished: Some(receive_finished),
+            thread: Some(thread),
+        };
+        receive_ready
+            .await
+            .map_err(|_| RegistryError::Unavailable("registry startup terminated".into()))??;
+        Ok(RegistrySession {
+            owner,
+            handle: RegistryHandle { shared },
+        })
+    }
+}
+
+impl RegistryHandle {
+    async fn submit<T, F>(&self, read: bool, run: F) -> Result<T>
+    where
+        T: Send + 'static,
+        F: FnOnce(&mut Store) -> Result<T> + Send + 'static,
+    {
+        let (reply, receive) = oneshot::channel();
+        {
+            let mut state = self.shared.state.lock().unwrap_or_else(|e| e.into_inner());
+            if !state.accepting {
+                return Err(RegistryError::Unavailable(
+                    "registry admission closed".into(),
+                ));
+            }
+            if state.queue.len() >= self.shared.capacity {
+                return Err(RegistryError::LimitExceeded(
+                    "registry queue is full".into(),
+                ));
+            }
+            state
+                .queue
+                .push_back(Box::new(Operation { read, run, reply }));
+            self.shared.wake.notify_one();
+        }
+        receive.await.unwrap_or_else(|_| {
+            Err(if read {
+                RegistryError::Unavailable("read completion lost".into())
+            } else {
+                RegistryError::OutcomeUnknown(
+                    "admitted write completion lost; inspect authoritative state".into(),
+                )
+            })
+        })
+    }
+    pub(crate) async fn read_settings(&self) -> Result<HostSettings> {
+        self.submit(true, Store::read_settings).await
+    }
+    pub(crate) async fn package_details(&self, package: PackageId) -> Result<PackageDetails> {
+        self.submit(true, move |s| s.package_details(package)).await
+    }
+    pub(crate) async fn project_details(&self, project: ProjectId) -> Result<ProjectDetails> {
+        self.submit(true, move |s| s.project_details(project)).await
+    }
+    pub(crate) async fn accept_artifact(
+        &self,
+        prepared: PreparedArtifact,
+        receipt: PublicationReceipt,
+    ) -> Result<ArtifactFacts> {
+        self.submit(false, move |s| s.accept_artifact(prepared, receipt))
+            .await
+    }
+    pub(crate) async fn change_installation(
+        &self,
+        expected: InstallationExpectation,
+        action: InstallationAction,
+        target: Option<ArtifactTarget>,
+        prerequisites: Option<InstallationPrerequisites>,
+    ) -> Result<InstallationSnapshot> {
+        self.submit(false, move |s| {
+            s.change_installation(expected, action, target, prerequisites)
+        })
+        .await
+    }
+    pub(crate) async fn set_host_settings(
+        &self,
+        expected: HostSettings,
+        settings: HostSettings,
+    ) -> Result<HostSettings> {
+        self.submit(false, move |s| s.set_host_settings(expected, settings))
+            .await
+    }
+    pub(crate) async fn save_permission_review(&self, review: PermissionReview) -> Result<()> {
+        self.submit(false, move |s| s.save_permission_review(review))
+            .await
+    }
+    pub(crate) async fn acknowledge_scope(&self, review: ScopeReview) -> Result<()> {
+        self.submit(false, move |s| s.acknowledge_scope(review))
+            .await
+    }
+    pub(crate) async fn set_enablement(&self, change: EnablementChange) -> Result<()> {
+        self.submit(false, move |s| s.set_enablement(change)).await
+    }
+    pub(crate) async fn register_project(&self, prepared: PreparedProject) -> Result<ProjectId> {
+        self.submit(false, move |s| s.register_project(prepared))
+            .await
+    }
+    pub(crate) async fn relink_project(
+        &self,
+        project: ProjectId,
+        expected: Revision,
+        prepared: PreparedProject,
+        closed: RelinkPrerequisite,
+    ) -> Result<Revision> {
+        self.submit(false, move |s| {
+            s.relink_project(project, expected, prepared, closed)
+        })
+        .await
+    }
+    pub(crate) async fn refresh_project_name(
+        &self,
+        project: ProjectId,
+        expected: Revision,
+        prepared: PreparedProject,
+    ) -> Result<()> {
+        self.submit(false, move |s| {
+            s.refresh_project_name(project, expected, prepared)
+        })
+        .await
+    }
+    pub(crate) async fn remove_unused_artifact(
+        &self,
+        artifact: ArtifactId,
+        unused: ArtifactUnused,
+    ) -> Result<()> {
+        self.submit(false, move |s| s.remove_unused_artifact(artifact, unused))
+            .await
+    }
+    pub(crate) async fn backup(&self, destination: PathBuf) -> Result<()> {
+        // Backup writes a destination file and must finish after successful admission.
+        self.submit(false, move |s| s.backup(&destination)).await
+    }
+}
+
+#[cfg(test)]
+#[path = "worker_tests.rs"]
+mod tests;

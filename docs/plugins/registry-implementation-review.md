@@ -1,215 +1,162 @@
 # Registry implementation review
 
-**Status: consolidated proposal. Not implementation approval.** The owner requested this review before registry code is written. Existing approvals remain requirements. Recommendations in this document are not new approvals.
+**Status: owner-approved internal foundation, implemented / unmerged.** The approved final sign-off covers the database and integrity slice described here. It does not approve or implement production package publication, generation switching or application integration.
 
-The registry is an internal Rust service. It stores plugin installation records, project registrations and saved user decisions in SQLite. It does not store manuscripts or execute plugins. Frontend authors will not call its methods directly.
+The registry is an internal Rust service in [`plugin_registry`](../../src-tauri/src/plugin_registry/mod.rs). It stores plugin installation records, project registrations and saved user decisions in SQLite. It does not store manuscripts or execute plugins. Frontend authors do not call its methods. No Tauri command, application startup caller or management UI uses it yet.
 
 ## How to read this review
 
-1. Read this document for scope, Rust responsibilities and the remaining decisions.
-2. Read the [schema review](registry-schema-review.md) for the complete proposed SQL. It includes 20 tables, indexes, checks and ownership triggers.
-3. Use the [foundation guide](registry-foundation.md) to check approved policy. The [artifact review](registry-artifacts.md) preserves the distinction between approved transitions and earlier recommendations.
+1. Read this page for implemented responsibilities, internal operations and integration limits.
+2. Read the [schema baseline](registry-schema-review.md) and authoritative [`schema.sql`](../../src-tauri/src/plugin_registry/schema.sql) for the 20-table schema.
+3. Use the [foundation guide](registry-foundation.md) for approved policy and the [artifact guide](registry-artifacts.md) for installation transitions.
 
-The SQL is a review artifact, not a migration. Rust names below are proposed internal names, not a plugin SDK or Tauri IPC contract. Routine private naming, message layout and migration bookkeeping do not need individual A/B approval. Changes to behavior, authority or responsibility still do.
+These are internal contracts, not plugin SDK or management IPC contracts. New behavior or responsibility changes still require owner approval.
 
 ## What exists today
 
-The native integrity module verifies package bytes against a supplied record. The manifest module parses the verified manifest and resolves static dependencies. The snapshot pool and resource route provide separate internal resource foundations.
+The registry implements typed async operations, a bounded dedicated worker, schema initialization and validation, transactional installation and decision operations, SQLite-aware backup and restore staging. Private migration infrastructure is tested with synthetic upgrades. Schema version `1` is the only actual supported schema. There is no shipped predecessor migration.
 
-There is no registry service or schema. The current verified-package fingerprint still hashes deterministic JSON. Implementing the approved `writers-ide.file-set/1` binary fingerprint will change that internal calculation. This proposal does not claim the source already uses it.
+The [integrity module](../../src-tauri/src/plugin_integrity/mod.rs) implements database-independent entry construction and iteration. Records and verified snapshots share the `writers-ide.file-set/1` binary fingerprint. Integrity-record JSON encoding is unchanged. The manifest parser, snapshot pool and resource route remain separate internal foundations.
 
-## Proposed implementation boundary
+## Approved implementation boundary
 
-The following work is proposed for the foundation. It is not authorized merely by appearing here.
-
-| Include                                                                       | Exclude                                                               |
-| ----------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Database-independent integrity entry construction and iteration               | Plugin SDK changes and management IPC                                 |
-| Shared binary fingerprint and reference-vector tests                          | External package loading and Basic Menu distribution                  |
-| Typed registry data, validation and semantic transitions                      | Real ZIP installation and immutable package publication               |
-| SQLite schema, initialization and supported transactional migration framework | Live tokens, attachment tickets and native authorization caches       |
-| Bounded dedicated worker, admission, completion and shutdown                  | Project file reads, indexing and filesystem watchers                  |
-| Transactional decisions, enablement and pure eligibility evaluation           | Actual directory identity validation and project opening              |
-| SQLite-aware backup and restore transformation tests                          | Application restart, recovery UI and production restore orchestration |
-
-The generation selector and filesystem publication adapter need a separately verified protocol before they can be part of a working restore path. Pure restore transformations can be tested without claiming that production restoration is implemented. Final sign-off must explicitly confirm whether filesystem publication belongs in this implementation slice or the following one.
+| Implemented                                                   | Not implemented by this slice                                 |
+| ------------------------------------------------------------- | ------------------------------------------------------------- |
+| Integrity entries, binary fingerprints and fixed-vector tests | Public SDK changes or management IPC                          |
+| Typed registry data, validation and semantic transitions      | ZIP installation or immutable package publication             |
+| 20-table SQLite schema and private migration execution helper | Live tokens, attachment tickets or native authorization       |
+| Bounded FIFO worker, readiness and explicit shutdown          | Application startup, first-run selection or launch forwarding |
+| Transactional permission, enablement and scope-review records | Actual native directory preparation or project opening        |
+| SQLite-aware backup and restore staging                       | Generation selector, durable publication or recovery UI       |
 
 ## Responsibility boundaries
 
 ### Preparation outside the database worker
 
-A trusted native helper takes one verified package snapshot. It derives the normalized manifest declarations, accepted file entries and shared fingerprint from those same bytes. It returns an owned `PreparedArtifact` with private fields.
+Trusted Rust host code can call `PreparedArtifact::from_verified(snapshot, artifact_store, limits)` before submitting a write. It parses the manifest and derives integrity metadata from the same retained verified bytes. It allocates a random artifact ID and derives the destination beneath the supplied host-owned store. The returned bundle has private fields and owns metadata, not all package payload buffers.
 
-The helper must not perform substantial hashing or manifest work inside the SQLite queue. Running a function through `async` alone does not move its CPU work off the calling thread. Use the host's bounded native execution facilities for preparation.
+Preparation is synchronous work. The eventual host must schedule it outside the database queue and off latency-sensitive threads. An async caller alone does not offload parsing or hashing.
 
-The eventual installer publishes the immutable package directory and produces a private `PublicationReceipt`. The receipt identifies the artifact, destination layout and matching prepared content. Registry acceptance checks the binding. The first library defines this contract and uses a test-only publisher substitute. It must not expose a production constructor that fabricates successful publication.
-
-Neither object grants native authority. Neither is accepted from JavaScript. Trusted native code remains responsible for their construction; these types are not a sandbox against compromised host code.
+Acceptance also requires a `PublicationReceipt` matched to the artifact ID, fingerprint and destination. Its constructor is test-only. The real durable publisher does not exist. `InstallationPrerequisites`, `PreparedProject`, `RelinkPrerequisite` and `ArtifactUnused` also have only test constructors. They represent future verified-artifact/import, native-location, closed-project and runtime-use checks. Tests exercise their bindings; they do not establish production enforcement. These values are neither JavaScript inputs nor permission credentials.
 
 ### SQLite worker
 
-One dedicated OS thread owns the `rusqlite` connection. It enables foreign keys, WAL and `synchronous=FULL`. It validates the resulting configuration. Ordinary operations enter a bounded FIFO queue.
+One OS thread owns the connection. It enables and verifies foreign keys, WAL and `synchronous=FULL`. It processes ordinary reads and writes in successful admission order. SQL and connections stay private.
 
-The worker owns SQL transactions and semantic state changes. It returns owned data, not a connection, transaction or live cursor. No transaction spans package verification, user confirmation or filesystem publication.
+The host supplies finite `RegistryLimits` and a positive queue capacity. A full queue rejects immediately with `LimitExceeded` before admission. There is no waiting queue for capacity. Production defaults remain open.
 
-A full queue rejects before admission with `LimitExceeded`. Admitted writes finish even if their waiter disappears. Abandoned reads are skipped before execution; running reads finish and release their resources. Production numerical defaults remain deferred. Tests supply explicit finite limits.
+Reads return bounded owned snapshots from one transaction. Transactions and cursors end before delivery. Abandoned queued reads are skipped. Running reads finish normally. Admitted writes continue even if their caller drops the future. Success means completion and commit of any changes, not admission.
 
 ### Application lifecycle owner
 
-Application startup owns creation, opening and shutdown. Windows receive cloneable operation handles. Dropping a window or the last handle does not shut down the service.
+`Registry::create` and `Registry::open` return a `RegistrySession` only after readiness checks finish. The session separates `RegistryOwner` from cloneable `RegistryHandle` operation access. Application lifecycle code will own the former; ordinary native callers will use the latter. That application wiring is absent.
 
-Opening returns a usable service only after schema checks, required migration, full SQLite integrity checking, foreign-key checking and domain validation succeed. Fresh creation is separate and refuses existing destinations. Automatic creation is allowed only when the dedicated registry location is absent.
+Creation uses non-overwriting file creation and refuses existing destinations, including zero-byte files. Opening never initializes missing storage. Readiness checks schema objects/version, full SQLite integrity, foreign keys, required rows/catalogs, resource bounds and domain relationships. These checks do not verify installation files or select an active generation.
 
-Explicit shutdown closes admission, rejects queued standalone reads, finishes current work and admitted writes, then awaits worker cleanup. Owner drop signals the same drain without blocking the destructor. It does not guarantee completion after process termination.
+The store canonicalizes its destination and holds a standard-library `File::try_lock` lock on a persistent `.registry-lock` sidecar. The lock is separate from the database because file locking can overlap SQLite byte-range locks on some platforms. The sidecar is not deleted on release. Ownership lasts through worker cleanup. This prevents competing service owners for the canonical destination; it is not application single-instance detection or second-launch forwarding. Those still need integration and cross-platform tests.
 
-## Proposed Rust contract shape
+`RegistryOwner::shutdown(self).await` closes admission, rejects queued standalone reads, finishes current work and drains admitted writes in order. It awaits cleanup and joins without blocking the async executor thread. Dropping the owner only signals draining without blocking. Retained handles cannot submit after closure. Explicit awaited shutdown is required to know cleanup finished before process exit.
 
-The following is signature notation for review, not compilable source. The eventual implementation supplies the named records and concrete error payloads. `&self` methods are called by trusted Rust host code. Each async method returns after its operation completes, not merely after queue admission.
+## Internal Rust contract shape
+
+The signatures below describe calls by trusted Rust host code. Paths, limits and capacity come from that host, not plugins. The methods are async. Tests currently supply their callers.
 
 ```text
-Registry::create(CreateRegistry) -> Result<RegistrySession, RegistryError>
-Registry::open(OpenRegistry)     -> Result<RegistrySession, RegistryError>
-
-RegistrySession {
-    owner: RegistryOwner,
-    handle: RegistryHandle,
-}
-
-RegistryOwner::shutdown(self) -> Result<(), RegistryError>
+Registry::create(path: PathBuf, limits: RegistryLimits, queue_capacity: usize)
+    -> Result<RegistrySession>
+Registry::open(path: PathBuf, limits: RegistryLimits, queue_capacity: usize)
+    -> Result<RegistrySession>
+RegistryOwner::shutdown(self) -> Result<()>
 ```
 
-Creation and opening are async readiness operations. `CreateRegistry` identifies a nonexisting destination and required initial configuration. `OpenRegistry` identifies existing storage and supplies validated host limits. Neither takes a plugin-provided path or a flag that converts an open failure into initialization.
+See [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs) for exact operation signatures and [`model.rs`](../../src-tauri/src/plugin_registry/model.rs) for records.
 
-`RegistryHandle` exposes typed, operation-specific methods in these families:
+| `RegistryHandle` method  | Input and atomic result                                                                                                                            |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read_settings`          | Returns the two typed host settings in one read transaction.                                                                                       |
+| `package_details`        | Takes `PackageId`; returns installation, artifacts, declarations and decisions in one bounded snapshot.                                            |
+| `project_details`        | Takes `ProjectId`; returns saved name, location, revision, logical public identity, decisions and overrides.                                       |
+| `accept_artifact`        | Takes `PreparedArtifact` and matching receipt; inserts history and complete immutable metadata together.                                           |
+| `change_installation`    | Takes expected state, semantic action, optional target and prerequisites; commits acceptance if supplied, pointers, revision and cleanup together. |
+| `register_project`       | Takes a complete `PreparedProject`; commits all location/name fields and initial revision together.                                                |
+| `relink_project`         | Takes key, expected revision, prepared location and closed-project prerequisite; replaces location and increments revision together.               |
+| `refresh_project_name`   | Takes key, expected location revision and prepared current location; refreshes the label only for the matching location.                           |
+| `save_permission_review` | Takes a bounded review with expected installation, settings and decisions; saves all effects and deliberate candidate consumption together.        |
+| `acknowledge_scope`      | Takes exact target release and baseline/revision; saves pending review or applies the selected baseline atomically.                                |
+| `set_enablement`         | Takes declaration, expected installation/choice and new choice; `None` removes a project override for Inherit.                                     |
+| `set_host_settings`      | Takes expected/current and replacement typed settings; commits coherent mode/policy changes.                                                       |
+| `remove_unused_artifact` | Requires matching runtime-use prerequisite and no installation reference; explicitly deletes owned children and artifact, not files/history.       |
+| `backup`                 | Takes a new destination path; completes SQLite-aware copying and file synchronization after admission.                                             |
 
-| Proposed method          | Inputs and result                                                                                               | Atomic boundary                                                                                |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `package_details`        | Stable package identity; owned details with installation state, accepted declarations and relevant review state | One bounded consistent read transaction                                                        |
-| `project_details`        | Local project registration key; owned saved location and decisions                                              | One bounded consistent read transaction                                                        |
-| `read_settings`          | No plugin input; typed host settings                                                                            | One bounded read transaction                                                                   |
-| `accept_artifact`        | Private prepared artifact and matching publication receipt; accepted artifact identity                          | History comparison plus all artifact/declaration inserts                                       |
-| `change_installation`    | Semantic action, reviewed expected state and any trusted prerequisites; committed transition result             | Pointer changes, relevant decision cleanup, enablement initialization and scope state together |
-| `register_project`       | Complete trusted prepared location and cached name; new local registration key                                  | All registration fields together                                                               |
-| `relink_project`         | Key, expected location revision and trusted validated replacement; new revision                                 | Location replacement and revision increment together                                           |
-| `refresh_project_name`   | Key, expected location revision and name from validated current opening                                         | Update only if the reviewed location is still current                                          |
-| `save_permission_review` | Named components, permission coverage, expected reviewed requirements and deliberate decisions                  | Validate and save the entire review, including any separately confirmed denial clearing        |
-| `set_enablement`         | Component, application choice or project override, applicable declaration and expected state                    | Choice change; Inherit deletes the project override                                            |
-| `acknowledge_scope`      | Exact target release, reviewed baseline/revision and scope                                                      | Save pending acknowledgement or establish matching selected baseline                           |
-| `set_host_settings`      | Typed setting changes and expected settings                                                                     | Coherent save; mode changes apply approved automatic-approval rules                            |
-| `remove_unused_artifact` | Artifact and expected eligibility                                                                               | Explicit owned-child deletion followed by artifact deletion                                    |
-
-These method families describe responsibilities, not a mandatory one-method-per-row design. The permission and settings methods must support the already approved rules without exposing arbitrary table mutation. A review that changes multiple facts must not be split into partial successful saves.
-
-An installation action may include a newly prepared target. In that case acceptance and the installation change commit together. Reuse the acceptance validation internally; do not call two public methods and claim they form one transaction. Separate acceptance remains useful for recording a durably published copy without selecting it.
+`ArtifactTarget::Prepared` combines preparation and receipt for acceptance within an installation transaction. Two separate public method calls do not form one atomic operation.
 
 ### Semantic installation actions
 
-Use a typed action enum internally for install, stage update, repair, restore previous, cancel stage, cancel all pending changes, uninstall and promote stage. Callers request intent, not arbitrary replacement pointer sets.
+[`transitions.rs`](../../src-tauri/src/plugin_registry/transitions.rs) calculates install, update, repair, previous-version restoration, cancellation, uninstall and promotion. Callers request actions, not arbitrary pointer replacements. The store checks the reviewed monotonic installation revision and state, then commits pointers, revision advancement and required decision/scope cleanup together. The revision survives uninstall and detects changes away and back.
 
-The pure transition calculator takes the current installation snapshot and validated target facts. It returns the new pointers and required cleanup. The committing operation rechecks the reviewed installation revision and expected state before applying that result, then advances the revision atomically with the change. Future previews can call the same calculator.
+Scope blockers are derived from the selected declaration and retained reviewed baseline. No baseline means initial review; a different scope means change review. A matching scope removes only this blocker. Staged acknowledgements bind to release and baseline revision. Selection applies matching review atomically. Native permission coverage remains separate. Uninstall retains history, denials, saved choices and scope baselines, but removes approvals and pending scope acknowledgements.
 
-Verification success, process-wide no-prior-import eligibility and closed-project checks are trusted host prerequisites, not claims a plugin can submit. The registry library can define private prepared-input contracts and exercise them in tests. Actual enforcement requires the later host integrations. Until then, passing a test prerequisite must not imply that production runtime checks exist.
+Unsupported component profiles block those components and required dependents, not selection of an otherwise valid package or compatible siblings. Package-fatal verification failures retain the no-fallback rule. Actual filesystem preflight and process-wide import tracking remain future prerequisites, not registry services.
 
 ### Integrity entries
 
-The integrity module remains independent of SQLite and `RegistryError`. It accepts a bounded fallible iterator of entries and exposes read-only iteration after validation.
+`IntegrityRecord::from_entries<E>(version, entries, limits)` consumes `IntoIterator<Item = Result<IntegrityEntry, E>>`. Each entry owns a path, `u64` byte length and `[u8; 32]` digest. Validation stops on the first source or record error. `IntegrityBuildError<E>` preserves `Source(E)` separately from `InvalidRecord(IntegrityError)`.
 
-```text
-IntegrityEntry { path: String, byte_length: u64, sha256: [u8; 32] }
-
-from_entries<E>(version, entries, limits)
-    -> Result<IntegrityRecord, IntegrityBuildError<E>>
-
-IntegrityBuildError<E> = Source(E) | InvalidRecord(IntegrityError)
-```
-
-The signature preserves concrete source errors. The registry maps errors after reconstruction. SQL lengths must fit SQLite's signed integer storage; reject unrepresentable values instead of wrapping. The integrity module owns conversion to its existing hexadecimal JSON representation. The JSON format need not change.
+`entries()` returns an exact-size iterator of owned metadata copies. Changing an entry cannot mutate the record. `format_version()` and `fingerprint()` provide validated metadata. `VerifiedPackage::integrity_record(limits)` derives a record from retained verified buffers rather than reopening source files. SQL reconstruction uses these APIs without a JSON round trip. The integrity module remains independent of SQLite and `RegistryError`.
 
 ### Completion and errors
 
-Use the [nine approved categories](registry-foundation.md#approved-registry-error-categories). Retain underlying causes for host diagnostics without exposing database details to plugins.
+The service uses the [nine domain categories](registry-foundation.md#approved-registry-error-categories). Missing requested records are `NotFound`; broken required relationships require recovery handling. A mutation reports `Storage` only when it is known not to have committed. Uncertain commit/rollback or a lost admitted-write completion is `OutcomeUnknown`; refresh authoritative state rather than blindly retrying.
 
-- `Ok` means successful completion and committed changes, if any.
-- Queue rejection is not admission and causes no execution.
-- `Storage` for a mutation means the operation is known not to have committed.
-- `OutcomeUnknown` means the caller cannot establish the commit/publication outcome. Do not blindly retry.
-- Missing caller-requested data is `NotFound`. Broken required relationships require recovery handling.
-- Unexpected worker termination makes existing handles unavailable. Do not replace the worker automatically or replay writes.
+Unexpected worker termination closes admission and makes existing handles unavailable. It does not automatically replace the worker or replay writes. Controlled reopen/recovery remains the host's responsibility.
+
+## Backup, migrations and restore preparation
+
+[`recovery.rs`](../../src-tauri/src/plugin_registry/recovery.rs) uses SQLite backup steps of 128 pages. `Busy` and `Locked` fail immediately rather than retrying indefinitely. Destinations are claimed without overwriting; failed staging files remain as evidence. Backup reads a consistent source transaction, validates the copied schema, closes the target and synchronizes the file. It does not prove generation-directory durability.
+
+[`migrations.rs`](../../src-tauri/src/plugin_registry/migrations.rs) is private infrastructure for reviewed static SQL chains, not caller-supplied SQL. It validates the source and bounded consecutive steps, completes a backup before mutation, applies steps/version changes in one transaction and validates the target before commit. Tests use synthetic `1 -> 2` schemas and failure chains. Actual opening supports schema `1` only and rejects unknown versions. No prior shipped schema migration is registered.
+
+The synchronous private `prepare_restore` helper is exercised directly by native tests. A future closed-registry coordinator must schedule it off latency-sensitive threads and retain exclusive maintenance ownership. It prepares a new database, not a live replacement. It holds consistent source/current read snapshots, performs bounded full validation of the backup and prepared result, and validates current history/allocation evidence separately. It merges history by canonical package/version, rejects known fingerprint conflicts, and preserves validated allocation high-water marks. It never merges current approvals or installation selection into the backup.
+
+Ordinary restoration requires matching namespaces. Explicitly acknowledged missing/unreadable history or unrecoverable allocation evidence requires a fresh namespace as specified by the recovery policy. The helper preserves safely decoded history pins even when other history or metadata is damaged. Missing or malformed evidence needs explicit loss acknowledgement; it never manufactures a missing fingerprint. A loss acknowledgement cannot bypass a known validated conflict, readable unsupported schema, known incompatible namespace or host resource limit. Deleted history with no surviving evidence cannot be detected or reconstructed. Restore forces Secure mode and moves approvals into inactive recovered candidates, merging source flags without granting coverage. Source/current databases stay unchanged.
 
 ## Proposed publication safety requirements
 
-The generation layout is approved. The following sequence assembles its requirements; it is not a verified cross-platform filesystem implementation.
+Generation publication is still planned. Stop the normal service and retain exclusive coordinator ownership. Prepare and validate a separate generation. Complete the supported platform's file, SQLite-sidecar and directory durability steps before replacing active-generation metadata. Reopen only the selected generation through readiness validation.
 
-1. Retain exclusive maintenance ownership after stopping the normal service.
-2. Prepare a separate generation through SQLite-aware copying.
-3. Apply restore transformations. Merge eligible history and counter evidence, sanitize approvals, force Secure mode and apply any required namespace change.
-4. Validate the prepared database. Complete a SQLite-aware close/checkpoint and durability sequence that preserves committed WAL contents.
-5. Durably prepare the generation's required files and directory entries before selecting it.
-6. Prepare replacement selector metadata in the same owned location. It contains only a validated generation identifier and format information, not an arbitrary path.
-7. Replace the selector through the supported platform's atomic replacement mechanism. Confirm the required file and directory durability.
-8. Reopen the selected registry through normal readiness validation. Return a fresh service only after success.
+Missing/invalid metadata requires plugin-free recovery. Do not guess a generation by name, timestamp or validity. An uncertain selector replacement must preserve both generations and report `OutcomeUnknown`, not automatically retry or switch back. Old generations remain until deliberate maintenance.
 
-A failure before attempting selection leaves the current selection unchanged. A failure after attempting selection must be classified from actual evidence. If durability cannot be established, report `OutcomeUnknown`, preserve both generations and enter controlled recovery. Do not automatically retry or switch back.
+Exact selector encoding, replacement/synchronization operations and fault handling need investigation and packaged tests on macOS, Linux and Windows. Backup and staging tests do not establish this protocol.
 
-Missing or invalid selector metadata requires recovery. Never choose by directory name, timestamp or database validity. Old generations are not automatically deleted. The selector is separate from the logical identity namespace, and active SQLite remains writable.
+## Remaining integration decisions
 
-### What still needs technical investigation
+Native path encoding, directory-identity schemes and alias matching need supported platform formats. `PublicProjectId` internally pairs namespace and registration key; its author-facing string encoding and native host mapping remain open. No real native location proof can be constructed yet.
 
-Document and test the exact supported replacement and durability operations for macOS, Linux and Windows. Investigate directory synchronization, Windows replacement/sharing behavior, SQLite backup/checkpoint failure handling and failure classification. A generic rename call alone is not proof of durability.
+Only permission mode and repair-conflict policy are foundation settings. Command/runtime integration must add typed settings persistence, dispatcher loading, change distribution and its settings menu. Lifecycle/management integration must add the blocked-activation preference, activation wiring and management toggle. These are completion gates for their slices and Part 4, not optional backlog items.
 
-This is engineering investigation, not another preference question. If a platform cannot support the approved guarantee, explain the limitation and ask before weakening behavior. Do not claim production restore readiness from in-memory SQL probes or a test on one OS.
+No project-forgetting workflow, configuration reset, automatic generation cleanup, cross-registry import, audit log, interactive history-conflict recovery or activation-health rollback is added. Production numerical defaults remain deferred.
 
-## Remaining owner decisions
+## Final sign-off proposal
 
-All four focused behavioral questions are resolved. Final schema/contract and implementation-scope sign-off remains required. A newly discovered behavior gap must still be explained before making a design choice. The owner has approved detecting installation changes away and back through a retained monotonic revision. Explicit review also consumes the matching recovered approval candidate atomically with the new decision.
+**Approved by the owner and implemented for the internal slice only.** The scope includes the integrity API and binary fingerprint, assembled 20-table schema, typed transactions, bounded worker/lifecycle, backup, private migration infrastructure and restore-data preparation. It excludes real publication, generation switching, application startup/recovery integration, management IPC/UI, live authority, project-file services, indexing, external loading and Basic Menu packaging.
 
-The owner approved limiting the foundation's settings to permission mode and repair-conflict policy. Add command resource settings and the blocked-activation preference through later typed migrations during Part 4. Do not substitute generic JSON or key/value storage.
+## Source, tests and validation
 
-These are completion requirements, not indefinite backlog items:
+- [`schema.rs`](../../src-tauri/src/plugin_registry/schema.rs), [`schema.sql`](../../src-tauri/src/plugin_registry/schema.sql) and [`schema_tests.rs`](../../src-tauri/src/plugin_registry/schema_tests.rs): creation, required objects, constraints and unsafe-state rejection.
+- [`store.rs`](../../src-tauri/src/plugin_registry/store.rs), [`store_decisions.rs`](../../src-tauri/src/plugin_registry/store_decisions.rs), [`store_validation.rs`](../../src-tauri/src/plugin_registry/store_validation.rs) and [`store_tests.rs`](../../src-tauri/src/plugin_registry/store_tests.rs): transactions, bounds, revisions, decisions, retention and rollback.
+- [`preparation.rs`](../../src-tauri/src/plugin_registry/preparation.rs), [`model.rs`](../../src-tauri/src/plugin_registry/model.rs), [`transitions.rs`](../../src-tauri/src/plugin_registry/transitions.rs) and [`error.rs`](../../src-tauri/src/plugin_registry/error.rs): private preparation contracts, typed records, policy calculations and errors.
+- [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs) and [`worker_tests.rs`](../../src-tauri/src/plugin_registry/worker_tests.rs): readiness, ownership, FIFO, overload, abandoned waiters, shutdown and failure.
+- [`recovery.rs`](../../src-tauri/src/plugin_registry/recovery.rs), [`recovery_tests.rs`](../../src-tauri/src/plugin_registry/recovery_tests.rs) and [`migrations.rs`](../../src-tauri/src/plugin_registry/migrations.rs): real-file/WAL backup, restore staging and synthetic migration tests.
+- [`plugin_integrity/tests.rs`](../../src-tauri/src/plugin_integrity/tests.rs): binary vectors, entry validation, source errors and existing integrity regressions.
 
-- External command/runtime and settings integration requires typed persistence, loading saved resource settings into the dispatcher, change distribution and the settings menu.
-- Plugin lifecycle/management integration requires persistence of the blocked-activation preference, activation-behavior wiring and its management toggle.
-- The internal registry foundation can finish without these additional settings. Their feature slices and Part 4 cannot finish without them.
+Run from `src-tauri`:
 
-No precise calendar date or order between those integration slices is established. Numerical defaults and existing preference semantics are unchanged by this scope decision.
+```sh
+cargo test --lib plugin_registry
+cargo test --lib plugin_integrity
+cargo test --lib
+cargo fmt -- --check
+cargo clippy --lib --tests -- -D warnings
+```
 
-The owner approved deriving scope-review blockers from saved facts, without a separate mutable blocked flag. For an installed component, no baseline requires initial review; a selected scope different from the baseline requires change review. Matching scopes have no scope-review blocker. Apply an applicable acknowledgement and update the baseline atomically. Pending acknowledgements remain completed reviews awaiting target selection. Returning to the reviewed scope clears only the scope blocker, not other activation checks.
-
-Explicit candidate review matches the component, operation/resource pair, coverage scope and project registration when project-specific. Save the current decision and delete only that candidate in one transaction. A failed save preserves it. Reviewing one project does not consume another project's or application-wide candidate. Automatic Trust-mode processing alone preserves recovered candidates. This does not implicitly clear any denial.
-
-The approved installation revision is separate from `location_revision` and `scope_revision`. It survives uninstall. The draft SQL stores it on `packages`, which remains after installation-state removal. Each committed installation-state change advances it atomically. Reviewed writes compare it and reject stale revisions with `Conflict`, including changes away and back. Start-at-1 storage and checked increments are proposed mechanics; counters must never wrap.
-
-Final sign-off must also confirm the remaining installation pointer-shape checks and the complete schema. Those checks are collected in the schema review instead of generating a separate question for each SQL expression.
-
-## Mechanical choices and deferred work
-
-The draft proposes `STRICT` tables, restrictive foreign keys, explicit singleton rows, binary text comparison, 16-byte logical namespace storage and checked positive counters starting at one. Review these together with the SQL. Names, enum encodings, indexes and concrete Rust wrappers are routine choices when they preserve approved behavior. Counter exhaustion must reject without wrapping or partial mutation.
-
-Native path encoding and directory identity need documented supported formats before real project registration. The foundation can store validated versioned binary fields without claiming it validates the actual directory. Unknown formats cannot recover grants. Public project-ID encoding remains opaque and is not a new author-facing format contract.
-
-Do not add project-forgetting APIs, generic configuration reset, automatic generation cleanup, cross-registry import, audit logging, interactive restore conflict resolution or activation-health rollback to complete this slice. These features remain deferred. Numerical production defaults remain deferred too; finite injected test limits are not release defaults.
-
-## Proposed implementation and test order
-
-After the focused decisions and final sign-off:
-
-1. **Integrity construction and fingerprint.** Add database-independent entry construction and read-only iteration. Implement the approved binary fingerprint once. Reproduce the existing reference vectors and test ordering, duplicates, malformed digests, source errors, unsupported formats and bounds.
-2. **Domain model and transitions.** Add typed identities, reviewed-state checks, coverage evaluation and the pure installation calculator. Test all repair/update/restoration paths, stale operations, uninstall retention, scope baselines and denial precedence.
-3. **Schema and transactions.** Add bundled `rusqlite`, the reviewed schema and typed operations. Test constraints directly and through the service. Inject transaction failures and verify no partial acceptance, decision review or selection cleanup.
-4. **Worker lifecycle.** Add bounded FIFO admission, ready-only handles and explicit shutdown. Test overload without admission, dropped waiters, queued-read rejection, admitted-write draining and unexpected worker loss.
-5. **Backup and recovery transformations.** Test SQLite-aware backups and restore preparation using real temporary files and WAL. Cover history conflicts, counter retention, namespace recovery, inactive recovered approvals and Secure mode. Keep publication claims separate until platform evidence exists.
-6. **Integration handoff.** Document the tested internal contracts and remaining production adapters. Do not enable application plugin loading, management IPC or native authority as a side effect.
-
-The eventual test matrix must include reopen persistence, wrong schema, missing required singleton/catalog data, foreign-key and domain corruption, revision exhaustion and supported migration failure. Restoration tests must distinguish database transformation from durable publication. Platform publication tests need explicit fault points before and after selector replacement.
-
-## Final approval checklist
-
-Before implementation, present one bounded sign-off covering:
-
-- The resolved behavioral questions and updated SQL.
-- The typed method families, prepared-input ownership and atomic boundaries.
-- Which backup/restore pieces are implemented in this slice and which remain gated.
-- The test matrix and any platform evidence still unavailable.
-- The fact that no public SDK, IPC, native authority or external-loading integration is included.
-
-Do not interpret approval to consolidate documentation as this final implementation sign-off.
+The [cumulative changelog](change-log.md#native-registry-design) records verified macOS validation. Library tests do not prove cross-platform publication or packaged Tauri authorization.
