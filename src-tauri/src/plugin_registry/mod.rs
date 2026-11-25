@@ -3,6 +3,8 @@ mod error;
 mod migrations;
 mod model;
 mod preparation;
+#[cfg(test)]
+mod publication_probe;
 mod recovery;
 mod schema;
 mod store;

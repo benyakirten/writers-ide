@@ -245,6 +245,84 @@ fn dropping_owner_drains_without_waiting_for_operation_handles() {
 }
 
 #[test]
+fn probe_startup_cancellation_keeps_location_lease_until_worker_cleanup() {
+    use super::super::publication_probe::LocationLease;
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let first = run(Registry::create(path.clone(), limits(), 8)).unwrap();
+    run(first.owner.shutdown()).unwrap();
+    let lease = LocationLease::acquire(dir.path()).unwrap();
+    let (started, entered) = mpsc::channel();
+    let (release, resume) = mpsc::channel();
+    let probe = ProbeStartup {
+        lease: lease.guard(),
+        after_open: Some((started, resume)),
+    };
+    let mut startup = Box::pin(Registry::open_for_probe(path.clone(), limits(), 8, probe));
+    enqueue(startup.as_mut());
+    wait(&entered);
+    drop(startup);
+    drop(lease);
+    assert!(matches!(
+        LocationLease::acquire(dir.path()),
+        Err(RegistryError::Unavailable(_))
+    ));
+    release.send(()).unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let _lease = loop {
+        match LocationLease::acquire(dir.path()) {
+            Ok(lease) => break lease,
+            Err(RegistryError::Unavailable(_)) => {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "abandoned startup did not release lease after cleanup"
+                );
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            Err(error) => panic!("unexpected lease failure: {error}"),
+        }
+    };
+    let next = run(Registry::open(path, limits(), 8)).unwrap();
+    run(next.owner.shutdown()).unwrap();
+}
+
+#[test]
+fn probe_location_lease_survives_dropped_session_and_abandoned_admitted_work() {
+    use super::super::publication_probe::{LocationLease, ProbeSession};
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let session = run(Registry::create(path.clone(), limits(), 8)).unwrap();
+    let handle = session.handle.clone();
+    let lease = LocationLease::acquire(dir.path()).unwrap();
+    let (started, entered) = mpsc::channel();
+    let (release, resume) = mpsc::channel();
+    let mut write = Box::pin(handle.submit(false, move |_| {
+        started.send(()).unwrap();
+        wait(&resume);
+        Ok(())
+    }));
+    enqueue(write.as_mut());
+    wait(&entered);
+    drop(write);
+    let mut leased = ProbeSession::new(session, lease).unwrap();
+    let finished = leased.completion();
+    drop(leased);
+    assert!(matches!(
+        LocationLease::acquire(dir.path()),
+        Err(RegistryError::Unavailable(_))
+    ));
+    release.send(()).unwrap();
+    run(finished).unwrap().unwrap();
+    assert!(matches!(
+        run(handle.read_settings()),
+        Err(RegistryError::Unavailable(_))
+    ));
+    let _lease = LocationLease::acquire(dir.path()).unwrap();
+    let next = run(Registry::open(path, limits(), 8)).unwrap();
+    run(next.owner.shutdown()).unwrap();
+}
+
+#[test]
 fn zero_capacity_is_rejected_without_creating_destination() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");

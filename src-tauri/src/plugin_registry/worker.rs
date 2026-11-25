@@ -56,6 +56,8 @@ struct Shared {
     state: Mutex<State>,
     wake: Condvar,
     capacity: usize,
+    #[cfg(test)]
+    probe_lease: Mutex<Option<Arc<std::fs::File>>>,
 }
 impl Shared {
     fn close(&self) {
@@ -96,6 +98,32 @@ impl Drop for RegistryOwner {
     }
 }
 impl RegistryOwner {
+    /// Prototype-only lifetime hook. Production location ownership is not wired.
+    #[cfg(test)]
+    pub(super) fn retain_probe_lease(&self, lease: Arc<std::fs::File>) -> Result<()> {
+        let state = self.shared.state.lock().unwrap_or_else(|e| e.into_inner());
+        if !state.accepting {
+            return Err(RegistryError::Unavailable(
+                "probe cannot attach to a stopped worker".into(),
+            ));
+        }
+        let mut guard = self
+            .shared
+            .probe_lease
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(existing) = guard.as_ref() {
+            return if Arc::ptr_eq(existing, &lease) {
+                Ok(())
+            } else {
+                Err(RegistryError::Conflict(
+                    "different probe lease already attached".into(),
+                ))
+            };
+        }
+        *guard = Some(lease);
+        Ok(())
+    }
     pub(crate) async fn shutdown(mut self) -> Result<()> {
         self.shared.close();
         let completion = self
@@ -115,26 +143,58 @@ impl RegistryOwner {
     }
 }
 
+#[cfg(test)]
+pub(super) struct ProbeStartup {
+    pub lease: Arc<std::fs::File>,
+    pub after_open: Option<(std::sync::mpsc::Sender<()>, std::sync::mpsc::Receiver<()>)>,
+}
+
 impl Registry {
     pub(crate) async fn create(
         path: PathBuf,
         limits: RegistryLimits,
         queue_capacity: usize,
     ) -> Result<RegistrySession> {
-        Self::start(path, limits, queue_capacity, true).await
+        Self::start(
+            path,
+            limits,
+            queue_capacity,
+            true,
+            #[cfg(test)]
+            None,
+        )
+        .await
     }
     pub(crate) async fn open(
         path: PathBuf,
         limits: RegistryLimits,
         queue_capacity: usize,
     ) -> Result<RegistrySession> {
-        Self::start(path, limits, queue_capacity, false).await
+        Self::start(
+            path,
+            limits,
+            queue_capacity,
+            false,
+            #[cfg(test)]
+            None,
+        )
+        .await
+    }
+    #[cfg(test)]
+    pub(super) async fn open_for_probe(
+        path: PathBuf,
+        limits: RegistryLimits,
+        capacity: usize,
+        probe: ProbeStartup,
+    ) -> Result<RegistrySession> {
+        Self::start(path, limits, capacity, false, Some(probe)).await
     }
     async fn start(
         path: PathBuf,
         limits: RegistryLimits,
         capacity: usize,
         create: bool,
+        #[cfg(test)] probe: Option<ProbeStartup>,
     ) -> Result<RegistrySession> {
         limits.validate()?;
         if capacity == 0 {
@@ -149,6 +209,8 @@ impl Registry {
             }),
             wake: Condvar::new(),
             capacity,
+            #[cfg(test)]
+            probe_lease: Mutex::new(probe.as_ref().map(|probe| probe.lease.clone())),
         });
         let (ready, receive_ready) = oneshot::channel();
         let (finished, receive_finished) = oneshot::channel();
@@ -169,6 +231,21 @@ impl Registry {
                             return;
                         }
                     };
+                    #[cfg(test)]
+                    if let Some(probe) = probe {
+                        if let Some((entered, release)) = probe.after_open {
+                            let _ = entered.send(());
+                            if release
+                                .recv_timeout(std::time::Duration::from_secs(10))
+                                .is_err()
+                            {
+                                let _ = ready.send(Err(RegistryError::Unavailable(
+                                    "probe startup barrier timed out".into(),
+                                )));
+                                return;
+                            }
+                        }
+                    }
                     // If startup's waiter is gone, no operation handle was issued.
                     if ready.send(Ok(())).is_err() {
                         return;
@@ -202,6 +279,12 @@ impl Registry {
                     // Store and its exclusive destination lock drop before completion.
                 }));
                 worker_shared.failed();
+                #[cfg(test)]
+                worker_shared
+                    .probe_lease
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .take();
                 let completion = result.map_err(|_| {
                     RegistryError::Unavailable("registry worker terminated unexpectedly".into())
                 });

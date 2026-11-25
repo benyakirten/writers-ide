@@ -160,7 +160,7 @@ This combines content-history records only. It does not merge current permission
 
 If current storage is missing or cannot be safely validated, allow explicit recovery from a validated backup. Explain that post-backup version-history records may be unrecoverable and require acknowledgement of that history loss. Do not present it as a normal history-preserving restore or claim that unknown records survived. Preserve any unreadable original for recovery. Apply the existing Secure-mode and inactive-recovered-approval rules.
 
-Trusted Rust code determines whether current storage can be safely validated; this is not a caller-supplied shortcut around conflict checks. Known accepted-content conflicts from a safely validated current registry still reject the initial restore. The private staging helper validates and merges available history without modifying source/current data. It validates pins independently and preserves every safely decoded pin even when another history row, namespace record or allocation counter is missing or malformed. Incomplete evidence requires loss acknowledgement and a fresh namespace. Readable unsupported schema versions, known namespace mismatches and known accepted-content conflicts still reject recovery. Resource-limit failures cannot be bypassed by acknowledging loss. History deleted without surviving evidence cannot be detected or reconstructed; do not claim it was preserved. Loss acknowledgement UI, generation publication and application recovery remain absent.
+Trusted Rust code determines whether current storage can be safely validated; this is not a caller-supplied shortcut around conflict checks. Known accepted-content conflicts from a safely validated current registry still reject the initial restore. The private staging helper validates and merges available history without modifying source/current data. It validates pins independently and preserves every safely decoded pin even when another history row, namespace record or allocation counter is missing or malformed. Incomplete evidence requires loss acknowledgement and a fresh namespace. Readable unsupported schema versions, known namespace mismatches and known accepted-content conflicts still reject recovery. Resource-limit failures cannot be bypassed by acknowledging loss. History deleted without surviving evidence cannot be detected or reconstructed; do not claim it was preserved. Loss acknowledgement UI, production generation publication and application recovery remain absent.
 
 ### Approved restore allocation-counter retention
 
@@ -192,7 +192,7 @@ Run restoration as closed-registry maintenance, not through a live service's mai
 
 After successful restoration and startup checks, open a fresh ready service with new operation handles. Old service handles do not revive. Application integration still follows the approved plugin-free recovery, native-authority cleanup and process-wide import/restart rules. Stopping the SQLite worker alone does not make previously imported plugin code safe to reload.
 
-Exact maintenance ownership types, restore/publication protocol and restart integration remain under review. The first library adds no live restore or management IPC.
+Production maintenance ownership types, restore/publication protocol and restart integration remain under review. The authorized test-only lease and cleanup coordinator do not settle those contracts. The first library adds no live restore or management IPC.
 
 ### Approved staged restore preparation
 
@@ -202,7 +202,7 @@ Build the restored registry at a separate host-owned staging location using SQLi
 
 Do not modify the current destination during preparation or alter the source backup. Preserve any unreadable original under the recovery policy. A preparation failure must not partially apply settings or installations to the current registry. Staging requires additional temporary disk space; it does not require holding the entire database in memory.
 
-The generation-directory layout below is approved. Exact publication, SQLite connection/checkpoint handling and crash recovery still need approval. A database-file rename alone is not an approved WAL-safe publication protocol. Normal startup checks still apply before returning a ready service. Restore staging is implemented; generation publication is not.
+The generation-directory layout below is approved. Production publication, SQLite connection/checkpoint handling and crash recovery still need approval. A database-file rename alone is not an approved WAL-safe publication protocol. Normal startup checks still apply before returning a ready service. Restore staging is implemented. A separately authorized test-only publication harness now exercises sealing and selector changes; production generation publication is not implemented.
 
 ### Approved registry generation layout
 
@@ -212,7 +212,7 @@ Prepare restoration in a new generation directory. After validation and required
 
 A physical generation is not the logical registry identity namespace. A same-registry restore can change physical generation without changing public project IDs. The active generation remains a normally writable SQLite database, not an immutable snapshot.
 
-Exact metadata encoding and crash-safe switching remain under review. Initial generation retention is defined below. This does not implement publication or add a plugin-facing filesystem API.
+Production metadata encoding and crash-safe switching remain under review. The [publication investigation](registry-publication-investigation.md) describes the authorized compiled test harness and separates it from earlier disposable Python/APFS evidence. Its private 61-byte checksummed selector is a fixture, not a public format or authentication. Its stable location lease spans first-run detection, draining and generation changes only in tests. Production per-database ownership does not supply that lease. Windows directory synchronization explicitly returns `Unsupported`; integrated tests stop before selector creation and return no session. Separate raw Windows move tests do not establish directory durability. Windows power-loss publication guarantees remain unresolved; no weaker success criterion is approved. Initial generation retention is defined below. No production publisher or plugin-facing filesystem API is added.
 
 ### Approved missing or invalid generation metadata
 
@@ -659,7 +659,7 @@ Users need not manually create a database on a fresh installation. However, this
 
 Fresh creation must refuse an existing destination without modifying it, including an apparently empty or zero-byte file. Use non-overwriting creation semantics rather than a path-existence check followed by an operation that could overwrite a file created in between. Do not implicitly repurpose an existing file. An unfinished file from an earlier initialization attempt requires separately defined recovery based on evidence of that attempt.
 
-Create/open signatures are implemented. First-run generation selection and interrupted-initialization recovery remain unimplemented. This is an internal Rust startup contract, not new management IPC or implemented first-run UI.
+Create/open signatures are implemented. The test-only harness checks first creation and rejects automatic resumption of interrupted initialization. Production first-run generation selection and interrupted-initialization recovery remain unimplemented. This is an internal Rust startup contract, not new management IPC or implemented first-run UI.
 
 ### Approved application-owned lifecycle
 
@@ -667,7 +667,7 @@ The internal owner/handle split is implemented. Canonical destination ownership 
 
 Application startup/shutdown code owns the registry lifecycle. Ordinary windows and background operations use operation handles, not lifecycle ownership. Holding or dropping an operation handle does not start or stop the registry. Do not tie shutdown to the last operation handle being dropped.
 
-The application owner explicitly stops admission, finishes admitted writes under their existing validation/transaction rules, and awaits worker cleanup and termination. It need not wait for every operation handle to be dropped. Retained handles cannot admit new work after admission closes; this does not cancel already-admitted writes. These are internal Rust responsibilities, not plugin or frontend shutdown capabilities. The library lifecycle is implemented; application startup/shutdown wiring remains absent.
+The application owner explicitly stops admission, finishes admitted writes under their existing validation/transaction rules, and awaits worker cleanup and termination. It need not wait for every operation handle to be dropped. Retained handles cannot admit new work after admission closes; this does not cancel already-admitted writes. These are internal Rust responsibilities, not plugin or frontend shutdown capabilities. The library lifecycle is implemented; application startup/shutdown wiring remains absent. Authorized `cfg(test)` hooks pass a shared location-lease file into the actual worker before the startup await and retain it through cleanup. Regressions cover abandoned startup and owner-drop draining. Production lease wiring is absent; the separate leased-session cleanup thread is only a prototype.
 
 If the application drops the lifecycle owner without awaiting shutdown, close admission and signal the worker to follow the shutdown policy without blocking the dropping thread. The worker retains registry ownership until draining and cleanup finish. Do not synchronously join from the destructor or release ownership early. This is only a fallback: application code must still await explicit shutdown before exiting to know finalization completed. It does not guarantee completion through a crash or force quit.
 
@@ -749,7 +749,7 @@ These categories and source-error translation are implemented in [`error.rs`](..
 
 The owner approved the assembled schema, internal Rust contracts and bounded implementation scope. The six review groups covered artifacts/transitions, project registrations, permission/enablement schema, internal Rust APIs, persistence/worker mechanics and complete foundation sign-off. That internal slice is implemented. They are not six remaining approval rounds.
 
-Real publication and generation switching, native location encodings and alias matching, management IPC/UI, live authorization, project-file services, indexing and external loading remain separate work. Additional settings retain their Part 4 completion gates. See the [implementation review](registry-implementation-review.md#remaining-integration-decisions) for those limits and [final sign-off](registry-implementation-review.md#final-sign-off-proposal) for the approved scope. New behavior gaps still require owner review.
+Production publication and generation switching, native location encodings and alias matching, management IPC/UI, live authorization, project-file services, indexing and external loading remain separate work. Additional settings retain their Part 4 completion gates. See the [implementation review](registry-implementation-review.md#remaining-integration-decisions) for those limits and [final sign-off](registry-implementation-review.md#final-sign-off-proposal) for the approved scope. New behavior gaps still require owner review.
 
 ## Existing source entry points
 
@@ -758,6 +758,7 @@ Real publication and generation switching, native location encodings and alias m
 - [`plugin_resources/mod.rs`](../../src-tauri/src/plugin_resources/mod.rs): existing immutable snapshot identities and verified-buffer ownership. Snapshot identities are not activation credentials or automatically registry artifact IDs.
 
 - [`plugin_registry/mod.rs`](../../src-tauri/src/plugin_registry/mod.rs), [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs) and [`schema.sql`](../../src-tauri/src/plugin_registry/schema.sql): internal service, dedicated worker and schema version 1.
-- The [implementation source/test map](registry-implementation-review.md#source-tests-and-validation) links transactions, decisions, validation, preparation, recovery and tests, with relevant Cargo commands.
+- [`publication_probe/mod.rs`](../../src-tauri/src/plugin_registry/publication_probe/mod.rs): authorized `cfg(test)` adapter, driven by Cargo tests in isolated temporary directories, not by application startup. Sibling modules implement checked sealing, native platform candidates, phase faults and child-process tests.
+- The [implementation source/test map](registry-implementation-review.md#source-tests-and-validation) links transactions, decisions, validation, preparation, recovery and tests, with relevant Cargo commands. The [cumulative changelog](change-log.md#native-registry-design) records current macOS validation and the configured, not remotely executed, three-OS Native Registry workflow.
 
 The application has no registry startup owner or commands yet. Tests exercise these internal contracts.

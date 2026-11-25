@@ -1,0 +1,48 @@
+name: Native Registry
+
+on:
+  push:
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/native_registry.yml'
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/native_registry.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  registry:
+    name: Registry and publication probes on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-latest, ubuntu-24.04]
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux Tauri build dependencies
+        if: runner.os == 'Linux'
+        working-directory: .
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Formatting
+        run: cargo fmt --check
+      - name: Library tests, including test-only publication probes
+        run: cargo test --locked --lib
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings

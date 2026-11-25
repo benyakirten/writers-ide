@@ -186,6 +186,25 @@ pnpm build
 
 Run `pnpm build:plugin-profile` to generate shared runtime artifacts. Run `pnpm build:plugin-sdk` to generate five private declarations-only packages in `node_modules/.cache/plugin-sdk`. They are not published npm packages and contain no JavaScript. The [portable SDK guide](docs/plugins/portable-sdk.md) explains local package delivery and the independent sample. Neither builder enables application external loading. For package-local SDK work, optionally run `pnpm --filter @writers-ide/plugins test` and `pnpm --filter @writers-ide/plugins check` directly.
 
+### Native registry checks
+
+Run these commands from `src-tauri`:
+
+```sh
+cargo test --lib plugin_registry::publication_probe
+cargo test --lib plugin_registry::worker_tests::probe_
+cargo test --lib
+cargo check --lib
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+```
+
+The first two commands are focused subsets, not replacements for the full library suite. The owner-authorized [`publication_probe`](src-tauri/src/plugin_registry/publication_probe/mod.rs) harness is compiled only for tests. Cargo tests supply isolated temporary directories, limits and fixture inputs. No application entry point calls it. It exercises checked SQLite sealing, native selector candidates, faults and child-process boundaries. Test-only worker hooks retain a location lease before the startup await through actual worker cleanup. The leased-session cleanup thread is a prototype, not production startup wiring.
+
+The selector encoding is private test data, not a public format or authentication. Windows integrated publication deliberately returns an unsupported directory-barrier error before selector creation and returns no session. Separate Windows raw move tests include blocked sharing handles; passing them would not establish directory durability. Process-exit and successful barrier-call tests are not power-loss tests. See the [publication investigation](docs/plugins/registry-publication-investigation.md) for coverage and the [cumulative changelog](docs/plugins/change-log.md#native-registry-design) for recorded validation.
+
+The new [Native Registry workflow](.github/workflows/native_registry.yml) is configured for stable Rust on `macos-15`, `windows-latest` and `ubuntu-24.04`. It runs `cargo fmt --check`, `cargo test --locked --lib` and `cargo clippy --locked --all-targets -- -D warnings`. It responds to native/workflow changes and manual dispatch. Its remote execution has not been verified. Do not report the matrix as passing without results. Windows/Linux and minimum-macOS evidence remain missing. These checks do not validate packaged startup, native authorization, management/public UI, external loading or production publication.
+
 ### Cross-engine browser smoke tests
 
 Browser tests use Chromium and WebKit. Run these commands from the repository root:

@@ -4912,6 +4912,7 @@ dependencies = [
  "cap-fs-ext",
  "cap-std",
  "getrandom 0.4.3",
+ "libc",
  "rusqlite",
  "semver",
  "serde",
@@ -4923,6 +4924,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "toml 1.2.1+spec-1.1.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

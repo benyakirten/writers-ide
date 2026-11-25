@@ -288,7 +288,7 @@ Pagination lives in `src/lib/editor/state/page-layout.svelte.ts`, `src/lib/edito
 ### Other platform code
 
 - Rust startup is in `src-tauri/src/lib.rs` and `src-tauri/src/main.rs`. The backend currently has the Tauri greeting command and opener plugin, not project storage or conversion services. Internal `src-tauri/src/plugin_integrity/` and `plugin_resources/` implement verified bytes and resource helpers. `src-tauri/src/plugin_manifest/` contains normalized declarations, strict parsing, limited SemVer matching and static resolution, with parser/resolver tests. These modules do not implement production installation, loading or native authorization.
-- The owner-approved internal `src-tauri/src/plugin_registry/` foundation implements typed async operations, a bounded FIFO worker/lifecycle, schema version 1 with 20 tables, transactional installation/permission/scope records, SQLite-aware backup and restore staging. Canonical destination ownership uses a persistent `.registry-lock` sidecar, not application single-instance forwarding. Publication/location/import/runtime-use prerequisites have test-only constructors. Private migration infrastructure tests synthetic upgrades; only schema 1 is actually supported and unknown schemas reject. No application startup owner, generation publisher, installer or native authority is wired. See the [registry implementation and source/test map](plugins/registry-implementation-review.md).
+- The owner-approved internal `src-tauri/src/plugin_registry/` foundation implements typed async operations, a bounded FIFO worker/lifecycle, schema version 1 with 20 tables, transactional installation/permission/scope records, SQLite-aware backup and restore staging. Canonical destination ownership uses a persistent `.registry-lock` sidecar, not application single-instance forwarding. Publication/location/import/runtime-use prerequisites have test-only constructors. Private migration infrastructure tests synthetic upgrades; only schema 1 is actually supported and unknown schemas reject. The authorized `cfg(test)` `publication_probe/` harness exercises checked sealing, native selector candidates, fault/process boundaries and actual-worker lease lifetime. Cargo tests supply isolated temporary directories; no application entry point calls it. Production location leasing, startup ownership, publication, installation and native authority remain unwired. See the [registry implementation and source/test map](plugins/registry-implementation-review.md).
 - Shared reactive services live in `src/lib/editor/state/` and `src/lib/services/`. Most still use module-level instances. `src/lib/utils/observable.ts` supports events and shortcuts.
 - Localization uses `project.inlang/settings.json`, `messages/`, `src/lib/i18n.ts`, `src/lib/services/locale-manager.svelte.ts` and generated `src/lib/paraglide/` code. Browser language falls back to English. French messages still include English text, and some UI text is hard-coded. `LocaleManager` independently starts in English. Saved language preferences are not implemented.
 - UI code uses Tailwind 4 with compatibility styles, Bits UI menus, icons, toasts and theme variables. This is not a finished theme/settings platform.
@@ -334,11 +334,12 @@ For internal native registry/integrity work, run from `src-tauri`:
 cargo test --lib plugin_registry
 cargo test --lib plugin_integrity
 cargo test --lib
-cargo fmt -- --check
-cargo clippy --lib --tests -- -D warnings
+cargo check --lib
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
 ```
 
-Library tests do not prove generation publication or packaged native authorization. The [registry guide](plugins/registry-implementation-review.md#source-tests-and-validation) links the tested modules and remaining boundaries.
+The [registry guide](plugins/registry-implementation-review.md#source-tests-and-validation) links the test-only publication harness, worker regressions and evidence limits. The [Native Registry workflow](../.github/workflows/native_registry.yml) configures stable Rust checks on macOS 15, Windows latest and Ubuntu 24.04. Remote execution is unverified; Windows/Linux and minimum-macOS evidence remain missing. Windows integrated publication deliberately stops at an unsupported directory barrier. Library runtime/barrier tests do not prove power-loss durability, production publication or packaged native authorization. The [plugin changelog](plugins/change-log.md#native-registry-design) records parent-run macOS validation.
 
 Choose checks that exercise the changed behavior:
 

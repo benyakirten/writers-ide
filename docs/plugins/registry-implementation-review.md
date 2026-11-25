@@ -1,6 +1,6 @@
 # Registry implementation review
 
-**Status: owner-approved internal foundation, implemented / unmerged.** The approved final sign-off covers the database and integrity slice described here. It does not approve or implement production package publication, generation switching or application integration.
+**Status: owner-approved internal foundation, implemented / unmerged.** The approved final sign-off covers the database and integrity slice described here. Separate owner authorization now also covers the test-only generation-publication harness. Neither approval covers production package publication, generation switching or application integration.
 
 The registry is an internal Rust service in [`plugin_registry`](../../src-tauri/src/plugin_registry/mod.rs). It stores plugin installation records, project registrations and saved user decisions in SQLite. It does not store manuscripts or execute plugins. Frontend authors do not call its methods. No Tauri command, application startup caller or management UI uses it yet.
 
@@ -20,14 +20,15 @@ The [integrity module](../../src-tauri/src/plugin_integrity/mod.rs) implements d
 
 ## Approved implementation boundary
 
-| Implemented                                                   | Not implemented by this slice                                 |
-| ------------------------------------------------------------- | ------------------------------------------------------------- |
-| Integrity entries, binary fingerprints and fixed-vector tests | Public SDK changes or management IPC                          |
-| Typed registry data, validation and semantic transitions      | ZIP installation or immutable package publication             |
-| 20-table SQLite schema and private migration execution helper | Live tokens, attachment tickets or native authorization       |
-| Bounded FIFO worker, readiness and explicit shutdown          | Application startup, first-run selection or launch forwarding |
-| Transactional permission, enablement and scope-review records | Actual native directory preparation or project opening        |
-| SQLite-aware backup and restore staging                       | Generation selector, durable publication or recovery UI       |
+| Implemented                                                             | Not implemented by this slice                                      |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Integrity entries, binary fingerprints and fixed-vector tests           | Public SDK changes or management IPC                               |
+| Typed registry data, validation and semantic transitions                | ZIP installation or immutable package publication                  |
+| 20-table SQLite schema and private migration execution helper           | Live tokens, attachment tickets or native authorization            |
+| Bounded FIFO worker, readiness and explicit shutdown                    | Application startup, first-run selection or launch forwarding      |
+| Transactional permission, enablement and scope-review records           | Actual native directory preparation or project opening             |
+| SQLite-aware backup and restore staging                                 | Production generation selector, durable publication or recovery UI |
+| Authorized `cfg(test)` publication adapter and worker lease regressions | Production location-lease wiring or Windows durability guarantee   |
 
 ## Responsibility boundaries
 
@@ -120,13 +121,19 @@ The synchronous private `prepare_restore` helper is exercised directly by native
 
 Ordinary restoration requires matching namespaces. Explicitly acknowledged missing/unreadable history or unrecoverable allocation evidence requires a fresh namespace as specified by the recovery policy. The helper preserves safely decoded history pins even when other history or metadata is damaged. Missing or malformed evidence needs explicit loss acknowledgement; it never manufactures a missing fingerprint. A loss acknowledgement cannot bypass a known validated conflict, readable unsupported schema, known incompatible namespace or host resource limit. Deleted history with no surviving evidence cannot be detected or reconstructed. Restore forces Secure mode and moves approvals into inactive recovered candidates, merging source flags without granting coverage. Source/current databases stay unchanged.
 
-## Proposed publication safety requirements
+## Publication harness and production safety requirements
 
-Generation publication is still planned. Stop the normal service and retain exclusive coordinator ownership. Prepare and validate a separate generation. Complete the supported platform's file, SQLite-sidecar and directory durability steps before replacing active-generation metadata. Reopen only the selected generation through readiness validation.
+Production generation publication is still planned. The owner-authorized [`publication_probe`](../../src-tauri/src/plugin_registry/publication_probe/mod.rs) module is compiled only for tests. `cargo test --lib` calls it with isolated temporary directories and explicit limits. There is no application entry point, public API or authority credential. It prepares fixture databases, checks sealing, exercises selector publication and opens actual registry workers. It does not install package artifacts or construct production artifact-publication receipts.
+
+For production, stop the normal service and retain exclusive coordinator ownership. Prepare and validate a separate generation. Complete the supported platform's file, SQLite-sidecar and directory durability steps before replacing active-generation metadata. Reopen only the selected generation through readiness validation.
 
 Missing/invalid metadata requires plugin-free recovery. Do not guess a generation by name, timestamp or validity. An uncertain selector replacement must preserve both generations and report `OutcomeUnknown`, not automatically retry or switch back. Old generations remain until deliberate maintenance.
 
-Exact selector encoding, replacement/synchronization operations and fault handling need investigation and packaged tests on macOS, Linux and Windows. Backup and staging tests do not establish this protocol.
+The [publication investigation](registry-publication-investigation.md) distinguishes earlier disposable Python/APFS observations from the compiled harness. The harness checks WAL/FULL, foreign keys, bounded readiness, TRUNCATE counters and explicit close before flushing the closed file. Preparation/close failures return the connection. Its private 61-byte checksummed selector fixture is not a production format or authentication mechanism. Production encoding and platform success criteria still need approval.
+
+Native first creation uses Linux `renameat2(RENAME_NOREPLACE)` or macOS `renamex_np(RENAME_EXCL)`. Windows raw-move tests use `MoveFileExW` with write-through, without copy or fallback. Windows directory synchronization explicitly returns `Unsupported`, so integrated publication stops before selector creation and returns no session. No Windows/Linux execution is verified. Runtime/barrier and process-exit tests do not prove power-loss durability.
+
+The test adapter acquires a stable location lease before first-run detection, seals the replacement, exercises the platform adapter and then opens the selected registry. `cfg(test)` worker hooks retain its `Arc<File>` before the startup await through actual worker cleanup, including abandoned startup and owner-drop draining. The leased-session cleanup thread is a prototype only. Production openers do not retain a location lease. A failed fresh open after confirmed publication requires recovery without switching back. A pre-opened gated worker is optional, not an approved lifecycle change. Source/current logical data remains unchanged during preparation, but SQLite opens can still create or rebuild sidecars.
 
 ## Remaining integration decisions
 
@@ -148,15 +155,21 @@ No project-forgetting workflow, configuration reset, automatic generation cleanu
 - [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs) and [`worker_tests.rs`](../../src-tauri/src/plugin_registry/worker_tests.rs): readiness, ownership, FIFO, overload, abandoned waiters, shutdown and failure.
 - [`recovery.rs`](../../src-tauri/src/plugin_registry/recovery.rs), [`recovery_tests.rs`](../../src-tauri/src/plugin_registry/recovery_tests.rs) and [`migrations.rs`](../../src-tauri/src/plugin_registry/migrations.rs): real-file/WAL backup, restore staging and synthetic migration tests.
 - [`plugin_integrity/tests.rs`](../../src-tauri/src/plugin_integrity/tests.rs): binary vectors, entry validation, source errors and existing integrity regressions.
+- [`publication_probe/mod.rs`](../../src-tauri/src/plugin_registry/publication_probe/mod.rs), [`sealing.rs`](../../src-tauri/src/plugin_registry/publication_probe/sealing.rs), [`platform.rs`](../../src-tauri/src/plugin_registry/publication_probe/platform.rs), [`tests.rs`](../../src-tauri/src/plugin_registry/publication_probe/tests.rs) and [`process_tests.rs`](../../src-tauri/src/plugin_registry/publication_probe/process_tests.rs): test-only lifecycle, native candidates, sealing, all-phase faults, partial writes, post-publication readiness rejection, process exits and cross-process locks. Child tests use timeouts and kill/reap guards. The two additional lease lifetime regressions are in `worker_tests.rs`.
 
 Run from `src-tauri`:
 
 ```sh
+cargo test --lib plugin_registry::publication_probe
+cargo test --lib plugin_registry::worker_tests::probe_
 cargo test --lib plugin_registry
 cargo test --lib plugin_integrity
 cargo test --lib
-cargo fmt -- --check
-cargo clippy --lib --tests -- -D warnings
+cargo check --lib
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
 ```
 
-The [cumulative changelog](change-log.md#native-registry-design) records verified macOS validation. Library tests do not prove cross-platform publication or packaged Tauri authorization.
+The [cumulative changelog](change-log.md#native-registry-design) separates older foundation validation from the parent-run current macOS result: 212 library tests, library check, formatting and all-target Clippy passed. The publication module has 34 tests; the two worker lease regressions are separate. Focused subsets do not replace that full validation.
+
+The [Native Registry workflow](../../.github/workflows/native_registry.yml) is configured for stable Rust on macOS 15, Windows latest and Ubuntu 24.04. It runs formatting, the full locked library suite and locked all-target Clippy. Remote CI has not been verified as executed. Windows/Linux and minimum-macOS evidence remain missing. Library tests do not prove power-loss durability, production publication or packaged Tauri authorization.
