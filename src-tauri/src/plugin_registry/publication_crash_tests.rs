@@ -101,7 +101,14 @@ impl Storage {
             }
         } else {
             assert!(metadata.is_file());
-            let bytes = fs::read(path).unwrap();
+            // Windows mandatory locks forbid reading the held ownership sidecar.
+            // Empty files have no bytes to import; keep their namespace entries
+            // without opening them or releasing the fixture's ownership locks.
+            let bytes = if metadata.len() == 0 {
+                Vec::new()
+            } else {
+                fs::read(path).unwrap()
+            };
             // Sealing guarantees the DB; the other fixture files must be empty.
             if path.file_name().unwrap() != "registry.sqlite"
                 && path.file_name().unwrap() != selector::ACTIVE
