@@ -7,8 +7,9 @@ use crate::plugin_registry::{
     selector,
 };
 use publisher::{InitialRoot, PublicationMode, PublicationStage};
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use std::fs;
 use std::{
-    fs,
     future::Future,
     path::Path,
     sync::mpsc,
