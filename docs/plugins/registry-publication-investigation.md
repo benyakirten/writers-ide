@@ -144,7 +144,141 @@ Operation handles for the stopped worker remain permanently closed and return `U
 
 The owner approved extending the dedicated registry thread to own lifecycle transitions, preparation, sealing and cleanup. A small shared control object handles admission and exposes lifecycle snapshots. Caller futures only wait for results, and failed connections remain on their owning thread in recovery-only mode. Fresh opening creates a new validated service and operation channel on that thread; it need not create another OS thread.
 
-The [consolidated Rust contract](registry-implementation-review.md#consolidated-rust-contract) describes the owner-approved shared core, now implemented internally. `MaintenanceRequest` has only test fixture constructors; no production restore/publication request can be submitted yet. The owner resolved the shutdown race identified by source review: shutdown or owner drop sets a persistent flag that immediately blocks new admission and ready-handle acquisition. Admitted maintenance completes its single attempt and records its outcome, then proceeds directly to cleanup without exposing a fresh service or waiting for interactive recovery. The location lock remains held through cleanup. Abandoning the shutdown waiter does not reverse shutdown or interrupt cleanup. Lifecycle revisions must also reject values from other coordinator lifetimes; this preserves the approved stale-request check. The bounded ownership, admission, cleanup and sealing contracts are implemented. Production maintenance adapters, selector encoding and application wiring remain separately gated. This approval does not promote the test-only cleanup thread or fixture format into production.
+The [consolidated Rust contract](registry-implementation-review.md#consolidated-rust-contract) describes the owner-approved shared core, now implemented internally. `MaintenanceRequest` has only test fixture constructors; no production restore/publication request can be submitted yet. The owner resolved the shutdown race identified by source review: shutdown or owner drop sets a persistent flag that immediately blocks new admission and ready-handle acquisition. Admitted maintenance completes its single attempt and records its outcome, then proceeds directly to cleanup without exposing a fresh service or waiting for interactive recovery. The location lock remains held through cleanup. Abandoning the shutdown waiter does not reverse shutdown or interrupt cleanup. Lifecycle revisions must also reject values from other coordinator lifetimes; this preserves the approved stale-request check. The bounded ownership, admission, cleanup and sealing contracts are implemented. Production maintenance adapters and application wiring remain separately gated. The selector encoding and publisher contract below are approved but not implemented; native publication enablement still requires passing the approved platform/storage qualification gates. This approval does not promote the test-only cleanup thread or fixture format into production.
+
+## Approved production selector structure
+
+**Approved structure; not implemented:** use a fixed-size, versioned binary record containing a format identifier/version, a random 128-bit generation ID and a SHA-256 checksum covering the preceding fields. Parsing requires the exact length and rejects unknown versions, malformed records and checksum mismatches. Resolve the generation ID within the host-owned layout, never as an arbitrary path. A checksum detects damaged metadata; it does not authenticate the record or prove publication durability. Missing or invalid metadata retains the approved recovery behavior, with no guessing or fallback.
+
+The fixture bytes below are not adopted as the production encoding. The owner approved the exact production bytes, compatibility rules and publisher contract below. The platform/storage policy below is also approved. Its required evidence must be gathered before publication is enabled. Windows publication remains blocked pending required research.
+
+## Approved production publisher contract
+
+**Owner-approved contract; not implemented.** This completes the first of two publication approval checkpoints. It specifies the selector representation and publisher responsibilities. The approved second checkpoint defines platform/storage assumptions, success criteria and required evidence. Its qualification gates must pass before production publication can be enabled. Existing ownership, shutdown and recovery policies remain in force.
+
+### Record and owned layout
+
+Use exactly 64 bytes:
+
+| Byte range | Contents                                                                                         |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| `0..16`    | Exact ASCII format/version header `WIDE-REGISTRY-1\n`, including the final LF byte.              |
+| `16..32`   | Raw 16-byte random physical generation ID. Treat these as bytes, not an integer with byte order. |
+| `32..64`   | Raw 32-byte SHA-256 digest of bytes `0..32`.                                                     |
+
+There are no optional fields, text encodings, padding or trailing bytes. The digest covers the header and ID, not the writable database. The logical registry namespace and in-memory lifecycle revision are not selector fields.
+
+For a dedicated root called `registry`, use this layout. The name is illustrative; choosing its application-data parent belongs to startup integration.
+
+```text
+stable-parent/
+  registry.location-lock
+  registry/
+    active
+    <32-lowercase-hex-generation-id>/
+      registry.sqlite
+      SQLite sidecars and the persistent per-database lock
+```
+
+`active` is the only selection authority. Derive the generation directory directly from the 16 ID bytes as exactly 32 lowercase hexadecimal ASCII characters. Do not accept a directory name or path from selector data. Allocate IDs with the host random source. Claim each new directory exclusively; never reuse an existing directory or treat a collision as permission to replace its contents. Bind the ID, lease and database together during preparation. The current generic private generation constructor does not yet enforce this approved ID/layout contract.
+
+Read the selector through one opened regular file, using a bounded read that detects bytes beyond the exact length. Reject symlinks and nonregular entries rather than following them. Validate the header, length and checksum before resolving the ID. Verify that the selected directory/database belongs beneath the owned root. A bounded read or checksum is not protection against arbitrary native processes modifying application data.
+
+### Version compatibility
+
+Version 1 readers accept only this exact version-1 record. Unknown versions, extra/truncated bytes and checksum failures return `RecoveryRequired` and preserve the selector. Do not attempt a text parser, reinterpret another format, rewrite metadata during reads or choose a different generation. A future version must bring an explicit compatibility decision; this contract does not promise that older applications can open newer formats. No conversion from unreleased test fixtures is added.
+
+### Consuming handoff and sequence
+
+Trusted Rust lifecycle code calls the publisher on the existing registry thread. There is no plugin/frontend caller or Tauri command. The publisher consumes `SealedGeneration`; it does not accept an arbitrary database path. It derives the record from that value's bound generation identity and retains its ownership throughout publication.
+
+Before disruptive maintenance or first-run root creation, reject a platform already known not to support the required publication protocol. This preflight does not establish durability. Windows remains blocked until its required research and approval are complete.
+
+For supported operation, use the existing approved order:
+
+1. Hold the location lease. For restoration, close old operation admission, drain admitted writes and close the old store. Prepare and seal the replacement directly in its final generation directory.
+2. Complete the platform-approved directory barriers for that generation and any newly created ancestor entries, through the root and its stable parent as required. The database file barrier is already part of checked sealing. Never split a database from its sidecars or delete crash-left sidecars.
+3. Create a unique temporary selector beside `active` using non-overwriting creation. Write the exact record, handle short writes, synchronize the file and close its handle before the native selection operation.
+4. Perform exactly one supported native selection operation. First publication uses exclusive destination creation; replacement uses atomic replacement without deleting `active` first. No copy fallback, alternate API or automatic selection retry is permitted.
+5. Complete the required post-selection directory barrier. Only after all required barriers succeed can the publisher return a private, generation-bound `PublishedGeneration` result. A read-back is not a substitute for these barriers.
+6. Consume that result to open and validate the selected database on the same registry thread. Release or transfer the per-database seal lock as part of controlled opening while retaining the location lease. Ordinary operation handles become available only after readiness passes and only if shutdown has not been requested.
+
+The published result retains generation identity and ownership. Publication failures also return a private, generation-bound failure value retaining the consumed generation, its per-database seal lock and its diagnostic error. The coordinator holds that value and the location lease in recovery-only mode until explicit recovery or shutdown. A failed publication does not return a reusable publication token or authorize an automatic retry.
+
+The published-to-ready handoff must account for retained ownership on failure too. Keep the location lease continuously. Preserve generation identity, diagnostics and any still-owned lock or returned live connection on the registry thread. Do not claim that a successfully closed connection remains available, or release and reacquire the location lease between phases.
+
+The published result is not a registry handle, a package-artifact `PublicationReceipt` or native authority. It confirms selector publication under the separately approved platform contract, not readiness. If the caller stops waiting, the admitted attempt still finishes. Persistent shutdown still sends completion directly to cleanup without exposing a fresh ready service.
+
+### First publication and replacement
+
+Only absence of the dedicated root under the location lease permits automatic first-run initialization. Claim the root exclusively before preparing the first generation. A crash after root creation but before valid selector publication leaves a recovery case, not an automatically resumable installation. The first native selector operation must refuse an unexpected destination, including a symlink.
+
+Replacement requires a valid current selector matching the coordinator's expected selected generation, with maintenance admission already checked against the reviewed lifecycle revision. Revalidate that selection before the native selection operation. If metadata is missing, invalid or unexpectedly changed, stop with `RecoveryRequired`; do not reinterpret the request as first publication. This check is defensive validation under cooperative ownership, not a filesystem compare-and-swap against hostile native writers.
+
+### Results and retained evidence
+
+| Boundary                                                                                         | Result and retained state                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Known unsupported protocol before admission/root claim                                           | `Unavailable`; no admitted maintenance or first-run root creation.                                                                                                                                 |
+| Failure before the native selection call                                                         | Report the specific validation/storage error. No new selection was made. Preserve the old selector and failed preparation/temporary evidence. An admitted maintenance failure stays recovery-only. |
+| Native selection attempted, but the required durable outcome cannot be confirmed                 | Conservatively report `OutcomeUnknown`; preserve generations and any remaining temporary selector. No ready handle, automatic retry or switch-back.                                                |
+| All required selection barriers complete                                                         | Return the private published-generation value. This is publication success, not service readiness.                                                                                                 |
+| Confirmed publication followed by read-back/selection inconsistency or failed database readiness | `RecoveryRequired`; preserve selected metadata and generations without switching back. Do not relabel confirmed publication as unknown merely because later readiness failed.                      |
+| Fresh readiness passes without pending shutdown                                                  | Record maintenance success; new revision-checked operation handles can be obtained. Old handles remain permanently closed.                                                                         |
+
+Old generations and surviving temporary evidence are not deleted automatically by this contract. Removal requires deliberate maintenance under separately reviewed eligibility rules. Preserving evidence can consume disk space. It does not authorize selecting an old or temporary record as a fallback.
+
+### Implementation and validation boundary
+
+The format codec and ownership/result contracts are approved for implementation and testing without enabling production publication. Linux/macOS candidate adapter implementation and testing are approved under the platform/storage policy below. Production enablement still depends on passing its qualification gates; Windows has no approved publication sequence. Startup, production restore request fields, recovery IPC/UI, external loading and Basic Menu packaging remain separate scopes.
+
+Tests must cover fixed record vectors, every malformed-field/length class, unknown versions, symlink/nonregular selector rejection, bounded reads, ID/path binding, exclusive initial publication, expected-selector mismatch, short writes, each pre/post-selection failure boundary and retained ownership. Keep lifecycle shutdown/cancellation regressions and native process-exit probes. Test results must distinguish ordinary process termination from actual power-loss evidence.
+
+## Approved platform and storage contract
+
+**Checkpoint 2 of 2; owner-approved policy, qualification incomplete.** This defines a conditional durability target, initial qualification targets and required evidence. Approval permits implementation and qualification work. It does not certify an untested filesystem or enable publication before its evidence gates pass. The exact selector and publisher ownership/failure contract above is already approved.
+
+### Storage assumptions and success target
+
+Keep the registry in host-managed local application data. The root, generations and selector must stay on the same local filesystem/volume. The stable parent must support the required directory barriers too. Do not offer a custom registry-location setting in this initial slice. Network shares, cloud-synchronized or provider-managed storage, volatile filesystems, and unqualified removable/overlay/userspace filesystems are outside the initial publication contract. This restriction concerns registry storage, not where authors may keep manuscripts.
+
+Qualification must identify the actual filesystem and relevant mount/storage configuration, not infer them from an operating-system label or path name. Runtime preflight rejects known unsupported or unrecognized configurations before disruptive admission or root creation. Do not claim that filesystem identification detects every cloud agent or proves that a device honors flushes. No native attacker boundary is added; cooperative local ownership remains the model.
+
+Publication success means that the sealed database and required directory/selector entries have completed the platform's required persistence barriers in dependency order. Under the qualified filesystem and storage stack's documented guarantees, a subsequent system crash or power loss must not roll selection back below that acknowledged publication or leave its generation unreachable. This excludes later writes, deliberate maintenance, external modification, media failure and storage stacks that falsely report flush completion. It is a durability target under stated assumptions, not unconditional protection from hardware failure.
+
+This contract concerns generation publication. It does not change SQLite's existing WAL/FULL policy for later ordinary transactions or imply that SQLite `fullfsync` is enabled. File checksums and successful read-back do not establish physical persistence.
+
+### Initial qualification targets and native candidates
+
+| Target                | Candidate primitive sequence                                                                                                                                                                             | Current evidence and enablement status                                                                                                                                                                                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux on local ext4   | `fsync` for required files/directories; `renameat2(RENAME_NOREPLACE)` for first selection; same-filesystem `rename` for replacement; selector-parent `fsync` afterward.                                  | Linux documents separate file/directory synchronization and ext4 support for exclusive rename. Ubuntu CI exercises the native candidates, but its actual storage configuration and crash durability are not yet qualified. Not approved for enablement by CI alone.  |
+| macOS on local APFS   | Required file/directory barriers using the verified Apple `F_FULLFSYNC` path; `renamex_np(RENAME_EXCL)` for first selection and same-filesystem `rename` for replacement; final selector-parent barrier. | Local APFS probes and macOS CI exercised these calls. Archived Apple documentation and successful calls do not establish the complete current APFS ordering contract. Minimum macOS 13.3 and crash/storage evidence remain missing. Not approved for enablement yet. |
+| Windows on local NTFS | Research target only. Evaluate same-volume native selection and persistence of the generation, parent entries and selector as one protocol under ordinary-user privileges.                               | Raw `MoveFileExW` and refusal-path tests pass. The complete directory/selector persistence contract remains unresolved. Publication stays blocked; no Windows primitive sequence is approved.                                                                        |
+
+These are initial qualification targets, not permanent exclusions of other local filesystems. Adding a filesystem requires evidence against the same contract, not a silent best-effort fallback. The Linux row does not assume that every Ubuntu runner uses ext4. The Windows row does not assert that NTFS cannot support a suitable protocol.
+
+The reviewed [Linux `fsync` documentation](https://man7.org/linux/man-pages/man2/fsync.2.html) requires a separate directory synchronization for directory-entry persistence. [`rename`](https://man7.org/linux/man-pages/man2/rename.2.html) describes atomic replacement visibility and filesystem-dependent `RENAME_NOREPLACE` support. These are complementary guarantees, not interchangeable calls.
+
+The reviewed [Apple `fsync` documentation](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/fsync.2.html) distinguishes drive flushing from ordinary host-to-drive writes. The inspected [Rust 1.90 Apple implementation](https://github.com/rust-lang/rust/blob/1.90.0/library/std/src/sys/fs/unix.rs) uses `F_FULLFSYNC` for `File::sync_all`. Qualification must check the implementation used by the build and the required directory behavior, not assume that the same Rust method supplies identical guarantees everywhere. Do not weaken a failed required barrier with an ordinary-flush fallback.
+
+The reviewed Microsoft [`MoveFileExW`](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw) and [`FlushFileBuffers`](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers) pages do not establish the complete ordinary-user protocol. Volume flushing requires administrator privileges. [`ReplaceFileW`](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-replacefilew) explicitly does not support its write-through flag and documents partial failure effects. Do not infer a complete protocol from a function name, filesystem journaling or one successful raw move.
+
+### Required evidence before each platform is enabled
+
+1. **A reviewed platform argument.** Document why each required data and directory dependency persists before selection is acknowledged. Resolve any filesystem-specific evidence gaps. Identify exact OS/filesystem versions, mount options and relevant storage/virtualization assumptions. A passing call is not a replacement for this argument.
+2. **Actual production-code coverage.** Test the approved 64-byte codec, generation binding, native adapters and consuming failure ownership. Include exclusive initial creation, replacement, contention, short writes, disk/flush errors, every boundary, shutdown and caller abandonment. Continue three-OS CI, while distinguishing unsupported/refusal paths from publication success.
+3. **Supported-version coverage.** Run native publication/barrier checks on supported platform baselines. macOS 13.3 is an explicit missing gate; macOS 15 CI is not a substitute. Packaged application startup and permissions remain a separate integration gate.
+4. **Crash/storage evidence beyond process exit.** Use a dedicated test environment with a documented cache-aware storage-fault model, or controlled power interruption, capable of losing unsynchronized writes. Exercise first creation and replacement before/after each barrier and after success is recorded. A guest restart that preserves host caches is not automatically a power-loss test. After acknowledged success, the selected new generation must remain reachable and valid within the model. Earlier interruptions must respect the approved phase-specific selection/recovery rules. Do not run destructive tests on user data or a development machine without explicit authorization and a dedicated setup.
+5. **A recorded qualification result.** Keep the tested environment, source rationale, results and limitations together. Review failures rather than weakening the protocol until tests pass. Enable only configurations whose required gates pass. Expanding the guarantee, changing the protocol or reducing the guarantee requires owner approval.
+
+No finite test campaign proves that every device reports persistence honestly. The storage assumptions and tested fault model must remain explicit. Physical hardware interruption can add evidence, but is not a universal hardware certification requirement. Ordinary process-exit tests remain valuable lifecycle tests; they do not fulfill the crash/storage gate by themselves.
+
+### Implementation and enablement boundary
+
+Both publication design checkpoints are approved. The codec, ownership/result handling and Linux/macOS candidate adapters may be implemented and tested behind the publication gate. Runtime qualification/preflight must not claim support solely because compilation or CI succeeds. Production enablement remains conditional on the evidence above; no platform becomes enabled by recording this decision.
+
+Windows research remains required for cross-platform plugin management and Part 4 completion. If that research needs a different protocol or weaker target, present the concrete issue and evidence for approval. Do not treat the existing Windows block as a permanent product exclusion or optional post-release backlog. This checkpoint does not authorize startup wiring, production restore request fields, recovery UI/IPC or external loading.
 
 ## Test-only lifecycle adapter
 
@@ -161,7 +295,7 @@ Location lease held
   -> return a fresh session
 ```
 
-The private selector fixture is exactly **61 bytes**: the 13-byte magic `WIDE-PROBE-1\n`, a 16-byte generation ID and a 32-byte SHA-256 checksum of the preceding bytes. Parsing checks exact length, magic and checksum. It resolves the opaque ID within the fixture layout, not as an arbitrary path or logical namespace. The checksum detects malformed fixture metadata; it does not authenticate anything. This encoding is test-only, not a public or production format. Production encoding remains open. The mutable database is not checksummed as an immutable artifact; ordinary registry writes change it.
+The private selector fixture is exactly **61 bytes**: the 13-byte magic `WIDE-PROBE-1\n`, a 16-byte generation ID and a 32-byte SHA-256 checksum of the preceding bytes. Parsing checks exact length, magic and checksum. It resolves the opaque ID within the fixture layout, not as an arbitrary path or logical namespace. The checksum detects malformed fixture metadata; it does not authenticate anything. This encoding is test-only, not a public or production format. The separate 64-byte production encoding is approved above but is not implemented. The mutable database is not checksummed as an immutable artifact; ordinary registry writes change it.
 
 Perform all persistent restore transformations and establish the database's intended journal mode before switching. Fresh opening is for readiness and normal SQLite recovery, not for finishing restore preparation. It may recreate sidecars; do not promise zero filesystem changes during opening.
 
@@ -221,9 +355,9 @@ These are runtime, failure-handling and barrier-call observations. They are not 
 
 ## Recommended next work
 
-1. Validate the new shared lifecycle and generation-bound sealing core on platform CI. Production maintenance adapters remain absent; review their concrete requests and publication integration before adding them. The core changes no plugin SDK contracts.
+1. Implement the approved publisher codec, generation binding, ownership/result handling and Linux/macOS candidates behind the publication gate. Both design checkpoints are approved; native publication enablement still requires passing the platform/storage qualification gates. The shared lifecycle/sealing core has passed three-OS CI, but production maintenance adapters remain absent. Review their concrete requests and integration before adding them.
 2. Retain Windows publication as required follow-up research, not optional backlog or permanent exclusion. Define supported storage assumptions and success criteria, and resolve the evidence gap before enabling it. The owner approved keeping it blocked in the meantime, not reducing its guarantees.
-3. Keep the authorized adapter, selector encoding, cleanup-thread prototype and worker hooks test-only. Production startup/publication still requires separate approval.
+3. Keep the fixture publisher, fixture selector encoding, cleanup-thread prototype and startup barriers test-only. Implementing the approved production codec and ownership/result contracts does not enable native publication or application startup.
 4. Maintain the implemented fault, sealing, lease and reopening regressions. Extend evidence where platform runs expose unsupported assumptions; do not silently weaken barriers to make a test pass.
 5. Use OS CI for Windows/Linux and a minimum-macOS validation environment. Run process-termination tests separately from power-loss/storage testing. CI termination alone does not establish power-loss behavior.
 6. Only after the protocol and evidence are accepted, implement the application lifecycle owner and production publication. Do not enable external plugins as a side effect.
