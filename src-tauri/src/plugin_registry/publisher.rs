@@ -344,3 +344,7 @@ mod tests;
 #[cfg(test)]
 #[path = "publication_crash_tests.rs"]
 mod crash_tests;
+
+#[cfg(all(test, unix))]
+#[path = "publication_storage_lab.rs"]
+mod storage_lab;
