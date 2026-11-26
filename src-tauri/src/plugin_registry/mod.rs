@@ -1,5 +1,7 @@
 //! Internal persistent plugin records. No Tauri commands, installation or native authority.
 mod error;
+mod generation;
+mod location;
 mod migrations;
 mod model;
 mod preparation;
@@ -15,9 +17,16 @@ mod worker;
 #[allow(unused_imports)]
 pub(crate) use self::{
     error::{RegistryError, Result},
+    location::LocationLease,
     model::*,
     preparation::*,
     store::ArtifactTarget,
     transitions::{InstallationAction, InstallationExpectation},
-    worker::{Registry, RegistryHandle, RegistryOwner, RegistrySession},
+    worker::{
+        lifecycle::{
+            LifecyclePhase, LifecycleRevision, LifecycleSnapshot, MaintenanceOutcome,
+            MaintenanceRequest, RecoveryKind, RegistryControl,
+        },
+        Registry, RegistryHandle, RegistryOwner, RegistrySession,
+    },
 };

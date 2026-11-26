@@ -1,14 +1,14 @@
 //! Checked SQLite sealing for the test-only publication probe.
 #![cfg(test)]
 
-use std::{fs, fs::OpenOptions, path::Path, time::Duration};
+use std::{fs, path::Path};
 
 use rusqlite::Connection;
 
 use super::super::{
-    error::{RegistryError, Result},
+    error::RegistryError,
+    generation::{finish_closed, prepare},
     model::RegistryLimits,
-    store,
 };
 
 #[derive(Debug)]
@@ -42,74 +42,9 @@ pub(super) fn seal(
     })
 }
 
-fn prepare(connection: &Connection, limits: &RegistryLimits) -> Result<()> {
-    if !connection.is_autocommit() {
-        return Err(RegistryError::Unavailable(
-            "cannot seal a registry with an active transaction".into(),
-        ));
-    }
-    // A caller-supplied busy handler must not turn this probe into a retry loop.
-    connection.busy_timeout(Duration::ZERO)?;
-    let journal: String = connection.query_row("PRAGMA main.journal_mode", [], |row| row.get(0))?;
-    let synchronous: i64 = connection.query_row("PRAGMA main.synchronous", [], |row| row.get(0))?;
-    let foreign_keys: i64 = connection.query_row("PRAGMA foreign_keys", [], |row| row.get(0))?;
-    if !journal.eq_ignore_ascii_case("wal") || synchronous != 2 || foreign_keys != 1 {
-        return Err(RegistryError::Unavailable(
-            "registry sealing requires WAL, synchronous=FULL and foreign_keys=ON".into(),
-        ));
-    }
-    store::validate_snapshot(connection, limits)?;
-    // query_row owns and finalizes its statement before checked close is attempted.
-    let counters = connection.query_row("PRAGMA main.wal_checkpoint(TRUNCATE)", [], |row| {
-        Ok((
-            row.get::<_, i64>(0)?,
-            row.get::<_, i64>(1)?,
-            row.get::<_, i64>(2)?,
-        ))
-    })?;
-    check_checkpoint(counters)
-}
-
-fn check_checkpoint((busy, log, checkpointed): (i64, i64, i64)) -> Result<()> {
-    // WAL mode was verified separately. SQLite may report no WAL ever existed.
-    if busy == 0 && ((log == 0 && checkpointed == 0) || (log == -1 && checkpointed == -1)) {
-        return Ok(());
-    }
-    Err(RegistryError::Unavailable(format!(
-        "registry TRUNCATE checkpoint incomplete: busy={busy}, log={log}, checkpointed={checkpointed}"
-    )))
-}
-
-fn finish_closed(path: &Path) -> Result<()> {
-    for suffix in ["-wal", "-journal"] {
-        let mut sidecar = path.as_os_str().to_os_string();
-        sidecar.push(suffix);
-        match fs::symlink_metadata(Path::new(&sidecar)) {
-            Ok(metadata) => {
-                // Do not guess whether an unexplained journal is cold. Preserve it.
-                if !metadata.is_file() || metadata.len() != 0 {
-                    return Err(RegistryError::RecoveryRequired(format!(
-                        "unexplained registry sidecar after checked close: {}",
-                        Path::new(&sidecar).display()
-                    )));
-                }
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error.into()),
-        }
-    }
-    // Never open an unrelated raw database descriptor while SQLite owns locks.
-    OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(path)?
-        .sync_all()?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
-    use super::super::super::schema;
+    use super::super::super::{generation::check_checkpoint, schema, store};
     use super::*;
     use crate::plugin_integrity::IntegrityLimits;
     use std::path::PathBuf;

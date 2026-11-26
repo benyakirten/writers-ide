@@ -15,6 +15,11 @@ use super::{
     transitions::{InstallationAction, InstallationExpectation},
 };
 
+#[path = "lifecycle.rs"]
+pub(crate) mod lifecycle;
+use super::location::LocationLease;
+use lifecycle::{LifecycleData, LifecyclePhase, RegistryControl};
+
 trait Work: Send {
     fn is_read(&self) -> bool;
     fn execute(self: Box<Self>, store: &mut Store);
@@ -51,6 +56,7 @@ where
 struct State {
     accepting: bool,
     queue: VecDeque<Box<dyn Work>>,
+    lifecycle: LifecycleData,
 }
 struct Shared {
     state: Mutex<State>,
@@ -63,12 +69,14 @@ impl Shared {
     fn close(&self) {
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         state.accepting = false;
+        state.lifecycle.shutdown();
         self.wake.notify_all();
     }
     fn failed(&self) {
         let jobs = {
             let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
             state.accepting = false;
+            state.lifecycle.stopped();
             std::mem::take(&mut state.queue)
         };
         for job in jobs {
@@ -86,6 +94,7 @@ pub(crate) struct RegistrySession {
 #[derive(Clone)]
 pub(crate) struct RegistryHandle {
     shared: Arc<Shared>,
+    service: u128,
 }
 pub(crate) struct RegistryOwner {
     shared: Arc<Shared>,
@@ -98,7 +107,13 @@ impl Drop for RegistryOwner {
     }
 }
 impl RegistryOwner {
-    /// Prototype-only lifetime hook. Production location ownership is not wired.
+    pub(crate) fn control(&self) -> RegistryControl {
+        RegistryControl {
+            shared: self.shared.clone(),
+        }
+    }
+
+    /// Fixture-only attachment hook. Owned opening retains its lease independently.
     #[cfg(test)]
     pub(super) fn retain_probe_lease(&self, lease: Arc<std::fs::File>) -> Result<()> {
         let state = self.shared.state.lock().unwrap_or_else(|e| e.into_inner());
@@ -150,6 +165,7 @@ pub(super) struct ProbeStartup {
 }
 
 impl Registry {
+    #[cfg(test)]
     pub(crate) async fn create(
         path: PathBuf,
         limits: RegistryLimits,
@@ -160,11 +176,13 @@ impl Registry {
             limits,
             queue_capacity,
             true,
+            None,
             #[cfg(test)]
             None,
         )
         .await
     }
+    #[cfg(test)]
     pub(crate) async fn open(
         path: PathBuf,
         limits: RegistryLimits,
@@ -175,11 +193,32 @@ impl Registry {
             limits,
             queue_capacity,
             false,
+            None,
             #[cfg(test)]
             None,
         )
         .await
     }
+    /// The host must already have selected and validated the generation under
+    /// this lease. This helper does not read a selector or initialize a root.
+    pub(crate) async fn open_owned(
+        lease: LocationLease,
+        path: PathBuf,
+        limits: RegistryLimits,
+        capacity: usize,
+    ) -> Result<RegistrySession> {
+        Self::start(
+            path,
+            limits,
+            capacity,
+            false,
+            Some(lease),
+            #[cfg(test)]
+            None,
+        )
+        .await
+    }
+
     #[cfg(test)]
     pub(super) async fn open_for_probe(
         path: PathBuf,
@@ -187,13 +226,14 @@ impl Registry {
         capacity: usize,
         probe: ProbeStartup,
     ) -> Result<RegistrySession> {
-        Self::start(path, limits, capacity, false, Some(probe)).await
+        Self::start(path, limits, capacity, false, None, Some(probe)).await
     }
     async fn start(
         path: PathBuf,
         limits: RegistryLimits,
         capacity: usize,
         create: bool,
+        lease: Option<LocationLease>,
         #[cfg(test)] probe: Option<ProbeStartup>,
     ) -> Result<RegistrySession> {
         limits.validate()?;
@@ -204,8 +244,9 @@ impl Registry {
         }
         let shared = Arc::new(Shared {
             state: Mutex::new(State {
-                accepting: true,
+                accepting: false,
                 queue: VecDeque::new(),
+                lifecycle: LifecycleData::new(),
             }),
             wake: Condvar::new(),
             capacity,
@@ -219,12 +260,24 @@ impl Registry {
             .name("plugin-registry".into())
             .spawn(move || {
                 let result = catch_unwind(AssertUnwindSafe(|| {
+                    let path = match lease
+                        .as_ref()
+                        .map(|lease| lease.check_database(&path))
+                        .transpose()
+                    {
+                        Ok(Some(path)) => path,
+                        Ok(None) => path,
+                        Err(error) => {
+                            let _ = ready.send(Err(error));
+                            return;
+                        }
+                    };
                     let store = if create {
                         Store::create(&path, limits)
                     } else {
                         Store::open(&path, limits)
                     };
-                    let mut store = match store {
+                    let store = match store {
                         Ok(store) => store,
                         Err(error) => {
                             let _ = ready.send(Err(error));
@@ -246,36 +299,22 @@ impl Registry {
                             }
                         }
                     }
+                    {
+                        let mut state = worker_shared
+                            .state
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner());
+                        if state.lifecycle.shutdown {
+                            return;
+                        }
+                        state.lifecycle.snapshot.phase = LifecyclePhase::Ready;
+                        state.accepting = true;
+                    }
                     // If startup's waiter is gone, no operation handle was issued.
                     if ready.send(Ok(())).is_err() {
                         return;
                     }
-                    loop {
-                        let work = {
-                            let mut state = worker_shared
-                                .state
-                                .lock()
-                                .unwrap_or_else(|e| e.into_inner());
-                            while state.queue.is_empty() && state.accepting {
-                                state = worker_shared
-                                    .wake
-                                    .wait(state)
-                                    .unwrap_or_else(|e| e.into_inner());
-                            }
-                            match state.queue.pop_front() {
-                                Some(job) => {
-                                    if !state.accepting && job.is_read() {
-                                        drop(state);
-                                        job.reject();
-                                        continue;
-                                    }
-                                    job
-                                }
-                                None => break,
-                            }
-                        };
-                        work.execute(&mut store);
-                    }
+                    lifecycle::run_worker(&worker_shared, store, lease.as_ref());
                     // Store and its exclusive destination lock drop before completion.
                 }));
                 worker_shared.failed();
@@ -288,6 +327,7 @@ impl Registry {
                 let completion = result.map_err(|_| {
                     RegistryError::Unavailable("registry worker terminated unexpectedly".into())
                 });
+                drop(lease);
                 let _ = finished.send(completion);
             })?;
         // The guard also closes admission if the startup future is abandoned.
@@ -301,7 +341,7 @@ impl Registry {
             .map_err(|_| RegistryError::Unavailable("registry startup terminated".into()))??;
         Ok(RegistrySession {
             owner,
-            handle: RegistryHandle { shared },
+            handle: RegistryHandle { shared, service: 0 },
         })
     }
 }
@@ -315,7 +355,7 @@ impl RegistryHandle {
         let (reply, receive) = oneshot::channel();
         {
             let mut state = self.shared.state.lock().unwrap_or_else(|e| e.into_inner());
-            if !state.accepting {
+            if !state.accepting || state.lifecycle.service != self.service {
                 return Err(RegistryError::Unavailable(
                     "registry admission closed".into(),
                 ));

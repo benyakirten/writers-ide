@@ -1,6 +1,6 @@
 # Registry implementation review
 
-**Status: owner-approved internal foundation, implemented / unmerged.** The approved final sign-off covers the database and integrity slice described here. Separate owner authorization now also covers the test-only generation-publication harness. Neither approval covers production package publication, generation switching or application integration.
+**Status: owner-approved internal foundation and shared lifecycle/sealing core, implemented / unmerged.** The bounded core includes location ownership, lifecycle control and generation-bound checked sealing. Maintenance adapters have test-only constructors. Production package publication, generation switching and application integration remain absent.
 
 The registry is an internal Rust service in [`plugin_registry`](../../src-tauri/src/plugin_registry/mod.rs). It stores plugin installation records, project registrations and saved user decisions in SQLite. It does not store manuscripts or execute plugins. Frontend authors do not call its methods. No Tauri command, application startup caller or management UI uses it yet.
 
@@ -20,15 +20,16 @@ The [integrity module](../../src-tauri/src/plugin_integrity/mod.rs) implements d
 
 ## Approved implementation boundary
 
-| Implemented                                                             | Not implemented by this slice                                      |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Integrity entries, binary fingerprints and fixed-vector tests           | Public SDK changes or management IPC                               |
-| Typed registry data, validation and semantic transitions                | ZIP installation or immutable package publication                  |
-| 20-table SQLite schema and private migration execution helper           | Live tokens, attachment tickets or native authorization            |
-| Bounded FIFO worker, readiness and explicit shutdown                    | Application startup, first-run selection or launch forwarding      |
-| Transactional permission, enablement and scope-review records           | Actual native directory preparation or project opening             |
-| SQLite-aware backup and restore staging                                 | Production generation selector, durable publication or recovery UI |
-| Authorized `cfg(test)` publication adapter and worker lease regressions | Production location-lease wiring or Windows durability guarantee   |
+| Implemented                                                           | Not implemented by this slice                                      |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Integrity entries, binary fingerprints and fixed-vector tests         | Public SDK changes or management IPC                               |
+| Typed registry data, validation and semantic transitions              | ZIP installation or immutable package publication                  |
+| 20-table SQLite schema and private migration execution helper         | Live tokens, attachment tickets or native authorization            |
+| Bounded FIFO worker, readiness and explicit shutdown                  | Application startup, first-run selection or launch forwarding      |
+| Transactional permission, enablement and scope-review records         | Actual native directory preparation or project opening             |
+| SQLite-aware backup and restore staging                               | Production generation selector, durable publication or recovery UI |
+| Location lease, shared lifecycle control and generation-bound sealing | Production maintenance requests or Windows durability guarantee    |
+| Authorized `cfg(test)` publication adapter and lifecycle regressions  | Application lifecycle wiring or production publication             |
 
 ## Responsibility boundaries
 
@@ -50,7 +51,9 @@ Reads return bounded owned snapshots from one transaction. Transactions and curs
 
 ### Application lifecycle owner
 
-`Registry::create` and `Registry::open` return a `RegistrySession` only after readiness checks finish. The session separates `RegistryOwner` from cloneable `RegistryHandle` operation access. Application lifecycle code will own the former; ordinary native callers will use the latter. That application wiring is absent.
+Trusted Rust host code acquires `LocationLease` beside the dedicated root, then calls `Registry::open_owned(lease, path, limits, capacity)` with an already selected existing database. The blocking lease acquisition belongs off latency-sensitive threads. Owned opening validates that the path resolves beneath the existing owned root. It neither selects a generation nor initializes missing storage. The worker retains the lease before the startup await until actual cleanup. No application caller is wired. Unleased `Registry::create` and `Registry::open` are now test-only helpers.
+
+Opening returns a `RegistrySession` after readiness. The session separates `RegistryOwner` from cloneable `RegistryHandle` operation access. `RegistryOwner::control()` supplies lifecycle snapshots, revision-checked handle acquisition and maintenance admission. Retaining a handle or control does not retain the location lease after thread cleanup.
 
 Creation uses non-overwriting file creation and refuses existing destinations, including zero-byte files. Opening never initializes missing storage. Readiness checks schema objects/version, full SQLite integrity, foreign keys, required rows/catalogs, resource bounds and domain relationships. These checks do not verify installation files or select an active generation.
 
@@ -60,7 +63,7 @@ The store canonicalizes its destination and holds a standard-library `File::try_
 
 ### Approved production ownership boundary
 
-**Approved direction; not implemented:** one lifecycle coordinator will retain the location lock across opening, normal operation, maintenance and fresh opening. It acquires the lock beside the dedicated registry root before checking whether that root exists. The worker receives shared retention before startup waits. Startup cancellation or dropping the coordinator must not release the lock while worker cleanup or admitted writes continue.
+**Approved and implemented as an internal core:** one lifecycle coordinator retains the location lock across owned opening, normal operation, maintenance transitions and fresh opening. Maintenance requests can currently be constructed only by test fixtures; production restore/publication adapters are not implemented. It acquires the lock beside the dedicated registry root before checking whether that root exists. The worker receives shared retention before startup waits. Startup cancellation or dropping the coordinator must not release the lock while worker cleanup or admitted writes continue.
 
 SQLite work stays on the database thread. Maintenance closes admission and drains admitted writes before preparing and sealing a replacement. Checked sealing preserves the connection if preparation, checkpointing or explicit close fails. A maintenance failure stops that attempt. It does not automatically resume service, retry publication or select another generation.
 
@@ -80,13 +83,13 @@ SQLite work stays on the database thread. Maintenance closes admission and drain
 
 Explicit awaited shutdown confirms cleanup. Dropping an owner initiates cleanup but does not certify completion. The coordinator and any outstanding cleanup must retain location ownership until their work actually finishes. Ordinary operation handles do not control this lifetime.
 
-This approval selects the responsibility boundary. Concrete Rust method/result contracts and cleanup mechanics still need review before production implementation. It does not adopt the test-only cleanup thread, selector format or application startup wiring. Windows publication remains blocked pending required research.
+The owner approved implementing this bounded responsibility and Rust contract. The core uses the existing dedicated thread, not the test-only cleanup thread. Production maintenance request fields, selector format and application startup wiring remain separately gated. Windows publication remains blocked pending required research.
 
-### Consolidated Rust contract proposal
+### Consolidated Rust contract
 
-**Draft for owner review, not implemented.** The policies above are approved. The following contracts assemble them into one implementation proposal. The names describe internal Rust types, not plugin APIs or Tauri commands. Trusted application Rust code supplies requests and receives owned results. No current application entry point calls this proposed lifecycle.
+**Owner-approved bounded core, implemented / unmerged.** These are internal Rust contracts, not plugin APIs or Tauri commands. Trusted application Rust code supplies inputs and receives owned results. No application entry point calls this lifecycle yet. `MaintenanceRequest` has only a test fixture constructor. The compiled control state machine is exercised through those fixtures, not through a production restore or publication API.
 
-| Proposed contract        | Responsibility                                                                                                                                                                                                                                                                                                                                                              |
+| Internal contract        | Responsibility                                                                                                                                                                                                                                                                                                                                                              |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `RegistryOwner`          | One lifecycle owner. Starts shutdown on drop and provides explicit awaited shutdown. The dedicated thread retains resources until its work and cleanup actually finish.                                                                                                                                                                                                     |
 | Shared lifecycle control | Holds only admission/control state and bounded owned snapshots. It does not expose a connection or perform SQL under its mutex. Maintenance admission and closing the old operation channel use the same synchronized decision.                                                                                                                                             |
@@ -100,28 +103,32 @@ This approval selects the responsibility boundary. Concrete Rust method/result c
 
 The thread remains alive while recovery-only mode awaits an explicit action. Its control path must still accept state inspection and shutdown when ordinary operation admission is closed. Ordinary registry work retains its existing bounded FIFO queue. There is no maintenance waiting queue and no unbounded queue of lifecycle requests.
 
-Proposed regression coverage includes simultaneous maintenance admission, stale revisions after failed attempts, foreign/prior-coordinator revision rejection, caller abandonment after admission, old-handle rejection, fresh-handle acquisition racing maintenance, and location-lock retention through startup cancellation, recovery-only mode and cleanup. Sealing tests must verify generation binding, connection retention before/at close and absence of a connection after checked close. Tests must also distinguish unknown publication from failed readiness after confirmed publication.
+Implemented regression coverage includes simultaneous maintenance admission, stale revisions after failed attempts, foreign/prior-coordinator revision rejection, caller abandonment after admission, old-handle rejection, fresh-handle acquisition racing maintenance, and location-lock retention through startup cancellation, recovery-only mode and cleanup. Sealing tests verify generation binding, connection retention before/at close and absence of a connection after checked close. Lifecycle fixture outcomes distinguish unknown publication from failed readiness after confirmed publication; the existing publication probe retains its native fault coverage.
 
 #### Review outcome and approved shutdown rule
 
-The source review confirms that current ordinary-worker shutdown only closes one admission channel and drains its work. It does not arbitrate maintenance completion against lifecycle shutdown. The existing test-only seal also accepts a connection and path separately; production generation-bound ownership must replace that pairing rather than promote its signature unchanged. Restore staging remains a separate helper, not a ready production maintenance request.
+The dedicated worker now arbitrates maintenance completion against lifecycle shutdown. `PreparedGeneration::create` creates a new generation directory and database together under the location lease. Consuming `seal()` binds the resulting value or failure to that same generation. The probe's separate connection/path signature remains test-only and shares checked sealing mechanics with this core. Restore staging remains a separate helper, not a production maintenance request.
 
-**Approved shutdown interaction; not implemented:** shutdown or owner drop sets a persistent control flag, including when maintenance is already admitted. Setting it immediately prevents further maintenance admission and ready-handle acquisition. An already admitted attempt still finishes its one planned attempt and records its outcome. It then proceeds directly to cleanup without exposing a ready service or waiting for an interactive recovery action. This does not cancel publication, retry it or change its success criteria. The thread retains the location lock through cleanup. Dropping the shutdown waiter does not reverse the flag or interrupt cleanup. Tests must cover shutdown and owner drop before and during maintenance completion, plus abandonment of the shutdown waiter.
+**Approved shutdown interaction; implemented in the core:** shutdown or owner drop sets a persistent control flag, including when maintenance is already admitted. Setting it immediately prevents further maintenance admission and ready-handle acquisition. An already admitted attempt still finishes its one planned attempt and records its outcome. It then proceeds directly to cleanup without exposing a ready service or waiting for an interactive recovery action. This does not cancel publication, retry it or change its success criteria. The thread retains the location lock through cleanup. Dropping the shutdown waiter does not reverse the flag or interrupt cleanup. Tests cover shutdown and owner drop before and during maintenance completion, plus abandonment of the shutdown waiter.
 
 This resolves the shutdown policy identified by the source and race review. The normal maintenance-success and recovery-only outcomes apply when shutdown has not been requested. Once shutdown is requested, recording the maintenance outcome does not reopen ordinary admission or wait for interactive recovery. Coordinator-lifetime revision binding and the distinction between a stopped service and a live lifecycle thread are implementation clarifications of the approved policies, not new permission or publication rules.
 
-Approval of this draft would not authorize a production selector, publisher, recovery-command API, application startup wiring or external loading. Windows publication research remains required. The existing test-only publisher can supply lifecycle fault evidence without becoming the production publisher. A pre-opened gated worker is not part of this proposal.
+This bounded implementation adds no production selector, publisher, recovery-command API, application startup wiring or external loading. Windows publication research remains required. The existing test-only publisher can supply lifecycle fault evidence without becoming the production publisher. A pre-opened gated worker is not part of this core.
 
 ## Internal Rust contract shape
 
 The signatures below describe calls by trusted Rust host code. Paths, limits and capacity come from that host, not plugins. The methods are async. Tests currently supply their callers.
 
 ```text
-Registry::create(path: PathBuf, limits: RegistryLimits, queue_capacity: usize)
-    -> Result<RegistrySession>
-Registry::open(path: PathBuf, limits: RegistryLimits, queue_capacity: usize)
-    -> Result<RegistrySession>
-RegistryOwner::shutdown(self) -> Result<()>
+LocationLease::acquire(root: &Path) -> Result<LocationLease> // blocking; no root creation
+Registry::open_owned(lease: LocationLease, path: PathBuf, limits: RegistryLimits, capacity: usize)
+    -> Result<RegistrySession> // async; existing selected database only
+RegistryOwner::control(&self) -> RegistryControl
+RegistryControl::snapshot(&self) -> LifecycleSnapshot
+RegistryControl::ready_handle(&self, expected: &LifecycleRevision) -> Result<RegistryHandle>
+RegistryControl::maintain(&self, expected: LifecycleRevision, request: MaintenanceRequest)
+    -> Result<()> // async; request constructors are test-only
+RegistryOwner::shutdown(self) -> Result<()> // async; waits for actual cleanup
 ```
 
 See [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs) for exact operation signatures and [`model.rs`](../../src-tauri/src/plugin_registry/model.rs) for records.
@@ -187,9 +194,9 @@ The [publication investigation](registry-publication-investigation.md) distingui
 
 Native first creation uses Linux `renameat2(RENAME_NOREPLACE)` or macOS `renamex_np(RENAME_EXCL)`. Windows raw-move tests use `MoveFileExW` with write-through, without copy or fallback. Windows directory synchronization explicitly returns `Unsupported`, so integrated publication stops before selector creation and returns no session. Native Registry CI passed formatting, the complete library suites and all-target Clippy on macOS, Windows and Ubuntu after the documentation-test line-ending correction. See the [validation record](change-log.md#native-registry-design). Runtime/barrier and process-exit tests do not prove power-loss durability.
 
-The test adapter acquires a stable location lease before first-run detection, seals the replacement, exercises the platform adapter and then opens the selected registry. `cfg(test)` worker hooks retain its `Arc<File>` before the startup await through actual worker cleanup, including abandoned startup and owner-drop draining. The leased-session cleanup thread is a prototype only. Production openers do not retain a location lease. A failed fresh open after confirmed publication requires recovery without switching back. A pre-opened gated worker is optional, not an approved lifecycle change. Source/current logical data remains unchanged during preparation, but SQLite opens can still create or rebuild sidecars.
+The test adapter acquires a stable location lease before first-run detection, seals the replacement, exercises the platform adapter and then opens the selected registry. `cfg(test)` worker hooks retain its `Arc<File>` before the startup await through actual worker cleanup, including abandoned startup and owner-drop draining. The leased-session cleanup thread is a prototype only. The internal `open_owned` helper now retains a separate production-compiled location lease; application startup is not wired to it. A failed fresh open after confirmed publication requires recovery without switching back. A pre-opened gated worker is optional, not an approved lifecycle change. Source/current logical data remains unchanged during preparation, but SQLite opens can still create or rebuild sidecars.
 
-The owner approved advancing shared production ownership and checked sealing while keeping Windows generation publication blocked temporarily. [Windows publication research](registry-publication-investigation.md#approved-next-direction-and-required-windows-research) remains a required completion gate, not permanent exclusion or optional backlog. No weaker Windows guarantee is approved. The [single-coordinator ownership boundary](#approved-production-ownership-boundary) is approved. Concrete Rust method/result contracts, cleanup mechanics, selector encoding and startup wiring still require review; the prototype remains test-only.
+The owner approved advancing shared production ownership and checked sealing while keeping Windows generation publication blocked temporarily. [Windows publication research](registry-publication-investigation.md#approved-next-direction-and-required-windows-research) remains a required completion gate, not permanent exclusion or optional backlog. No weaker Windows guarantee is approved. The [single-coordinator ownership boundary](#approved-production-ownership-boundary) is approved. The shared core is implemented under its reviewed Rust contract. Production maintenance requests, selector encoding and startup wiring remain gated; the publisher prototype remains test-only.
 
 ## Remaining integration decisions
 
@@ -208,7 +215,8 @@ No project-forgetting workflow, configuration reset, automatic generation cleanu
 - [`schema.rs`](../../src-tauri/src/plugin_registry/schema.rs), [`schema.sql`](../../src-tauri/src/plugin_registry/schema.sql) and [`schema_tests.rs`](../../src-tauri/src/plugin_registry/schema_tests.rs): creation, required objects, constraints and unsafe-state rejection.
 - [`store.rs`](../../src-tauri/src/plugin_registry/store.rs), [`store_decisions.rs`](../../src-tauri/src/plugin_registry/store_decisions.rs), [`store_validation.rs`](../../src-tauri/src/plugin_registry/store_validation.rs) and [`store_tests.rs`](../../src-tauri/src/plugin_registry/store_tests.rs): transactions, bounds, revisions, decisions, retention and rollback.
 - [`preparation.rs`](../../src-tauri/src/plugin_registry/preparation.rs), [`model.rs`](../../src-tauri/src/plugin_registry/model.rs), [`transitions.rs`](../../src-tauri/src/plugin_registry/transitions.rs) and [`error.rs`](../../src-tauri/src/plugin_registry/error.rs): private preparation contracts, typed records, policy calculations and errors.
-- [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs) and [`worker_tests.rs`](../../src-tauri/src/plugin_registry/worker_tests.rs): readiness, ownership, FIFO, overload, abandoned waiters, shutdown and failure.
+- [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs), [`lifecycle.rs`](../../src-tauri/src/plugin_registry/lifecycle.rs), [`lifecycle_tests.rs`](../../src-tauri/src/plugin_registry/lifecycle_tests.rs) and [`worker_tests.rs`](../../src-tauri/src/plugin_registry/worker_tests.rs): readiness, bounded admission, lifecycle snapshots/revisions, handle replacement, recovery retention, abandonment and sticky shutdown.
+- [`location.rs`](../../src-tauri/src/plugin_registry/location.rs), [`generation.rs`](../../src-tauri/src/plugin_registry/generation.rs) and [`generation_tests.rs`](../../src-tauri/src/plugin_registry/generation_tests.rs): stable location ownership, generation-bound creation/sealing, checked close, failure ownership and closed-file synchronization.
 - [`recovery.rs`](../../src-tauri/src/plugin_registry/recovery.rs), [`recovery_tests.rs`](../../src-tauri/src/plugin_registry/recovery_tests.rs) and [`migrations.rs`](../../src-tauri/src/plugin_registry/migrations.rs): real-file/WAL backup, restore staging and synthetic migration tests.
 - [`plugin_integrity/tests.rs`](../../src-tauri/src/plugin_integrity/tests.rs): binary vectors, entry validation, source errors and existing integrity regressions.
 - [`publication_probe/mod.rs`](../../src-tauri/src/plugin_registry/publication_probe/mod.rs), [`sealing.rs`](../../src-tauri/src/plugin_registry/publication_probe/sealing.rs), [`platform.rs`](../../src-tauri/src/plugin_registry/publication_probe/platform.rs), [`tests.rs`](../../src-tauri/src/plugin_registry/publication_probe/tests.rs) and [`process_tests.rs`](../../src-tauri/src/plugin_registry/publication_probe/process_tests.rs): test-only lifecycle, native candidates, sealing, all-phase faults, partial writes, post-publication readiness rejection, process exits and cross-process locks. Child tests use timeouts and kill/reap guards. The two additional lease lifetime regressions are in `worker_tests.rs`.
@@ -217,7 +225,9 @@ Run from `src-tauri`:
 
 ```sh
 cargo test --lib plugin_registry::publication_probe
-cargo test --lib plugin_registry::worker_tests::probe_
+cargo test --lib plugin_registry::worker::tests::probe_
+cargo test --lib plugin_registry::worker::lifecycle
+cargo test --lib plugin_registry::generation
 cargo test --lib plugin_registry
 cargo test --lib plugin_integrity
 cargo test --lib
@@ -226,6 +236,6 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 ```
 
-The [cumulative changelog](change-log.md#native-registry-design) separates older foundation validation from the parent-run current macOS result: 213 library tests, library check, formatting and all-target Clippy passed. The publication module has 34 tests; the two worker lease regressions are separate. Focused subsets do not replace that full validation.
+The [cumulative changelog](change-log.md#native-registry-design) separates earlier foundation/probe evidence from current shared-core validation. Focused subsets do not replace the full library suite, library check, formatting and all-target Clippy.
 
-The [Native Registry workflow](../../.github/workflows/native_registry.yml) is configured for stable Rust on macOS 15, Windows latest and Ubuntu 24.04. It runs formatting, the full locked library suite and locked all-target Clippy. Verified CI passed all three checks on macOS 15, Windows latest and Ubuntu 24.04 after the LF/CRLF documentation-test correction. Minimum-macOS evidence remains missing. See the [CI record](change-log.md#native-registry-design). Library tests do not prove power-loss durability, production publication or packaged Tauri authorization.
+The [Native Registry workflow](../../.github/workflows/native_registry.yml) is configured for stable Rust on macOS 15, Windows latest and Ubuntu 24.04. It runs formatting, the full locked library suite and locked all-target Clippy. Earlier CI passed all three checks on macOS 15, Windows latest and Ubuntu 24.04 after the LF/CRLF documentation-test correction. That run predates this shared-core implementation; its new tests still need platform CI. Minimum-macOS evidence remains missing. See the [CI record](change-log.md#native-registry-design). Library tests do not prove power-loss durability, production publication or packaged Tauri authorization.

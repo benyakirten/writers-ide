@@ -24,8 +24,8 @@ pub(crate) enum ArtifactTarget {
     Prepared(Box<(PreparedArtifact, PublicationReceipt)>),
 }
 
-/// Synchronous single-owner implementation. Only the worker may own this value.
-/// The connection and lifetime destination lock never escape this module.
+/// Synchronous single-owner implementation for the worker and generation owner.
+/// The connection never escapes this module; checked close returns the destination lock.
 pub(crate) struct Store {
     connection: Connection,
     _ownership: File,
@@ -86,6 +86,43 @@ impl Store {
         store.validate_ready()?;
         Ok(store)
     }
+    /// Consume the preparation store without losing ownership on a failed close.
+    pub(super) fn seal(self) -> std::result::Result<File, (RegistryError, Box<Self>)> {
+        if let Err(error) = self
+            .ensure_available()
+            .and_then(|()| super::generation::prepare(&self.connection, &self.limits))
+        {
+            return Err((error, Box::new(self)));
+        }
+        let Self {
+            connection,
+            _ownership,
+            limits,
+            poisoned,
+            #[cfg(test)]
+            fail_rollback,
+        } = self;
+        match connection.close() {
+            Ok(()) => Ok(_ownership),
+            Err((connection, error)) => Err((
+                error.into(),
+                Box::new(Self {
+                    connection,
+                    _ownership,
+                    limits,
+                    poisoned,
+                    #[cfg(test)]
+                    fail_rollback,
+                }),
+            )),
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn test_connection(&self) -> &Connection {
+        &self.connection
+    }
+
     pub(crate) fn backup(&self, destination: &Path) -> Result<()> {
         self.ensure_available()?;
         super::recovery::backup_database(&self.connection, destination)
