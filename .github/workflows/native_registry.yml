@@ -46,3 +46,10 @@ jobs:
         run: cargo test --locked --lib
       - name: Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Upload storage environment observations (not qualification proof)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: registry-storage-evidence-${{ matrix.os }}-${{ github.run_attempt }}
+          path: src-tauri/target/registry-qualification/storage-evidence-${{ github.run_id }}-${{ github.run_attempt }}.json
+          if-no-files-found: warn

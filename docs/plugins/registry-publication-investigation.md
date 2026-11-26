@@ -282,6 +282,37 @@ Both publication design checkpoints are approved. The codec, ownership/result ha
 
 Windows research remains required for cross-platform plugin management and Part 4 completion. If that research needs a different protocol or weaker target, present the concrete issue and evidence for approval. Do not treat the existing Windows block as a permanent product exclusion or optional post-release backlog. This checkpoint does not authorize startup wiring, production restore request fields, recovery UI/IPC or external loading.
 
+## Cache-aware model and environment observations
+
+**Test-only qualification work implemented; no platform qualified.** [`publication_crash_tests.rs`](../../src-tauri/src/plugin_registry/publication_crash_tests.rs) drives the actual consuming `publish_with` orchestration through a private storage-model adapter. It is not a separate hand-written publisher and does not alter production preflight.
+
+The model separates stable object identities, file bytes and directory entries. File synchronization commits bytes only. Directory synchronization commits that directory's immediate entries, not child data. Rename preserves the selector object's identity. Sealed database bytes are assumed durable at entry, while their new directory entries are not. Replacement begins with a persisted valid old selection captured before new preparation. First creation begins with an unpersisted root entry beneath an existing stable parent.
+
+Each campaign observes 27 boundaries around creation, partial/full writing, file/directory barriers, selection and acknowledged success. At each boundary it reconstructs 18 bounded persistence scenarios. These combine durable-only or selected early namespace persistence with lost, partial, torn or complete unsynchronized selector bytes. First creation and replacement therefore cover 972 primary crash-state checks. Reconstructed images use the real selector parser, bound-entry validation and SQLite readiness checks. They never scan generations to choose a fallback.
+
+Negative controls omit the generation-directory barrier, selector file synchronization, first-root parent barrier or final selector-parent barrier. Each control detects an acknowledged result that would be missing, unreadable or still selected to the old generation within the model. These controls show that the campaign is not merely checking successful host writes.
+
+The model assumes completed barriers cannot roll back and treats each directory namespace snapshot atomically. It tests representative persistence choices, not every dirty-entry subset, sector tear, metadata-corruption pattern, device or filesystem. It starts after checked sealing and does not simulate later ordinary SQLite transactions. Fixture visibility operations are not tests of native atomic replacement. All model files and reconstructed images are isolated temporary directories. The campaign does not kill processes, reset machines or force cache loss on the host. Normal sealing of isolated fixture databases still uses its existing file-synchronization calls.
+
+This is evidence about the implementation's sequence under explicit storage assumptions. It does not resolve the platform argument, map those assumptions to actual APFS/ext4/NTFS behavior, validate macOS 13.3 or qualify a real storage stack. Production publication remains unavailable on every platform.
+
+### Environment evidence and CI artifacts
+
+[`qualification_evidence.rs`](../../src-tauri/src/plugin_registry/qualification_evidence.rs) is compiled only for tests. Its capture test observes one real default-tempdir fixture and the repository manifest, not an application registry location. It records target OS/architecture, a sanitized numeric Unix kernel release, filesystem observations and whether those two samples identify the same filesystem. It explicitly sets qualification, runtime publication enablement and physical power-loss testing to false. Probe failures remain explicit unavailable observations.
+
+macOS uses `statfs` for filesystem name and flags. Linux records `statfs`/`statvfs` data and a bounded `/proc/self/mountinfo` observation. The mount parser chooses the most specific component-prefix entry, decodes kernel path escapes and refuses ambiguous observations. It does not infer ext4 from the shared ext2/ext3/ext4 magic number. Only allowlisted filesystem names and durability-related mount options are serialized; unknown options are counted, not copied. Windows uses volume information and drive-kind observations. Drive type and filesystem names do not prove physical locality or flush guarantees.
+
+Reports omit absolute sample paths, mount sources, volume identifiers/labels/serials, custom kernel suffixes and raw native errors. The collector invokes no subprocess and requires no administrator rights. The underlying device/storage stack, compiler implementation and complete OS product/build remain separate evidence obligations; the numeric kernel release is not a product version. The local observation and toolchain are recorded in the [cumulative changelog](change-log.md#native-registry-design).
+
+Run these focused commands from `src-tauri`:
+
+```sh
+cargo test --locked --lib plugin_registry::generation::publisher::crash_tests
+cargo test --locked --lib plugin_registry::qualification_evidence
+```
+
+The environment test writes a local report to `target/registry-qualification/storage-evidence-local.json`. In GitHub Actions it uses a numeric run-ID/attempt-specific filename instead. The [Native Registry workflow](../../.github/workflows/native_registry.yml) is configured to upload only that exact current report as `registry-storage-evidence-<matrix-os>-<attempt>`, even when later checks fail. The new collection/upload path still needs native CI execution on all three platforms. Missing reports are warnings, not fabricated success. Unique report filenames prevent a cached target directory from attributing an old observation to a new run. The JSON report describes environment observations, not test outcomes or platform qualification. Use the workflow's test result and the source model assumptions alongside it.
+
 ## Test-only lifecycle adapter
 
 This sequence is implemented only in the private test harness. It is not a production Rust API or application lifecycle integration.
@@ -341,7 +372,7 @@ Those experiments did not execute Windows, Linux or macOS 13.3. Their visibility
 
 The newer production-format implementation has separate tests in [`selector_tests.rs`](../../src-tauri/src/plugin_registry/selector_tests.rs), [`publisher_tests.rs`](../../src-tauri/src/plugin_registry/publisher_tests.rs), [`publication_platform_tests.rs`](../../src-tauri/src/plugin_registry/publication_platform_tests.rs) and [`publication_lifecycle_tests.rs`](../../src-tauri/src/plugin_registry/publication_lifecycle_tests.rs). They cover strict metadata and entry checks, consuming ownership, every selection boundary, original diagnostics, same-thread lifecycle replacement and production refusal. The publisher's Rust module path is `plugin_registry::generation::publisher`; publication/lifecycle tests are under `plugin_registry::worker::lifecycle::publication_tests`.
 
-Only test adapters exercise native selection. Production preflight remains unavailable on all platforms. The [cumulative validation record](change-log.md#native-registry-design) distinguishes local gated-implementation checks from earlier cross-platform CI; the newer code still needs its own platform runs. No qualification, minimum-macOS or power-loss result is implied by the following older fixture coverage.
+Only test adapters exercise native selection. Production preflight remains unavailable on all platforms. The [cumulative validation record](change-log.md#native-registry-design) records local checks and the verified three-platform CI pass for the gated implementation after its Windows import-guard correction. No qualification, minimum-macOS or power-loss result is implied by the following older fixture coverage.
 
 The current macOS publication-module suite has **34 tests**, including the missing/unusable selected-database regression. The two worker lease regressions are outside that module. Coverage includes:
 
@@ -361,7 +392,7 @@ These are runtime, failure-handling and barrier-call observations. They are not 
 
 ## Recommended next work
 
-1. Validate the new gated codec, publisher, consuming failure/readiness ownership and native candidates on platform CI. Both design checkpoints are approved and the implementation is in place, but native production enablement still requires passing the platform/storage qualification gates. Production maintenance request adapters remain absent; review their concrete requests and integration before adding them.
+1. Retain the verified three-platform CI pass for the gated codec/publisher. Run the newer cache-aware campaign and environment collector on platform CI and inspect its current-run artifacts. Neither modeled success nor reported filesystem names qualify a platform. Both design checkpoints are approved and the implementation is in place, but native production enablement still requires passing the platform/storage qualification gates. Production maintenance request adapters remain absent; review their concrete requests and integration before adding them.
 2. Retain Windows publication as required follow-up research, not optional backlog or permanent exclusion. Define supported storage assumptions and success criteria, and resolve the evidence gap before enabling it. The owner approved keeping it blocked in the meantime, not reducing its guarantees.
 3. Keep the fixture publisher, fixture selector encoding, cleanup-thread prototype and startup barriers test-only. Implementing the approved production codec and ownership/result contracts does not enable native publication or application startup.
 4. Maintain the implemented fault, sealing, lease and reopening regressions. Extend evidence where platform runs expose unsupported assumptions; do not silently weaken barriers to make a test pass.

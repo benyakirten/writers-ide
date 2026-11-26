@@ -8,6 +8,8 @@ mod preparation;
 mod publication_platform;
 #[cfg(test)]
 mod publication_probe;
+#[cfg(test)]
+mod qualification_evidence;
 mod recovery;
 mod schema;
 mod selector;

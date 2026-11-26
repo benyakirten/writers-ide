@@ -340,3 +340,7 @@ impl fmt::Debug for ReopenFailure {
 #[cfg(test)]
 #[path = "publisher_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "publication_crash_tests.rs"]
+mod crash_tests;
