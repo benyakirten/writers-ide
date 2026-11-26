@@ -1,4 +1,4 @@
-//! Generation-bound checked sealing. This does not publish or select a generation.
+//! Generation ownership and checked sealing. Native publication remains qualification-gated.
 use std::{
     fmt,
     fs::{self, File, OpenOptions},
@@ -14,8 +14,12 @@ use super::{
     error::{RegistryError, Result},
     location::LocationLease,
     model::RegistryLimits,
+    selector::GenerationId,
     store::{self, Store},
 };
+
+#[path = "publisher.rs"]
+pub(super) mod publisher;
 
 #[cfg(test)]
 #[path = "generation_tests.rs"]
@@ -23,6 +27,7 @@ mod tests;
 
 // Keep SQLite preparation and recovery ownership on the caller's registry thread.
 struct Generation {
+    id: GenerationId,
     directory: PathBuf,
     database: PathBuf,
     _lease: LocationLease,
@@ -47,11 +52,29 @@ pub(super) struct SealFailure {
 }
 
 impl PreparedGeneration {
-    /// The host supplies an existing owned root and one local directory name.
-    /// Neither this name nor the database filename defines a selector format.
-    pub(super) fn create(
+    /// The owned root must exist. Allocate and claim a new physical generation;
+    /// collisions never authorize reuse or overwrite.
+    pub(super) fn create(lease: &LocationLease, limits: RegistryLimits) -> Result<Self> {
+        Self::create_id(lease, GenerationId::random()?, limits)
+    }
+
+    fn create_id(lease: &LocationLease, id: GenerationId, limits: RegistryLimits) -> Result<Self> {
+        Self::create_bound(lease, Path::new(&id.name()), id, limits)
+    }
+
+    #[cfg(test)]
+    pub(super) fn create_named_for_test(
         lease: &LocationLease,
         name: &Path,
+        limits: RegistryLimits,
+    ) -> Result<Self> {
+        Self::create_bound(lease, name, GenerationId::random()?, limits)
+    }
+
+    fn create_bound(
+        lease: &LocationLease,
+        name: &Path,
+        id: GenerationId,
         limits: RegistryLimits,
     ) -> Result<Self> {
         limits.validate()?;
@@ -76,6 +99,7 @@ impl PreparedGeneration {
         Ok(Self {
             store,
             generation: Generation {
+                id,
                 directory,
                 database,
                 _lease: lease.clone(),

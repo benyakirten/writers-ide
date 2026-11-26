@@ -1,5 +1,11 @@
-//! Internal lifecycle control. Publication adapters remain test-only.
-use super::super::{generation::SealFailure, location::LocationLease};
+//! Internal lifecycle control. Production maintenance request adapters remain absent.
+use super::super::{
+    generation::{
+        publisher::{PublicationFailure, ReopenFailure},
+        SealFailure,
+    },
+    location::LocationLease,
+};
 use super::*;
 
 #[derive(Clone, Debug)]
@@ -165,7 +171,7 @@ impl RegistryControl {
 }
 
 // Only typed test adapters can currently construct requests. There is no
-// production publisher, restore request constructor, or arbitrary host callback API.
+// enabled production publisher, restore request constructor, or arbitrary host callback API.
 pub(crate) struct MaintenanceRequest {
     operation: Box<dyn Maintenance>,
 }
@@ -181,8 +187,29 @@ enum MaintenanceResult {
     Recovery {
         error: RegistryError,
         kind: RecoveryKind,
-        retained: Option<SealFailure>,
+        retained: Option<RetainedFailure>,
     },
+}
+
+enum RetainedFailure {
+    Seal(SealFailure),
+    Publication(PublicationFailure),
+    Reopen(ReopenFailure),
+}
+impl From<SealFailure> for RetainedFailure {
+    fn from(failure: SealFailure) -> Self {
+        Self::Seal(failure)
+    }
+}
+impl From<PublicationFailure> for RetainedFailure {
+    fn from(failure: PublicationFailure) -> Self {
+        Self::Publication(failure)
+    }
+}
+impl From<ReopenFailure> for RetainedFailure {
+    fn from(failure: ReopenFailure) -> Self {
+        Self::Reopen(failure)
+    }
 }
 
 pub(super) fn run_worker(shared: &Shared, store: Store, lease: Option<&LocationLease>) {
@@ -308,3 +335,7 @@ impl MaintenanceRequest {
 #[cfg(test)]
 #[path = "lifecycle_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "publication_lifecycle_tests.rs"]
+mod publication_tests;

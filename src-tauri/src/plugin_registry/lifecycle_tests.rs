@@ -575,7 +575,8 @@ fn recovery_retains_location_and_seal_failure_connection_until_shutdown() {
             Err(RegistryError::Unavailable(_))
         ));
         let generation =
-            PreparedGeneration::create(lease, Path::new("candidate"), limits()).unwrap();
+            PreparedGeneration::create_named_for_test(lease, Path::new("candidate"), limits())
+                .unwrap();
         // Corrupt required rows through a separate fixture connection. Sealing must
         // fail validation before close and return the still-owned connection.
         let connection = rusqlite::Connection::open(generation_path(lease.root())).unwrap();
@@ -587,7 +588,7 @@ fn recovery_retains_location_and_seal_failure_connection_until_shutdown() {
         MaintenanceResult::Recovery {
             error: RegistryError::RecoveryRequired("checked seal failed".into()),
             kind: RecoveryKind::Preparation,
-            retained: Some(failure),
+            retained: Some(failure.into()),
         }
     });
     assert!(matches!(

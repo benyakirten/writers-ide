@@ -24,7 +24,9 @@ fn fixture() -> (TempDir, LocationLease, PreparedGeneration) {
     let root = directory.path().join("owned-root");
     let lease = LocationLease::acquire(&root).unwrap();
     fs::create_dir(&root).unwrap();
-    let generation = PreparedGeneration::create(&lease, Path::new("candidate"), limits()).unwrap();
+    let generation =
+        PreparedGeneration::create_named_for_test(&lease, Path::new("candidate"), limits())
+            .unwrap();
     (directory, lease, generation)
 }
 
@@ -44,7 +46,10 @@ fn constructor_requires_existing_root_and_never_creates_it() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("absent");
     let lease = LocationLease::acquire(&root).unwrap();
-    assert!(PreparedGeneration::create(&lease, Path::new("candidate"), limits()).is_err());
+    assert!(
+        PreparedGeneration::create_named_for_test(&lease, Path::new("candidate"), limits())
+            .is_err()
+    );
     assert!(!root.exists());
 }
 
@@ -62,7 +67,7 @@ fn constructor_refuses_non_single_component_names_without_storage_changes() {
     ] {
         assert!(
             matches!(
-                PreparedGeneration::create(&lease, Path::new(name), limits()),
+                PreparedGeneration::create_named_for_test(&lease, Path::new(name), limits()),
                 Err(RegistryError::InvalidInput(_))
             ),
             "{name}"
@@ -78,14 +83,18 @@ fn constructor_never_reuses_existing_directory_file_or_symlink() {
     fs::write(lease.root().join("file"), b"preserve").unwrap();
     fs::create_dir(lease.root().join("empty")).unwrap();
     for name in ["candidate", "file", "empty"] {
-        assert!(PreparedGeneration::create(&lease, Path::new(name), limits()).is_err());
+        assert!(
+            PreparedGeneration::create_named_for_test(&lease, Path::new(name), limits()).is_err()
+        );
     }
     assert_eq!(fs::read(lease.root().join("file")).unwrap(), b"preserve");
     assert_eq!(fs::read_dir(lease.root().join("empty")).unwrap().count(), 0);
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink("missing", lease.root().join("link")).unwrap();
-        assert!(PreparedGeneration::create(&lease, Path::new("link"), limits()).is_err());
+        assert!(
+            PreparedGeneration::create_named_for_test(&lease, Path::new("link"), limits()).is_err()
+        );
         assert!(fs::symlink_metadata(lease.root().join("link"))
             .unwrap()
             .is_symlink());
@@ -96,7 +105,8 @@ fn constructor_never_reuses_existing_directory_file_or_symlink() {
 #[test]
 fn seal_is_bound_to_its_generation_and_retains_both_ownership_locks() {
     let (_directory, lease, first) = fixture();
-    let second = PreparedGeneration::create(&lease, Path::new("other"), limits()).unwrap();
+    let second =
+        PreparedGeneration::create_named_for_test(&lease, Path::new("other"), limits()).unwrap();
     let root = lease.root().to_path_buf();
     let path = first.generation.database.clone();
     first

@@ -5,10 +5,12 @@ mod location;
 mod migrations;
 mod model;
 mod preparation;
+mod publication_platform;
 #[cfg(test)]
 mod publication_probe;
 mod recovery;
 mod schema;
+mod selector;
 mod store;
 mod transitions;
 mod worker;

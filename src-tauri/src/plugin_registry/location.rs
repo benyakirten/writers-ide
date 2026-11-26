@@ -67,6 +67,10 @@ impl LocationLease {
         self.guard.clone()
     }
 
+    pub(super) fn same_owner(&self, other: &Self) -> bool {
+        self.root == other.root && Arc::ptr_eq(&self.guard, &other.guard)
+    }
+
     pub(super) fn check_database(&self, path: &Path) -> Result<PathBuf> {
         if !fs::symlink_metadata(&self.root)?.is_dir() {
             return Err(RegistryError::RecoveryRequired(
