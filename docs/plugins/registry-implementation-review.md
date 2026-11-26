@@ -260,7 +260,7 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 ```
 
-The [native storage lab guide](../../tooling/registry-lab/README.md) covers the opt-in Linux controller, unprivileged build/workload, calibration and replay. `cargo test --locked --lib storage_lab` exercises temporary-directory Rust fixtures, not the ignored native entry. From the repository root, `python3 -B -m unittest discover -s tooling/registry-lab -v` runs non-destructive safety/protocol tests with Python 3.11+. Ubuntu CI is configured to run those tests with Python 3.12; actual scratch-device execution is not a CI step and remains unverified. Neither suite qualifies a storage stack.
+The [native storage lab guide](../../tooling/registry-lab/README.md) covers the opt-in Linux controller, unprivileged build/workload, calibration and replay. `cargo test --locked --lib storage_lab` exercises temporary-directory Rust fixtures, not the ignored native entry. From the repository root, `python3 -B -m unittest discover -s tooling/registry-lab -v` runs non-destructive safety/protocol tests with Python 3.11+. The Python 3.12 safety step passed on Ubuntu CI, alongside passing Rust formatting, library tests and Clippy on all three platforms for the harness revision. Actual scratch-device execution is not a CI step and remains unverified. Neither suite qualifies a storage stack.
 
 The [cumulative changelog](change-log.md#native-registry-design) separates earlier foundation/probe evidence from current shared-core validation. Focused subsets do not replace the full library suite, library check, formatting and all-target Clippy.
 

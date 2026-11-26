@@ -67,7 +67,7 @@ The second command must list `log-writes`. Loading the module does not create a 
 
 Use a normal checkout on the VM system filesystem, not a shared Mac directory or scratch disk. Check out the committed source revision under review. Resolve uncommitted source changes before a native run; the controller refuses a dirty or mismatched build. No tool commits changes automatically.
 
-Building the full Tauri library can take substantial disk space and memory. The earlier VM root had about 7.8 GiB free; that has not been established as sufficient. Check available resources before building. Do not resize the system disk or LVM automatically to make a build pass. Close Docker Desktop if memory is constrained. The helper limits Cargo to one build job.
+Building the full Tauri library can take substantial disk space and memory. Check available resources before building. The owner's VM root LV was expanded separately under explicit administrative setup approval; the experiment controller does not perform that operation. Do not resize the system disk or LVM automatically to make a build pass. Close Docker Desktop if memory is constrained. The helper limits Cargo to one build job.
 
 From the checkout root, without sudo:
 
