@@ -6,6 +6,7 @@ mod platform;
 mod process_tests;
 mod sealing;
 mod tests;
+mod windows_conformance;
 
 use super::{
     error::{RegistryError, Result},

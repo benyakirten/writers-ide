@@ -199,6 +199,7 @@ cargo test --locked --lib plugin_registry::generation::publisher
 cargo test --locked --lib plugin_registry::generation::publisher::crash_tests
 cargo test --locked --lib plugin_registry::qualification_evidence
 cargo test --locked --lib storage_lab
+cargo test --locked --lib windows_conformance
 cargo test --locked --lib plugin_registry::worker::lifecycle::publication_tests
 cargo test --locked --lib plugin_registry::worker::lifecycle
 cargo test --locked --lib plugin_registry::publication_probe
@@ -220,6 +221,8 @@ python3 -B -m unittest discover -s tooling/registry-lab -v
 ```
 
 Those tests use fake inventories, memory streams, regular temporary files and fake workload processes. They do not mount or format devices. Native Registry CI runs this suite on Ubuntu with Python 3.12 and responds to lab-tooling changes. Native scratch-device execution stays outside CI and requires the guide's separate review and consent. One owner-approved UTM campaign completed and its exported logs, calibration and per-cut reports were reviewed. Normal first/replacement acknowledgment checks passed within the prefix model. Selector-file and final-root barrier omissions were detected; generation-directory and stable-parent omissions were masked. See the [native replay findings](docs/plugins/registry-publication-investigation.md#reviewed-native-replay-evidence). This is not a qualification result, and no platform is enabled.
+
+The approved [Windows conformance fixture](docs/plugins/windows-registry-conformance-proposal.md) uses only owned temporary objects and supported Win32 operations. Its ordinary tests cover admission, bounded subprocesses, strict report schemas and cleanup policy without running the ignored Windows matrix. Native execution requires explicit opt-in, a matching executable-bound build record and non-elevated Windows/NTFS preflight. The build-only PowerShell helper and native matrix have not yet run on Windows. Existing production Windows candidates remain unsupported; these tests never qualify or enable publication.
 
 The shared lifecycle and generation code is production-compiled but not connected to application startup. `Registry::open_owned` validates a supplied existing database beneath a leased root; it does not select or initialize a generation. Maintenance request constructors are `cfg(test)` closures only. The consuming publisher and native candidates are runtime-compiled behind a qualification gate. Production maintenance request adapters remain absent.
 
