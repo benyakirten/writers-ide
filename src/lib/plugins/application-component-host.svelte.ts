@@ -4,6 +4,7 @@ import {
 	CommandComponentHost,
 	type PresentationRecord,
 } from '../../../packages-js/plugins/command-component-host';
+import type { CommandResourceSettingsClient } from '../../../packages-js/plugins/command-resource-settings';
 import Registry, { type BarItemRegistry } from '$lib/editor/state/bar-item-registry.svelte';
 import TabRegistry, { type TabStateRegistry } from '$lib/editor/state/tab-state-registry.svelte';
 import { workQueue } from '$lib/editor/state/work-queue.svelte';
@@ -12,11 +13,22 @@ import { createApplicationLocale } from './application-locale.svelte';
 type Record = PresentationRecord<SveltePresentation>;
 export type ApplicationComponentHostOptions = Omit<
 	ConstructorParameters<typeof CommandComponentHost<SveltePresentation>>[0],
-	'locale'
+	'locale' | 'ledger'
 > & {
 	bars?: BarItemRegistry;
 	views?: TabStateRegistry;
-};
+} & (
+		| {
+				resourceSettingsClient: CommandResourceSettingsClient;
+				ledger?: never;
+		  }
+		| {
+				resourceSettingsClient?: never;
+				ledger?: ConstructorParameters<
+					typeof CommandComponentHost<SveltePresentation>
+				>[0]['ledger'];
+		  }
+	);
 export type ApplicationComponentHostError = {
 	readonly placementId: string;
 	readonly runtimeId: string;
@@ -207,7 +219,10 @@ class WorkspacePresentations {
 
 /** Internal trusted-component assembly. Does not replace the bundled host or grant native access. */
 export function createApplicationComponentHost(options: ApplicationComponentHostOptions = {}) {
-	const { bars = Registry, views = TabRegistry, ...hostOptions } = options;
+	const { bars = Registry, views = TabRegistry, resourceSettingsClient, ...hostOptions } = options;
+	if (resourceSettingsClient && hostOptions.ledger !== undefined) {
+		throw new Error('Supply either a resource settings client or a ledger, not both.');
+	}
 	const locale = createApplicationLocale();
 	const adapter = new WorkspacePresentations(bars, views);
 	let unsubscribe = () => {};
@@ -227,12 +242,17 @@ export function createApplicationComponentHost(options: ApplicationComponentHost
 			try {
 				adapter.dispose();
 			} finally {
-				locale.dispose();
+				try {
+					locale.dispose();
+				} finally {
+					resourceSettingsClient?.dispose();
+				}
 			}
 		}
 	}
 	const host = new ApplicationHost({
 		...hostOptions,
+		...(resourceSettingsClient ? { ledger: resourceSettingsClient.ledger } : {}),
 		locale,
 		workQueue: options.workQueue ?? workQueue,
 	});

@@ -186,6 +186,20 @@ pnpm build
 
 Run `pnpm build:plugin-profile` to generate shared runtime artifacts. Run `pnpm build:plugin-sdk` to generate five private declarations-only packages in `node_modules/.cache/plugin-sdk`. They are not published npm packages and contain no JavaScript. The [portable SDK guide](docs/plugins/portable-sdk.md) explains local package delivery and the independent sample. Neither builder enables application external loading. For package-local SDK work, optionally run `pnpm --filter @writers-ide/plugins test` and `pnpm --filter @writers-ide/plugins check` directly.
 
+### Internal command resource-settings checks
+
+Stage B's fake-source coordinator/client and opt-in application assembly ledger integration are implemented internally / unmerged. They are not public SDK APIs or production saved-settings transport. Read [fixture setup and lifetime](docs/plugins/resource-settings-plan.md#internal-fixture-setup-and-lifetime) before changing them. The service client reads/subscribes without a setter. The defaults of 16 operations and 64 subscribers are fixture bounds, not approved production transport budgets. Stage A native persistence and its validation scope are unchanged.
+
+Run these commands from the repository root:
+
+```sh
+pnpm --filter @writers-ide/plugins test
+pnpm --filter @writers-ide/plugins check
+pnpm exec vitest run src/lib/plugins/application-command-resource-settings.svelte.test.ts src/lib/plugins/application-component-host.svelte.test.ts
+```
+
+The package suite includes coordinator/client, reservation and dispatcher tests. The application tests cover opt-in injection, initial admission, updates, lowered limits, unfinished cancellation, disconnects, explicit reattachment and disposal. Neither fake delivery nor browser unit tests validate production multi-window IPC. Production Rust coordination, registry-backed settings loading, IPC, startup, UI, default bundled-host migration, external loading and publication remain separately gated. See the [cumulative validation record](docs/plugins/change-log.md#resource-settings-persistence-and-distribution) for results and outstanding checks.
+
 ### Native registry checks
 
 Run these commands from `src-tauri`:
