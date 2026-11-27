@@ -4,7 +4,7 @@ use super::{
     preparation::*,
     transitions::{self, InstallationAction, InstallationExpectation},
 };
-use crate::plugin_integrity::{IntegrityEntry, IntegrityRecord};
+use crate::plugin_integrity::{IntegrityBuildError, IntegrityEntry, IntegrityRecord};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use std::{
     fs::{File, OpenOptions},
@@ -28,11 +28,17 @@ pub(crate) enum ArtifactTarget {
 
 /// Synchronous single-owner implementation for the worker and generation owner.
 /// The connection never escapes this module; checked close returns the destination lock.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum StoreRecovery {
+    TransactionUncertain,
+    DomainInvalid,
+}
+
 pub(crate) struct Store {
     connection: Connection,
     _ownership: File,
     limits: RegistryLimits,
-    poisoned: bool,
+    recovery: std::cell::Cell<Option<StoreRecovery>>,
     #[cfg(test)]
     fail_rollback: bool,
 }
@@ -58,7 +64,7 @@ impl Store {
             connection,
             _ownership: ownership,
             limits,
-            poisoned: false,
+            recovery: std::cell::Cell::new(None),
             #[cfg(test)]
             fail_rollback: false,
         };
@@ -101,7 +107,7 @@ impl Store {
             connection,
             _ownership: ownership,
             limits,
-            poisoned: false,
+            recovery: std::cell::Cell::new(None),
             #[cfg(test)]
             fail_rollback: false,
         };
@@ -120,7 +126,7 @@ impl Store {
             connection,
             _ownership,
             limits,
-            poisoned,
+            recovery,
             #[cfg(test)]
             fail_rollback,
         } = self;
@@ -132,7 +138,7 @@ impl Store {
                     connection,
                     _ownership,
                     limits,
-                    poisoned,
+                    recovery,
                     #[cfg(test)]
                     fail_rollback,
                 }),
@@ -147,49 +153,60 @@ impl Store {
 
     pub(crate) fn backup(&self, destination: &Path) -> Result<()> {
         self.ensure_available()?;
-        super::recovery::backup_database(&self.connection, destination)
+        super::recovery::backup_database_observed(&self.connection, destination, |error| {
+            self.record_live_error(error);
+        })
     }
     pub(crate) fn read_settings(&mut self) -> Result<HostSettings> {
         self.ensure_available()?;
-        let tx = self.connection.transaction()?;
-        let settings = read_settings(&tx)?;
-        tx.commit()?;
-        Ok(settings)
+        let result = (|| {
+            let tx = self.connection.transaction()?;
+            let settings = read_settings(&tx)?;
+            tx.commit()?;
+            Ok(settings)
+        })();
+        self.record_live_result(result)
     }
     pub(crate) fn package_details(&mut self, package: PackageId) -> Result<PackageDetails> {
         self.ensure_available()?;
-        let tx = self.connection.transaction()?;
-        validation::bounds(&tx, &self.limits)?;
-        let canonical_id = tx
-            .query_row(
-                "SELECT canonical_id FROM packages WHERE id=?1",
-                [package.0],
-                |r| r.get(0),
-            )
-            .optional()?
-            .ok_or_else(|| RegistryError::NotFound("package".into()))?;
-        let installation = installation(&tx, package)?;
-        let ids = artifact_ids(&tx, package, &self.limits)?;
-        let mut artifacts = Vec::new();
-        for id in ids {
-            artifacts.push(artifact_details(&tx, id, &self.limits)?);
-        }
-        let decisions = decisions::package_decisions(&tx, package, &self.limits)?;
-        tx.commit()?;
-        Ok(PackageDetails {
-            canonical_id,
-            installation,
-            artifacts,
-            decisions,
-        })
+        let result = (|| {
+            let tx = self.connection.transaction()?;
+            validation::bounds(&tx, &self.limits)?;
+            let canonical_id = tx
+                .query_row(
+                    "SELECT canonical_id FROM packages WHERE id=?1",
+                    [package.0],
+                    |r| r.get(0),
+                )
+                .optional()?
+                .ok_or_else(|| RegistryError::NotFound("package".into()))?;
+            let installation = installation(&tx, package)?;
+            let ids = artifact_ids(&tx, package, &self.limits)?;
+            let mut artifacts = Vec::new();
+            for id in ids {
+                artifacts.push(artifact_details(&tx, id, &self.limits)?);
+            }
+            let decisions = decisions::package_decisions(&tx, package, &self.limits)?;
+            tx.commit()?;
+            Ok(PackageDetails {
+                canonical_id,
+                installation,
+                artifacts,
+                decisions,
+            })
+        })();
+        self.record_live_result(result)
     }
     pub(crate) fn project_details(&mut self, project: ProjectId) -> Result<ProjectDetails> {
         self.ensure_available()?;
-        let tx = self.connection.transaction()?;
-        validation::bounds(&tx, &self.limits)?;
-        let details = project_details(&tx, project, &self.limits)?;
-        tx.commit()?;
-        Ok(details)
+        let result = (|| {
+            let tx = self.connection.transaction()?;
+            validation::bounds(&tx, &self.limits)?;
+            let details = project_details(&tx, project, &self.limits)?;
+            tx.commit()?;
+            Ok(details)
+        })();
+        self.record_live_result(result)
     }
     pub(crate) fn accept_artifact(
         &mut self,
@@ -471,10 +488,35 @@ impl Store {
         Ok(())
             })
     }
+    pub(super) fn recovery(&self) -> Option<StoreRecovery> {
+        self.recovery.get()
+    }
+    // Call only around live database decoding/validation and mutation bodies.
+    // Never classify arbitrary worker, restore-source or backup-target errors here.
+    fn record_live_result<T>(&self, result: Result<T>) -> Result<T> {
+        if let Err(error) = &result {
+            self.record_live_error(error);
+        }
+        result
+    }
+    fn record_live_error(&self, error: &RegistryError) {
+        let invalid = match error {
+            RegistryError::RecoveryRequired(_) => true,
+            RegistryError::Storage(error) => error.downcast_ref::<rusqlite::Error>().is_some_and(|error| {
+                matches!(error, rusqlite::Error::QueryReturnedNoRows | rusqlite::Error::InvalidColumnType(..) | rusqlite::Error::FromSqlConversionFailure(..) | rusqlite::Error::IntegralValueOutOfRange(..))
+                    || matches!(error, rusqlite::Error::SqliteFailure(code, _) if matches!(code.code, rusqlite::ErrorCode::DatabaseCorrupt | rusqlite::ErrorCode::NotADatabase))
+                    || matches!(error, rusqlite::Error::SqliteFailure(_, Some(message)) if message.starts_with("no such table: ") || message.starts_with("no such column: "))
+            }),
+            _ => false,
+        };
+        if invalid && self.recovery.get().is_none() {
+            self.recovery.set(Some(StoreRecovery::DomainInvalid));
+        }
+    }
     fn ensure_available(&self) -> Result<()> {
-        if self.poisoned {
+        if self.recovery.get().is_some() {
             return Err(RegistryError::Unavailable(
-                "registry transaction outcome requires controlled reopening".into(),
+                "live registry requires explicit recovery".into(),
             ));
         }
         Ok(())
@@ -484,11 +526,15 @@ impl Store {
         operation: impl FnOnce(&Connection, &RegistryLimits) -> Result<T>,
     ) -> Result<T> {
         self.ensure_available()?;
-        self.connection.execute_batch("BEGIN IMMEDIATE")?;
-        match operation(&self.connection, &self.limits) {
+        self.record_live_result(
+            self.connection
+                .execute_batch("BEGIN IMMEDIATE")
+                .map_err(RegistryError::from),
+        )?;
+        match self.record_live_result(operation(&self.connection, &self.limits)) {
             Ok(value) => {
                 if let Err(error) = self.connection.execute_batch("COMMIT") {
-                    self.poisoned = true;
+                    self.recovery.set(Some(StoreRecovery::TransactionUncertain));
                     let _ = self.connection.execute_batch("ROLLBACK");
                     return Err(RegistryError::OutcomeUnknown(format!(
                         "commit outcome could not be established: {error}"
@@ -502,7 +548,7 @@ impl Store {
                 // preserving any ordinary failure category, including Storage.
                 if !self.connection.is_autocommit() {
                     if let Err(rollback) = self.rollback() {
-                        self.poisoned = true;
+                        self.recovery.set(Some(StoreRecovery::TransactionUncertain));
                         return Err(RegistryError::OutcomeUnknown(format!(
                             "operation failed ({error}); rollback not established: {rollback}"
                         )));
@@ -618,6 +664,9 @@ fn installation(c: &Connection, package: PackageId) -> Result<InstallationSnapsh
         )
         .optional()?
         .ok_or_else(|| RegistryError::NotFound("package".into()))?;
+    if revision < 1 {
+        return Err(corrupt("invalid installation revision"));
+    }
     let raw = c.query_row("SELECT selected_artifact_id,staged_artifact_id,previous_artifact_id,pending_repair_artifact_id FROM package_installation_state WHERE package_id=?1", [package.0], |r| Ok((r.get::<_,Option<Vec<u8>>>(0)?,r.get::<_,Option<Vec<u8>>>(1)?,r.get::<_,Option<Vec<u8>>>(2)?,r.get::<_,Option<Vec<u8>>>(3)?))).optional()?;
     let pointers = raw
         .map(|(s, t, p, r)| {
@@ -786,6 +835,19 @@ fn requirements(
         })
         .collect()
 }
+fn stored_integrity_record(
+    version: u32,
+    entries: impl IntoIterator<Item = Result<IntegrityEntry>>,
+    limits: &crate::plugin_integrity::IntegrityLimits,
+) -> Result<IntegrityRecord> {
+    IntegrityRecord::from_entries(version, entries, limits).map_err(|error| match error {
+        IntegrityBuildError::Source(error) => error,
+        IntegrityBuildError::InvalidRecord(error) => {
+            corrupt(&format!("invalid stored integrity record: {error:?}"))
+        }
+    })
+}
+
 fn artifact_details(
     c: &Connection,
     id: ArtifactId,
@@ -820,8 +882,7 @@ fn artifact_details(
                 sha256: digest(sha)?,
             })
         });
-    let integrity = IntegrityRecord::from_entries(version, entries, &limits.integrity)
-        .map_err(|e| corrupt(&format!("invalid stored integrity record: {e:?}")))?;
+    let integrity = stored_integrity_record(version, entries, &limits.integrity)?;
     if integrity.fingerprint() != facts.fingerprint {
         return Err(corrupt(
             "artifact file-set fingerprint does not match accepted release",
@@ -883,6 +944,9 @@ fn check_project_revision(c: &Connection, project: ProjectId, expected: Revision
         )
         .optional()?
         .ok_or_else(|| RegistryError::NotFound("project registration".into()))?;
+    if revision < 1 {
+        return Err(corrupt("invalid project revision"));
+    }
     if revision != expected.0 {
         return Err(RegistryError::Conflict("project location changed".into()));
     }
@@ -894,6 +958,9 @@ fn project_details(
     limits: &RegistryLimits,
 ) -> Result<ProjectDetails> {
     let raw = c.query_row("SELECT display_name,path_encoding,path_bytes,directory_identity_scheme,directory_identity_bytes,location_revision FROM project_registrations WHERE id=?1",[project.0],|r| Ok((r.get(0)?,ProjectLocation { path_encoding:r.get(1)?,path_bytes:r.get(2)?,directory_identity_scheme:r.get(3)?,directory_identity_bytes:r.get(4)? },Revision(r.get(5)?)))).optional()?.ok_or_else(|| RegistryError::NotFound("project registration".into()))?;
+    if raw.2 .0 < 1 {
+        return Err(corrupt("invalid project revision"));
+    }
     let mut query = c.prepare("SELECT component_id,enabled FROM project_component_overrides WHERE project_registration_id=?1 ORDER BY component_id LIMIT ?2")?;
     let overrides = query
         .query_map(params![project.0, limits.max_rows as i64 + 1], |r| {

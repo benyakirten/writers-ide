@@ -184,7 +184,12 @@ fn abrupt_publisher_exit_preserves_selector_boundary_and_both_generations() {
         );
         assert!(old.id.database(&lease).is_file());
         assert!(new.database(&lease).is_file());
-        let session = run(Registry::open(selected.database(&lease), limits(), 4)).unwrap();
+        let session = run(Registry::open(
+            selected.database(&lease),
+            limits(),
+            crate::plugin_registry::RegistryCapacity::with_observers(4, 4, 4).unwrap(),
+        ))
+        .unwrap();
         run(session.owner.shutdown()).unwrap();
     }
 }

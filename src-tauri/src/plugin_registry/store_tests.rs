@@ -1610,3 +1610,164 @@ fn bounded_write_rejection_rolls_back_the_entire_prepared_acceptance() {
         0
     );
 }
+
+#[test]
+fn live_revision_decoders_mark_invalid_persisted_domains() {
+    for case in 0..3 {
+        let (_dir, mut s) = store();
+        let artifact = accept_version(&mut s, "1.0.0");
+        let component = component(&mut s, &artifact);
+        let project = project(&mut s, 42);
+        s.connection
+            .execute_batch("PRAGMA ignore_check_constraints=ON;")
+            .unwrap();
+        let result = match case {
+            0 => {
+                s.connection
+                    .execute(
+                        "UPDATE packages SET installation_revision=0 WHERE id=?1",
+                        [artifact.package.0],
+                    )
+                    .unwrap();
+                s.package_details(artifact.package).map(|_| ())
+            }
+            1 => {
+                s.connection
+                    .execute(
+                        "UPDATE project_registrations SET location_revision=0 WHERE id=?1",
+                        [project.0],
+                    )
+                    .unwrap();
+                s.project_details(project).map(|_| ())
+            }
+            _ => {
+                s.connection
+                    .execute(
+                        "INSERT INTO component_scope_state VALUES (?1,'project',0)",
+                        [component.0],
+                    )
+                    .unwrap();
+                s.mutate(|tx, _| decisions::baseline(tx, component).map(|_| ()))
+            }
+        };
+        assert!(matches!(result, Err(RegistryError::RecoveryRequired(_))));
+        assert_eq!(s.recovery(), Some(StoreRecovery::DomainInvalid));
+        assert!(matches!(
+            s.read_settings(),
+            Err(RegistryError::Unavailable(_))
+        ));
+    }
+}
+
+#[test]
+fn stored_integrity_source_io_error_is_preserved_exactly_and_nonfatal() {
+    let (_dir, mut s) = store();
+    let error = RegistryError::Storage(Box::new(rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_IOERR),
+        Some("injected SQLite entry read failure".into()),
+    )));
+    let RegistryError::Storage(original) = &error else {
+        unreachable!()
+    };
+    let original = std::ptr::from_ref(original.as_ref()).cast::<()>();
+    let result = s.record_live_result(stored_integrity_record(
+        1,
+        [Err(error)],
+        &s.limits.integrity,
+    ));
+    let Err(RegistryError::Storage(returned)) = result else {
+        panic!("entry source failure was reclassified");
+    };
+    assert_eq!(std::ptr::from_ref(returned.as_ref()).cast::<()>(), original);
+    assert!(matches!(returned.downcast_ref::<rusqlite::Error>(),
+        Some(rusqlite::Error::SqliteFailure(code, _)) if code.code == rusqlite::ErrorCode::SystemIoFailure));
+    assert_eq!(s.recovery(), None);
+    assert!(s.read_settings().is_ok());
+}
+
+#[test]
+fn stored_integrity_invalid_record_and_invalid_source_decode_remain_fatal() {
+    for invalid_record in [false, true] {
+        let (_dir, mut s) = store();
+        let result = if invalid_record {
+            stored_integrity_record(0, [], &s.limits.integrity)
+        } else {
+            stored_integrity_record(
+                1,
+                [Err(RegistryError::from(
+                    rusqlite::Error::IntegralValueOutOfRange(1, i64::MAX),
+                ))],
+                &s.limits.integrity,
+            )
+        };
+        let result = s.record_live_result(result);
+        if invalid_record {
+            assert!(matches!(result, Err(RegistryError::RecoveryRequired(_))));
+        } else {
+            assert!(matches!(result, Err(RegistryError::Storage(_))));
+        }
+        assert_eq!(s.recovery(), Some(StoreRecovery::DomainInvalid));
+        assert!(matches!(
+            s.read_settings(),
+            Err(RegistryError::Unavailable(_))
+        ));
+    }
+}
+
+#[test]
+fn backup_source_evidence_is_observed_inside_its_actual_snapshot() {
+    let (dir, s) = store();
+    s.connection.execute_batch(
+        "PRAGMA ignore_check_constraints=ON; UPDATE host_settings SET command_max_caller_pending=0;",
+    ).unwrap();
+    let mut observed = false;
+    let destination = dir.path().join("backup.sqlite");
+    let result =
+        super::super::recovery::backup_database_observed(&s.connection, &destination, |error| {
+            assert!(!s.connection.is_autocommit());
+            observed = true;
+            s.record_live_error(error);
+        });
+    assert!(matches!(result, Err(RegistryError::RecoveryRequired(_))));
+    assert!(observed);
+    assert!(s.connection.is_autocommit());
+    assert_eq!(s.recovery(), Some(StoreRecovery::DomainInvalid));
+    assert!(!destination.exists());
+}
+
+#[test]
+fn backup_target_invalidity_and_copy_storage_failure_do_not_poison_source() {
+    use super::super::recovery::{test_backup_target_fault, BackupTestFault};
+    for fault in [
+        BackupTestFault::InvalidTarget,
+        BackupTestFault::ReadOnlyTarget,
+    ] {
+        let (dir, mut s) = store();
+        let original = s.read_settings().unwrap();
+        let mut observed = 0;
+        let destination = dir.path().join("backup.sqlite");
+        let result = test_backup_target_fault(
+            &s.connection,
+            &destination,
+            |error| {
+                observed += 1;
+                s.record_live_error(error);
+            },
+            fault,
+        );
+        match fault {
+            BackupTestFault::InvalidTarget => {
+                assert!(matches!(result, Err(RegistryError::RecoveryRequired(_))))
+            }
+            BackupTestFault::ReadOnlyTarget => {
+                assert!(matches!(result, Err(RegistryError::Storage(_))))
+            }
+        }
+        assert_eq!(observed, 0);
+        assert_eq!(s.recovery(), None);
+        assert!(s.connection.is_autocommit());
+        assert_eq!(s.read_settings().unwrap(), original);
+        assert!(destination.exists());
+        s.backup(&dir.path().join("healthy-backup.sqlite")).unwrap();
+    }
+}

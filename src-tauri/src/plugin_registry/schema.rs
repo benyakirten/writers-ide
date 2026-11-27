@@ -80,6 +80,12 @@ pub(crate) fn validate(connection: &Connection) -> Result<()> {
     validate_version(connection, VERSION)
 }
 
+// Live-store health needs domain evidence, not opening's recovery wrapper around
+// ordinary storage failures. Keep those failures in their original category.
+pub(super) fn validate_live(connection: &Connection) -> Result<()> {
+    validate_inner(connection, VERSION)
+}
+
 pub(crate) fn validate_supported(connection: &Connection) -> Result<i64> {
     let version = supported_version(connection)?;
     validate_version(connection, version)?;

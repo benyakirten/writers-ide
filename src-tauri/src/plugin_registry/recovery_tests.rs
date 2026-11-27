@@ -752,3 +752,49 @@ fn invalid_backup_and_unsupported_versions_do_not_create_destination() {
     ));
     assert!(!target.exists());
 }
+
+#[test]
+fn backups_preserve_supported_versions_and_read_only_sources_without_schema_writes() {
+    for legacy in [false, true] {
+        let directory = tempdir().unwrap();
+        let source_path = directory.path().join("source.sqlite");
+        let mut source = Connection::open(&source_path).unwrap();
+        if legacy {
+            schema::initialize_v1(&mut source).unwrap();
+        } else {
+            schema::initialize(&mut source).unwrap();
+        }
+        source.close().unwrap();
+        let original = std::fs::read(&source_path).unwrap();
+        let source = open_existing(&source_path).unwrap();
+        assert!(source.is_readonly("main").unwrap());
+        let schema_version: i64 = source
+            .query_row("PRAGMA schema_version", [], |r| r.get(0))
+            .unwrap();
+        let destination = directory.path().join("backup.sqlite");
+        if legacy {
+            let refused = directory.path().join("current-only.sqlite");
+            assert!(matches!(
+                backup_database(&source, &refused),
+                Err(RegistryError::RecoveryRequired(_))
+            ));
+            assert!(!refused.exists());
+        }
+        backup_database_supported(&source, &destination).unwrap();
+        let target = open_existing(&destination).unwrap();
+        assert_eq!(
+            schema::validate_supported(&target).unwrap(),
+            if legacy { 1 } else { schema::VERSION }
+        );
+        assert_eq!(
+            source
+                .query_row("PRAGMA schema_version", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            schema_version
+        );
+        assert_eq!(std::fs::read(&source_path).unwrap(), original);
+        if !legacy {
+            backup_database(&source, &directory.path().join("current.sqlite")).unwrap();
+        }
+    }
+}

@@ -29,9 +29,10 @@ pub(crate) use self::{
     transitions::{InstallationAction, InstallationExpectation},
     worker::{
         lifecycle::{
-            LifecyclePhase, LifecycleRevision, LifecycleSnapshot, MaintenanceOutcome,
-            MaintenanceRequest, RecoveryKind, RegistryControl,
+            LifecycleObserver, LifecyclePhase, LifecycleRevision, LifecycleSnapshot,
+            MaintenanceOutcome, MaintenanceRequest, RecoveryCause, RecoveryKind, RegistryControl,
+            ServiceValidityObserver, StopReason,
         },
-        Registry, RegistryHandle, RegistryOwner, RegistrySession,
+        Registry, RegistryCapacity, RegistryHandle, RegistryOwner, RegistrySession,
     },
 };

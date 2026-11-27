@@ -198,7 +198,7 @@ Before disruptive maintenance or first-run root creation, reject a platform alre
 
 The runtime publisher currently refuses before this sequence. Test-only candidate and fault adapters exercise the same compiled orchestration in this approved order:
 
-1. Hold the location lease. For restoration, close old operation admission, drain admitted writes and close the old store. Prepare and seal the replacement directly in its final generation directory.
+1. Hold the location lease. For restoration, close old operation admission, drain admitted writes while the source store remains valid and close the old store. Live-store invalidation suppresses pending maintenance and retains the invalid store until shutdown instead; see the [implemented lifecycle contract](registry-implementation-review.md#lifecycle-invalidation-and-observation--current-implementation). Otherwise, prepare and seal the replacement directly in its final generation directory.
 2. Complete the platform-approved directory barriers for that generation and any newly created ancestor entries, through the root and its stable parent as required. The database file barrier is already part of checked sealing. Never split a database from its sidecars or delete crash-left sidecars.
 3. Create a unique temporary selector beside `active` using non-overwriting creation. Write the exact record, handle short writes, synchronize the file and close its handle before the native selection operation.
 4. Perform exactly one supported native selection operation. First publication uses exclusive destination creation; replacement uses atomic replacement without deleting `active` first. No copy fallback, alternate API or automatic selection retry is permitted.

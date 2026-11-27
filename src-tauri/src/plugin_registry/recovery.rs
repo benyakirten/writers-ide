@@ -79,23 +79,94 @@ fn copy(source: &Connection, destination: &mut Connection) -> Result<()> {
 }
 
 pub(crate) fn backup_database(source: &Connection, destination: &Path) -> Result<()> {
-    backup_validated(source, destination, false)
+    backup_database_observed(source, destination, |_| {})
 }
 
 pub(super) fn backup_database_supported(source: &Connection, destination: &Path) -> Result<()> {
-    backup_validated(source, destination, true)
+    backup_validated(
+        source,
+        destination,
+        true,
+        |_| {},
+        #[cfg(test)]
+        None,
+    )
 }
 
-fn backup_validated(source: &Connection, destination: &Path, supported: bool) -> Result<()> {
-    let snapshot = source.unchecked_transaction()?;
-    let version = if supported {
-        schema::validate_supported(&snapshot)?
-    } else {
-        schema::validate(&snapshot)?;
-        schema::VERSION
+pub(super) fn backup_database_observed(
+    source: &Connection,
+    destination: &Path,
+    source_error: impl FnMut(&RegistryError),
+) -> Result<()> {
+    backup_validated(
+        source,
+        destination,
+        false,
+        source_error,
+        #[cfg(test)]
+        None,
+    )
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy)]
+pub(super) enum BackupTestFault {
+    InvalidTarget,
+    ReadOnlyTarget,
+}
+
+#[cfg(test)]
+pub(super) fn test_backup_target_fault(
+    source: &Connection,
+    destination: &Path,
+    source_error: impl FnMut(&RegistryError),
+    fault: BackupTestFault,
+) -> Result<()> {
+    backup_validated(source, destination, false, source_error, Some(fault))
+}
+
+fn backup_validated(
+    source: &Connection,
+    destination: &Path,
+    supported: bool,
+    mut source_error: impl FnMut(&RegistryError),
+    #[cfg(test)] target_fault: Option<BackupTestFault>,
+) -> Result<()> {
+    let snapshot = source
+        .unchecked_transaction()
+        .map_err(RegistryError::from)
+        .inspect_err(&mut source_error)?;
+    let validate_source = || {
+        if supported {
+            schema::validate_supported(&snapshot)
+        } else {
+            schema::validate_live(&snapshot).map(|()| schema::VERSION)
+        }
     };
+    let version = validate_source().inspect_err(&mut source_error)?;
     let mut target = claim_destination(destination)?;
-    copy(&snapshot, &mut target)?;
+    #[cfg(test)]
+    if matches!(target_fault, Some(BackupTestFault::ReadOnlyTarget)) {
+        target.close().unwrap();
+        target = Connection::open_with_flags(
+            destination,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .unwrap();
+    }
+    if let Err(error) = copy(&snapshot, &mut target) {
+        // SQLite's backup API reports through the destination connection. A copy
+        // error alone cannot establish which database is invalid. Inspect the
+        // same pinned source snapshot, without reclassifying the copy result.
+        let _ = validate_source().inspect_err(&mut source_error);
+        return Err(error);
+    }
+    #[cfg(test)]
+    if matches!(target_fault, Some(BackupTestFault::InvalidTarget)) {
+        target
+            .execute_batch("UPDATE registry_metadata SET schema_version=999")
+            .unwrap();
+    }
     if schema::validate_supported(&target)? != version {
         return Err(RegistryError::RecoveryRequired(
             "backup schema version differs from its source".into(),
@@ -103,7 +174,10 @@ fn backup_validated(source: &Connection, destination: &Path, supported: bool) ->
     }
     target.close().map_err(|(_, error)| error)?;
     sync_destination(destination)?;
-    snapshot.commit()?;
+    snapshot
+        .commit()
+        .map_err(RegistryError::from)
+        .inspect_err(&mut source_error)?;
     Ok(())
 }
 

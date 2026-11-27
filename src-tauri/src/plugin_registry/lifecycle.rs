@@ -7,6 +7,12 @@ use super::super::{
     location::LocationLease,
 };
 use super::*;
+#[path = "observation.rs"]
+mod observation;
+#[allow(unused_imports)]
+pub(crate) use observation::{
+    LifecycleObserver, ReaderBudget, ServiceValidity, ServiceValidityObserver,
+};
 
 #[derive(Clone, Debug)]
 pub(crate) struct LifecycleRevision {
@@ -25,6 +31,8 @@ pub(crate) enum RecoveryKind {
     Preparation,
     PublicationUnknown,
     PublishedNotReady,
+    TransactionUncertain,
+    DomainInvalid,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum LifecyclePhase {
@@ -39,18 +47,34 @@ pub(crate) enum LifecyclePhase {
 pub(crate) enum MaintenanceOutcome {
     Ready,
     Recovery(RecoveryKind),
+    SuppressedBeforeExecution,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StopReason {
+    Shutdown,
+    WorkerPanicked,
+    WorkerTerminated,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RecoveryCause {
+    TransactionUncertain,
+    DomainInvalid,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct LifecycleSnapshot {
     pub revision: LifecycleRevision,
     pub phase: LifecyclePhase,
     pub last_outcome: Option<MaintenanceOutcome>,
+    pub recovery_cause: Option<RecoveryCause>,
+    pub stop_reason: Option<StopReason>,
 }
 
 pub(super) struct LifecycleData {
     pub snapshot: LifecycleSnapshot,
     pub shutdown: bool,
     pub service: u128,
+    pub(super) validity: Arc<ServiceValidity>,
+    publisher: Option<watch::Sender<LifecycleSnapshot>>,
     pending: Option<MaintenanceTask>,
 }
 impl LifecycleData {
@@ -63,13 +87,17 @@ impl LifecycleData {
                 },
                 phase: LifecyclePhase::Opening,
                 last_outcome: None,
+                recovery_cause: None,
+                stop_reason: None,
             },
             shutdown: false,
             service: 0,
+            validity: Arc::new(ServiceValidity::new()),
+            publisher: None,
             pending: None,
         }
     }
-    fn advance(&mut self) {
+    pub(super) fn advance(&mut self) {
         // Refresh the opaque identity on exhaustion rather than reuse a revision.
         match self.snapshot.revision.sequence.checked_add(1) {
             Some(sequence) => self.snapshot.revision.sequence = sequence,
@@ -81,20 +109,43 @@ impl LifecycleData {
             }
         }
     }
+    pub(super) fn publish(&mut self) {
+        if let Some(publisher) = &self.publisher {
+            publisher.send_replace(self.snapshot.clone());
+        }
+    }
+    pub(super) fn suppress_pending(&mut self) -> Option<MaintenanceTask> {
+        let pending = self.pending.take();
+        if pending.is_some() {
+            self.snapshot.last_outcome = Some(MaintenanceOutcome::SuppressedBeforeExecution);
+        }
+        pending
+    }
     pub fn shutdown(&mut self) {
         if !self.shutdown {
             self.shutdown = true;
+            self.validity.invalidate();
             self.advance();
             if self.snapshot.phase != LifecyclePhase::Stopped {
                 self.snapshot.phase = LifecyclePhase::ShuttingDown;
             }
+            self.publish();
         }
     }
-    pub fn stopped(&mut self) {
+    pub fn stopped(&mut self, panicked: bool) {
+        self.snapshot.stop_reason = Some(if panicked {
+            StopReason::WorkerPanicked
+        } else if self.shutdown {
+            StopReason::Shutdown
+        } else {
+            StopReason::WorkerTerminated
+        });
         self.shutdown = true;
+        self.validity.invalidate();
         self.snapshot.phase = LifecyclePhase::Stopped;
         self.advance();
-        self.pending.take();
+        self.publish();
+        self.publisher.take();
     }
 }
 
@@ -122,13 +173,43 @@ impl RegistryControl {
         if &state.lifecycle.snapshot.revision != expected {
             return Err(RegistryError::Conflict("stale lifecycle revision".into()));
         }
-        if !state.accepting || state.lifecycle.snapshot.phase != LifecyclePhase::Ready {
+        if !state.accepting
+            || state.lifecycle.snapshot.phase != LifecyclePhase::Ready
+            || !state.lifecycle.validity.is_valid()
+        {
             return Err(RegistryError::Unavailable("registry is not ready".into()));
         }
         Ok(RegistryHandle {
             shared: self.shared.clone(),
             service: state.lifecycle.service,
+            validity: state.lifecycle.validity.clone(),
         })
+    }
+    #[cfg(test)]
+    pub(crate) async fn test_replace_service(
+        &self,
+        expected: LifecycleRevision,
+        path: PathBuf,
+        limits: RegistryLimits,
+    ) -> Result<()> {
+        let request = MaintenanceRequest::fixture(move |lease| {
+            let result = (|| {
+                let path = match lease {
+                    Some(lease) => lease.check_database(&path)?,
+                    None => path,
+                };
+                Store::open(&path, limits)
+            })();
+            match result {
+                Ok(store) => MaintenanceResult::Ready(store),
+                Err(error) => MaintenanceResult::Recovery {
+                    error,
+                    kind: RecoveryKind::Preparation,
+                    retained: None,
+                },
+            }
+        });
+        self.maintain(expected, request).await
     }
     pub(crate) async fn maintain(
         &self,
@@ -157,9 +238,11 @@ impl RegistryControl {
                 ));
             }
             state.accepting = false;
+            state.lifecycle.validity.invalidate();
             state.lifecycle.advance();
             state.lifecycle.snapshot.phase = LifecyclePhase::Maintenance;
             state.lifecycle.pending = Some(MaintenanceTask { request, reply });
+            state.lifecycle.publish();
             self.shared.wake.notify_all();
         }
         receive.await.unwrap_or_else(|_| {
@@ -178,9 +261,16 @@ pub(crate) struct MaintenanceRequest {
 trait Maintenance: Send {
     fn execute(self: Box<Self>, lease: Option<&LocationLease>) -> MaintenanceResult;
 }
-struct MaintenanceTask {
+pub(super) struct MaintenanceTask {
     request: MaintenanceRequest,
     reply: oneshot::Sender<Result<()>>,
+}
+impl MaintenanceTask {
+    pub(super) fn suppress(self) {
+        let _ = self.reply.send(Err(RegistryError::Unavailable(
+            "maintenance suppressed before execution; request did not run".into(),
+        )));
+    }
 }
 enum MaintenanceResult {
     Ready(Store),
@@ -227,7 +317,9 @@ pub(super) fn run_worker(shared: &Shared, store: Store, lease: Option<&LocationL
             loop {
                 match state.queue.pop_front() {
                     Some(job) => {
-                        if !state.accepting && job.is_read() {
+                        if state.lifecycle.snapshot.recovery_cause.is_some()
+                            || (!state.accepting && job.is_read())
+                        {
                             drop(state);
                             job.reject();
                             state = shared.state.lock().unwrap_or_else(|e| e.into_inner());
@@ -248,9 +340,10 @@ pub(super) fn run_worker(shared: &Shared, store: Store, lease: Option<&LocationL
             }
         };
         match action {
-            Action::Work(job) => {
-                job.execute(store.as_mut().expect("admitted operation owns a store"))
-            }
+            Action::Work(job) => job.execute(
+                store.as_mut().expect("admitted operation owns a store"),
+                shared,
+            ),
             Action::Stop => break,
             Action::Maintenance(task) => {
                 // Close the old service before replacement preparation. No SQL
@@ -294,14 +387,17 @@ pub(super) fn run_worker(shared: &Shared, store: Store, lease: Option<&LocationL
                                     .service
                                     .checked_add(1)
                                     .expect("service identity exhausted");
+                                state.lifecycle.validity = Arc::new(ServiceValidity::new());
                                 state.lifecycle.snapshot.phase = LifecyclePhase::Ready;
                                 state.accepting = true;
                             }
                             MaintenanceOutcome::Recovery(kind) => {
                                 state.lifecycle.snapshot.phase = LifecyclePhase::RecoveryOnly(kind);
                             }
+                            MaintenanceOutcome::SuppressedBeforeExecution => unreachable!(),
                         }
                     }
+                    state.lifecycle.publish();
                 }
                 let _ = task.reply.send(reply);
             }

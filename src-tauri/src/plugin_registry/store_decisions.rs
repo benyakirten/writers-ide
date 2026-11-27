@@ -2,7 +2,12 @@ use super::*;
 
 pub(super) fn baseline(c: &Connection, component: ComponentId) -> Result<Option<ScopeBaseline>> {
     c.query_row("SELECT last_reviewed_scope,scope_revision FROM component_scope_state WHERE component_id=?1",[component.0],|r| Ok((r.get::<_,String>(0)?,r.get::<_,i64>(1)?))).optional()?
-        .map(|(scope,revision)| Ok(ScopeBaseline { scope:parse_scope(&scope)?,revision:Revision(revision) })).transpose()
+        .map(|(scope, revision)| {
+            if revision < 1 {
+                return Err(corrupt("invalid scope revision"));
+            }
+            Ok(ScopeBaseline { scope: parse_scope(&scope)?, revision: Revision(revision) })
+        }).transpose()
 }
 pub(super) fn acknowledgement(
     c: &Connection,

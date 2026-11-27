@@ -1,11 +1,10 @@
 //! Internal real-registry settings coordination. No IPC or plugin authority.
 //!
-//! The fixture must close this owner before replacing the registry, and await
-//! settings shutdown before registry/runtime shutdown. Drop only closes admission;
-//! it cannot keep an executor alive. There is deliberately no lifecycle watch:
-//! poisoning by unrelated registry operations is detected only on our next read
-//! or write. Production writes should route here; lower-level writes are not
-//! globally intercepted and cannot generate notifications.
+//! Await settings shutdown before registry/runtime shutdown. Drop only closes
+//! admission; it cannot keep an executor alive. One service-validity reader closes
+//! idle associations after registry invalidation. Atomic checks also gate settings
+//! actions independently of watcher progress. Lower-level successful writes do not
+//! generate settings notifications.
 //!
 //! Close prevents reconciliation and discards pending deliveries. Callback selection
 //! is ordered with close under the state mutex, but invocation is outside it. An
@@ -14,7 +13,7 @@
 //! callback revocation.
 use super::{
     CommandResourceRevision, CommandResourceSettings, CommandResourceSettingsSnapshot,
-    RegistryError, RegistryHandle, Result,
+    RegistryError, RegistryHandle, Result, ServiceValidityObserver,
 };
 use std::{
     collections::BTreeMap,
@@ -78,6 +77,7 @@ struct State {
     snapshot: Arc<SettingsSnapshot>,
     operations: usize,
     delivery_running: bool,
+    watcher_running: bool,
     next_subscription: u64,
     subscribers: BTreeMap<u64, Subscriber>,
 }
@@ -87,6 +87,7 @@ struct Shared {
     max_subscribers: usize,
     state: Mutex<State>,
     delivery: Notify,
+    closed: Notify,
     drained: Notify,
     #[cfg(test)]
     fail_delivery_turn: std::sync::atomic::AtomicBool,
@@ -104,6 +105,7 @@ impl Shared {
         // Wake before foreign cleanup. Destructors may reenter or panic. Drop
         // each subscriber separately so one panic cannot unwind through another.
         self.delivery.notify_one();
+        self.closed.notify_one();
         for (_, subscriber) in removed {
             let _ = caught_panic(catch_unwind(AssertUnwindSafe(|| drop(subscriber))));
         }
@@ -115,6 +117,18 @@ impl Shared {
             self.close();
         }
     }
+    // The atomic load is the ordering point. Never acquire registry locks here.
+    fn is_open(&self, state: &State) -> bool {
+        !state.closed && self.registry.is_service_valid()
+    }
+    fn select_read(&self, snapshot: Arc<SettingsSnapshot>) -> Result<Arc<SettingsSnapshot>> {
+        let state = self.lock();
+        if self.is_open(&state) {
+            Ok(snapshot)
+        } else {
+            Err(closed())
+        }
+    }
     fn snapshot(&self, saved: CommandResourceSettingsSnapshot) -> Arc<SettingsSnapshot> {
         Arc::new(SettingsSnapshot {
             epoch: self.lock().snapshot.epoch.clone(),
@@ -124,7 +138,7 @@ impl Shared {
     fn reconcile(&self, snapshot: Arc<SettingsSnapshot>) {
         let inconsistent = {
             let mut state = self.lock();
-            if state.closed || snapshot.saved.revision < state.snapshot.saved.revision {
+            if !self.is_open(&state) || snapshot.saved.revision < state.snapshot.saved.revision {
                 return;
             }
             if snapshot.saved.revision == state.snapshot.saved.revision {
@@ -154,7 +168,7 @@ impl Shared {
     }
     fn reserve(self: &Arc<Self>) -> Result<OperationSlot> {
         let mut state = self.lock();
-        if state.closed {
+        if !self.is_open(&state) {
             return Err(closed());
         }
         if state.operations >= self.max_operations {
@@ -173,7 +187,7 @@ impl Shared {
             notified.as_mut().enable();
             {
                 let state = self.lock();
-                if state.operations == 0 && !state.delivery_running {
+                if state.operations == 0 && !state.delivery_running && !state.watcher_running {
                     return;
                 }
             }
@@ -197,6 +211,45 @@ impl Drop for DeliveryExit {
         let _finished = Finished(&self.0);
         self.0.close();
     }
+}
+
+// Own the reader before spawning, including when the future is never polled.
+struct ValidityExit {
+    shared: Arc<Shared>,
+    observer: Option<ServiceValidityObserver>,
+}
+impl Drop for ValidityExit {
+    fn drop(&mut self) {
+        struct Finished<'a>(&'a Shared);
+        impl Drop for Finished<'_> {
+            fn drop(&mut self) {
+                self.0.lock().watcher_running = false;
+                self.0.drained.notify_waiters();
+            }
+        }
+        let _finished = Finished(&self.shared);
+        drop(self.observer.take());
+        self.shared.close();
+    }
+}
+async fn watch_validity(mut exit: ValidityExit) {
+    let notified = exit.shared.closed.notified();
+    tokio::pin!(notified);
+    notified.as_mut().enable();
+    if exit.shared.lock().closed {
+        return;
+    }
+    let invalidated = exit.observer.as_mut().unwrap().invalidated();
+    tokio::pin!(invalidated);
+    std::future::poll_fn(|cx| {
+        use std::{future::Future, task::Poll};
+        if notified.as_mut().poll(cx).is_ready() || invalidated.as_mut().poll(cx).is_ready() {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    })
+    .await;
 }
 
 // A custom panic payload can itself have a panicking destructor. Isolate that
@@ -236,6 +289,7 @@ impl SettingsOwner {
                 "settings capacities must be positive".into(),
             ));
         }
+        let observer = registry.observe_validity()?;
         let saved = registry.read_command_resource_settings().await?;
         let shared = Arc::new(Shared {
             registry,
@@ -249,14 +303,26 @@ impl SettingsOwner {
                 }),
                 operations: 0,
                 delivery_running: true,
+                watcher_running: true,
                 next_subscription: 0,
                 subscribers: BTreeMap::new(),
             }),
             delivery: Notify::new(),
+            closed: Notify::new(),
             drained: Notify::new(),
             #[cfg(test)]
             fail_delivery_turn: std::sync::atomic::AtomicBool::new(false),
         });
+        {
+            let state = shared.lock();
+            if !shared.is_open(&state) {
+                return Err(closed());
+            }
+        }
+        tokio::spawn(watch_validity(ValidityExit {
+            shared: shared.clone(),
+            observer: Some(observer),
+        }));
         tokio::spawn(deliver(DeliveryExit(shared.clone())));
         Ok(Self { shared })
     }
@@ -295,7 +361,7 @@ impl SettingsOperations {
                 Ok(saved) => {
                     let snapshot = shared.snapshot(saved);
                     shared.reconcile(snapshot.clone());
-                    Ok(snapshot)
+                    shared.select_read(snapshot)
                 }
                 Err(error) => {
                     shared.read_failure(&error);
@@ -328,14 +394,27 @@ impl SettingsOperations {
                 }
                 Err(error @ RegistryError::Conflict(_)) => {
                     // This read is a later observation, not the conflicting transaction.
-                    match shared.registry.read_command_resource_settings().await {
+                    let can_read = {
+                        let state = shared.lock();
+                        shared.is_open(&state)
+                    };
+                    let observation = if can_read {
+                        shared.registry.read_command_resource_settings().await
+                    } else {
+                        Err(closed())
+                    };
+                    match observation {
                         Ok(saved) => {
                             let snapshot = shared.snapshot(saved);
                             shared.reconcile(snapshot.clone());
+                            let (current, read_error) = match shared.select_read(snapshot) {
+                                Ok(snapshot) => (Some(snapshot), None),
+                                Err(error) => (None, Some(error)),
+                            };
                             Ok(SaveOutcome::Conflict {
                                 error,
-                                current: Some(snapshot),
-                                read_error: None,
+                                current,
+                                read_error,
                             })
                         }
                         Err(read_error) => {
@@ -365,7 +444,8 @@ impl SettingsOperations {
 }
 impl SettingsAssociation {
     pub(crate) fn is_closed(&self) -> bool {
-        self.shared.lock().closed
+        let state = self.shared.lock();
+        !self.shared.is_open(&state)
     }
     pub(crate) async fn read(&self) -> Result<Arc<SettingsSnapshot>> {
         SettingsOperations {
@@ -381,7 +461,7 @@ impl SettingsAssociation {
         let observer: Observer = Arc::new(observer);
         let result = (|| {
             let mut state = self.shared.lock();
-            if state.closed {
+            if !self.shared.is_open(&state) {
                 return Err(closed());
             }
             if state.subscribers.len() >= self.shared.max_subscribers {
@@ -457,7 +537,7 @@ async fn deliver(exit: DeliveryExit) {
         );
         let ids = {
             let state = shared.lock();
-            if state.closed {
+            if !shared.is_open(&state) {
                 break;
             }
             state.subscribers.keys().copied().collect::<Vec<_>>()
@@ -465,6 +545,9 @@ async fn deliver(exit: DeliveryExit) {
         for id in ids {
             let next = {
                 let mut state = shared.lock();
+                if !shared.is_open(&state) {
+                    break;
+                }
                 state.subscribers.get_mut(&id).and_then(|subscriber| {
                     if subscriber.in_progress.is_some() {
                         return None;

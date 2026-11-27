@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     plugin_integrity::IntegrityLimits,
-    plugin_registry::{Registry, RegistryLimits, RegistrySession},
+    plugin_registry::{Registry, RegistryCapacity, RegistryLimits, RegistrySession},
 };
 use std::{
     future::Future,
@@ -46,9 +46,13 @@ fn limits() -> RegistryLimits {
 }
 async fn fixture() -> (tempfile::TempDir, RegistrySession, SettingsOwner) {
     let dir = tempfile::tempdir().unwrap();
-    let session = Registry::create(dir.path().join("registry.sqlite"), limits(), 16)
-        .await
-        .unwrap();
+    let session = Registry::create(
+        dir.path().join("registry.sqlite"),
+        limits(),
+        RegistryCapacity::with_observers(16, 4, 4).unwrap(),
+    )
+    .await
+    .unwrap();
     let owner = SettingsOwner::start(session.handle.clone(), 2, 3)
         .await
         .unwrap();
@@ -220,9 +224,13 @@ fn command_resource_settings_custom_panic_payload_drop_is_isolated() {
 fn command_resource_settings_unpolled_delivery_drop_closes_and_drains() {
     run(async {
         let dir = tempfile::tempdir().unwrap();
-        let session = Registry::create(dir.path().join("db"), limits(), 8)
-            .await
-            .unwrap();
+        let session = Registry::create(
+            dir.path().join("db"),
+            limits(),
+            RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+        )
+        .await
+        .unwrap();
         let saved = session
             .handle
             .read_command_resource_settings()
@@ -242,10 +250,12 @@ fn command_resource_settings_unpolled_delivery_drop_closes_and_drains() {
                 }),
                 operations: 0,
                 delivery_running: true,
+                watcher_running: false,
                 next_subscription: 0,
                 subscribers: BTreeMap::new(),
             }),
             delivery: Notify::new(),
+            closed: Notify::new(),
             drained: Notify::new(),
             fail_delivery_turn: std::sync::atomic::AtomicBool::new(false),
         });
@@ -315,9 +325,13 @@ fn command_resource_settings_delivery_exit_guard_on_unexpected_unwind() {
 
 async fn abandoned_startup(completed_before_resume: bool) {
     let dir = tempfile::tempdir().unwrap();
-    let session = Registry::create(dir.path().join("db"), limits(), 8)
-        .await
-        .unwrap();
+    let session = Registry::create(
+        dir.path().join("db"),
+        limits(),
+        RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    )
+    .await
+    .unwrap();
     let references = session.handle.test_shared_references();
     let (started, receive_started) = mpsc::channel();
     let (release, receive_release) = mpsc::channel();
@@ -473,9 +487,13 @@ fn command_resource_settings_scoped_close_allows_selected_callback_but_no_pendin
 fn command_resource_settings_initial_read_saved_values_and_no_defaults() {
     run(async {
         let dir = tempfile::tempdir().unwrap();
-        let session = Registry::create(dir.path().join("db"), limits(), 8)
-            .await
-            .unwrap();
+        let session = Registry::create(
+            dir.path().join("db"),
+            limits(),
+            RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+        )
+        .await
+        .unwrap();
         let original = session
             .handle
             .read_command_resource_settings()
@@ -815,10 +833,12 @@ fn command_resource_settings_unknown_poisoned_store_closes_without_reread() {
             Err(RegistryError::Unavailable(_))
         ));
         assert_eq!(session.handle.test_settings_reads(), reads);
-        // Native lifecycle is deliberately not changed by settings fail-closure.
+        // Transaction uncertainty invalidates the native service before its reply.
         assert_eq!(
             session.owner.control().snapshot().phase,
-            crate::plugin_registry::LifecyclePhase::Ready
+            crate::plugin_registry::LifecyclePhase::RecoveryOnly(
+                crate::plugin_registry::RecoveryKind::TransactionUncertain
+            )
         );
         stop(session, owner).await;
     });
@@ -1083,5 +1103,687 @@ fn command_resource_settings_replacement_lower_revision_fresh_epoch_and_stale_ha
             Err(RegistryError::Unavailable(_))
         ));
         stop(replacement, replacement_owner).await;
+    });
+}
+
+fn unrelated_failure(store: &mut crate::plugin_registry::store::Store, mode: usize) -> Result<()> {
+    if mode == 2 {
+        panic!("unrelated worker panic");
+    }
+    if mode == 1 {
+        store
+            .test_connection()
+            .execute("DELETE FROM host_settings", [])?;
+        store.read_command_resource_settings()?;
+    } else {
+        let initial = store.read_command_resource_settings()?;
+        store.test_connection().execute_batch(
+            "CREATE TEMP TABLE validity_parent (id INTEGER PRIMARY KEY);
+             CREATE TEMP TABLE validity_child (parent INTEGER REFERENCES validity_parent(id) DEFERRABLE INITIALLY DEFERRED);
+             CREATE TEMP TRIGGER validity_commit_failure AFTER UPDATE OF command_resource_revision ON host_settings
+             BEGIN INSERT INTO validity_child VALUES (1); END;",
+        )?;
+        store.set_command_resource_settings(
+            initial.revision,
+            CommandResourceSettings {
+                max_payload_depth: initial.settings.max_payload_depth + 1,
+                ..initial.settings
+            },
+        )?;
+    }
+    Ok(())
+}
+
+// Do not poll the Tokio runtime: prove the gate works before its watcher runs.
+fn wait_invalid(handle: &RegistryHandle) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while handle.is_service_valid() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "invalidation watchdog"
+        );
+        std::thread::yield_now();
+    }
+}
+
+#[test]
+fn command_resource_settings_unrelated_failure_idle_watcher_and_atomic_gates() {
+    run(async {
+        for mode in 0..3 {
+            let (_dir, session, owner) = fixture().await;
+            let initial = owner.association().read().await.unwrap();
+            let calls = Arc::new(AtomicUsize::new(0));
+            let called = calls.clone();
+            let sub = owner
+                .association()
+                .subscribe(move |_| {
+                    called.fetch_add(1, Ordering::SeqCst);
+                })
+                .unwrap();
+            until(|| calls.load(Ordering::SeqCst) == 1).await;
+            assert!(sub.acknowledge(&initial.epoch, initial.saved.revision));
+            let updated = session
+                .handle
+                .set_command_resource_settings(initial.saved.revision, changed(&initial, 1))
+                .await
+                .unwrap();
+            owner.shared.reconcile(owner.shared.snapshot(updated));
+            let mut failure = Box::pin(
+                session
+                    .handle
+                    .test_submit(move |store| unrelated_failure(store, mode)),
+            );
+            pending(failure.as_mut());
+            wait_invalid(&session.handle);
+            assert!(!owner.shared.lock().closed, "watcher has not run");
+            assert!(owner.association().is_closed());
+            assert!(matches!(
+                owner.shared.reserve(),
+                Err(RegistryError::Unavailable(_))
+            ));
+            assert!(matches!(
+                owner.association().subscribe(|_| {}),
+                Err(RegistryError::Unavailable(_))
+            ));
+            owner
+                .shared
+                .reconcile(owner.shared.snapshot(CommandResourceSettingsSnapshot {
+                    revision: initial.saved.revision,
+                    settings: initial.saved.settings,
+                }));
+            assert!(!owner.shared.lock().closed);
+            let _ = failure.await;
+            until(|| {
+                let state = owner.shared.lock();
+                state.closed && !state.watcher_running
+            })
+            .await;
+            assert!(owner.shared.lock().subscribers.is_empty());
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                1,
+                "pending snapshot was discarded"
+            );
+            owner.shutdown().await;
+            let _ = session.owner.shutdown().await;
+        }
+    });
+}
+
+#[test]
+fn command_resource_settings_observer_capacity_and_shutdown_release() {
+    run(async {
+        let dir = tempfile::tempdir().unwrap();
+        let session = Registry::create(
+            dir.path().join("db"),
+            limits(),
+            RegistryCapacity::with_observers(8, 1, 1).unwrap(),
+        )
+        .await
+        .unwrap();
+        let reader = session.handle.observe_validity().unwrap();
+        let reads = session.handle.test_settings_reads();
+        assert!(matches!(
+            SettingsOwner::start(session.handle.clone(), 1, 1).await,
+            Err(RegistryError::LimitExceeded(_))
+        ));
+        assert_eq!(session.handle.test_settings_reads(), reads);
+        drop(reader);
+        let owner = SettingsOwner::start(session.handle.clone(), 1, 1)
+            .await
+            .unwrap();
+        assert!(matches!(
+            session.handle.observe_validity(),
+            Err(RegistryError::LimitExceeded(_))
+        ));
+        owner.shutdown().await;
+        assert!(session.handle.is_service_valid());
+        let reader = session.handle.observe_validity().unwrap();
+        assert!(reader.is_valid());
+        drop(reader);
+        let owner = SettingsOwner::start(session.handle.clone(), 1, 1)
+            .await
+            .unwrap();
+        let shared = owner.shared.clone();
+        drop(owner);
+        shared.drain().await;
+        assert!(session.handle.observe_validity().is_ok());
+        session.owner.shutdown().await.unwrap();
+        assert!(matches!(
+            SettingsOwner::start(session.handle.clone(), 1, 1).await,
+            Err(RegistryError::Unavailable(_))
+        ));
+    });
+}
+
+#[test]
+fn command_resource_settings_startup_read_completed_then_invalidated() {
+    run(async {
+        let dir = tempfile::tempdir().unwrap();
+        let session = Registry::create(
+            dir.path().join("db"),
+            limits(),
+            RegistryCapacity::with_observers(8, 1, 1).unwrap(),
+        )
+        .await
+        .unwrap();
+        let (entered, entering) = mpsc::channel();
+        let (release, released) = mpsc::channel();
+        let mut barrier = Box::pin(session.handle.test_submit(move |_| {
+            entered.send(()).unwrap();
+            released.recv_timeout(Duration::from_secs(10)).unwrap();
+            Ok(())
+        }));
+        pending(barrier.as_mut());
+        entering.recv_timeout(Duration::from_secs(10)).unwrap();
+        let mut startup = Box::pin(SettingsOwner::start(session.handle.clone(), 1, 1));
+        pending(startup.as_mut());
+        let mut failure = Box::pin(
+            session
+                .handle
+                .test_submit(|store| unrelated_failure(store, 0)),
+        );
+        pending(failure.as_mut());
+        release.send(()).unwrap();
+        wait_invalid(&session.handle);
+        assert!(matches!(startup.await, Err(RegistryError::Unavailable(_))));
+        barrier.await.unwrap();
+        assert!(matches!(
+            failure.await,
+            Err(RegistryError::OutcomeUnknown(_))
+        ));
+        session.owner.shutdown().await.unwrap();
+    });
+}
+
+#[test]
+fn command_resource_settings_completed_native_results_after_invalidation() {
+    run(async {
+        // Native read/save/conflict finishes before unrelated invalidation. Its
+        // settings task cannot select the response until this thread yields.
+        for operation in 0..3 {
+            let (_dir, session, owner) = fixture().await;
+            let initial = owner.association().read().await.unwrap();
+            let expected = if operation == 2 {
+                session
+                    .handle
+                    .set_command_resource_settings(initial.saved.revision, changed(&initial, 1))
+                    .await
+                    .unwrap()
+                    .revision
+            } else {
+                initial.saved.revision
+            };
+            let reads = session.handle.test_settings_reads();
+            let (entered, entering) = mpsc::channel();
+            let (release, released) = mpsc::channel();
+            let mut barrier = Box::pin(session.handle.test_submit(move |_| {
+                entered.send(()).unwrap();
+                released.recv_timeout(Duration::from_secs(10)).unwrap();
+                Ok(())
+            }));
+            pending(barrier.as_mut());
+            entering.recv_timeout(Duration::from_secs(10)).unwrap();
+            let operations = owner.operations();
+            let mut read = Box::pin(operations.read());
+            let mut save = Box::pin(operations.save(initial.saved.revision, changed(&initial, 2)));
+            if operation == 0 {
+                pending(read.as_mut());
+            } else {
+                pending(save.as_mut());
+            }
+            until(|| session.handle.test_queue_len() == 1).await;
+            let mut failure = Box::pin(
+                session
+                    .handle
+                    .test_submit(|store| unrelated_failure(store, 0)),
+            );
+            pending(failure.as_mut());
+            release.send(()).unwrap();
+            wait_invalid(&session.handle);
+            if operation == 0 {
+                assert!(matches!(read.await, Err(RegistryError::Unavailable(_))));
+                assert_eq!(session.handle.test_settings_reads(), reads + 1);
+            } else if operation == 1 {
+                let snapshot = saved(save.await.unwrap());
+                assert!(snapshot.saved.revision > expected);
+                assert_eq!(snapshot.saved.settings.max_payload_depth, 2);
+            } else {
+                match save.await.unwrap() {
+                    SaveOutcome::Conflict {
+                        error,
+                        current,
+                        read_error,
+                    } => {
+                        assert!(matches!(error, RegistryError::Conflict(_)));
+                        assert!(current.is_none());
+                        assert!(matches!(read_error, Some(RegistryError::Unavailable(_))));
+                    }
+                    _ => panic!("confirmed conflict lost"),
+                }
+                assert_eq!(
+                    session.handle.test_settings_reads(),
+                    reads,
+                    "no conflict follow-up or retry"
+                );
+            }
+            assert_eq!(
+                owner.shared.lock().snapshot,
+                initial,
+                "no late reconciliation"
+            );
+            barrier.await.unwrap();
+            assert!(matches!(
+                failure.await,
+                Err(RegistryError::OutcomeUnknown(_))
+            ));
+            stop(session, owner).await;
+        }
+    });
+}
+
+#[test]
+fn command_resource_settings_conflict_followup_completed_before_invalidation_withheld() {
+    run(async {
+        let (_dir, session, owner) = fixture().await;
+        let initial = owner.association().read().await.unwrap();
+        session
+            .handle
+            .set_command_resource_settings(initial.saved.revision, changed(&initial, 1))
+            .await
+            .unwrap();
+        let reads = session.handle.test_settings_reads();
+        let (entered, entering) = mpsc::channel();
+        let (release, released) = mpsc::channel();
+        let mut first = Box::pin(session.handle.test_submit(move |_| {
+            entered.send(()).unwrap();
+            released.recv_timeout(Duration::from_secs(10)).unwrap();
+            Ok(())
+        }));
+        pending(first.as_mut());
+        entering.recv_timeout(Duration::from_secs(10)).unwrap();
+        let operations = owner.operations();
+        let mut conflict = Box::pin(operations.save(initial.saved.revision, changed(&initial, 2)));
+        pending(conflict.as_mut());
+        until(|| session.handle.test_queue_len() == 1).await;
+        let (entered_second, entering_second) = mpsc::channel();
+        let (release_second, released_second) = mpsc::channel();
+        let mut second = Box::pin(session.handle.test_submit(move |_| {
+            entered_second.send(()).unwrap();
+            released_second
+                .recv_timeout(Duration::from_secs(10))
+                .unwrap();
+            Ok(())
+        }));
+        pending(second.as_mut());
+        release.send(()).unwrap();
+        entering_second
+            .recv_timeout(Duration::from_secs(10))
+            .unwrap();
+        until(|| session.handle.test_queue_len() == 1).await;
+        let mut failure = Box::pin(
+            session
+                .handle
+                .test_submit(|store| unrelated_failure(store, 0)),
+        );
+        pending(failure.as_mut());
+        release_second.send(()).unwrap();
+        wait_invalid(&session.handle);
+        match conflict.await.unwrap() {
+            SaveOutcome::Conflict {
+                error,
+                current,
+                read_error,
+            } => {
+                assert!(matches!(error, RegistryError::Conflict(_)));
+                assert!(current.is_none());
+                assert!(matches!(read_error, Some(RegistryError::Unavailable(_))));
+            }
+            _ => panic!("conflict must remain confirmed"),
+        }
+        assert_eq!(session.handle.test_settings_reads(), reads + 1);
+        assert_eq!(owner.shared.lock().snapshot, initial);
+        first.await.unwrap();
+        second.await.unwrap();
+        assert!(matches!(
+            failure.await,
+            Err(RegistryError::OutcomeUnknown(_))
+        ));
+        stop(session, owner).await;
+    });
+}
+
+#[test]
+fn command_resource_settings_validity_exit_unpolled_cancel_and_panic_release_slot() {
+    run(async {
+        let dir = tempfile::tempdir().unwrap();
+        let session = Registry::create(
+            dir.path().join("db"),
+            limits(),
+            RegistryCapacity::with_observers(8, 1, 1).unwrap(),
+        )
+        .await
+        .unwrap();
+        let saved = session
+            .handle
+            .read_command_resource_settings()
+            .await
+            .unwrap();
+        for mode in 0..3 {
+            // Isolate the watcher from delivery so its own exit guard must close
+            // the association and certify completion. The reader is real/charged.
+            let shared = Arc::new(Shared {
+                registry: session.handle.clone(),
+                max_operations: 1,
+                max_subscribers: 1,
+                state: Mutex::new(State {
+                    closed: false,
+                    snapshot: Arc::new(SettingsSnapshot {
+                        epoch: SettingsEpoch(Arc::new(())),
+                        saved,
+                    }),
+                    operations: 0,
+                    delivery_running: false,
+                    watcher_running: true,
+                    next_subscription: 0,
+                    subscribers: BTreeMap::new(),
+                }),
+                delivery: Notify::new(),
+                closed: Notify::new(),
+                drained: Notify::new(),
+                fail_delivery_turn: std::sync::atomic::AtomicBool::new(false),
+            });
+            let exit = ValidityExit {
+                shared: shared.clone(),
+                observer: Some(session.handle.observe_validity().unwrap()),
+            };
+            assert!(matches!(
+                session.handle.observe_validity(),
+                Err(RegistryError::LimitExceeded(_))
+            ));
+            let mut drain = Box::pin(shared.drain());
+            pending(drain.as_mut());
+            if mode == 0 {
+                drop(Box::pin(watch_validity(exit)));
+            } else if mode == 1 {
+                let (entered, entering) = oneshot::channel();
+                let task = tokio::spawn(async move {
+                    let watcher = watch_validity(exit);
+                    tokio::pin!(watcher);
+                    std::future::poll_fn(|cx| {
+                        assert!(watcher.as_mut().poll(cx).is_pending());
+                        Poll::Ready(())
+                    })
+                    .await;
+                    entered.send(()).unwrap();
+                    watcher.await;
+                });
+                entering.await.unwrap();
+                task.abort();
+                assert!(task.await.unwrap_err().is_cancelled());
+            } else {
+                let task = tokio::spawn(async move {
+                    let _exit = exit;
+                    panic!("unexpected validity task panic");
+                });
+                assert!(task.await.unwrap_err().is_panic());
+            }
+            drain.await;
+            assert!(shared.lock().closed);
+            assert!(!shared.lock().watcher_running);
+            assert!(session.handle.is_service_valid());
+            assert!(session.handle.observe_validity().unwrap().is_valid());
+        }
+        session.owner.shutdown().await.unwrap();
+    });
+}
+
+#[test]
+fn command_resource_settings_invalidation_during_selected_callback_allows_finish_only() {
+    run(async {
+        let (_dir, session, owner) = fixture().await;
+        let initial = owner.association().read().await.unwrap();
+        let historical = owner.shared.select_read(initial.clone()).unwrap();
+        let (selected, selection) = mpsc::channel();
+        let mut failure = Box::pin(session.handle.test_submit(move |store| {
+            selection.recv_timeout(Duration::from_secs(10)).unwrap();
+            unrelated_failure(store, 0)
+        }));
+        pending(failure.as_mut());
+        let handle = session.handle.clone();
+        let association = owner.association();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let first_calls = calls.clone();
+        let _first = owner
+            .association()
+            .subscribe(move |_| {
+                assert!(!association.is_closed());
+                selected.send(()).unwrap();
+                wait_invalid(&handle);
+                assert!(association.is_closed());
+                assert!(matches!(
+                    association.subscribe(|_| {}),
+                    Err(RegistryError::Unavailable(_))
+                ));
+                first_calls.fetch_add(1, Ordering::SeqCst);
+            })
+            .unwrap();
+        let second_calls = calls.clone();
+        let _second = owner
+            .association()
+            .subscribe(move |_| {
+                second_calls.fetch_add(100, Ordering::SeqCst);
+            })
+            .unwrap();
+        assert!(matches!(
+            failure.await,
+            Err(RegistryError::OutcomeUnknown(_))
+        ));
+        owner.shutdown().await;
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            historical, initial,
+            "a response selected before invalidation remains historical"
+        );
+        session.owner.shutdown().await.unwrap();
+    });
+}
+
+#[test]
+fn command_resource_settings_same_registry_coalesced_replacement_keeps_old_service_closed() {
+    run(async {
+        use crate::plugin_registry::LifecyclePhase;
+
+        for late_save in [false, true] {
+            let dir = tempfile::tempdir().unwrap();
+            let restored_path = dir.path().join("restored.sqlite");
+            let restored = Registry::create(
+                restored_path.clone(),
+                limits(),
+                RegistryCapacity::with_observers(8, 1, 1).unwrap(),
+            )
+            .await
+            .unwrap();
+            let restored_settings = restored
+                .handle
+                .read_command_resource_settings()
+                .await
+                .unwrap();
+            restored.owner.shutdown().await.unwrap();
+            let session = Registry::create(
+                dir.path().join("registry.sqlite"),
+                limits(),
+                RegistryCapacity::with_observers(8, 1, 1).unwrap(),
+            )
+            .await
+            .unwrap();
+            let owner = SettingsOwner::start(session.handle.clone(), 1, 2)
+                .await
+                .unwrap();
+            let old = owner.association();
+            let operations = owner.operations();
+            let initial = old.read().await.unwrap();
+            let previous = saved(
+                operations
+                    .save(initial.saved.revision, changed(&initial, 1))
+                    .await
+                    .unwrap(),
+            );
+            assert!(previous.saved.revision > restored_settings.revision);
+            let calls = Arc::new(AtomicUsize::new(0));
+            let called = calls.clone();
+            let subscription = old
+                .subscribe(move |_| {
+                    called.fetch_add(1, Ordering::SeqCst);
+                })
+                .unwrap();
+            until(|| calls.load(Ordering::SeqCst) == 1).await;
+            assert!(subscription.acknowledge(&previous.epoch, previous.saved.revision));
+
+            let control = session.owner.control();
+            let lifecycle = control.observe().unwrap();
+            let before = lifecycle.current();
+            assert_eq!(before.phase, LifecyclePhase::Ready);
+            let (entered, entering) = mpsc::channel();
+            let (release, released) = mpsc::channel();
+            let mut barrier = Box::pin(session.handle.test_submit(move |_| {
+                entered.send(()).unwrap();
+                released.recv_timeout(Duration::from_secs(10)).unwrap();
+                Ok(())
+            }));
+            pending(barrier.as_mut());
+            entering.recv_timeout(Duration::from_secs(10)).unwrap();
+            let mut save =
+                Box::pin(operations.save(previous.saved.revision, changed(&previous, 2)));
+            if late_save {
+                pending(save.as_mut());
+                until(|| session.handle.test_queue_len() == 1).await;
+            }
+            let mut replacement = Box::pin(control.test_replace_service(
+                before.revision.clone(),
+                restored_path,
+                limits(),
+            ));
+            pending(replacement.as_mut());
+            assert_eq!(control.snapshot().phase, LifecyclePhase::Maintenance);
+            assert!(!session.handle.is_service_valid());
+            release.send(()).unwrap();
+
+            // Keep Tokio, its validity watcher and the old save completion
+            // unpolled until the SQLite worker has established replacement readiness.
+            let deadline = std::time::Instant::now() + Duration::from_secs(10);
+            while control.snapshot().phase != LifecyclePhase::Ready {
+                assert!(std::time::Instant::now() < deadline, "replacement watchdog");
+                std::thread::yield_now();
+            }
+            let after = lifecycle.current();
+            assert_eq!(
+                after.phase,
+                LifecyclePhase::Ready,
+                "latest-state observation coalesced maintenance"
+            );
+            assert_ne!(after.revision, before.revision);
+            assert!(
+                !owner.shared.lock().closed,
+                "settings watcher has not resumed"
+            );
+            assert!(
+                old.is_closed(),
+                "replacement readiness cannot revive the old latch"
+            );
+            assert!(matches!(
+                owner.shared.reserve(),
+                Err(RegistryError::Unavailable(_))
+            ));
+            assert!(matches!(
+                old.subscribe(|_| {}),
+                Err(RegistryError::Unavailable(_))
+            ));
+            assert!(matches!(
+                session.handle.observe_validity(),
+                Err(RegistryError::Unavailable(_))
+            ));
+            let fresh = control.ready_handle(&after.revision).unwrap();
+            assert!(fresh.is_service_valid());
+            assert!(
+                matches!(
+                    fresh.observe_validity(),
+                    Err(RegistryError::LimitExceeded(_))
+                ),
+                "old watcher still owns the only reader slot"
+            );
+            replacement.await.unwrap();
+            barrier.await.unwrap();
+            let confirmed = if late_save {
+                let result = saved(save.await.unwrap());
+                assert_eq!(result.epoch, previous.epoch);
+                assert!(result.saved.revision > previous.saved.revision);
+                assert_eq!(result.saved.settings.max_payload_depth, 2);
+                Some(result)
+            } else {
+                drop(save);
+                None
+            };
+            until(|| {
+                let state = owner.shared.lock();
+                state.closed && !state.watcher_running
+            })
+            .await;
+            assert!(owner.shared.lock().subscribers.is_empty());
+            assert_eq!(
+                owner.shared.lock().snapshot,
+                previous,
+                "old completion cannot reconcile after replacement"
+            );
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                1,
+                "no late old-service publication"
+            );
+
+            // A single reader slot proves the old watcher released its charge
+            // even though the old settings owner and handles are still retained.
+            let fresh_owner = SettingsOwner::start(fresh.clone(), 1, 1).await.unwrap();
+            let current = fresh_owner.association().read().await.unwrap();
+            assert_eq!(current.saved, restored_settings);
+            assert!(current.saved.revision < previous.saved.revision);
+            assert_ne!(current.epoch, previous.epoch);
+            if let Some(confirmed) = confirmed {
+                assert_ne!(confirmed.epoch, current.epoch);
+                owner.shared.reconcile(confirmed);
+            }
+            assert_eq!(owner.shared.lock().snapshot, previous);
+            assert_eq!(fresh_owner.shared.lock().snapshot, current);
+            assert!(matches!(
+                old.read().await,
+                Err(RegistryError::Unavailable(_))
+            ));
+            assert!(matches!(
+                operations
+                    .save(previous.saved.revision, changed(&previous, 3))
+                    .await,
+                Err(RegistryError::Unavailable(_))
+            ));
+            assert_eq!(
+                fresh.read_command_resource_settings().await.unwrap(),
+                restored_settings,
+                "old writes were not replayed into the replacement"
+            );
+            owner.shutdown().await;
+            assert!(fresh.is_service_valid());
+            assert!(
+                matches!(
+                    fresh.observe_validity(),
+                    Err(RegistryError::LimitExceeded(_))
+                ),
+                "fresh service owns the only slot"
+            );
+            fresh_owner.shutdown().await;
+            assert!(
+                fresh.observe_validity().unwrap().is_valid(),
+                "fresh shutdown released its slot"
+            );
+            session.owner.shutdown().await.unwrap();
+        }
     });
 }

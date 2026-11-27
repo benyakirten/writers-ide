@@ -2,10 +2,13 @@ use std::{
     collections::VecDeque,
     panic::{catch_unwind, AssertUnwindSafe},
     path::PathBuf,
-    sync::{Arc, Condvar, Mutex},
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc, Condvar, Mutex,
+    },
     thread::{self, JoinHandle},
 };
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, watch};
 
 use super::{
     error::{RegistryError, Result},
@@ -22,7 +25,7 @@ use lifecycle::{LifecycleData, LifecyclePhase, RegistryControl};
 
 trait Work: Send {
     fn is_read(&self) -> bool;
-    fn execute(self: Box<Self>, store: &mut Store);
+    fn execute(self: Box<Self>, store: &mut Store, shared: &Shared);
     fn reject(self: Box<Self>);
 }
 
@@ -39,11 +42,14 @@ where
     fn is_read(&self) -> bool {
         self.read
     }
-    fn execute(self: Box<Self>, store: &mut Store) {
+    fn execute(self: Box<Self>, store: &mut Store, shared: &Shared) {
         if self.read && self.reply.is_closed() {
             return;
         }
         let result = (self.run)(store);
+        if let Some(cause) = store.recovery() {
+            shared.invalidate(cause);
+        }
         let _ = self.reply.send(result);
     }
     fn reject(self: Box<Self>) {
@@ -64,6 +70,8 @@ struct Shared {
     state: Mutex<State>,
     wake: Condvar,
     capacity: usize,
+    lifecycle_readers: Arc<lifecycle::ReaderBudget>,
+    validity_readers: Arc<lifecycle::ReaderBudget>,
     #[cfg(test)]
     probe_lease: Mutex<Option<Arc<std::fs::File>>>,
 }
@@ -74,17 +82,82 @@ impl Shared {
         state.lifecycle.shutdown();
         self.wake.notify_all();
     }
-    fn failed(&self) {
-        let jobs = {
+    fn invalidate(&self, cause: super::store::StoreRecovery) {
+        let pending = {
+            let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            if state.lifecycle.snapshot.recovery_cause.is_some() {
+                return;
+            }
+            state.accepting = false;
+            state.lifecycle.validity.invalidate();
+            state.lifecycle.snapshot.recovery_cause = Some(match cause {
+                super::store::StoreRecovery::TransactionUncertain => {
+                    lifecycle::RecoveryCause::TransactionUncertain
+                }
+                super::store::StoreRecovery::DomainInvalid => {
+                    lifecycle::RecoveryCause::DomainInvalid
+                }
+            });
+            let pending = state.lifecycle.suppress_pending();
+            if !state.lifecycle.shutdown {
+                state.lifecycle.snapshot.phase = LifecyclePhase::RecoveryOnly(match cause {
+                    super::store::StoreRecovery::TransactionUncertain => {
+                        lifecycle::RecoveryKind::TransactionUncertain
+                    }
+                    super::store::StoreRecovery::DomainInvalid => {
+                        lifecycle::RecoveryKind::DomainInvalid
+                    }
+                });
+            }
+            state.lifecycle.advance();
+            state.lifecycle.publish();
+            pending
+        };
+        if let Some(task) = pending {
+            task.suppress();
+        }
+        self.wake.notify_all();
+    }
+    fn failed(&self, panicked: bool) {
+        let (jobs, pending) = {
             let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
             state.accepting = false;
-            state.lifecycle.stopped();
-            std::mem::take(&mut state.queue)
+            let pending = state.lifecycle.suppress_pending();
+            state.lifecycle.stopped(panicked);
+            (std::mem::take(&mut state.queue), pending)
         };
+        if let Some(task) = pending {
+            task.suppress();
+        }
         for job in jobs {
             job.reject();
         }
         self.wake.notify_all();
+    }
+}
+
+/// The host supplies positive queue and observation budgets.
+pub(crate) struct RegistryCapacity {
+    queue: usize,
+    lifecycle_readers: usize,
+    validity_readers: usize,
+}
+impl RegistryCapacity {
+    pub(crate) fn with_observers(
+        queue: usize,
+        lifecycle_readers: usize,
+        validity_readers: usize,
+    ) -> Result<Self> {
+        if queue == 0 || lifecycle_readers == 0 || validity_readers == 0 {
+            return Err(RegistryError::InvalidInput(
+                "queue and reader caps must be positive".into(),
+            ));
+        }
+        Ok(Self {
+            queue,
+            lifecycle_readers,
+            validity_readers,
+        })
     }
 }
 
@@ -97,6 +170,7 @@ pub(crate) struct RegistrySession {
 pub(crate) struct RegistryHandle {
     shared: Arc<Shared>,
     service: u128,
+    validity: Arc<lifecycle::ServiceValidity>,
 }
 pub(crate) struct RegistryOwner {
     shared: Arc<Shared>,
@@ -171,7 +245,7 @@ impl Registry {
     pub(crate) async fn create(
         path: PathBuf,
         limits: RegistryLimits,
-        queue_capacity: usize,
+        queue_capacity: RegistryCapacity,
     ) -> Result<RegistrySession> {
         Self::start(
             path,
@@ -188,7 +262,7 @@ impl Registry {
     pub(crate) async fn open(
         path: PathBuf,
         limits: RegistryLimits,
-        queue_capacity: usize,
+        queue_capacity: RegistryCapacity,
     ) -> Result<RegistrySession> {
         Self::start(
             path,
@@ -207,7 +281,7 @@ impl Registry {
         lease: LocationLease,
         path: PathBuf,
         limits: RegistryLimits,
-        capacity: usize,
+        capacity: RegistryCapacity,
     ) -> Result<RegistrySession> {
         Self::start(
             path,
@@ -228,7 +302,7 @@ impl Registry {
         path: PathBuf,
         backup: PathBuf,
         limits: RegistryLimits,
-        capacity: usize,
+        capacity: RegistryCapacity,
     ) -> Result<RegistrySession> {
         Self::start_with_upgrade(
             path,
@@ -247,7 +321,7 @@ impl Registry {
     pub(super) async fn open_for_probe(
         path: PathBuf,
         limits: RegistryLimits,
-        capacity: usize,
+        capacity: RegistryCapacity,
         probe: ProbeStartup,
     ) -> Result<RegistrySession> {
         Self::start(path, limits, capacity, false, None, Some(probe)).await
@@ -255,7 +329,7 @@ impl Registry {
     async fn start(
         path: PathBuf,
         limits: RegistryLimits,
-        capacity: usize,
+        capacity: RegistryCapacity,
         create: bool,
         lease: Option<LocationLease>,
         #[cfg(test)] probe: Option<ProbeStartup>,
@@ -276,16 +350,17 @@ impl Registry {
     async fn start_with_upgrade(
         path: PathBuf,
         limits: RegistryLimits,
-        capacity: usize,
+        capacity: RegistryCapacity,
         create: bool,
         lease: Option<LocationLease>,
         upgrade_backup: Option<PathBuf>,
         #[cfg(test)] probe: Option<ProbeStartup>,
     ) -> Result<RegistrySession> {
         limits.validate()?;
-        if capacity == 0 {
+        if capacity.queue == 0 || capacity.lifecycle_readers == 0 || capacity.validity_readers == 0
+        {
             return Err(RegistryError::InvalidInput(
-                "queue capacity must be positive".into(),
+                "queue and reader caps must be positive".into(),
             ));
         }
         let shared = Arc::new(Shared {
@@ -297,7 +372,9 @@ impl Registry {
                 lifecycle: LifecycleData::new(),
             }),
             wake: Condvar::new(),
-            capacity,
+            capacity: capacity.queue,
+            lifecycle_readers: Arc::new(lifecycle::ReaderBudget::new(capacity.lifecycle_readers)),
+            validity_readers: Arc::new(lifecycle::ReaderBudget::new(capacity.validity_readers)),
             #[cfg(test)]
             probe_lease: Mutex::new(probe.as_ref().map(|probe| probe.lease.clone())),
         });
@@ -358,6 +435,8 @@ impl Registry {
                             return;
                         }
                         state.lifecycle.snapshot.phase = LifecyclePhase::Ready;
+                        state.lifecycle.advance();
+                        state.lifecycle.publish();
                         state.accepting = true;
                     }
                     // If startup's waiter is gone, no operation handle was issued.
@@ -367,7 +446,7 @@ impl Registry {
                     lifecycle::run_worker(&worker_shared, store, lease.as_ref());
                     // Store and its exclusive destination lock drop before completion.
                 }));
-                worker_shared.failed();
+                worker_shared.failed(result.is_err());
                 #[cfg(test)]
                 worker_shared
                     .probe_lease
@@ -389,10 +468,10 @@ impl Registry {
         receive_ready
             .await
             .map_err(|_| RegistryError::Unavailable("registry startup terminated".into()))??;
-        Ok(RegistrySession {
-            owner,
-            handle: RegistryHandle { shared, service: 0 },
-        })
+        let handle = owner
+            .control()
+            .ready_handle(&owner.control().snapshot().revision)?;
+        Ok(RegistrySession { owner, handle })
     }
 }
 
@@ -436,7 +515,10 @@ impl RegistryHandle {
         let (reply, receive) = oneshot::channel();
         {
             let mut state = self.shared.state.lock().unwrap_or_else(|e| e.into_inner());
-            if !state.accepting || state.lifecycle.service != self.service {
+            if !state.accepting
+                || state.lifecycle.service != self.service
+                || !self.is_service_valid()
+            {
                 return Err(RegistryError::Unavailable(
                     "registry admission closed".into(),
                 ));

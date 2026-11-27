@@ -5,10 +5,13 @@ impl Store {
         &mut self,
     ) -> Result<CommandResourceSettingsSnapshot> {
         self.ensure_available()?;
-        let tx = self.connection.transaction()?;
-        let snapshot = read(&tx)?;
-        tx.commit()?;
-        Ok(snapshot)
+        let result = (|| {
+            let tx = self.connection.transaction()?;
+            let snapshot = read(&tx)?;
+            tx.commit()?;
+            Ok(snapshot)
+        })();
+        self.record_live_result(result)
     }
 
     pub(crate) fn set_command_resource_settings(

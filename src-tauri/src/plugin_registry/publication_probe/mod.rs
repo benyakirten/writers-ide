@@ -283,13 +283,16 @@ async fn open_selected(lease: LocationLease, limits: RegistryLimits) -> Result<P
         lease: lease.guard(),
         after_open: None,
     };
-    let session = Registry::open_for_probe(selected.database(&lease), limits, 8, startup)
-        .await
-        .map_err(|e| {
-            RegistryError::RecoveryRequired(format!(
-                "probe selected registry failed readiness: {e}"
-            ))
-        })?;
+    let session = Registry::open_for_probe(
+        selected.database(&lease),
+        limits,
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+        startup,
+    )
+    .await
+    .map_err(|e| {
+        RegistryError::RecoveryRequired(format!("probe selected registry failed readiness: {e}"))
+    })?;
     ProbeSession::new(session, lease)
 }
 

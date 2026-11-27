@@ -57,7 +57,7 @@ fn owned_upgrade_returns_ready_settings_only_after_preserved_backup_and_validati
         path.clone(),
         backup.clone(),
         limits(),
-        4,
+        crate::plugin_registry::RegistryCapacity::with_observers(4, 4, 4).unwrap(),
     ))
     .unwrap();
     let saved = run(session.handle.read_command_resource_settings()).unwrap();
@@ -90,7 +90,13 @@ fn owned_upgrade_returns_ready_settings_only_after_preserved_backup_and_validati
         run(session.handle.read_command_resource_settings()),
         Err(RegistryError::Unavailable(_))
     ));
-    let reopened = run(Registry::open_owned(lease, path, limits(), 4)).unwrap();
+    let reopened = run(Registry::open_owned(
+        lease,
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(4, 4, 4).unwrap(),
+    ))
+    .unwrap();
     assert_eq!(
         run(reopened.handle.read_command_resource_settings()).unwrap(),
         saved
@@ -102,7 +108,12 @@ fn owned_upgrade_returns_ready_settings_only_after_preserved_backup_and_validati
 fn legacy_open_without_explicit_backup_never_returns_a_ready_handle() {
     let (_directory, lease, path) = fixture(true);
     assert!(matches!(
-        run(Registry::open_owned(lease, path.clone(), limits(), 4)),
+        run(Registry::open_owned(
+            lease,
+            path.clone(),
+            limits(),
+            crate::plugin_registry::RegistryCapacity::with_observers(4, 4, 4).unwrap()
+        )),
         Err(RegistryError::RecoveryRequired(_))
     ));
     assert_eq!(version(&path), 1);
@@ -118,7 +129,7 @@ fn occupied_backup_or_unknown_schema_never_exposes_a_ready_service() {
         path.clone(),
         backup.clone(),
         limits(),
-        4,
+        crate::plugin_registry::RegistryCapacity::with_observers(4, 4, 4).unwrap(),
     ))
     .is_err());
     assert_eq!(std::fs::read(&backup).unwrap(), b"existing evidence");
@@ -135,7 +146,7 @@ fn occupied_backup_or_unknown_schema_never_exposes_a_ready_service() {
             path.clone(),
             unused.clone(),
             limits(),
-            4
+            crate::plugin_registry::RegistryCapacity::with_observers(4, 4, 4).unwrap()
         )),
         Err(RegistryError::RecoveryRequired(_))
     ));
@@ -160,7 +171,7 @@ fn current_schema_upgrade_open_preserves_saved_limits_and_never_overwrites_backu
         path,
         backup.clone(),
         limits(),
-        4,
+        crate::plugin_registry::RegistryCapacity::with_observers(4, 4, 4).unwrap(),
     ))
     .unwrap();
     let settings = run(session.handle.read_command_resource_settings()).unwrap();

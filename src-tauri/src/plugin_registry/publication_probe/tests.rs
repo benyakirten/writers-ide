@@ -307,7 +307,12 @@ mod unix {
         assert_eq!(read_selector(&root.lease).unwrap(), new.id);
         assert_eq!(run(session.handle.read_settings()).unwrap(), original);
         run(session.shutdown()).unwrap();
-        let reopened = run(Registry::open(old.id.database(&root.lease), limits(), 8)).unwrap();
+        let reopened = run(Registry::open(
+            old.id.database(&root.lease),
+            limits(),
+            crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+        ))
+        .unwrap();
         assert_eq!(run(reopened.handle.read_settings()).unwrap(), changed);
         run(reopened.owner.shutdown()).unwrap();
         assert!(old.id.directory(&root.lease).is_dir());

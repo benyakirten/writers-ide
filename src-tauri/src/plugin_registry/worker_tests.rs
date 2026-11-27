@@ -44,7 +44,12 @@ fn wait<T>(receiver: &mpsc::Receiver<T>) -> T {
 fn command_resource_fifo_bounded_admission_and_service_lifetime() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("registry.sqlite");
-    let session = run(Registry::create(path.clone(), limits(), 2)).unwrap();
+    let session = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(2, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let original = run(session.handle.read_command_resource_settings()).unwrap();
     let changed = CommandResourceSettings {
         max_payload_depth: 1,
@@ -84,7 +89,12 @@ fn command_resource_fifo_bounded_admission_and_service_lifetime() {
     assert_eq!(saved.settings, changed);
     assert_eq!(run(read).unwrap(), saved);
     run(session.owner.shutdown()).unwrap();
-    let next = run(Registry::open(path, limits(), 2)).unwrap();
+    let next = run(Registry::open(
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(2, 4, 4).unwrap(),
+    ))
+    .unwrap();
     assert_eq!(
         run(next.handle.read_command_resource_settings()).unwrap(),
         saved
@@ -103,6 +113,7 @@ fn command_resource_fifo_bounded_admission_and_service_lifetime() {
     let stale = RegistryHandle {
         shared: next.handle.shared.clone(),
         service: next.handle.service + 1,
+        validity: next.handle.validity.clone(),
     };
     assert!(matches!(
         run(stale.read_command_resource_settings()),
@@ -119,7 +130,12 @@ fn command_resource_fifo_bounded_admission_and_service_lifetime() {
 fn command_resource_abandoned_admitted_write_drains_after_close() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("registry.sqlite");
-    let session = run(Registry::create(path.clone(), limits(), 2)).unwrap();
+    let session = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(2, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let original = run(session.handle.read_command_resource_settings()).unwrap();
     let changed = CommandResourceSettings {
         max_window_pending: 1,
@@ -148,7 +164,12 @@ fn command_resource_abandoned_admitted_write_drains_after_close() {
     run(active).unwrap();
     assert!(matches!(run(read), Err(RegistryError::Unavailable(_))));
     run(session.owner.shutdown()).unwrap();
-    let next = run(Registry::open(path, limits(), 2)).unwrap();
+    let next = run(Registry::open(
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(2, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let saved = run(next.handle.read_command_resource_settings()).unwrap();
     assert_eq!(saved.settings, changed);
     assert_eq!(saved.revision.value(), 1);
@@ -159,7 +180,12 @@ fn command_resource_abandoned_admitted_write_drains_after_close() {
 fn creates_only_after_readiness_and_reopens_saved_settings() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("registry.sqlite");
-    let session = run(Registry::create(path.clone(), limits(), 8)).unwrap();
+    let session = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let original = run(session.handle.read_settings()).unwrap();
     let changed = HostSettings {
         permission_mode: PermissionMode::Trust,
@@ -174,7 +200,12 @@ fn creates_only_after_readiness_and_reopens_saved_settings() {
         run(session.handle.read_settings()),
         Err(RegistryError::Unavailable(_))
     ));
-    let reopened = run(Registry::open(path, limits(), 8)).unwrap();
+    let reopened = run(Registry::open(
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     assert_eq!(run(reopened.handle.read_settings()).unwrap(), changed);
     run(reopened.owner.shutdown()).unwrap();
 }
@@ -183,10 +214,20 @@ fn creates_only_after_readiness_and_reopens_saved_settings() {
 fn creation_never_overwrites_and_open_never_creates() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("registry.sqlite");
-    assert!(run(Registry::open(path.clone(), limits(), 1)).is_err());
+    assert!(run(Registry::open(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(1, 4, 4).unwrap()
+    ))
+    .is_err());
     assert!(!path.exists());
     std::fs::write(&path, b"original").unwrap();
-    assert!(run(Registry::create(path.clone(), limits(), 1)).is_err());
+    assert!(run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(1, 4, 4).unwrap()
+    ))
+    .is_err());
     assert_eq!(std::fs::read(path).unwrap(), b"original");
 }
 
@@ -194,20 +235,39 @@ fn creation_never_overwrites_and_open_never_creates() {
 fn ownership_is_exclusive_until_shutdown() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("registry.sqlite");
-    let session = run(Registry::create(path.clone(), limits(), 2)).unwrap();
+    let session = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(2, 4, 4).unwrap(),
+    ))
+    .unwrap();
     assert!(matches!(
-        run(Registry::open(path.clone(), limits(), 2)),
+        run(Registry::open(
+            path.clone(),
+            limits(),
+            crate::plugin_registry::RegistryCapacity::with_observers(2, 4, 4).unwrap()
+        )),
         Err(RegistryError::Unavailable(_))
     ));
     run(session.owner.shutdown()).unwrap();
-    let next = run(Registry::open(path, limits(), 2)).unwrap();
+    let next = run(Registry::open(
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(2, 4, 4).unwrap(),
+    ))
+    .unwrap();
     run(next.owner.shutdown()).unwrap();
 }
 
 #[test]
 fn full_queue_rejects_without_execution_and_writes_keep_fifo() {
     let dir = tempfile::tempdir().unwrap();
-    let session = run(Registry::create(dir.path().join("db"), limits(), 1)).unwrap();
+    let session = run(Registry::create(
+        dir.path().join("db"),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(1, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let (started, receive_started) = mpsc::channel();
     let (release, receive_release) = mpsc::channel();
     let mut first = Box::pin(session.handle.submit(false, move |_| {
@@ -243,7 +303,12 @@ fn full_queue_rejects_without_execution_and_writes_keep_fifo() {
 fn shutdown_rejects_queued_reads_but_finishes_abandoned_writes() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
-    let session = run(Registry::create(path.clone(), limits(), 8)).unwrap();
+    let session = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let original = run(session.handle.read_settings()).unwrap();
     let changed = HostSettings {
         permission_mode: PermissionMode::Trust,
@@ -268,7 +333,12 @@ fn shutdown_rejects_queued_reads_but_finishes_abandoned_writes() {
     run(active).unwrap();
     assert!(matches!(run(read), Err(RegistryError::Unavailable(_))));
     run(session.owner.shutdown()).unwrap();
-    let next = run(Registry::open(path, limits(), 8)).unwrap();
+    let next = run(Registry::open(
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     assert_eq!(run(next.handle.read_settings()).unwrap(), changed);
     run(next.owner.shutdown()).unwrap();
 }
@@ -276,7 +346,12 @@ fn shutdown_rejects_queued_reads_but_finishes_abandoned_writes() {
 #[test]
 fn abandoned_queued_read_is_not_executed() {
     let dir = tempfile::tempdir().unwrap();
-    let session = run(Registry::create(dir.path().join("db"), limits(), 8)).unwrap();
+    let session = run(Registry::create(
+        dir.path().join("db"),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let (started, receive_started) = mpsc::channel();
     let (release, receive_release) = mpsc::channel();
     let mut active = Box::pin(session.handle.submit(false, move |_| {
@@ -305,7 +380,12 @@ fn abandoned_queued_read_is_not_executed() {
 fn panic_makes_admitted_write_unknown_and_never_revives_handles() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
-    let session = run(Registry::create(path.clone(), limits(), 8)).unwrap();
+    let session = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let original = run(session.handle.read_settings()).unwrap();
     let changed = HostSettings {
         permission_mode: PermissionMode::Trust,
@@ -321,7 +401,12 @@ fn panic_makes_admitted_write_unknown_and_never_revives_handles() {
         run(session.handle.read_settings()),
         Err(RegistryError::Unavailable(_))
     ));
-    let next = run(Registry::open(path, limits(), 8)).unwrap();
+    let next = run(Registry::open(
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     assert_eq!(run(next.handle.read_settings()).unwrap(), changed);
     run(next.owner.shutdown()).unwrap();
 }
@@ -330,7 +415,12 @@ fn panic_makes_admitted_write_unknown_and_never_revives_handles() {
 fn dropping_owner_drains_without_waiting_for_operation_handles() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
-    let mut session = run(Registry::create(path.clone(), limits(), 8)).unwrap();
+    let mut session = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let original = run(session.handle.read_settings()).unwrap();
     let changed = HostSettings {
         permission_mode: PermissionMode::Trust,
@@ -354,7 +444,12 @@ fn dropping_owner_drains_without_waiting_for_operation_handles() {
     release.send(()).unwrap();
     run(write).unwrap();
     run(finished.unwrap()).unwrap().unwrap();
-    let next = run(Registry::open(path, limits(), 8)).unwrap();
+    let next = run(Registry::open(
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     assert_eq!(run(next.handle.read_settings()).unwrap(), changed);
     run(next.owner.shutdown()).unwrap();
 }
@@ -364,7 +459,12 @@ fn probe_startup_cancellation_keeps_location_lease_until_worker_cleanup() {
     use super::super::publication_probe::LocationLease;
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
-    let first = run(Registry::create(path.clone(), limits(), 8)).unwrap();
+    let first = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     run(first.owner.shutdown()).unwrap();
     let lease = LocationLease::acquire(dir.path()).unwrap();
     let (started, entered) = mpsc::channel();
@@ -373,7 +473,12 @@ fn probe_startup_cancellation_keeps_location_lease_until_worker_cleanup() {
         lease: lease.guard(),
         after_open: Some((started, resume)),
     };
-    let mut startup = Box::pin(Registry::open_for_probe(path.clone(), limits(), 8, probe));
+    let mut startup = Box::pin(Registry::open_for_probe(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+        probe,
+    ));
     enqueue(startup.as_mut());
     wait(&entered);
     drop(startup);
@@ -397,7 +502,12 @@ fn probe_startup_cancellation_keeps_location_lease_until_worker_cleanup() {
             Err(error) => panic!("unexpected lease failure: {error}"),
         }
     };
-    let next = run(Registry::open(path, limits(), 8)).unwrap();
+    let next = run(Registry::open(
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     run(next.owner.shutdown()).unwrap();
 }
 
@@ -406,7 +516,12 @@ fn probe_location_lease_survives_dropped_session_and_abandoned_admitted_work() {
     use super::super::publication_probe::{LocationLease, ProbeSession};
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
-    let session = run(Registry::create(path.clone(), limits(), 8)).unwrap();
+    let session = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let handle = session.handle.clone();
     let lease = LocationLease::acquire(dir.path()).unwrap();
     let (started, entered) = mpsc::channel();
@@ -433,7 +548,12 @@ fn probe_location_lease_survives_dropped_session_and_abandoned_admitted_work() {
         Err(RegistryError::Unavailable(_))
     ));
     let _lease = LocationLease::acquire(dir.path()).unwrap();
-    let next = run(Registry::open(path, limits(), 8)).unwrap();
+    let next = run(Registry::open(
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     run(next.owner.shutdown()).unwrap();
 }
 
@@ -442,7 +562,15 @@ fn zero_capacity_is_rejected_without_creating_destination() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
     assert!(matches!(
-        run(Registry::create(path.clone(), limits(), 0)),
+        run(Registry::create(
+            path.clone(),
+            limits(),
+            RegistryCapacity {
+                queue: 0,
+                lifecycle_readers: 4,
+                validity_readers: 4
+            }
+        )),
         Err(RegistryError::InvalidInput(_))
     ));
     assert!(!path.exists());

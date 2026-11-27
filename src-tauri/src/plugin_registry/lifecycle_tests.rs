@@ -13,6 +13,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[path = "lifecycle_invalidation_tests.rs"]
+mod invalidation;
+
 const TIMEOUT: Duration = Duration::from_secs(10);
 
 fn limits() -> RegistryLimits {
@@ -102,7 +105,12 @@ fn forbidden(count: &Arc<AtomicUsize>) -> MaintenanceRequest {
 fn simultaneous_admission_has_one_winner_and_abandoned_attempt_finishes() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("registry.sqlite");
-    let session = run(Registry::create(path.clone(), limits(), 8)).unwrap();
+    let session = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let control = session.owner.control();
     let before = control.snapshot();
     assert_eq!(before.phase, LifecyclePhase::Ready);
@@ -202,7 +210,12 @@ fn simultaneous_admission_has_one_winner_and_abandoned_attempt_finishes() {
 fn maintenance_drains_writes_rejects_reads_and_replaces_handles_on_same_thread() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("registry.sqlite");
-    let session = run(Registry::create(path.clone(), limits(), 8)).unwrap();
+    let session = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let control = session.owner.control();
     let before = control.snapshot();
     let old_clone = session.handle.clone();
@@ -308,11 +321,16 @@ fn maintenance_drains_writes_rejects_reads_and_replaces_handles_on_same_thread()
 fn revisions_reject_foreign_and_prior_lifetimes_without_invoking_requests() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("first.sqlite");
-    let first = run(Registry::create(path.clone(), limits(), 8)).unwrap();
+    let first = run(Registry::create(
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let second = run(Registry::create(
         dir.path().join("second.sqlite"),
         limits(),
-        8,
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
     ))
     .unwrap();
     let previous = first.owner.control().snapshot().revision;
@@ -331,7 +349,12 @@ fn revisions_reject_foreign_and_prior_lifetimes_without_invoking_requests() {
     ));
     assert_eq!(control.snapshot(), before);
     run(first.owner.shutdown()).unwrap();
-    let reopened = run(Registry::open(path, limits(), 8)).unwrap();
+    let reopened = run(Registry::open(
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let control = reopened.owner.control();
     let current = control.snapshot();
     assert_ne!(current.revision, previous);
@@ -378,7 +401,13 @@ fn shutdown_case(pending: bool, recovery: bool, style: ShutdownStyle) {
     std::fs::create_dir(&root).unwrap();
     let path = root.join("current.sqlite");
     drop(Store::create(&path, limits()).unwrap());
-    let session = run(Registry::open_owned(lease, path.clone(), limits(), 8)).unwrap();
+    let session = run(Registry::open_owned(
+        lease,
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let control = session.owner.control();
     let initial = control.snapshot();
     let (active_started, active_entered) = mpsc::channel();
@@ -488,7 +517,13 @@ fn shutdown_case(pending: bool, recovery: bool, style: ShutdownStyle) {
     ));
     assert_eq!(rejected.load(Ordering::SeqCst), 0);
     let lease = LocationLease::acquire(&root).unwrap();
-    let reopened = run(Registry::open_owned(lease, path, limits(), 8)).unwrap();
+    let reopened = run(Registry::open_owned(
+        lease,
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     run(reopened.owner.shutdown()).unwrap();
 }
 
@@ -503,7 +538,7 @@ fn abandoned_failures_report_distinct_recovery_states_and_never_resume() {
         let session = run(Registry::create(
             dir.path().join("registry.sqlite"),
             limits(),
-            8,
+            crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
         ))
         .unwrap();
         let control = session.owner.control();
@@ -563,7 +598,13 @@ fn recovery_retains_location_and_seal_failure_connection_until_shutdown() {
     std::fs::create_dir(&root).unwrap();
     let path = root.join("current.sqlite");
     drop(Store::create(&path, limits()).unwrap());
-    let session = run(Registry::open_owned(lease, path.clone(), limits(), 8)).unwrap();
+    let session = run(Registry::open_owned(
+        lease,
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let control = session.owner.control();
     let worker_thread = run(session.handle.submit(true, |_| Ok(thread::current().id()))).unwrap();
     let failure_path = root.join("candidate/registry.sqlite");
@@ -674,7 +715,7 @@ fn owned_startup_cancellation_retains_location_until_worker_cleanup() {
     let mut startup = Box::pin(Registry::start(
         path.clone(),
         limits(),
-        8,
+        RegistryCapacity::with_observers(8, 4, 4).unwrap(),
         false,
         Some(lease.clone()),
         Some(probe),
@@ -695,7 +736,13 @@ fn owned_startup_cancellation_retains_location_until_worker_cleanup() {
     release.send(()).unwrap();
     let lease = reacquire_after_cleanup(&root);
     assert!(guard.upgrade().is_none());
-    let session = run(Registry::open_owned(lease, path, limits(), 8)).unwrap();
+    let session = run(Registry::open_owned(
+        lease,
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     run(session.owner.shutdown()).unwrap();
 }
 
@@ -709,7 +756,13 @@ fn open_owned_missing_or_empty_root_never_initializes_storage() {
             std::fs::create_dir(&root).unwrap();
         }
         let path = root.join("current.sqlite");
-        assert!(run(Registry::open_owned(lease, path.clone(), limits(), 8)).is_err());
+        assert!(run(Registry::open_owned(
+            lease,
+            path.clone(),
+            limits(),
+            crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap()
+        ))
+        .is_err());
         let _lease = reacquire_after_cleanup(&root);
         assert!(!path.exists());
         assert_eq!(root.exists(), existing_root);
@@ -731,7 +784,12 @@ fn open_owned_rejects_existing_database_outside_its_root() {
     drop(store);
     let before = std::fs::read(&outside).unwrap();
     assert!(matches!(
-        run(Registry::open_owned(lease, outside.clone(), limits(), 8)),
+        run(Registry::open_owned(
+            lease,
+            outside.clone(),
+            limits(),
+            crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap()
+        )),
         Err(RegistryError::InvalidInput(_))
     ));
     let _lease = reacquire_after_cleanup(&root);
@@ -755,7 +813,13 @@ fn retained_handles_and_control_do_not_retain_location_after_owned_shutdown() {
     std::fs::create_dir(&root).unwrap();
     let path = root.join("current.sqlite");
     drop(Store::create(&path, limits()).unwrap());
-    let session = run(Registry::open_owned(lease, path.clone(), limits(), 8)).unwrap();
+    let session = run(Registry::open_owned(
+        lease,
+        path.clone(),
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     let control = session.owner.control();
     let retained_handle = session.handle.clone();
     let ready = control.snapshot();
@@ -779,7 +843,13 @@ fn retained_handles_and_control_do_not_retain_location_after_owned_shutdown() {
             Err(RegistryError::Unavailable(_))
         ));
     }
-    let next = run(Registry::open_owned(lease, path, limits(), 8)).unwrap();
+    let next = run(Registry::open_owned(
+        lease,
+        path,
+        limits(),
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
+    ))
+    .unwrap();
     run(next.handle.read_settings()).unwrap();
     assert!(matches!(
         run(retained_handle.read_settings()),

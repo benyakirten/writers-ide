@@ -121,7 +121,7 @@ fn production_refusal_retains_consumed_failure_until_owned_shutdown() {
             database
         },
         limits(),
-        8,
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
     ))
     .unwrap();
     let control = session.owner.control();
@@ -187,7 +187,7 @@ fn native_replacements_keep_one_worker_and_permanently_close_prior_handles() {
         lease,
         old_database.clone(),
         limits(),
-        8,
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
     ))
     .unwrap();
     let control = session.owner.control();
@@ -263,7 +263,7 @@ fn confirmed_native_publication_reopen_failure_preserves_selection_until_shutdow
         lease,
         old_database.clone(),
         limits(),
-        8,
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
     ))
     .unwrap();
     let control = session.owner.control();
@@ -361,7 +361,7 @@ fn shutdown_during_native_publication_finishes_switch_without_fresh_handles() {
         lease,
         old_database.clone(),
         limits(),
-        8,
+        crate::plugin_registry::RegistryCapacity::with_observers(8, 4, 4).unwrap(),
     ))
     .unwrap();
     let control = session.owner.control();

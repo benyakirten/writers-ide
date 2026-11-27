@@ -164,6 +164,30 @@ fn command_resource_noop_stale_aba_and_exhaustion() {
     assert_eq!(store.read_command_resource_settings().unwrap(), exhausted);
 }
 
+fn assert_invalid_command_settings(store: &mut Store, read_first: bool) {
+    let result = if read_first {
+        store.read_command_resource_settings()
+    } else {
+        store.set_command_resource_settings(
+            CommandResourceRevision::default(),
+            CommandResourceSettings::default(),
+        )
+    };
+    assert!(matches!(result, Err(RegistryError::RecoveryRequired(_))));
+    assert_eq!(store.recovery(), Some(StoreRecovery::DomainInvalid));
+    assert!(matches!(
+        store.read_command_resource_settings(),
+        Err(RegistryError::Unavailable(_))
+    ));
+    assert!(matches!(
+        store.set_command_resource_settings(
+            CommandResourceRevision::default(),
+            CommandResourceSettings::default(),
+        ),
+        Err(RegistryError::Unavailable(_))
+    ));
+}
+
 #[test]
 fn command_resource_rejects_invalid_stored_values_and_missing_row() {
     for column in COLUMNS {
@@ -173,54 +197,36 @@ fn command_resource_rejects_invalid_stored_values_and_missing_row() {
             &[-1, 0, 9_007_199_254_740_992, i64::MAX]
         };
         for value in invalid_values {
-            let (_dir, mut store) = store();
-            store
-                .connection
-                .execute_batch("PRAGMA ignore_check_constraints=ON")
-                .unwrap();
-            store
-                .connection
-                .execute(&format!("UPDATE host_settings SET {column}=?1"), [value])
-                .unwrap();
-            assert!(
-                matches!(
-                    store.read_command_resource_settings(),
-                    Err(RegistryError::RecoveryRequired(_))
-                ),
-                "{column}={value}"
-            );
-            assert!(matches!(
-                store.set_command_resource_settings(
-                    CommandResourceRevision::default(),
-                    CommandResourceSettings::default()
-                ),
-                Err(RegistryError::RecoveryRequired(_))
-            ));
-            let retained: i64 = store
-                .connection
-                .query_row(&format!("SELECT {column} FROM host_settings"), [], |r| {
-                    r.get(0)
-                })
-                .unwrap();
-            assert_eq!(retained, *value);
+            for read_first in [true, false] {
+                let (_dir, mut store) = store();
+                store
+                    .connection
+                    .execute_batch("PRAGMA ignore_check_constraints=ON")
+                    .unwrap();
+                store
+                    .connection
+                    .execute(&format!("UPDATE host_settings SET {column}=?1"), [value])
+                    .unwrap();
+                // Exercise both decoders as the first failing operation on a fresh store.
+                assert_invalid_command_settings(&mut store, read_first);
+                let retained: i64 = store
+                    .connection
+                    .query_row(&format!("SELECT {column} FROM host_settings"), [], |r| {
+                        r.get(0)
+                    })
+                    .unwrap();
+                assert_eq!(retained, *value);
+            }
         }
     }
-    let (_dir, mut store) = store();
-    store
-        .connection
-        .execute("DELETE FROM host_settings", [])
-        .unwrap();
-    assert!(matches!(
-        store.read_command_resource_settings(),
-        Err(RegistryError::RecoveryRequired(_))
-    ));
-    assert!(matches!(
-        store.set_command_resource_settings(
-            CommandResourceRevision::default(),
-            CommandResourceSettings::default()
-        ),
-        Err(RegistryError::RecoveryRequired(_))
-    ));
+    for read_first in [true, false] {
+        let (_dir, mut store) = store();
+        store
+            .connection
+            .execute("DELETE FROM host_settings", [])
+            .unwrap();
+        assert_invalid_command_settings(&mut store, read_first);
+    }
 }
 
 #[test]
@@ -234,32 +240,22 @@ fn command_resource_rejects_noninteger_storage_without_coercion() {
         Value::Blob(vec![0; 1_048_576]),
     ];
     for column in COLUMNS {
-        let (_dir, mut store) = store();
-        // Shadow the strict production table to model malformed storage types.
-        store
-            .connection
-            .execute_batch("CREATE TEMP TABLE host_settings AS SELECT * FROM main.host_settings;")
-            .unwrap();
         for value in &invalid_values {
-            store
-                .connection
-                .execute(&format!("UPDATE host_settings SET {column}=?1"), [value])
-                .unwrap();
-            assert!(
-                matches!(
-                    store.read_command_resource_settings(),
-                    Err(RegistryError::RecoveryRequired(_))
-                ),
-                "{column}: {:?}",
-                value.data_type()
-            );
-            assert!(matches!(
-                store.set_command_resource_settings(
-                    CommandResourceRevision::default(),
-                    CommandResourceSettings::default()
-                ),
-                Err(RegistryError::RecoveryRequired(_))
-            ));
+            for read_first in [true, false] {
+                let (_dir, mut store) = store();
+                // Shadow the strict production table to model malformed storage types.
+                store
+                    .connection
+                    .execute_batch(
+                        "CREATE TEMP TABLE host_settings AS SELECT * FROM main.host_settings;",
+                    )
+                    .unwrap();
+                store
+                    .connection
+                    .execute(&format!("UPDATE host_settings SET {column}=?1"), [value])
+                    .unwrap();
+                assert_invalid_command_settings(&mut store, read_first);
+            }
         }
     }
 }
