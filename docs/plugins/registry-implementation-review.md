@@ -14,7 +14,7 @@ These are internal contracts, not plugin SDK or management IPC contracts. New be
 
 ## What exists today
 
-The registry implements typed async operations, a bounded dedicated worker, schema initialization and validation, transactional installation and decision operations, SQLite-aware backup and restore staging. Private migration infrastructure is tested with synthetic upgrades. Schema version `1` is the only actual supported schema. There is no shipped predecessor migration.
+The registry implements typed async operations, a bounded dedicated worker, schema initialization and validation, transactional installation and decision operations, SQLite-aware backup and restore staging. Schema version `2` retains 20 tables. Resource-settings Stage A is implemented internally / unmerged. It adds eight typed limits, a separate revision, purpose-specific operations and a real internal `1 → 2` migration. Version 1 is an unshipped internal baseline retained exactly in `schema_v1.sql`. Unknown versions reject. The [approved settings design](resource-settings-plan.md) separates this implementation from planned distribution. Only Stage A implementation is authorized; Stage B design approval does not authorize its implementation.
 
 The [integrity module](../../src-tauri/src/plugin_integrity/mod.rs) implements database-independent entry construction and iteration. Records and verified snapshots share the `writers-ide.file-set/1` binary fingerprint. Integrity-record JSON encoding is unchanged. The manifest parser, snapshot pool and resource route remain separate internal foundations.
 
@@ -54,7 +54,9 @@ Reads return bounded owned snapshots from one transaction. Transactions and curs
 
 Trusted Rust host code acquires `LocationLease` beside the dedicated root, then calls `Registry::open_owned(lease, path, limits, capacity)` with an already selected existing database. The blocking lease acquisition belongs off latency-sensitive threads. Owned opening validates that the path resolves beneath the existing owned root. It neither selects a generation nor initializes missing storage. The worker retains the lease before the startup await until actual cleanup. No application caller is wired. Unleased `Registry::create` and `Registry::open` are now test-only helpers.
 
-Opening returns a `RegistrySession` after readiness. The session separates `RegistryOwner` from cloneable `RegistryHandle` operation access. `RegistryOwner::control()` supplies lifecycle snapshots, revision-checked handle acquisition and maintenance admission. Retaining a handle or control does not retain the location lease after thread cleanup.
+For a recognized version-1 database, trusted Rust code must instead call `Registry::open_owned_with_upgrade(lease, path, backup, limits, capacity)`. The host supplies an explicit non-overwriting backup destination. Ordinary opening validates version 2 and refuses version 1 without that upgrade path. Upgrade opening of an already-current database validates without creating a backup or resetting settings. Neither method is an application startup adapter.
+
+Opening returns a `RegistrySession` after readiness, including required backup and migration validation. The session separates `RegistryOwner` from cloneable `RegistryHandle` operation access. `RegistryOwner::control()` supplies lifecycle snapshots, revision-checked handle acquisition and maintenance admission. Retaining a handle or control does not retain the location lease after thread cleanup.
 
 Creation uses non-overwriting file creation and refuses existing destinations, including zero-byte files. Opening never initializes missing storage. Readiness checks schema objects/version, full SQLite integrity, foreign keys, required rows/catalogs, resource bounds and domain relationships. These checks do not verify installation files or select an active generation.
 
@@ -124,6 +126,8 @@ The signatures below describe calls by trusted Rust host code. Paths, limits and
 LocationLease::acquire(root: &Path) -> Result<LocationLease> // blocking; no root creation
 Registry::open_owned(lease: LocationLease, path: PathBuf, limits: RegistryLimits, capacity: usize)
     -> Result<RegistrySession> // async; existing selected database only
+Registry::open_owned_with_upgrade(lease: LocationLease, path: PathBuf, backup: PathBuf,
+    limits: RegistryLimits, capacity: usize) -> Result<RegistrySession> // async; explicit backup
 RegistryOwner::control(&self) -> RegistryControl
 RegistryControl::snapshot(&self) -> LifecycleSnapshot
 RegistryControl::ready_handle(&self, expected: &LifecycleRevision) -> Result<RegistryHandle>
@@ -134,24 +138,34 @@ RegistryOwner::shutdown(self) -> Result<()> // async; waits for actual cleanup
 
 See [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs) for exact operation signatures and [`model.rs`](../../src-tauri/src/plugin_registry/model.rs) for records.
 
-| `RegistryHandle` method  | Input and atomic result                                                                                                                            |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `read_settings`          | Returns the two typed host settings in one read transaction.                                                                                       |
-| `package_details`        | Takes `PackageId`; returns installation, artifacts, declarations and decisions in one bounded snapshot.                                            |
-| `project_details`        | Takes `ProjectId`; returns saved name, location, revision, logical public identity, decisions and overrides.                                       |
-| `accept_artifact`        | Takes `PreparedArtifact` and matching receipt; inserts history and complete immutable metadata together.                                           |
-| `change_installation`    | Takes expected state, semantic action, optional target and prerequisites; commits acceptance if supplied, pointers, revision and cleanup together. |
-| `register_project`       | Takes a complete `PreparedProject`; commits all location/name fields and initial revision together.                                                |
-| `relink_project`         | Takes key, expected revision, prepared location and closed-project prerequisite; replaces location and increments revision together.               |
-| `refresh_project_name`   | Takes key, expected location revision and prepared current location; refreshes the label only for the matching location.                           |
-| `save_permission_review` | Takes a bounded review with expected installation, settings and decisions; saves all effects and deliberate candidate consumption together.        |
-| `acknowledge_scope`      | Takes exact target release and baseline/revision; saves pending review or applies the selected baseline atomically.                                |
-| `set_enablement`         | Takes declaration, expected installation/choice and new choice; `None` removes a project override for Inherit.                                     |
-| `set_host_settings`      | Takes expected/current and replacement typed settings; commits coherent mode/policy changes.                                                       |
-| `remove_unused_artifact` | Requires matching runtime-use prerequisite and no installation reference; explicitly deletes owned children and artifact, not files/history.       |
-| `backup`                 | Takes a new destination path; completes SQLite-aware copying and file synchronization after admission.                                             |
+| `RegistryHandle` method          | Input and atomic result                                                                                                                            |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read_command_resource_settings` | Returns `CommandResourceSettingsSnapshot` with all eight limits and their revision in one read transaction.                                        |
+| `set_command_resource_settings`  | Takes `CommandResourceRevision` and `CommandResourceSettings`; commits all eight limits and revision together after expected-revision validation.  |
+| `read_settings`                  | Returns the two typed permission/repair host settings in one read transaction.                                                                     |
+| `package_details`                | Takes `PackageId`; returns installation, artifacts, declarations and decisions in one bounded snapshot.                                            |
+| `project_details`                | Takes `ProjectId`; returns saved name, location, revision, logical public identity, decisions and overrides.                                       |
+| `accept_artifact`                | Takes `PreparedArtifact` and matching receipt; inserts history and complete immutable metadata together.                                           |
+| `change_installation`            | Takes expected state, semantic action, optional target and prerequisites; commits acceptance if supplied, pointers, revision and cleanup together. |
+| `register_project`               | Takes a complete `PreparedProject`; commits all location/name fields and initial revision together.                                                |
+| `relink_project`                 | Takes key, expected revision, prepared location and closed-project prerequisite; replaces location and increments revision together.               |
+| `refresh_project_name`           | Takes key, expected location revision and prepared current location; refreshes the label only for the matching location.                           |
+| `save_permission_review`         | Takes a bounded review with expected installation, settings and decisions; saves all effects and deliberate candidate consumption together.        |
+| `acknowledge_scope`              | Takes exact target release and baseline/revision; saves pending review or applies the selected baseline atomically.                                |
+| `set_enablement`                 | Takes declaration, expected installation/choice and new choice; `None` removes a project override for Inherit.                                     |
+| `set_host_settings`              | Takes expected/current and replacement typed settings; commits coherent mode/policy changes.                                                       |
+| `remove_unused_artifact`         | Requires matching runtime-use prerequisite and no installation reference; explicitly deletes owned children and artifact, not files/history.       |
+| `backup`                         | Takes a new destination path; completes SQLite-aware copying and file synchronization after admission.                                             |
 
 `ArtifactTarget::Prepared` combines preparation and receipt for acceptance within an installation transaction. Two separate public method calls do not form one atomic operation.
+
+### Command resource settings
+
+[`model.rs`](../../src-tauri/src/plugin_registry/model.rs) defines `CommandResourceSettings`, `CommandResourceRevision` and `CommandResourceSettingsSnapshot`. The limits are positive JavaScript-safe integers. The revision starts at zero and serializes/deserializes as a canonical nonnegative decimal string, not a JavaScript number. It remains separate from installation and lifecycle revisions and the two-field permission `HostSettings`.
+
+[`store_command_settings.rs`](../../src-tauri/src/plugin_registry/store_command_settings.rs) reads scalar integers through borrowed `ValueRef` values without allocating malformed persisted strings or blobs. Missing or invalid persisted values return `RecoveryRequired`. A stale revision returns `Conflict`, even if the proposed limits match. A current identical write returns the snapshot without advancing the revision. This no-op remains valid at the signed-integer maximum; a changed write there returns `LimitExceeded`. Resource-only updates do not change permission mode, clean up automatic approvals or invalidate permission reviews.
+
+The operations use the existing bounded FIFO worker and service-bound `RegistryHandle`. Admitted writes survive caller abandonment. Mutation uncertainty returns `OutcomeUnknown` and poisons the store; controlled reopening/recovery is required before further ordinary use. Stage A implements no settings coordinator, delivery epoch, window distribution or UI.
 
 ### Semantic installation actions
 
@@ -177,9 +191,9 @@ Unexpected worker termination closes admission and makes existing handles unavai
 
 [`recovery.rs`](../../src-tauri/src/plugin_registry/recovery.rs) uses SQLite backup steps of 128 pages. `Busy` and `Locked` fail immediately rather than retrying indefinitely. Destinations are claimed without overwriting; failed staging files remain as evidence. Backup reads a consistent source transaction, validates the copied schema, closes the target and synchronizes the file. It does not prove generation-directory durability.
 
-[`migrations.rs`](../../src-tauri/src/plugin_registry/migrations.rs) is private infrastructure for reviewed static SQL chains, not caller-supplied SQL. It validates the source and bounded consecutive steps, completes a backup before mutation, applies steps/version changes in one transaction and validates the target before commit. Tests use synthetic `1 -> 2` schemas and failure chains. Actual opening supports schema `1` only and rejects unknown versions. No prior shipped schema migration is registered.
+[`migrations.rs`](../../src-tauri/src/plugin_registry/migrations.rs) is private infrastructure for reviewed static SQL chains, not caller-supplied SQL. It validates the source and bounded consecutive steps, completes a backup before mutation, applies steps/version changes in one transaction and validates the target before commit. The registered private chain uses compiled [`migration_v1_to_v2.sql`](../../src-tauri/src/plugin_registry/migration_v1_to_v2.sql) to rebuild the settings table to the exact version-2 definition. Version-aware validation preserves namespace, allocation high-water marks, permissions and unrelated rows. Real-upgrade regressions accompany synthetic failure-chain tests. `Store::open_with_upgrade(path, backup, limits)` is the store entry point used by owned upgrade opening. Local validation is recorded in the cumulative changelog; Stage A Windows/Linux validation remains outstanding. No automatic backup destination, retention or cleanup policy is introduced.
 
-The synchronous private `prepare_restore` helper is exercised directly by native tests. A future closed-registry coordinator must schedule it off latency-sensitive threads and retain exclusive maintenance ownership. It prepares a new database, not a live replacement. It holds consistent source/current read snapshots, performs bounded full validation of the backup and prepared result, and validates current history/allocation evidence separately. It merges history by canonical package/version, rejects known fingerprint conflicts, and preserves validated allocation high-water marks. It never merges current approvals or installation selection into the backup.
+The synchronous private `prepare_restore` helper is exercised directly by native tests. A future closed-registry coordinator must schedule it off latency-sensitive threads and retain exclusive maintenance ownership. It prepares a new database, not a live replacement. It holds consistent source/current read snapshots, performs bounded full validation of the backup and prepared result, and validates current history/allocation evidence separately. It merges history by canonical package/version, rejects known fingerprint conflicts, and preserves validated allocation high-water marks. It never merges current approvals or installation selection into the backup. The source is read-only and may use recognized schema 1 or 2. The owned destination is upgraded and target-validated before history merge and permission quarantine. Version-2 limits and resource revision survive restoration; version 1 receives the approved defaults and revision zero. Source/current databases remain untouched. Secure-mode permission sanitization is independent of the resource configuration.
 
 Ordinary restoration requires matching namespaces. Explicitly acknowledged missing/unreadable history or unrecoverable allocation evidence requires a fresh namespace as specified by the recovery policy. The helper preserves safely decoded history pins even when other history or metadata is damaged. Missing or malformed evidence needs explicit loss acknowledgement; it never manufactures a missing fingerprint. A loss acknowledgement cannot bypass a known validated conflict, readable unsupported schema, known incompatible namespace or host resource limit. Deleted history with no surviving evidence cannot be detected or reconstructed. Restore forces Secure mode and moves approvals into inactive recovered candidates, merging source flags without granting coverage. Source/current databases stay unchanged.
 
@@ -215,7 +229,7 @@ The owner approved advancing shared production ownership and checked sealing whi
 
 Native path encoding, directory-identity schemes and alias matching need supported platform formats. `PublicProjectId` internally pairs namespace and registration key; its author-facing string encoding and native host mapping remain open. No real native location proof can be constructed yet.
 
-Only permission mode and repair-conflict policy are foundation settings. Command/runtime integration must add typed settings persistence, dispatcher loading, change distribution and its settings menu. Lifecycle/management integration must add the blocked-activation preference, activation wiring and management toggle. These are completion gates for their slices and Part 4, not optional backlog items.
+Typed command resource persistence and the recognized schema migration are implemented internally in Stage A. Permission mode and repair policy retain their separate two-field contract. Command/runtime integration still requires saved-settings loading into the dispatcher, change distribution and its settings menu. Lifecycle/management integration must add the blocked-activation preference, activation wiring and management toggle. These are completion gates for their slices and Part 4, not optional backlog items.
 
 No project-forgetting workflow, configuration reset, automatic generation cleanup, cross-registry import, audit log, interactive history-conflict recovery or activation-health rollback is added. Production numerical defaults remain deferred.
 
@@ -235,13 +249,18 @@ No project-forgetting workflow, configuration reset, automatic generation cleanu
 - [`publication_platform.rs`](../../src-tauri/src/plugin_registry/publication_platform.rs) and [`publication_platform_tests.rs`](../../src-tauri/src/plugin_registry/publication_platform_tests.rs): always-refusing production preflight and unqualified Linux/macOS candidates. Windows/other native candidate helpers return `Unsupported`; the old Windows raw move experiment stays separate.
 - [`publication_crash_tests.rs`](../../src-tauri/src/plugin_registry/publication_crash_tests.rs): test-only cache-aware storage model driven by the actual publisher sequence, reconstructed selector/database readiness and missing-barrier negative controls. It does not qualify a native filesystem.
 - [`qualification_evidence.rs`](../../src-tauri/src/plugin_registry/qualification_evidence.rs): test-only, sanitized environment observations. CI uploads current-run JSON, not a qualification token. See [model assumptions and artifact limits](registry-publication-investigation.md#cache-aware-model-and-environment-observations).
-- [`recovery.rs`](../../src-tauri/src/plugin_registry/recovery.rs), [`recovery_tests.rs`](../../src-tauri/src/plugin_registry/recovery_tests.rs) and [`migrations.rs`](../../src-tauri/src/plugin_registry/migrations.rs): real-file/WAL backup, restore staging and synthetic migration tests.
+- [`recovery.rs`](../../src-tauri/src/plugin_registry/recovery.rs), [`recovery_tests.rs`](../../src-tauri/src/plugin_registry/recovery_tests.rs), [`recovery_command_settings_tests.rs`](../../src-tauri/src/plugin_registry/recovery_command_settings_tests.rs), [`migrations.rs`](../../src-tauri/src/plugin_registry/migrations.rs), [`migrations_stage_a_tests.rs`](../../src-tauri/src/plugin_registry/migrations_stage_a_tests.rs) and [`migration_v1_to_v2.sql`](../../src-tauri/src/plugin_registry/migration_v1_to_v2.sql): real-file/WAL backup, version-aware restore, real internal upgrade and synthetic failure-chain tests.
+- [`store_command_settings.rs`](../../src-tauri/src/plugin_registry/store_command_settings.rs), [`store_command_settings_tests.rs`](../../src-tauri/src/plugin_registry/store_command_settings_tests.rs) and [`opening_upgrade_tests.rs`](../../src-tauri/src/plugin_registry/opening_upgrade_tests.rs): typed atomic resource operations, numeric/revision boundaries, permission independence and explicit upgrade readiness.
 - [`plugin_integrity/tests.rs`](../../src-tauri/src/plugin_integrity/tests.rs): binary vectors, entry validation, source errors and existing integrity regressions.
 - [`publication_probe/mod.rs`](../../src-tauri/src/plugin_registry/publication_probe/mod.rs), [`sealing.rs`](../../src-tauri/src/plugin_registry/publication_probe/sealing.rs), [`platform.rs`](../../src-tauri/src/plugin_registry/publication_probe/platform.rs), [`tests.rs`](../../src-tauri/src/plugin_registry/publication_probe/tests.rs) and [`process_tests.rs`](../../src-tauri/src/plugin_registry/publication_probe/process_tests.rs): test-only lifecycle, native candidates, sealing, all-phase faults, partial writes, post-publication readiness rejection, process exits and cross-process locks. Child tests use timeouts and kill/reap guards. The two additional lease lifetime regressions are in `worker_tests.rs`.
 
 Run from `src-tauri`:
 
 ```sh
+cargo test --locked --lib command_resource
+cargo test --locked --lib opening_upgrade_tests
+cargo test --locked --lib migrations
+cargo test --locked --lib recovery
 cargo test --locked --lib plugin_registry::selector
 cargo test --locked --lib plugin_registry::publication_platform
 cargo test --locked --lib plugin_registry::generation::publisher

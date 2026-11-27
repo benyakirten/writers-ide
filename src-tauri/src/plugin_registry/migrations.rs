@@ -1,40 +1,93 @@
-//! Trusted migration execution infrastructure. Version 1 has no shipped predecessors.
+//! Recognized internal schema upgrades. The version-1 baseline was never shipped.
 //! Plans are native static definitions, never caller-provided SQL or plugin data.
 use super::{
     error::{RegistryError, Result},
     model::RegistryLimits,
-    recovery, store,
+    recovery, schema, store,
 };
 use rusqlite::Connection;
 use std::path::Path;
 
-pub(super) struct Migration {
-    pub from: i64,
-    pub to: i64,
-    pub sql: &'static str,
+struct Migration {
+    from: i64,
+    to: i64,
+    sql: &'static str,
 }
 
-/// The future version-specific opener supplies a reviewed chain and its target
-/// validator. Normal version-1 opening never guesses or applies an unknown plan.
-pub(super) fn execute_supported(
+const SUPPORTED: [Migration; 1] = [Migration {
+    from: 1,
+    to: 2,
+    sql: include_str!("migration_v1_to_v2.sql"),
+}];
+
+/// The caller supplies an explicit non-overwriting pre-upgrade backup destination.
+/// A validated current database needs no backup or mutation.
+pub(super) fn upgrade_to_current(
     connection: &mut Connection,
-    steps: &[Migration],
     backup: &Path,
     limits: &RegistryLimits,
-    validate_target: fn(&Connection) -> Result<()>,
 ) -> Result<()> {
+    prepare_upgrade(connection, limits)?;
+    if store::validate_supported_snapshot(connection, limits)? == schema::VERSION {
+        return Ok(());
+    }
+    execute_supported(
+        connection,
+        &SUPPORTED,
+        backup,
+        limits,
+        store::validate_snapshot,
+    )
+}
+
+/// Only for a caller-owned restore working copy whose verified source is retained.
+/// This never creates another backup or modifies the original restore source.
+pub(super) fn upgrade_restore_copy(
+    connection: &mut Connection,
+    limits: &RegistryLimits,
+) -> Result<()> {
+    prepare_upgrade(connection, limits)?;
+    let original = store::validate_supported_snapshot(connection, limits)?;
+    if original == schema::VERSION {
+        return Ok(());
+    }
+    validate_chain(original, &SUPPORTED, limits)?;
+    apply_chain(
+        connection,
+        &SUPPORTED,
+        original,
+        limits,
+        store::validate_snapshot,
+    )
+}
+
+fn prepare_upgrade(connection: &Connection, limits: &RegistryLimits) -> Result<()> {
     limits.validate()?;
     if !connection.is_autocommit() {
         return Err(RegistryError::InvalidInput(
             "migration cannot nest a transaction".into(),
         ));
     }
-    store::validate_snapshot(connection, limits)?;
-    let original: i64 = connection.query_row(
-        "SELECT schema_version FROM registry_metadata WHERE singleton=1",
-        [],
-        |r| r.get(0),
-    )?;
+    Ok(())
+}
+
+// The chain and target validator remain private, native definitions.
+fn execute_supported(
+    connection: &mut Connection,
+    steps: &[Migration],
+    backup: &Path,
+    limits: &RegistryLimits,
+    validate_target: fn(&Connection, &RegistryLimits) -> Result<()>,
+) -> Result<()> {
+    prepare_upgrade(connection, limits)?;
+    let original = store::validate_supported_snapshot(connection, limits)?;
+    validate_chain(original, steps, limits)?;
+    // No schema mutation is attempted unless the SQLite-aware backup succeeds.
+    recovery::backup_database_supported(connection, backup)?;
+    apply_chain(connection, steps, original, limits, validate_target)
+}
+
+fn validate_chain(original: i64, steps: &[Migration], limits: &RegistryLimits) -> Result<()> {
     if steps.is_empty() || steps.len() > limits.max_review_items {
         return Err(RegistryError::InvalidInput(
             "migration requires a bounded supported chain".into(),
@@ -56,15 +109,19 @@ pub(super) fn execute_supported(
         }
         expected = step.to;
     }
-    // No schema mutation is attempted unless the SQLite-aware backup succeeds.
-    recovery::backup_database(connection, backup)?;
+    Ok(())
+}
+
+fn apply_chain(
+    connection: &mut Connection,
+    steps: &[Migration],
+    original: i64,
+    limits: &RegistryLimits,
+    validate_target: fn(&Connection, &RegistryLimits) -> Result<()>,
+) -> Result<()> {
     connection.execute_batch("BEGIN IMMEDIATE")?;
     let result = (|| {
-        let current: i64 = connection.query_row(
-            "SELECT schema_version FROM registry_metadata WHERE singleton=1",
-            [],
-            |r| r.get(0),
-        )?;
+        let current = store::validate_supported_snapshot(connection, limits)?;
         if current != original {
             return Err(RegistryError::Conflict(
                 "schema changed after backup".into(),
@@ -76,7 +133,7 @@ pub(super) fn execute_supported(
                 return Err(RegistryError::RecoveryRequired("migration version row changed unexpectedly".into()));
             }
         }
-        validate_target(connection)
+        validate_target(connection, limits)
     })();
     if let Err(error) = result {
         if !connection.is_autocommit() {
@@ -94,6 +151,10 @@ pub(super) fn execute_supported(
     })?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "migrations_stage_a_tests.rs"]
+mod stage_a_tests;
 
 #[cfg(test)]
 mod tests {
@@ -116,14 +177,14 @@ mod tests {
         schema::initialize(&mut c).unwrap();
         c
     }
-    // Version 2 is a test fixture only, not a registered production migration.
-    fn target(c: &Connection) -> Result<()> {
+    // Version 3 is a test fixture only, not a registered production migration.
+    fn target(c: &Connection, _: &RegistryLimits) -> Result<()> {
         let version: i64 =
             c.query_row("SELECT schema_version FROM registry_metadata", [], |r| {
                 r.get(0)
             })?;
         let value: i64 = c.query_row("SELECT value FROM migration_probe", [], |r| r.get(0))?;
-        if version != 2 || value != 7 {
+        if version != 3 || value != 7 {
             return Err(RegistryError::RecoveryRequired(
                 "test target invalid".into(),
             ));
@@ -131,7 +192,7 @@ mod tests {
         Ok(())
     }
     fn first() -> Migration {
-        Migration { from: 1, to: 2, sql: "CREATE TABLE migration_probe(value INTEGER); INSERT INTO migration_probe VALUES(7);" }
+        Migration { from: 2, to: 3, sql: "CREATE TABLE migration_probe(value INTEGER); INSERT INTO migration_probe VALUES(7);" }
     }
     #[test]
     fn backs_up_before_upgrade_and_preserves_old_schema() {
@@ -139,14 +200,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let backup = dir.path().join("backup");
         execute_supported(&mut c, &[first()], &backup, &limits(), target).unwrap();
-        target(&c).unwrap();
+        target(&c, &limits()).unwrap();
         let old = Connection::open(backup).unwrap();
         schema::validate(&old).unwrap();
         assert_eq!(
             old.query_row("SELECT schema_version FROM registry_metadata", [], |r| r
                 .get::<_, i64>(0))
                 .unwrap(),
-            1
+            2
         );
     }
     #[test]
@@ -154,8 +215,8 @@ mod tests {
         let mut c = database();
         let dir = tempfile::tempdir().unwrap();
         let bad = Migration {
-            from: 2,
-            to: 3,
+            from: 3,
+            to: 4,
             sql: "INSERT INTO table_that_does_not_exist VALUES(1);",
         };
         assert!(execute_supported(
@@ -174,7 +235,9 @@ mod tests {
         let mut c = database();
         let dir = tempfile::tempdir().unwrap();
         let backup = dir.path().join("backup");
-        let reject = |_: &Connection| Err(RegistryError::RecoveryRequired("test rejection".into()));
+        let reject = |_: &Connection, _: &RegistryLimits| {
+            Err(RegistryError::RecoveryRequired("test rejection".into()))
+        };
         assert!(execute_supported(&mut c, &[first()], &backup, &limits(), reject).is_err());
         schema::validate(&c).unwrap();
         let original = std::fs::read(&backup).unwrap();
@@ -188,8 +251,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let backup = dir.path().join("backup");
         let wrong = Migration {
-            from: 2,
-            to: 3,
+            from: 3,
+            to: 4,
             sql: "SELECT 1",
         };
         assert!(execute_supported(&mut c, &[wrong], &backup, &limits(), target).is_err());

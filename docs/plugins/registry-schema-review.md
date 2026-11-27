@@ -1,6 +1,6 @@
 # Registry schema review
 
-**Status: approved implementation baseline, implemented / unmerged.** This page explains schema version `1` of the internal host registry. The authoritative executable schema is [`schema.sql`](../../src-tauri/src/plugin_registry/schema.sql). This is not a migration from a previously shipped registry. Production application integration remains absent.
+**Status: approved implementation baseline, implemented / unmerged.** This page explains schema version `2` of the internal host registry. Resource-settings Stage A is implemented internally / unmerged. The authoritative executable schema is [`schema.sql`](../../src-tauri/src/plugin_registry/schema.sql). The recognized `1 → 2` migration upgrades an internal unshipped baseline. Production application integration remains absent.
 
 The registry records accepted plugin installations and user decisions. It does not store manuscript contents, plugin-owned data, the project file index or live native credentials. Package files remain in immutable directories outside SQLite. Selection, enablement, scope acknowledgement and native approval are separate facts. None alone authorizes activation.
 
@@ -35,7 +35,7 @@ There are no persistent management-plan, activation, ticket, token, live-opening
 - `NOT NULL` accompanies non-integer primary keys. SQLite checks can otherwise pass on null results. Nullable fields have explicit shape checks where needed.
 - All foreign keys use restrictive deletion and no cascading updates. Rust performs coherent cleanup explicitly in one transaction. Child-key indexes support parent checks and scoped cleanup; they are not performance claims.
 - Checks constrain stored values. SQLite may losslessly coerce bound values even in `STRICT` tables. Rust must reject incorrectly typed external input before binding it.
-- Positive revision counters start at `1` in the implementation. Rust must reject exhaustion before incrementing a signed 64-bit counter.
+- Installation and project-location revision counters start at `1`. The independent command resource revision starts at `0`. Rust rejects exhaustion before incrementing a signed 64-bit counter; a current-revision resource no-op still succeeds at the maximum.
 - No SQL default issues approval or enables a component. Defaults below apply only when deliberately creating a fresh settings row.
 
 Enable foreign keys on every connection before transactions. Journal and synchronization settings are approved operating requirements, not a complete opening or publication protocol:
@@ -52,7 +52,7 @@ The worker must inspect the resulting settings. An in-memory review database can
 
 The required metadata row holds a random 16-byte logical namespace generated in trusted Rust with `getrandom`. A physical registry generation is not this namespace. Public project-ID string encoding and host integration remain open.
 
-`schema_version = 1` identifies the first implemented schema. It is not a claim of a prior shipped version. Opening rejects unknown schemas. A private migration helper tests reviewed static chains using synthetic upgrades; it registers no production predecessor migration.
+`schema_version = 2` identifies the current schema, still with 20 tables. [`schema_v1.sql`](../../src-tauri/src/plugin_registry/schema_v1.sql) retains the internal unshipped version-1 baseline byte-for-byte. Private compiled [`migration_v1_to_v2.sql`](../../src-tauri/src/plugin_registry/migration_v1_to_v2.sql) rebuilds `host_settings` to the exact current definition. Version-aware source, backup and target validators preserve identity, allocation high-water marks, permissions and unrelated data. Ordinary opening validates version 2. Version 1 requires explicit upgrade opening with a host-chosen non-overwriting backup destination. Unknown versions reject. See the [opening contract](registry-implementation-review.md#application-lifecycle-owner).
 
 ```sql
 CREATE TABLE registry_metadata (
@@ -68,15 +68,35 @@ CREATE TABLE host_settings (
     permission_mode TEXT NOT NULL DEFAULT 'secure'
         CHECK (permission_mode IN ('secure', 'trust')),
     repair_conflict_policy TEXT NOT NULL DEFAULT 'keep-update'
-        CHECK (repair_conflict_policy IN ('keep-update', 'ask-before-replacing-update'))
+        CHECK (repair_conflict_policy IN ('keep-update', 'ask-before-replacing-update')),
+    command_max_caller_pending INTEGER NOT NULL DEFAULT 32
+        CHECK (command_max_caller_pending BETWEEN 1 AND 9007199254740991),
+    command_max_provider_pending INTEGER NOT NULL DEFAULT 64
+        CHECK (command_max_provider_pending BETWEEN 1 AND 9007199254740991),
+    command_max_window_pending INTEGER NOT NULL DEFAULT 256
+        CHECK (command_max_window_pending BETWEEN 1 AND 9007199254740991),
+    command_max_payload_bytes INTEGER NOT NULL DEFAULT 8388608
+        CHECK (command_max_payload_bytes BETWEEN 1 AND 9007199254740991),
+    command_max_payload_depth INTEGER NOT NULL DEFAULT 64
+        CHECK (command_max_payload_depth BETWEEN 1 AND 9007199254740991),
+    command_max_payload_entries INTEGER NOT NULL DEFAULT 100000
+        CHECK (command_max_payload_entries BETWEEN 1 AND 9007199254740991),
+    command_max_component_bytes INTEGER NOT NULL DEFAULT 33554432
+        CHECK (command_max_component_bytes BETWEEN 1 AND 9007199254740991),
+    command_max_window_bytes INTEGER NOT NULL DEFAULT 134217728
+        CHECK (command_max_window_bytes BETWEEN 1 AND 9007199254740991),
+    command_resource_revision INTEGER NOT NULL DEFAULT 0
+        CHECK (command_resource_revision >= 0)
 ) STRICT;
 ```
 
-The two logical settings and their fresh defaults are [approved](registry-foundation.md#approved-host-settings-storage). The SQL strings are the implemented encodings. `ask-before-replacing-update` means the approved **Ask before replacing the update** preference. It does not replace an update without confirmation. The repair policy is not the deferred restore-history conflict setting.
+The two permission/repair settings and their fresh defaults are [approved](registry-foundation.md#approved-host-settings-storage). The SQL strings are the implemented encodings. `ask-before-replacing-update` means the approved **Ask before replacing the update** preference. It does not replace an update without confirmation. The repair policy is not the deferred restore-history conflict setting.
 
 The singleton keys enforce **at most** one row. Rust must require exactly one row in each table before readiness. Fresh creation inserts both rows atomically. Ordinary opening preserves them and fails if either is missing or invalid. Restore forces Secure mode and separates recovered approvals before readiness. Namespace changes occur only at an approved recovery boundary, not ordinary startup.
 
-Do not add a generic key/value or JSON settings column. The owner approved keeping the additional settings out of this foundation. Add them through typed migrations in their corresponding Part 4 integration slices, with persistence and controls required before those slices and Part 4 are complete. This two-field table does not implicitly implement every host preference.
+The eight resource columns require positive JavaScript-safe integers. Their revision is a separate nonnegative SQLite integer, initially zero. Native `CommandResourceSettings` validation enforces the same bounds before SQL conversion. `CommandResourceRevision` uses canonical decimal-string serde. Reads and writes return a complete `CommandResourceSettingsSnapshot`; permission `HostSettings` still has only its original two fields. Resource edits therefore do not alter permission-review comparisons or permission cleanup. See the [implemented resource contract](resource-settings-plan.md#implemented-update-and-conflict-contract).
+
+Restore accepts recognized version-1 and version-2 backups read-only. It upgrades only the owned target copy before history merge and permission quarantine. Version-2 saved limits/revision survive; version 1 receives defaults/revision zero. Secure mode is forced independently. Do not add generic key/value or JSON settings storage. Saved-settings loading, distribution, controls and the blocked-activation preference remain unimplemented. Stage B design is approved, but only Stage A implementation is authorized.
 
 ## Stable package, component and version identity
 
@@ -507,13 +527,13 @@ Permissions also require synchronization with private live authorization state. 
 
 ## Approved mechanics and remaining integration
 
-The assembled 20-table schema, `STRICT` storage, restrictive foreign keys, required singleton rows, partial permission-coverage indexes and ownership/identity triggers are approved and implemented. Artifact IDs and namespaces are 16-byte BLOBs. Revisions start at `1`, use checked signed-64-bit increments and reject exhaustion. Installation revision remains on the retained package row after uninstall.
+The assembled 20-table schema, `STRICT` storage, restrictive foreign keys, required singleton rows, partial permission-coverage indexes and ownership/identity triggers are approved and implemented. Artifact IDs and namespaces are 16-byte BLOBs. Registry identity and installation revisions start at `1`. The independent command-resource revision starts at `0`. Revisions use checked signed-64-bit increments and reject exhaustion. Installation revision remains on the retained package row after uninstall.
 
 Project columns store versioned binary fields, but supported native path/identity formats and alias matching remain open. `PreparedProject` and the closed-project prerequisite have only test constructors. Byte equality is not a production native identity check. Public project-ID string encoding and mapping remain open.
 
-Permission mode and repair-conflict policy are the only settings here. Command/runtime integration must add a typed migration, persistence, dispatcher loading, change distribution and settings menu. Lifecycle/management integration must persist the blocked-activation preference, wire activation behavior and add its toggle. Both are Part 4 completion gates.
+The settings row stores permission mode, repair-conflict policy, eight command-resource limits and their independent revision. Typed persistence and the real internal `1 → 2` migration are implemented in [Stage A](resource-settings-plan.md). Command/runtime integration still needs saved-settings loading, change distribution and a settings menu. Lifecycle/management integration must persist the blocked-activation preference, wire activation behavior and add its toggle. Both are Part 4 completion gates.
 
-The private migration helper backs up before a reviewed static chain and rolls back failed transactional upgrades. Tests use synthetic `1 -> 2` fixtures only. Actual opening supports schema `1` and rejects unknown schemas; there is no shipped predecessor migration.
+The private migration helper backs up before a reviewed static chain and rolls back failed transactional upgrades. Schema 2 is current. A real internal `1 → 2` migration preserves the unshipped baseline. Ordinary opening accepts version 2; recognized version 1 requires the explicit backup-requiring upgrade opener. Unknown schemas reject. Synthetic failure-chain tests supplement the real migration tests. Production startup remains unwired.
 
 Production numerical defaults, checkpoint scheduling, backup retention, generation selector encoding, durable publication and crash-safe switching remain separate integration work. Tests inject explicit finite bounds. Startup cost and production capacity are not measured. Project forgetting, cross-registry import and interactive history-conflict recovery remain outside this slice.
 

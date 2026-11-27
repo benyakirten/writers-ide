@@ -41,6 +41,121 @@ fn wait<T>(receiver: &mpsc::Receiver<T>) -> T {
 }
 
 #[test]
+fn command_resource_fifo_bounded_admission_and_service_lifetime() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("registry.sqlite");
+    let session = run(Registry::create(path.clone(), limits(), 2)).unwrap();
+    let original = run(session.handle.read_command_resource_settings()).unwrap();
+    let changed = CommandResourceSettings {
+        max_payload_depth: 1,
+        ..original.settings
+    };
+    let (started, receive_started) = mpsc::channel();
+    let (release, receive_release) = mpsc::channel();
+    let mut active = Box::pin(session.handle.submit(false, move |_| {
+        started.send(()).unwrap();
+        wait(&receive_release);
+        Ok(())
+    }));
+    enqueue(active.as_mut());
+    wait(&receive_started);
+    let mut write = Box::pin(
+        session
+            .handle
+            .set_command_resource_settings(original.revision, changed),
+    );
+    enqueue(write.as_mut());
+    let mut read = Box::pin(session.handle.read_command_resource_settings());
+    enqueue(read.as_mut());
+    assert!(matches!(
+        run(session.handle.read_command_resource_settings()),
+        Err(RegistryError::LimitExceeded(_))
+    ));
+    assert!(matches!(
+        run(session
+            .handle
+            .set_command_resource_settings(original.revision, original.settings)),
+        Err(RegistryError::LimitExceeded(_))
+    ));
+    release.send(()).unwrap();
+    run(active).unwrap();
+    let saved = run(write).unwrap();
+    assert_eq!(saved.revision.value(), 1);
+    assert_eq!(saved.settings, changed);
+    assert_eq!(run(read).unwrap(), saved);
+    run(session.owner.shutdown()).unwrap();
+    let next = run(Registry::open(path, limits(), 2)).unwrap();
+    assert_eq!(
+        run(next.handle.read_command_resource_settings()).unwrap(),
+        saved
+    );
+    assert!(matches!(
+        run(session.handle.read_command_resource_settings()),
+        Err(RegistryError::Unavailable(_))
+    ));
+    assert!(matches!(
+        run(session
+            .handle
+            .set_command_resource_settings(saved.revision, original.settings)),
+        Err(RegistryError::Unavailable(_))
+    ));
+    // Even an accepting worker rejects a handle from an older service association.
+    let stale = RegistryHandle {
+        shared: next.handle.shared.clone(),
+        service: next.handle.service + 1,
+    };
+    assert!(matches!(
+        run(stale.read_command_resource_settings()),
+        Err(RegistryError::Unavailable(_))
+    ));
+    assert!(matches!(
+        run(stale.set_command_resource_settings(saved.revision, original.settings)),
+        Err(RegistryError::Unavailable(_))
+    ));
+    run(next.owner.shutdown()).unwrap();
+}
+
+#[test]
+fn command_resource_abandoned_admitted_write_drains_after_close() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("registry.sqlite");
+    let session = run(Registry::create(path.clone(), limits(), 2)).unwrap();
+    let original = run(session.handle.read_command_resource_settings()).unwrap();
+    let changed = CommandResourceSettings {
+        max_window_pending: 1,
+        ..original.settings
+    };
+    let (started, receive_started) = mpsc::channel();
+    let (release, receive_release) = mpsc::channel();
+    let mut active = Box::pin(session.handle.submit(false, move |_| {
+        started.send(()).unwrap();
+        wait(&receive_release);
+        Ok(())
+    }));
+    enqueue(active.as_mut());
+    wait(&receive_started);
+    let mut read = Box::pin(session.handle.read_command_resource_settings());
+    enqueue(read.as_mut());
+    let mut write = Box::pin(
+        session
+            .handle
+            .set_command_resource_settings(original.revision, changed),
+    );
+    enqueue(write.as_mut());
+    drop(write);
+    session.owner.shared.close();
+    release.send(()).unwrap();
+    run(active).unwrap();
+    assert!(matches!(run(read), Err(RegistryError::Unavailable(_))));
+    run(session.owner.shutdown()).unwrap();
+    let next = run(Registry::open(path, limits(), 2)).unwrap();
+    let saved = run(next.handle.read_command_resource_settings()).unwrap();
+    assert_eq!(saved.settings, changed);
+    assert_eq!(saved.revision.value(), 1);
+    run(next.owner.shutdown()).unwrap();
+}
+
+#[test]
 fn creates_only_after_readiness_and_reopens_saved_settings() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("registry.sqlite");

@@ -278,7 +278,7 @@ fn restore_never_overwrites_a_destination_or_downgrades_an_unsupported_current()
         b"existing destination"
     );
     current
-        .execute_batch("UPDATE registry_metadata SET schema_version=2")
+        .execute_batch("UPDATE registry_metadata SET schema_version=3")
         .unwrap();
     let unused_path = directory.path().join("unused.db");
     assert!(matches!(
@@ -634,7 +634,7 @@ fn incomplete_history_cannot_downgrade_known_namespace_or_unsupported_version() 
                 )
                 .unwrap();
         } else {
-            current.execute_batch("PRAGMA ignore_check_constraints=ON; UPDATE registry_metadata SET schema_version=2,identity_namespace=x'01'; PRAGMA ignore_check_constraints=OFF").unwrap();
+            current.execute_batch("PRAGMA ignore_check_constraints=ON; UPDATE registry_metadata SET schema_version=3,identity_namespace=x'01'; PRAGMA ignore_check_constraints=OFF").unwrap();
         }
         assert!(matches!(
             prepare_restore(&backup_path, Some(&current_path), &target_path, true),
@@ -743,7 +743,7 @@ fn invalid_backup_and_unsupported_versions_do_not_create_destination() {
     let backup_path = directory.path().join("backup.db");
     let backup = database(&backup_path);
     backup
-        .execute_batch("UPDATE registry_metadata SET schema_version=2")
+        .execute_batch("UPDATE registry_metadata SET schema_version=3")
         .unwrap();
     let target = directory.path().join("target.db");
     assert!(matches!(

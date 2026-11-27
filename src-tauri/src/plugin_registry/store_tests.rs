@@ -2,6 +2,82 @@ use super::*;
 use crate::plugin_integrity::{create_record, verify_package, IntegrityLimits};
 use tempfile::TempDir;
 
+#[test]
+fn command_resource_edits_preserve_approvals_and_pending_permission_reviews() {
+    let (_dir, mut s) = store();
+    let artifact = accept_version(&mut s, "1.0.0");
+    let snapshot = install(&mut s, &artifact);
+    let component = component(&mut s, &artifact);
+    let secure = s.read_settings().unwrap();
+    let trust = HostSettings {
+        permission_mode: PermissionMode::Trust,
+        repair_conflict_policy: RepairConflictPolicy::AskBeforeReplacingUpdate,
+    };
+    s.set_host_settings(secure, trust).unwrap();
+    let automatic_key = DecisionKey {
+        component,
+        permission: NativePermission::ExternalOpen,
+        coverage: Coverage::Application,
+    };
+    review(
+        &mut s,
+        &snapshot,
+        artifact.id,
+        automatic_key.clone(),
+        PermissionEffect::ApproveAutomatic,
+        false,
+    )
+    .unwrap();
+    let project = project(&mut s, 42);
+    let explicit_key = DecisionKey {
+        coverage: Coverage::Project(project),
+        ..automatic_key.clone()
+    };
+    review(
+        &mut s,
+        &snapshot,
+        artifact.id,
+        explicit_key.clone(),
+        PermissionEffect::ApproveExplicit,
+        false,
+    )
+    .unwrap();
+    let automatic = decision_for(&mut s, &automatic_key);
+    let explicit = decision_for(&mut s, &explicit_key);
+    let pending = PermissionReview {
+        installation: snapshot,
+        target: Some(artifact.id),
+        expected_settings: trust,
+        items: vec![PermissionReviewItem {
+            key: explicit_key.clone(),
+            expected: explicit.clone(),
+            effect: PermissionEffect::Deny,
+            consume_recovered: false,
+        }],
+    };
+    let original = s.read_command_resource_settings().unwrap();
+    let changed = CommandResourceSettings {
+        max_caller_pending: 1,
+        ..original.settings
+    };
+    let saved = s
+        .set_command_resource_settings(original.revision, changed)
+        .unwrap();
+    assert_eq!(s.read_settings().unwrap(), trust);
+    assert_eq!(decision_for(&mut s, &automatic_key), automatic);
+    assert_eq!(decision_for(&mut s, &explicit_key), explicit);
+    s.save_permission_review(pending).unwrap();
+    assert!(decision_for(&mut s, &explicit_key).denied);
+    assert_eq!(decision_for(&mut s, &automatic_key), automatic);
+    assert_eq!(s.read_command_resource_settings().unwrap(), saved);
+    s.set_host_settings(trust, secure).unwrap();
+    let explicit_after_review = decision_for(&mut s, &explicit_key);
+    s.set_command_resource_settings(saved.revision, original.settings)
+        .unwrap();
+    assert_eq!(decision_for(&mut s, &explicit_key), explicit_after_review);
+    assert_eq!(s.read_settings().unwrap(), secure);
+}
+
 fn limits() -> RegistryLimits {
     RegistryLimits {
         integrity: IntegrityLimits {

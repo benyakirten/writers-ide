@@ -6,7 +6,7 @@ The internal component harness connects provider APIs and typed application comm
 
 [`command-dispatcher.ts`](../../packages-js/plugins/command-dispatcher.ts) is an internal module. It has no package export and is not connected to the bundled plugin host. Tests can supply trusted dependency declarations, provider registrations and lifetime signals directly. The [component lifecycle harness](#component-lifecycle-harness) now constructs these bindings from host-selected component descriptors.
 
-The dispatcher implements execution and availability. The internal harness adds synchronous activation, API/command publication checks, provider connections and required-consumer lifecycle planning. The harness also implements in-memory project references, selection and independent leases. Neither module implements manifest-to-runtime assembly, the application's project UI/persistence, external loading, native authorization, settings persistence or a settings menu. Creating a dispatcher or harness does not grant permission to run external code.
+The dispatcher implements execution and availability. The internal harness adds synchronous activation, API/command publication checks, provider connections and required-consumer lifecycle planning. The harness also implements in-memory project references, selection and independent leases. Neither module implements manifest-to-runtime assembly, the application's project UI/persistence, external loading, native authorization, saved-settings loading/distribution or a settings menu. Internal native resource persistence is implemented separately in Stage A; see its [validation scope](resource-settings-plan.md#source-and-validation-entry-points). Creating a dispatcher or harness does not grant permission to run external code.
 
 ## Internal application assembly
 
@@ -18,7 +18,7 @@ By default, `bars` and `views` are the shared `BarItemRegistry` and `TabStateReg
 
 Adapter failures appear in `errors` as host-only records containing placement ID, runtime ID, contribution kind and the original error. They are not plugin diagnostics, persisted records or native authority. Cleanup removes a registry entry only if it is still the same object registered by this adapter. A foreign replacement is not removed.
 
-The assembly does not implement external imports, a loader, manifest-to-runtime integration, native services, settings persistence, persistent project registration or layout persistence.
+The assembly does not implement external imports, a loader, manifest-to-runtime integration, native services, saved-settings loading/distribution, persistent project registration or layout persistence. Stage A's separate native persistence does not connect it to saved resource settings.
 
 ## What the host supplies
 
@@ -69,7 +69,9 @@ Arguments and results are independent boundary copies. Within a copy, repeated r
 
 Reservations cover distinct retained representations. Mutable schema inputs are inspected again after asynchronous work before their previous receipts are replaced. This is checkpoint accounting, not continuous mutation tracking. A plugin or transform can allocate memory before the dispatcher sees it. The limits do not bound the entire JavaScript heap or preempt synchronous work.
 
-Updates to an injected ledger apply to new admissions. Existing calls retain their captured limits while continuing to contribute to shared counters. This implements the accounting behavior, not application-wide settings distribution or persistence.
+The injected ledger's `updateLimits` method is already implemented and tested. Updates apply to new admissions. Existing calls retain their captured limits while continuing to contribute to shared counters. This implements the accounting behavior, not application-wide settings distribution or persistence.
+
+The [approved distribution design](resource-settings-plan.md#approved-window-delivery-and-application--not-implemented) will apply committed snapshots through `updateLimits` on each window's existing ledger, without replacing counters or dispatchers. Save success means a confirmed commit, not application in every window. A window may use older limits until delivery or detected association closure. [Stage A internal native persistence](resource-settings-plan.md#implementation-stages-and-acceptance) is implemented internally / unmerged. It uses the existing registry service association and adds no distribution epoch. Stage B's transport-independent coordinator/client fixture is design-approved but not authorized for implementation. Production IPC, settings loading, distribution and UI remain absent.
 
 ## Cancellation and cleanup
 

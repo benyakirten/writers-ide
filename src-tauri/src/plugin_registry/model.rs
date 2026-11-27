@@ -109,6 +109,111 @@ pub(crate) struct HostSettings {
     pub permission_mode: PermissionMode,
     pub repair_conflict_policy: RepairConflictPolicy,
 }
+/// Independent command budgets. No relationship between these limits is required.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CommandResourceSettings {
+    pub max_caller_pending: u64,
+    pub max_provider_pending: u64,
+    pub max_window_pending: u64,
+    pub max_payload_bytes: u64,
+    pub max_payload_depth: u64,
+    pub max_payload_entries: u64,
+    pub max_component_bytes: u64,
+    pub max_window_bytes: u64,
+}
+impl Default for CommandResourceSettings {
+    fn default() -> Self {
+        Self {
+            max_caller_pending: 32,
+            max_provider_pending: 64,
+            max_window_pending: 256,
+            max_payload_bytes: 8_388_608,
+            max_payload_depth: 64,
+            max_payload_entries: 100_000,
+            max_component_bytes: 33_554_432,
+            max_window_bytes: 134_217_728,
+        }
+    }
+}
+impl CommandResourceSettings {
+    pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+
+    pub(crate) fn validate(&self) -> Result<()> {
+        for value in [
+            self.max_caller_pending,
+            self.max_provider_pending,
+            self.max_window_pending,
+            self.max_payload_bytes,
+            self.max_payload_depth,
+            self.max_payload_entries,
+            self.max_component_bytes,
+            self.max_window_bytes,
+        ] {
+            if !(1..=Self::MAX_SAFE_INTEGER).contains(&value) {
+                return Err(RegistryError::InvalidInput(
+                    "command resource limits must be positive JavaScript-safe integers".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Persisted ordering marker, separate from installation and service revisions.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct CommandResourceRevision(i64);
+impl CommandResourceRevision {
+    pub(crate) fn new(value: i64) -> Result<Self> {
+        if value < 0 {
+            return Err(RegistryError::InvalidInput(
+                "command resource revision must be nonnegative".into(),
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    pub(crate) fn value(self) -> i64 {
+        self.0
+    }
+
+    pub(crate) fn next(self) -> Result<Self> {
+        self.0.checked_add(1).map(Self).ok_or_else(|| {
+            RegistryError::LimitExceeded("command resource revision exhausted".into())
+        })
+    }
+}
+impl serde::Serialize for CommandResourceRevision {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.0.to_string())
+    }
+}
+impl<'de> serde::Deserialize<'de> for CommandResourceRevision {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let text = <String as serde::Deserialize>::deserialize(deserializer)?;
+        if text.is_empty()
+            || (text.len() > 1 && text.starts_with('0'))
+            || !text.bytes().all(|byte| byte.is_ascii_digit())
+        {
+            return Err(serde::de::Error::custom(
+                "expected canonical nonnegative decimal revision",
+            ));
+        }
+        let value = text.parse::<i64>().map_err(serde::de::Error::custom)?;
+        Self::new(value).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CommandResourceSettingsSnapshot {
+    pub revision: CommandResourceRevision,
+    pub settings: CommandResourceSettings,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum NativePermission {
     ProjectFilesList,

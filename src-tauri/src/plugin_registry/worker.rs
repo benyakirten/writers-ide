@@ -219,6 +219,28 @@ impl Registry {
         .await
     }
 
+    /// Upgrade only a recognized selected database, retaining a separately
+    /// supplied non-overwriting backup before any schema mutation.
+    pub(crate) async fn open_owned_with_upgrade(
+        lease: LocationLease,
+        path: PathBuf,
+        backup: PathBuf,
+        limits: RegistryLimits,
+        capacity: usize,
+    ) -> Result<RegistrySession> {
+        Self::start_with_upgrade(
+            path,
+            limits,
+            capacity,
+            false,
+            Some(lease),
+            Some(backup),
+            #[cfg(test)]
+            None,
+        )
+        .await
+    }
+
     #[cfg(test)]
     pub(super) async fn open_for_probe(
         path: PathBuf,
@@ -234,6 +256,28 @@ impl Registry {
         capacity: usize,
         create: bool,
         lease: Option<LocationLease>,
+        #[cfg(test)] probe: Option<ProbeStartup>,
+    ) -> Result<RegistrySession> {
+        Self::start_with_upgrade(
+            path,
+            limits,
+            capacity,
+            create,
+            lease,
+            None,
+            #[cfg(test)]
+            probe,
+        )
+        .await
+    }
+
+    async fn start_with_upgrade(
+        path: PathBuf,
+        limits: RegistryLimits,
+        capacity: usize,
+        create: bool,
+        lease: Option<LocationLease>,
+        upgrade_backup: Option<PathBuf>,
         #[cfg(test)] probe: Option<ProbeStartup>,
     ) -> Result<RegistrySession> {
         limits.validate()?;
@@ -274,6 +318,8 @@ impl Registry {
                     };
                     let store = if create {
                         Store::create(&path, limits)
+                    } else if let Some(backup) = upgrade_backup {
+                        Store::open_with_upgrade(&path, &backup, limits)
                     } else {
                         Store::open(&path, limits)
                     };
@@ -380,6 +426,22 @@ impl RegistryHandle {
             })
         })
     }
+    pub(crate) async fn read_command_resource_settings(
+        &self,
+    ) -> Result<CommandResourceSettingsSnapshot> {
+        self.submit(true, Store::read_command_resource_settings)
+            .await
+    }
+    pub(crate) async fn set_command_resource_settings(
+        &self,
+        expected_revision: CommandResourceRevision,
+        settings: CommandResourceSettings,
+    ) -> Result<CommandResourceSettingsSnapshot> {
+        self.submit(false, move |s| {
+            s.set_command_resource_settings(expected_revision, settings)
+        })
+        .await
+    }
     pub(crate) async fn read_settings(&self) -> Result<HostSettings> {
         self.submit(true, Store::read_settings).await
     }
@@ -472,3 +534,7 @@ impl RegistryHandle {
 #[cfg(test)]
 #[path = "worker_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "opening_upgrade_tests.rs"]
+mod opening_upgrade_tests;

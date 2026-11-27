@@ -5,8 +5,35 @@ use super::{
     model::RegistryLimits,
 };
 
-pub(crate) const VERSION: i64 = 1;
+pub(crate) const VERSION: i64 = 2;
 const SQL: &str = include_str!("schema.sql");
+const SQL_V1: &str = include_str!("schema_v1.sql");
+
+fn supported_sql(version: i64) -> Result<&'static str> {
+    match version {
+        1 => Ok(SQL_V1),
+        VERSION => Ok(SQL),
+        _ => Err(RegistryError::RecoveryRequired(format!(
+            "unsupported registry schema version {version}"
+        ))),
+    }
+}
+
+fn supported_version(connection: &Connection) -> Result<i64> {
+    let version = connection
+        .query_row(
+            "SELECT schema_version FROM registry_metadata WHERE singleton=1",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|error| {
+            RegistryError::RecoveryRequired(format!(
+                "registry validation failed: cannot read schema version: {error}"
+            ))
+        })?;
+    supported_sql(version)?;
+    Ok(version)
+}
 pub(crate) const IDENTITY_TABLES: [&str; 3] = ["packages", "components", "project_registrations"];
 
 pub(crate) fn fresh_namespace() -> Result<[u8; 16]> {
@@ -17,6 +44,15 @@ pub(crate) fn fresh_namespace() -> Result<[u8; 16]> {
 }
 
 pub(crate) fn initialize(connection: &mut Connection) -> Result<()> {
+    initialize_version(connection, VERSION)
+}
+
+#[cfg(test)]
+pub(crate) fn initialize_v1(connection: &mut Connection) -> Result<()> {
+    initialize_version(connection, 1)
+}
+
+fn initialize_version(connection: &mut Connection, version: i64) -> Result<()> {
     let namespace = fresh_namespace()?;
     let transaction = connection.transaction()?;
     let objects: i64 = transaction.query_row(
@@ -29,19 +65,29 @@ pub(crate) fn initialize(connection: &mut Connection) -> Result<()> {
             "initialization requires an empty database".into(),
         ));
     }
-    transaction.execute_batch(SQL)?;
+    transaction.execute_batch(supported_sql(version)?)?;
     transaction.execute(
         "INSERT INTO registry_metadata VALUES (1, ?1, ?2)",
-        rusqlite::params![VERSION, namespace.as_slice()],
+        rusqlite::params![version, namespace.as_slice()],
     )?;
     transaction.execute("INSERT INTO host_settings(singleton) VALUES (1)", [])?;
-    validate(&transaction)?;
+    validate_version(&transaction, version)?;
     transaction.commit()?;
     Ok(())
 }
 
 pub(crate) fn validate(connection: &Connection) -> Result<()> {
-    validate_inner(connection).map_err(|error| match error {
+    validate_version(connection, VERSION)
+}
+
+pub(crate) fn validate_supported(connection: &Connection) -> Result<i64> {
+    let version = supported_version(connection)?;
+    validate_version(connection, version)?;
+    Ok(version)
+}
+
+fn validate_version(connection: &Connection, version: i64) -> Result<()> {
+    validate_inner(connection, version).map_err(|error| match error {
         RegistryError::RecoveryRequired(_) => error,
         _ => RegistryError::RecoveryRequired(format!("registry validation failed: {error}")),
     })
@@ -53,9 +99,9 @@ fn text<'a>(row: &'a rusqlite::Row<'_>, index: usize) -> Result<&'a str> {
         .map_err(|_| RegistryError::RecoveryRequired("invalid stored UTF-8 text".into()))
 }
 
-fn validate_objects(connection: &Connection) -> Result<()> {
+fn validate_objects(connection: &Connection, version: i64) -> Result<()> {
     let expected = Connection::open_in_memory()?;
-    expected.execute_batch(SQL)?;
+    expected.execute_batch(supported_sql(version)?)?;
     let query = "SELECT type, name, sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type, name";
     let count_query =
         "SELECT count(*) FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'";
@@ -113,10 +159,10 @@ fn require_absent(connection: &Connection, query: &str, message: &str) -> Result
     Ok(())
 }
 
-fn validate_inner(connection: &Connection) -> Result<()> {
+fn validate_inner(connection: &Connection, version: i64) -> Result<()> {
     // Compare definitions, not just object names: missing constraints and changed
     // triggers must not turn an unsupported database into a ready registry.
-    validate_objects(connection)?;
+    validate_objects(connection, version)?;
     let mut statement = connection.prepare("PRAGMA integrity_check")?;
     let mut rows = statement.query([])?;
     let mut checked = false;
@@ -144,7 +190,7 @@ fn validate_inner(connection: &Connection) -> Result<()> {
         [],
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
     )?;
-    if metadata.0 != 1 || metadata.1 != VERSION || !metadata.2 {
+    if metadata.0 != 1 || metadata.1 != version || !metadata.2 {
         return Err(RegistryError::RecoveryRequired(
             "unsupported registry version or namespace".into(),
         ));
@@ -160,6 +206,34 @@ fn validate_inner(connection: &Connection) -> Result<()> {
                 "missing required {table} singleton"
             )));
         }
+    }
+    if version == VERSION {
+        // Check persisted domains explicitly: integrity_check alone is not a
+        // reliable guard for values written with CHECK constraints disabled.
+        require_absent(
+            connection,
+            "SELECT 1 FROM host_settings WHERE
+                typeof(command_max_caller_pending) <> 'integer'
+                OR command_max_caller_pending NOT BETWEEN 1 AND 9007199254740991
+                OR typeof(command_max_provider_pending) <> 'integer'
+                OR command_max_provider_pending NOT BETWEEN 1 AND 9007199254740991
+                OR typeof(command_max_window_pending) <> 'integer'
+                OR command_max_window_pending NOT BETWEEN 1 AND 9007199254740991
+                OR typeof(command_max_payload_bytes) <> 'integer'
+                OR command_max_payload_bytes NOT BETWEEN 1 AND 9007199254740991
+                OR typeof(command_max_payload_depth) <> 'integer'
+                OR command_max_payload_depth NOT BETWEEN 1 AND 9007199254740991
+                OR typeof(command_max_payload_entries) <> 'integer'
+                OR command_max_payload_entries NOT BETWEEN 1 AND 9007199254740991
+                OR typeof(command_max_component_bytes) <> 'integer'
+                OR command_max_component_bytes NOT BETWEEN 1 AND 9007199254740991
+                OR typeof(command_max_window_bytes) <> 'integer'
+                OR command_max_window_bytes NOT BETWEEN 1 AND 9007199254740991
+                OR typeof(command_resource_revision) <> 'integer'
+                OR command_resource_revision < 0
+             LIMIT 1",
+            "invalid stored command resource settings",
+        )?;
     }
     let count: i64 = connection.query_row(
         "SELECT count(*) FROM (SELECT 1 FROM native_permissions LIMIT 4)",
@@ -298,9 +372,20 @@ fn validate_identifiers(connection: &Connection) -> Result<()> {
 }
 
 pub(crate) fn validate_with_limits(connection: &Connection, limits: &RegistryLimits) -> Result<()> {
-    validate_objects(connection)?;
-    check_limits(connection, limits)?;
+    validate_objects(connection, VERSION)?;
+    check_limits(connection, limits, VERSION)?;
     validate(connection)
+}
+
+pub(crate) fn validate_supported_with_limits(
+    connection: &Connection,
+    limits: &RegistryLimits,
+) -> Result<i64> {
+    let version = supported_version(connection)?;
+    validate_objects(connection, version)?;
+    check_limits(connection, limits, version)?;
+    validate_version(connection, version)?;
+    Ok(version)
 }
 
 // The list is the fixed schema contract, not caller-controlled SQL.
@@ -327,10 +412,10 @@ const TABLES: [&str; 20] = [
     "component_scope_acknowledgements",
 ];
 
-fn check_limits(connection: &Connection, limits: &RegistryLimits) -> Result<()> {
+fn check_limits(connection: &Connection, limits: &RegistryLimits, version: i64) -> Result<()> {
     limits.validate()?;
     let expected = Connection::open_in_memory()?;
-    expected.execute_batch(SQL)?;
+    expected.execute_batch(supported_sql(version)?)?;
     let mut total = 0_u64;
     for table in TABLES {
         let count: i64 = connection.query_row(
@@ -566,7 +651,7 @@ pub(crate) fn inspect_restore_evidence(
                 }
                 bound_evidence_row(row, 1, &mut bytes, limits)?;
                 if let rusqlite::types::ValueRef::Integer(version) = row.get_ref(0)? {
-                    if version != VERSION {
+                    if supported_sql(version).is_err() {
                         return Err(RegistryError::RecoveryRequired(format!(
                             "unsupported current registry schema version {version}"
                         )));

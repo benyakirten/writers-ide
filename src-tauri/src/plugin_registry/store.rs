@@ -11,6 +11,8 @@ use std::{
     path::Path,
 };
 
+#[path = "store_command_settings.rs"]
+mod command_settings;
 #[path = "store_decisions.rs"]
 mod decisions;
 #[cfg(test)]
@@ -64,17 +66,37 @@ impl Store {
         Ok(store)
     }
     pub(crate) fn open(path: &Path, limits: RegistryLimits) -> Result<Self> {
+        Self::open_existing(path, None, limits)
+    }
+
+    pub(crate) fn open_with_upgrade(
+        path: &Path,
+        backup: &Path,
+        limits: RegistryLimits,
+    ) -> Result<Self> {
+        Self::open_existing(path, Some(backup), limits)
+    }
+
+    fn open_existing(path: &Path, backup: Option<&Path>, limits: RegistryLimits) -> Result<Self> {
         limits.validate()?;
         // canonicalize fails for a missing database; only the sidecar may be created.
         let ownership = destination_lock(path)?;
-        let connection = Connection::open_with_flags(
+        let mut connection = Connection::open_with_flags(
             path,
             OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )?;
         // Identify existing storage before changing its journal configuration.
         validation::preflight(&connection, &limits)?;
-        super::schema::validate_with_limits(&connection, &limits)?;
+        let version = super::schema::validate_supported_with_limits(&connection, &limits)?;
+        if version != super::schema::VERSION && backup.is_none() {
+            return Err(RegistryError::RecoveryRequired(
+                "recognized registry upgrade requires an explicit backup destination".into(),
+            ));
+        }
         configure(&connection)?;
+        if let Some(backup) = backup {
+            super::migrations::upgrade_to_current(&mut connection, backup, &limits)?;
+        }
         let mut store = Self {
             connection,
             _ownership: ownership,
@@ -512,6 +534,18 @@ pub(super) fn validate_snapshot(connection: &Connection, limits: &RegistryLimits
     validation::preflight(connection, limits)?;
     super::schema::validate_with_limits(connection, limits)?;
     validation::validate(connection, limits)
+}
+
+/// Recognize retained migration/restore sources without making an old schema ready.
+pub(super) fn validate_supported_snapshot(
+    connection: &Connection,
+    limits: &RegistryLimits,
+) -> Result<i64> {
+    limits.validate()?;
+    validation::preflight(connection, limits)?;
+    let version = super::schema::validate_supported_with_limits(connection, limits)?;
+    validation::validate(connection, limits)?;
+    Ok(version)
 }
 fn destination_lock(path: &Path) -> Result<File> {
     let canonical = path.canonicalize()?;

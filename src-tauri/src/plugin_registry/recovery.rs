@@ -79,11 +79,28 @@ fn copy(source: &Connection, destination: &mut Connection) -> Result<()> {
 }
 
 pub(crate) fn backup_database(source: &Connection, destination: &Path) -> Result<()> {
+    backup_validated(source, destination, false)
+}
+
+pub(super) fn backup_database_supported(source: &Connection, destination: &Path) -> Result<()> {
+    backup_validated(source, destination, true)
+}
+
+fn backup_validated(source: &Connection, destination: &Path, supported: bool) -> Result<()> {
     let snapshot = source.unchecked_transaction()?;
-    schema::validate(&snapshot)?;
+    let version = if supported {
+        schema::validate_supported(&snapshot)?
+    } else {
+        schema::validate(&snapshot)?;
+        schema::VERSION
+    };
     let mut target = claim_destination(destination)?;
     copy(&snapshot, &mut target)?;
-    schema::validate(&target)?;
+    if schema::validate_supported(&target)? != version {
+        return Err(RegistryError::RecoveryRequired(
+            "backup schema version differs from its source".into(),
+        ));
+    }
     target.close().map_err(|(_, error)| error)?;
     sync_destination(destination)?;
     snapshot.commit()?;
@@ -100,7 +117,7 @@ pub(crate) fn prepare_restore(
     limits.validate()?;
     let source = open_existing(backup)?;
     let source_snapshot = source.unchecked_transaction()?;
-    super::store::validate_snapshot(&source_snapshot, limits)?;
+    super::store::validate_supported_snapshot(&source_snapshot, limits)?;
 
     // Hold both read transactions until preparation completes. Validation,
     // history reads and the SQLite backup must refer to the same snapshots.
@@ -177,6 +194,9 @@ pub(crate) fn prepare_restore(
     }
     let mut target = claim_destination(destination)?;
     copy(&source_snapshot, &mut target)?;
+    // Upgrade only the owned working copy. The read-only backup and current
+    // snapshots stay intact, including if upgrade or later preparation fails.
+    super::migrations::upgrade_restore_copy(&mut target, limits)?;
     let transaction = target.transaction()?;
     // Raise the sequences before merging any new package identities. Matching
     // numeric IDs in different snapshots are not evidence of matching identity.
@@ -291,3 +311,7 @@ fn quarantine_approvals(connection: &Connection) -> Result<()> {
 #[cfg(test)]
 #[path = "recovery_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "recovery_command_settings_tests.rs"]
+mod command_settings_tests;
