@@ -1,6 +1,6 @@
 # Command resource settings: approved persistence and distribution design
 
-**Status: owner-approved design. Stage A internal native persistence and Stage B's internal distribution fixture are authorized and implemented / unmerged. Authorization extends through Stage B only, not production integration.**
+**Status: owner-approved design. Stage A internal native persistence and Stage B's internal distribution fixture are authorized and implemented / unmerged. The owner also approved the bounded internal real-registry Rust coordinator and all its design choices. It is implemented / unmerged. This authorization excludes production integration.**
 
 Application commands let a component invoke a declared action supplied by another component. The host's dispatcher validates those calls and accounts for pending calls and retained payloads. Resource settings control those budgets. They do not grant native permissions or bound arbitrary plugin memory use.
 
@@ -8,7 +8,7 @@ This design connects the [approved settings behavior](command-contract.md#user-s
 
 ## Current implementation and approved requirements
 
-The [reservation ledger](../../packages-js/plugins/command-reservations.ts) implements validated defaults, per-window counters and `updateLimits`. Each admitted call captures its limits. Updating the ledger does not replace its counters, cancel running work or alter an admitted call's limits. Stage B adds an internal fake-source, transport-independent coordinator/client fixture. The [application component assembly](../../src/lib/plugins/application-component-host.svelte.ts) accepts either a ledger or an opt-in `resourceSettingsClient`. There is no production registry source, Rust settings coordinator, saved-settings loader or window transport. See [internal setup and lifetime](#internal-fixture-setup-and-lifetime).
+The [reservation ledger](../../packages-js/plugins/command-reservations.ts) implements validated defaults, per-window counters and `updateLimits`. Each admitted call captures its limits. Updating the ledger does not replace its counters, cancel running work or alter an admitted call's limits. Stage B adds an internal fake-source, transport-independent coordinator/client fixture. The [application component assembly](../../src/lib/plugins/application-component-host.svelte.ts) accepts either a ledger or an opt-in `resourceSettingsClient`. A separate internal Rust coordinator now reads and saves through an injected real `RegistryHandle`. It has no TypeScript source adapter, frontend connection, production saved-settings loader or window transport. See [the Rust coordinator and remaining integration](#internal-rust-coordinator-and-remaining-production-integration). See [internal setup and lifetime](#internal-fixture-setup-and-lifetime).
 
 The [schema-2 registry settings row](../../src-tauri/src/plugin_registry/schema.sql) stores permission mode, repair-conflict policy, eight resource limits and a separate resource revision. [The model](../../src-tauri/src/plugin_registry/model.rs) keeps the two-field `HostSettings` independent from `CommandResourceSettings`, `CommandResourceRevision` and `CommandResourceSettingsSnapshot`. Permission reviews still compare only `HostSettings`. Resource-specific reads and writes are implemented in [`store_command_settings.rs`](../../src-tauri/src/plugin_registry/store_command_settings.rs) and exposed through `RegistryHandle` in [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs). They are internal Rust operations, not IPC or a settings loader.
 
@@ -16,7 +16,7 @@ Already approved behavior includes one application-wide configuration, independe
 
 ## Approved design choices
 
-The owner approved all five choices. Implementation authorization now covers Stage A and the internal Stage B fixture only:
+The owner approved all five choices. Implementation authorization covers Stage A, the internal Stage B fixture and the bounded internal Rust coordinator described below. The original five approved choices are:
 
 1. Keep the existing registry as the sole durable authority. Add explicit typed columns through a real internal schema-1-to-schema-2 upgrade. Do not add browser storage, a second configuration file or a new dependency.
 2. Give resource settings a separate optimistic-concurrency revision and typed operations. Keep permission-setting comparisons independent.
@@ -75,7 +75,7 @@ Return save success only after SQLite commit succeeds. Preserve `OutcomeUnknown`
 
 ## Runtime authority and snapshots: internal fixture and production boundary
 
-The eventual production runtime owner is a Rust-side internal settings coordinator. It will own the committed snapshot and distribution state. The registry worker remains the only database owner; it must not call frontend observers or wait for WebView acknowledgments while a transaction is open. Stage B models this ownership in TypeScript with a fake source. It does not implement or wire the production Rust coordinator or a registry-backed source.
+The internal Rust settings coordinator owns its committed snapshot and bounded native-observer delivery state. It uses a real injected `RegistryHandle`. The registry worker remains the only database owner. Callbacks run outside transactions and the SQLite thread. Stage B separately models distribution and frontend ledger application in TypeScript with a fake source. No adapter connects these implementations, and neither is wired into production startup or window transport.
 
 Once a write is admitted, completion reconciliation must remain owned independently of the caller's waiting future. Abandoning the request must not leave committed settings permanently absent from the coordinator's snapshot or change delivery. Publishing only after a caller-owned `await` is insufficient. Late read/write completions must not regress a newer accepted snapshot. Uncertain completion triggers authoritative resynchronization or the existing recovery path, not guessed publication. The owning reconciliation work must remain bounded by host admission and lifecycle limits; do not create an unbounded background task for every subscriber.
 
@@ -115,6 +115,66 @@ Persistent diagnostics are not included. Nor are permission settings changes, bl
 
 **Later production integration.** Approve and implement the management read/write routes, bounded transport recovery, saved/application UI, registry startup and remaining authorization prerequisites. Verify real packaged windows and the supported platform matrix. The internal stages do not complete settings integration or Part 4. Windows contract work stays deferred unless explicitly resumed.
 
+## Internal Rust coordinator and remaining production integration
+
+**Owner-approved bounded internal implementation / unmerged.** The owner approved all coordinator design decisions and implementation of this internal slice. [`command_resource_settings.rs`](../../src-tauri/src/plugin_registry/command_resource_settings.rs) uses an injected, already-ready native `RegistryHandle`, not a generic fake source. Its [native tests](../../src-tauri/src/plugin_registry/command_resource_settings_tests.rs) use the real registry worker and SQLite. This approval does not authorize production startup, IPC, management/native authority, frontend integration or publication enablement.
+
+### Remaining integration gaps
+
+- [`lib.rs`](../../src-tauri/src/lib.rs) registers the example `greet` command and opener plugin. It creates no registry or settings service. [`+page.svelte`](../../src/routes/+page.svelte) starts the legacy bundled host and renders its plugin manager in the editor's WebView. That dialog is not the approved separate native management/recovery boundary.
+- [`tauri.conf.json`](../../src-tauri/tauri.conf.json) defines one application window and has no CSP. [`capabilities/default.json`](../../src-tauri/capabilities/default.json) applies the existing core/opener permissions to `main`. These files do not implement settings-write authorization. No settings setter should be added to that window as a shortcut.
+- The internal coordinator reconciles reads and writes made through its operation handles. Direct lower-level `RegistryHandle` writes are not intercepted and generate no settings notifications. Future production resource writes must route through the settings coordinator. No registry change feed or TypeScript source adapter is added.
+- A stale resource write returns `RegistryError::Conflict`, not the current settings. A later read can obtain authoritative state, but another save may intervene. That later snapshot is not necessarily the one that caused the conflict.
+- [`Store::mutate`](../../src-tauri/src/plugin_registry/store.rs) poisons the store on uncertain commit or rollback. Subsequent settings reads refuse through the same handle. Stage B's fake-source resynchronization cannot be copied as an unconditional same-service native read.
+- [`RegistryControl`](../../src-tauri/src/plugin_registry/lifecycle.rs) exposes lifecycle snapshots and revision-checked ready-handle acquisition, but no lifecycle subscription. Ordinary work does not currently transition lifecycle state when the store becomes poisoned. A lifecycle phase of `Ready` alone therefore does not establish store health after mutation uncertainty.
+- Production first publication and replacement remain blocked by `production_preflight`. Windows directory-barrier candidates remain unsupported. An explicit existing-database opener is not a first-run or generation-selection policy.
+
+### Native API and completion ownership
+
+Trusted native fixture code calls `SettingsOwner::start(registry, max_operations, max_subscribers).await` inside a running supplied Tokio runtime. Both capacities must be positive; zero returns `InvalidInput`. They are explicit internal bounds, not production defaults. Startup reads authoritative saved settings before returning an owner. Failed loading returns the registry error and exposes no association or guessed defaults. Abandoning startup does not leave a settings service or delivery task behind.
+
+The fixture retains the registry lifecycle owner separately. The settings owner holds operation access only. It does not open SQLite, acquire another lease, create an executor or OS thread, or replace the registry lifecycle coordinator.
+
+- `owner.operations()` returns cloneable `SettingsOperations` with async `read()` and `save(expected_revision, settings)`.
+- `owner.association()` returns cloneable `SettingsAssociation` with async `read()`, `subscribe(observer)` and synchronous `is_closed()`. It has no setter and cannot produce write access.
+- A read returns `Arc<SettingsSnapshot>`. The snapshot contains `epoch: SettingsEpoch` and `saved: CommandResourceSettingsSnapshot`. Each owner starts with a fresh allocation-based epoch. It is not persisted, serialized as a wire identity or used as authority.
+
+Each admitted read or save reserves an operation slot before spawning one service-owned task. Excess work returns `LimitExceeded` immediately, without a capacity-waiting queue. The slot remains held through native completion and reconciliation, including a conflict's later read. Dropping the caller's future after admission does not abort that task. The supplied runtime must continue driving it.
+
+Successful results reconcile monotonically within the epoch. Older completions cannot regress published state. Equal revision and equal settings emit no change. Equal revision with different settings closes the association. A returned operation snapshot describes that operation's observation, not necessarily the latest published snapshot. A confirmed save can still return successfully after closure, but it cannot reconcile into the closed service.
+
+### Save results and native failures
+
+`save()` returns `Result<SaveOutcome>`. `SaveOutcome::Saved(snapshot)` retains the registry's commit-confirmed result. A stale revision returns `SaveOutcome::Conflict { error, current, read_error }`. It retains the original `RegistryError::Conflict` and performs one separate authoritative read without retrying the draft. Successful observation sets `current: Some(snapshot)` and `read_error: None`. Another save may intervene, so this is not an atomic snapshot of the conflicting transaction. Failed observation retains the conflict, sets `current: None` and `read_error: Some(error)`, and closes the association. It does not turn a confirmed conflict into an unknown save outcome.
+
+`OutcomeUnknown` closes the association and returns the original error. The coordinator does not reread the same poisoned store, replay the save or reopen automatically. Controlled lifecycle recovery is required. Native `Unavailable` and `RecoveryRequired` errors also close it. Known validation, capacity, revision-exhaustion and confirmed storage failures retain their error categories and do not by themselves close it. A lost read-completion channel returns `Unavailable`; a lost save-completion channel returns `OutcomeUnknown` with a controlled-recovery message.
+
+### Snapshot subscriptions and closure
+
+`association.subscribe(observer)` accepts `Fn(Arc<SettingsSnapshot>) + Send + Sync + 'static` and returns `SettingsSubscription`. Registration and selection of the initial snapshot are ordered with reconciliation under the state mutex. Delivery runs outside that mutex and the SQLite thread. The callback receives a snapshot directly, not an event object or a closed notification. Host code checks `association.is_closed()` for closure. There is no push closed callback or production failure-detection protocol.
+
+Each live subscriber retains at most one in-progress snapshot and one latest replacement. The subscriber cap rejects excess registrations with `LimitExceeded`. One service-owned delivery task visits only identities present at the start of each turn and yields between turns. Reentrant subscription churn does not add a task or retained closure per notification. Host code calls `subscription.acknowledge(&snapshot.epoch, snapshot.saved.revision)` after applying that delivery. Only an exact in-progress epoch/revision releases capacity; stale, foreign or unmatched acknowledgments return `false`. Dropping the subscription removes its pending state.
+
+A panicking callback removes that subscriber. Observer cleanup runs outside the state mutex. Cleanup panics are isolated and close the association where required. A delivery-task exit guard closes the association and signals delivery cleanup completion even on unexpected unwind. These protections do not interrupt a blocking callback.
+
+`owner.close()` closes admission and associations, discards pending deliveries and suppresses late reconciliation. Closure and callback selection are ordered under the mutex, but invocation occurs outside it. A callback already selected may start or finish after close returns. This is not synchronous callback revocation. `owner.shutdown().await` consumes the owner, closes it and waits for admitted operation tasks and the delivery task, including an in-flight callback and its cleanup.
+
+Dropping the owner closes admission and associations without aborting admitted tasks or awaiting task completion. Cleanup of stored observers may run during close/drop. Task-owned state remains alive only while the supplied runtime drives it. Owner drop does not certify completion or prevent runtime teardown. Keep the runtime and registry owner alive through settings draining. Await settings shutdown, then registry shutdown, before tearing down the runtime. Explicitly close the old settings owner before fixture-controlled registry replacement. Start a new owner from the replacement ready handle and explicitly reattach callers. Old handles remain closed and never retarget.
+
+### Lifecycle limitation
+
+This slice adds no generic lifecycle watch or poison-to-lifecycle repair. A store poisoned by unrelated registry work is detected only by the coordinator's next native read or write. Idle associations are not automatically invalidated. The registry lifecycle can still report `Ready` after ordinary mutation uncertainty. Settings fail-closure does not repair that state or establish production failure detection. Generic lifecycle invalidation and notification for all registry users remain later approval and implementation gates.
+
+### Later production decision gates
+
+Production integration still needs a concrete registry startup and recovery adapter. It must select and validate the active generation, distinguish first launch from damaged storage, choose non-overwriting upgrade-backup locations and retain ownership through failure. Publication qualification remains a prerequisite for enabling first-run or replacement publication. Windows research remains deferred, not waived.
+
+The management boundary needs a separate app-owned WebView with no plugin imports. Rust must validate the actual calling WebView and its lifetime, not a caller-supplied label or frontend wrapper. A settings screen inside the current editor dialog would not establish that boundary. Protected Tauri routes, navigation/window creation permissions and CSP need a joint review and packaged authorization tests.
+
+The window transport needs exact messages and explicit limits for operations, subscriptions, message bytes, acknowledgments, delivery deadlines and bounded resynchronization. Define gap detection and service closure without polling or unbounded retries. Retain separate saved and applied status. The existing fixture demonstrates behavior, not an approved wire contract or production capacity.
+
+Finally, production composition must decide when to adopt the opt-in component assembly and how saved settings reach every command-hosting workspace. The current bundled host does not use that dispatcher. Changing it is a separate lifecycle integration, not a side effect of adding settings IPC. Settings UI and real packaged multi-window tests follow these decisions.
+
 ## Internal fixture setup and lifetime
 
 These are internal repository imports for trusted application composition and tests. They are not public SDK exports or plugin authority. [`command-resource-settings.ts`](../../packages-js/plugins/command-resource-settings.ts) supplies the coordinator and client. The [assembly tests](../../src/lib/plugins/application-command-resource-settings.svelte.test.ts) demonstrate their setup with an in-memory source.
@@ -130,6 +190,7 @@ The coordinator bounds admitted source operations and live subscribers. Defaults
 
 ## Source and validation entry points
 
+- Internal real-registry coordinator and regressions: [`command_resource_settings.rs`](../../src-tauri/src/plugin_registry/command_resource_settings.rs), [`command_resource_settings_tests.rs`](../../src-tauri/src/plugin_registry/command_resource_settings_tests.rs).
 - Native data and operations: [`model.rs`](../../src-tauri/src/plugin_registry/model.rs), [`schema.sql`](../../src-tauri/src/plugin_registry/schema.sql), [`store.rs`](../../src-tauri/src/plugin_registry/store.rs), [`store_decisions.rs`](../../src-tauri/src/plugin_registry/store_decisions.rs), [`worker.rs`](../../src-tauri/src/plugin_registry/worker.rs).
 - Migration and recovery: [`schema.rs`](../../src-tauri/src/plugin_registry/schema.rs), [`migrations.rs`](../../src-tauri/src/plugin_registry/migrations.rs), [`recovery.rs`](../../src-tauri/src/plugin_registry/recovery.rs).
 - Runtime settings and existing tests: [`command-reservations.ts`](../../packages-js/plugins/command-reservations.ts), [`command-reservations.test.ts`](../../packages-js/plugins/command-reservations.test.ts), [`command-dispatcher.test.ts`](../../packages-js/plugins/command-dispatcher.test.ts).
@@ -141,10 +202,13 @@ The coordinator bounds admitted source operations and live subscribers. Defaults
 Run focused native checks from `src-tauri`:
 
 ```sh
+cargo test --locked --lib command_resource_settings
 cargo test --locked --lib command_resource
 cargo test --locked --lib opening_upgrade_tests
 cargo test --locked --lib migrations
 cargo test --locked --lib recovery
 ```
 
-Stage A passed the focused checks above, the full library suite, native check, formatting and all-target Clippy locally on macOS. See the [cumulative changelog](change-log.md#resource-settings-persistence-and-distribution) for verified results. Stage A Windows/Linux execution remains unverified. See [CONTRIBUTING.md](../../CONTRIBUTING.md#native-registry-checks) for broader checks. Stage B has focused coordinator/client, ledger, dispatcher and assembly tests. Run `pnpm --filter @writers-ide/plugins test` and `pnpm --filter @writers-ide/plugins check` for package validation. Run the application settings and existing assembly tests through the root Vitest configuration. The cumulative changelog records verified Stage B results and the unrelated existing application type-check failure. Production multi-window behavior requires real packaged-window tests, not just fake delivery or browser unit tests.
+The internal Rust coordinator's 23 focused tests, full native library suite, native check, formatting and all-target Clippy passed locally on macOS. See the [cumulative changelog](change-log.md#resource-settings-persistence-and-distribution) for verified counts and review scope. These checks do not validate production integration or Windows/Linux execution.
+
+Stage A passed its focused persistence checks, the full library suite, native check, formatting and all-target Clippy locally on macOS. See the [cumulative changelog](change-log.md#resource-settings-persistence-and-distribution) for verified results. Stage A Windows/Linux execution remains unverified. See [CONTRIBUTING.md](../../CONTRIBUTING.md#native-registry-checks) for broader checks. Stage B has focused coordinator/client, ledger, dispatcher and assembly tests. Run `pnpm --filter @writers-ide/plugins test` and `pnpm --filter @writers-ide/plugins check` for package validation. Run the application settings and existing assembly tests through the root Vitest configuration. The cumulative changelog records verified Stage B results and the unrelated existing application type-check failure. Production multi-window behavior requires real packaged-window tests, not just fake delivery or browser unit tests.

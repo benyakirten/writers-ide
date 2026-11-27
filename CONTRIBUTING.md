@@ -188,7 +188,7 @@ Run `pnpm build:plugin-profile` to generate shared runtime artifacts. Run `pnpm 
 
 ### Internal command resource-settings checks
 
-Stage B's fake-source coordinator/client and opt-in application assembly ledger integration are implemented internally / unmerged. They are not public SDK APIs or production saved-settings transport. Read [fixture setup and lifetime](docs/plugins/resource-settings-plan.md#internal-fixture-setup-and-lifetime) before changing them. The service client reads/subscribes without a setter. The defaults of 16 operations and 64 subscribers are fixture bounds, not approved production transport budgets. Stage A native persistence and its validation scope are unchanged.
+Stage B's fake-source coordinator/client and opt-in application assembly ledger integration are implemented internally / unmerged. They are not public SDK APIs or production saved-settings transport. Read [fixture setup and lifetime](docs/plugins/resource-settings-plan.md#internal-fixture-setup-and-lifetime) before changing them. The service client reads/subscribes without a setter. The defaults of 16 operations and 64 subscribers are fixture bounds, not approved production transport budgets. Stage A native persistence and its validation scope are unchanged. The approved internal real-registry Rust coordinator is also implemented / unmerged. Read its [native API and lifetime](docs/plugins/resource-settings-plan.md#internal-rust-coordinator-and-remaining-production-integration). It requires an injected ready `RegistryHandle`, explicit positive operation/subscriber caps and a running supplied Tokio runtime. Await settings shutdown before registry shutdown and runtime teardown. Owner drop closes associations but does not certify task completion.
 
 Run these commands from the repository root:
 
@@ -198,13 +198,14 @@ pnpm --filter @writers-ide/plugins check
 pnpm exec vitest run src/lib/plugins/application-command-resource-settings.svelte.test.ts src/lib/plugins/application-component-host.svelte.test.ts
 ```
 
-The package suite includes coordinator/client, reservation and dispatcher tests. The application tests cover opt-in injection, initial admission, updates, lowered limits, unfinished cancellation, disconnects, explicit reattachment and disposal. Neither fake delivery nor browser unit tests validate production multi-window IPC. Production Rust coordination, registry-backed settings loading, IPC, startup, UI, default bundled-host migration, external loading and publication remain separately gated. See the [cumulative validation record](docs/plugins/change-log.md#resource-settings-persistence-and-distribution) for results and outstanding checks.
+The package suite includes coordinator/client, reservation and dispatcher tests. The application tests cover opt-in injection, initial admission, updates, lowered limits, unfinished cancellation, disconnects, explicit reattachment and disposal. Neither fake delivery nor browser unit tests validate production multi-window IPC. The Rust coordinator has separate real-worker tests. It adds no TypeScript source adapter, frontend wiring, generic lifecycle watch or poison-to-lifecycle repair. Production saved-settings loading, IPC, startup, UI, default bundled-host migration, external loading and publication remain separately gated. See the [cumulative validation record](docs/plugins/change-log.md#resource-settings-persistence-and-distribution) for results and outstanding checks.
 
 ### Native registry checks
 
 Run these commands from `src-tauri`:
 
 ```sh
+cargo test --locked --lib command_resource_settings
 cargo test --locked --lib command_resource
 cargo test --locked --lib opening_upgrade_tests
 cargo test --locked --lib migrations

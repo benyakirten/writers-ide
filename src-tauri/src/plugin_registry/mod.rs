@@ -1,4 +1,5 @@
 //! Internal persistent plugin records. No Tauri commands, installation or native authority.
+pub(crate) mod command_resource_settings;
 mod error;
 mod generation;
 mod location;

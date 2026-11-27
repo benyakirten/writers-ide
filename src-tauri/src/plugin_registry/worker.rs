@@ -59,6 +59,8 @@ struct State {
     lifecycle: LifecycleData,
 }
 struct Shared {
+    #[cfg(test)]
+    settings_reads: std::sync::atomic::AtomicUsize,
     state: Mutex<State>,
     wake: Condvar,
     capacity: usize,
@@ -287,6 +289,8 @@ impl Registry {
             ));
         }
         let shared = Arc::new(Shared {
+            #[cfg(test)]
+            settings_reads: std::sync::atomic::AtomicUsize::new(0),
             state: Mutex::new(State {
                 accepting: false,
                 queue: VecDeque::new(),
@@ -393,6 +397,37 @@ impl Registry {
 }
 
 impl RegistryHandle {
+    #[cfg(test)]
+    pub(super) async fn test_submit<T, F>(&self, run: F) -> Result<T>
+    where
+        T: Send + 'static,
+        F: FnOnce(&mut Store) -> Result<T> + Send + 'static,
+    {
+        self.submit(false, run).await
+    }
+
+    #[cfg(test)]
+    pub(super) fn test_shared_references(&self) -> usize {
+        Arc::strong_count(&self.shared)
+    }
+
+    #[cfg(test)]
+    pub(super) fn test_queue_len(&self) -> usize {
+        self.shared
+            .state
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .queue
+            .len()
+    }
+
+    #[cfg(test)]
+    pub(super) fn test_settings_reads(&self) -> usize {
+        self.shared
+            .settings_reads
+            .load(std::sync::atomic::Ordering::SeqCst)
+    }
+
     async fn submit<T, F>(&self, read: bool, run: F) -> Result<T>
     where
         T: Send + 'static,
@@ -429,6 +464,10 @@ impl RegistryHandle {
     pub(crate) async fn read_command_resource_settings(
         &self,
     ) -> Result<CommandResourceSettingsSnapshot> {
+        #[cfg(test)]
+        self.shared
+            .settings_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.submit(true, Store::read_command_resource_settings)
             .await
     }
