@@ -436,6 +436,20 @@ impl Report {
         Ok(bytes)
     }
 }
+struct TokenCheckFailure {
+    context: &'static str,
+    native_code: Option<u32>,
+}
+
+fn record_token_refusal(report: &mut Report, error: &TokenCheckFailure) {
+    report.status = "refused";
+    report.results.push(json!({
+        "preflight": "ordinary-user token check refused",
+        "context": error.context,
+        "native_code": error.native_code,
+    }));
+}
+
 fn checkpoint(file: &mut File, report: &Report) -> Result<(), &'static str> {
     use std::io::{Seek, SeekFrom};
     let bytes = report.bytes()?;
@@ -696,12 +710,13 @@ fn run_fixture() {
         .expect("exclusive conformance report");
     checkpoint(&mut file, &report).expect("initial report checkpoint");
     let result = (|| -> Result<(), &'static str> {
-        if native::check_token().is_err() {
-            report.status = "refused";
-            report
-                .results
-                .push(json!({"preflight": "ordinary-user token check refused"}));
+        if let Err(error) = native::check_token() {
+            record_token_refusal(&mut report, &error);
             checkpoint(&mut file, &report)?;
+            eprintln!(
+                "Token admission refused: {}; native code: {:?}",
+                error.context, error.native_code
+            );
             return Err("ordinary-user token required");
         }
         report.build = build_identity(deadline)?;
@@ -726,6 +741,24 @@ fn run_fixture() {
         "Conformance observations retained at {}; no platform is qualified",
         path.display()
     );
+}
+
+#[cfg(windows)]
+#[test]
+#[ignore = "explicit opt-in required; read-only token diagnosis, no matrix or scratch files"]
+fn inspect_token() {
+    assert_eq!(
+        std::env::var(OPT_IN).as_deref(),
+        Ok("1"),
+        "token diagnostic opt-in required"
+    );
+    match native::check_token() {
+        Ok(()) => eprintln!("Token admission passed; no matrix or filesystem preflight was run"),
+        Err(error) => panic!(
+            "Token admission refused: {}; native code: {:?}; no matrix or filesystem preflight was run",
+            error.context, error.native_code
+        ),
+    }
 }
 
 #[cfg(windows)]
@@ -816,6 +849,43 @@ mod tests {
             _ => panic!("unknown fake mode"),
         }
     }
+    #[test]
+    fn controller_token_refusal_retains_context_without_admitting_work() {
+        for (context, native_code) in [
+            ("elevated token", None),
+            ("token information", Some(5)),
+            ("token SID bounds", None),
+            ("privilege lookup", Some(u32::MAX)),
+        ] {
+            let mut report = Report::new("ab".repeat(16), false);
+            record_token_refusal(
+                &mut report,
+                &TokenCheckFailure {
+                    context,
+                    native_code,
+                },
+            );
+            assert_eq!(report.status, "refused");
+            assert_eq!(
+                report.results,
+                vec![json!({
+                    "preflight": "ordinary-user token check refused",
+                    "context": context,
+                    "native_code": native_code,
+                })]
+            );
+            assert_eq!(report.build, json!({"available": false}));
+            assert_eq!(report.cleanup, json!({"attempted": false}));
+            assert!(!report.qualified);
+            assert!(!report.runtime_publication_enabled);
+            assert!(!report.physical_power_loss_tested);
+            let bytes = report.bytes().unwrap();
+            let decoded: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(decoded["results"][0]["native_code"], json!(native_code));
+            assert!(sanitized(&decoded["results"][0], 0));
+        }
+    }
+
     #[test]
     fn exact_matrix_and_admission_are_bounded() {
         assert_eq!(CASES.len(), 20);

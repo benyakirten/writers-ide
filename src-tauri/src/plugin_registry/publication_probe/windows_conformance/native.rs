@@ -44,7 +44,7 @@ use windows_sys::Win32::{
     },
 };
 
-use super::{Operation, Request, WorkerResult, WorkerStatus};
+use super::{Operation, Request, TokenCheckFailure, WorkerResult, WorkerStatus};
 use crate::plugin_registry::selector::{decode, encode, GenerationId};
 
 #[path = "cleanup_protocol.rs"]
@@ -106,7 +106,27 @@ impl Drop for Token {
     }
 }
 
-// u64 storage provides alignment for all token records used here. No probing
+fn check_elevation(
+    query: impl FnOnce(&mut TOKEN_ELEVATION, u32, &mut u32) -> Result<()>,
+) -> Result<()> {
+    let mut elevation = TOKEN_ELEVATION::default();
+    let mut length = 0;
+    // TokenElevation needs its fixed-size record, not the variable-query buffer.
+    query(
+        &mut elevation,
+        size_of::<TOKEN_ELEVATION>() as u32,
+        &mut length,
+    )?;
+    if length as usize != size_of::<TOKEN_ELEVATION>() {
+        return Err(refuse("token elevation bounds"));
+    }
+    if elevation.TokenIsElevated != 0 {
+        return Err(refuse("elevated token"));
+    }
+    Ok(())
+}
+
+// u64 storage aligns the variable-length privilege and user records. No probing
 // retry is needed: an unexpectedly large token observation is a refusal.
 fn token_info(token: &Token, class: TOKEN_INFORMATION_CLASS) -> Result<(Vec<u64>, usize)> {
     let mut buffer = vec![0u64; 2048];
@@ -135,13 +155,21 @@ fn checked_user() -> Result<Vec<u8>> {
         return Err(native_error("open process token"));
     }
     let token = Token(raw);
-    let (elevation, length) = token_info(&token, TokenElevation)?;
-    if length != size_of::<TOKEN_ELEVATION>() {
-        return Err(refuse("token elevation bounds"));
-    }
-    if unsafe { (*(elevation.as_ptr().cast::<TOKEN_ELEVATION>())).TokenIsElevated } != 0 {
-        return Err(refuse("elevated token"));
-    }
+    check_elevation(|elevation, capacity, length| {
+        let ok = unsafe {
+            GetTokenInformation(
+                token.0,
+                TokenElevation,
+                (elevation as *mut TOKEN_ELEVATION).cast(),
+                capacity,
+                length,
+            )
+        };
+        if ok == 0 {
+            return Err(native_error("token information"));
+        }
+        Ok(())
+    })?;
     let (privileges, length) = token_info(&token, TokenPrivileges)?;
     let start = offset_of!(TOKEN_PRIVILEGES, Privileges);
     if length < start {
@@ -209,12 +237,12 @@ fn checked_user() -> Result<Vec<u8>> {
     Ok(unsafe { std::slice::from_raw_parts(sid.cast::<u8>(), sid_length) }.to_vec())
 }
 
-pub(super) fn check_token() -> std::result::Result<(), String> {
+pub(super) fn check_token() -> std::result::Result<(), TokenCheckFailure> {
     checked_user()
         .map(|_| ())
-        .map_err(|error| match error.code {
-            Some(code) => format!("{}: native code {code}", error.context),
-            None => error.context.to_owned(),
+        .map_err(|error| TokenCheckFailure {
+            context: error.context,
+            native_code: error.code,
         })
 }
 
@@ -833,6 +861,66 @@ fn environment() -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn elevation_query_uses_one_exact_four_byte_record() {
+        let mut calls = 0;
+        let result = check_elevation(|elevation, capacity, length| {
+            calls += 1;
+            assert_eq!(size_of::<TOKEN_ELEVATION>(), 4);
+            assert_eq!(capacity, 4);
+            assert_eq!(elevation.TokenIsElevated, 0);
+            *length = 4;
+            Ok(())
+        });
+        assert!(result.is_ok());
+        assert_eq!(calls, 1);
+    }
+
+    #[test]
+    fn elevation_query_rejects_returned_length_mismatches() {
+        for returned in [0, 3, 5, 16384, u32::MAX] {
+            let result = check_elevation(|_, _, length| {
+                *length = returned;
+                Ok(())
+            });
+            let Err(error) = result else {
+                panic!("unexpected token elevation length accepted");
+            };
+            assert_eq!(error.context, "token elevation bounds");
+            assert_eq!(error.code, None);
+        }
+    }
+
+    #[test]
+    fn elevation_query_preserves_elevation_and_native_failure_refusals() {
+        for value in [1, 2, u32::MAX] {
+            let result = check_elevation(|elevation, _, length| {
+                elevation.TokenIsElevated = value;
+                *length = 4;
+                Ok(())
+            });
+            let Err(error) = result else {
+                panic!("elevated token accepted");
+            };
+            assert_eq!(error.context, "elevated token");
+        }
+        let mut calls = 0;
+        let result = check_elevation(|_, _, _| {
+            calls += 1;
+            Err(Failure {
+                invariant: false,
+                context: "token information",
+                code: Some(24),
+            })
+        });
+        let Err(error) = result else {
+            panic!("failed token query accepted");
+        };
+        assert_eq!(calls, 1);
+        assert_eq!(error.context, "token information");
+        assert_eq!(error.code, Some(24));
+    }
 
     #[test]
     fn run_ids_are_fixed_lowercase_hex() {
