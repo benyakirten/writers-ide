@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-settings-detach"
+description = "Enables the settings_detach command without any pre-configured scope."
+commands.allow = ["settings_detach"]
+
+[[permission]]
+identifier = "deny-settings-detach"
+description = "Denies the settings_detach command without any pre-configured scope."
+commands.deny = ["settings_detach"]

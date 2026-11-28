@@ -18,6 +18,10 @@ use super::{
     transitions::{InstallationAction, InstallationExpectation},
 };
 
+#[cfg(test)]
+#[path = "opening_attempt_tests.rs"]
+mod opening_attempt_tests;
+
 #[path = "lifecycle.rs"]
 pub(crate) mod lifecycle;
 use super::location::LocationLease;
@@ -234,6 +238,78 @@ impl RegistryOwner {
     }
 }
 
+/// Owns startup and worker completion without exposing operation admission.
+/// Dropping it requests shutdown; only awaited cleanup certifies completion.
+pub(crate) struct RegistryOpening {
+    owner: Option<RegistryOwner>,
+    ready: oneshot::Receiver<Result<()>>,
+}
+pub(crate) struct OpeningFailure {
+    pub error: RegistryError,
+    /// Cleanup-only ownership. Destructure the failure to retain the original
+    /// typed error separately while awaiting `cleanup.wait()`.
+    pub cleanup: OpeningCleanup,
+}
+pub(crate) struct OpeningCleanup {
+    owner: Option<RegistryOwner>,
+}
+impl OpeningCleanup {
+    pub(crate) async fn wait(self) -> Result<()> {
+        match self.owner {
+            Some(owner) => owner.shutdown().await,
+            None => Ok(()),
+        }
+    }
+}
+impl OpeningFailure {
+    pub(crate) async fn cleanup(self) -> Result<()> {
+        self.cleanup.wait().await
+    }
+    fn before_worker(error: RegistryError) -> Self {
+        Self {
+            error,
+            cleanup: OpeningCleanup { owner: None },
+        }
+    }
+}
+impl RegistryOpening {
+    pub(crate) async fn cleanup(mut self) -> Result<()> {
+        match self.owner.take() {
+            Some(owner) => owner.shutdown().await,
+            None => Ok(()), // Completion already transferred ownership to its result.
+        }
+    }
+    /// Cancellation leaves ownership in this attempt for explicit cleanup.
+    /// Call once to transfer ownership to either the session or failure result.
+    pub(crate) async fn complete(
+        &mut self,
+    ) -> std::result::Result<RegistrySession, OpeningFailure> {
+        if self.owner.is_none() {
+            return Err(OpeningFailure::before_worker(RegistryError::InvalidInput(
+                "opening result already consumed".into(),
+            )));
+        }
+        let readiness = (&mut self.ready).await.unwrap_or_else(|_| {
+            Err(RegistryError::Unavailable(
+                "registry startup terminated".into(),
+            ))
+        });
+        let owner = self.owner.take().expect("unconsumed opening owner");
+        let handle = readiness.and_then(|()| {
+            owner
+                .control()
+                .ready_handle(&owner.control().snapshot().revision)
+        });
+        match handle {
+            Ok(handle) => Ok(RegistrySession { owner, handle }),
+            Err(error) => Err(OpeningFailure {
+                error,
+                cleanup: OpeningCleanup { owner: Some(owner) },
+            }),
+        }
+    }
+}
+
 #[cfg(test)]
 pub(super) struct ProbeStartup {
     pub lease: Arc<std::fs::File>,
@@ -356,12 +432,54 @@ impl Registry {
         upgrade_backup: Option<PathBuf>,
         #[cfg(test)] probe: Option<ProbeStartup>,
     ) -> Result<RegistrySession> {
-        limits.validate()?;
+        let mut opening = Self::begin_with_upgrade(
+            path,
+            limits,
+            capacity,
+            create,
+            lease,
+            upgrade_backup,
+            #[cfg(test)]
+            probe,
+        )
+        .map_err(|failure| failure.error)?;
+        opening.complete().await.map_err(|failure| failure.error)
+    }
+
+    /// The caller has already validated the selected generation. No initialization.
+    pub(crate) fn begin_owned(
+        lease: LocationLease,
+        path: PathBuf,
+        limits: RegistryLimits,
+        capacity: RegistryCapacity,
+    ) -> std::result::Result<RegistryOpening, OpeningFailure> {
+        Self::begin_with_upgrade(
+            path,
+            limits,
+            capacity,
+            false,
+            Some(lease),
+            None,
+            #[cfg(test)]
+            None,
+        )
+    }
+
+    fn begin_with_upgrade(
+        path: PathBuf,
+        limits: RegistryLimits,
+        capacity: RegistryCapacity,
+        create: bool,
+        lease: Option<LocationLease>,
+        upgrade_backup: Option<PathBuf>,
+        #[cfg(test)] probe: Option<ProbeStartup>,
+    ) -> std::result::Result<RegistryOpening, OpeningFailure> {
+        limits.validate().map_err(OpeningFailure::before_worker)?;
         if capacity.queue == 0 || capacity.lifecycle_readers == 0 || capacity.validity_readers == 0
         {
-            return Err(RegistryError::InvalidInput(
+            return Err(OpeningFailure::before_worker(RegistryError::InvalidInput(
                 "queue and reader caps must be positive".into(),
-            ));
+            )));
         }
         let shared = Arc::new(Shared {
             #[cfg(test)]
@@ -422,6 +540,8 @@ impl Registry {
                                 let _ = ready.send(Err(RegistryError::Unavailable(
                                     "probe startup barrier timed out".into(),
                                 )));
+                                // The live store remains on its worker until cleanup.
+                                wait_for_opening_cleanup(&worker_shared);
                                 return;
                             }
                         }
@@ -458,20 +578,26 @@ impl Registry {
                 });
                 drop(lease);
                 let _ = finished.send(completion);
-            })?;
+            })
+            .map_err(|error| OpeningFailure::before_worker(error.into()))?;
         // The guard also closes admission if the startup future is abandoned.
         let owner = RegistryOwner {
             shared: shared.clone(),
             finished: Some(receive_finished),
             thread: Some(thread),
         };
-        receive_ready
-            .await
-            .map_err(|_| RegistryError::Unavailable("registry startup terminated".into()))??;
-        let handle = owner
-            .control()
-            .ready_handle(&owner.control().snapshot().revision)?;
-        Ok(RegistrySession { owner, handle })
+        Ok(RegistryOpening {
+            owner: Some(owner),
+            ready: receive_ready,
+        })
+    }
+}
+
+#[cfg(test)]
+fn wait_for_opening_cleanup(shared: &Shared) {
+    let mut state = shared.state.lock().unwrap_or_else(|e| e.into_inner());
+    while !state.lifecycle.shutdown {
+        state = shared.wake.wait(state).unwrap_or_else(|e| e.into_inner());
     }
 }
 

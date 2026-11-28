@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Application Integration Fixture",
+  "version": "0.1.0",
+  "identifier": "com.writerside.applicationintegration.fixture",
+  "build": { "beforeBuildCommand": "node build.mjs", "frontendDist": "../dist" },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self' ipc: http://ipc.localhost; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; worker-src 'none'",
+      "capabilities": [
+        { "identifier": "manager", "windows": ["manager"], "permissions": ["shell", "manager"] },
+        { "identifier": "workspaces", "windows": ["workspace-a", "workspace-b"], "permissions": ["shell", "workspace"] },
+        { "identifier": "probe", "windows": ["probe"], "permissions": ["shell"] }
+      ]
+    }
+  },
+  "bundle": { "active": true, "targets": ["app"], "icon": ["icons/icon.png"], "macOS": { "minimumSystemVersion": "13.3" } }
+}

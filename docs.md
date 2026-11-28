@@ -22,6 +22,8 @@ For plugin implementation work, see the [implementation plan](docs/plugins/imple
 
 For registry startup and recovery work, read the [generation-publication investigation](docs/plugins/registry-publication-investigation.md). It separates earlier disposable Python probes from the authorized compiled test-only harness, checked sealing and worker lease regressions. Cargo tests use isolated temporary directories; no application entry point calls the adapter. Production publication remains gated. The [Native Registry workflow](.github/workflows/native_registry.yml) is configured for three operating systems, not verified as remotely executed. macOS runtime/barrier results do not establish power-loss durability or Windows/Linux support.
 
+The [approved application-integration guide](docs/plugins/application-integration-plan.md) describes the implemented isolated fixture and its shared internal adapters. The [prototype README](prototypes/application-integration/README.md) provides build, native-test and packaged-runner commands. The guide separates fixture contracts and approved budgets from unfinished production startup, shutdown UX, supported-platform qualification and publication enablement.
+
 For current API usage, start with these package guides:
 
 - [Plugins](packages-js/plugins/README.md): add features, manage their lifetime, and connect plugins through declared APIs.

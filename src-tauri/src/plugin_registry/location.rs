@@ -13,15 +13,48 @@ pub(crate) struct LocationLease {
     guard: Arc<File>,
 }
 
+#[derive(Debug)]
+pub(crate) enum LocationAcquireError {
+    Contended,
+    LockFailed(std::io::Error),
+    OpenFailed(RegistryError),
+}
+impl LocationAcquireError {
+    fn into_registry_error(self) -> RegistryError {
+        match self {
+            Self::Contended => RegistryError::Unavailable("registry location already owned".into()),
+            Self::LockFailed(error) => {
+                RegistryError::Unavailable(format!("registry location lock failed: {error}"))
+            }
+            Self::OpenFailed(error) => error,
+        }
+    }
+}
+
+impl From<RegistryError> for LocationAcquireError {
+    fn from(error: RegistryError) -> Self {
+        Self::OpenFailed(error)
+    }
+}
+impl From<std::io::Error> for LocationAcquireError {
+    fn from(error: std::io::Error) -> Self {
+        Self::OpenFailed(error.into())
+    }
+}
+
 impl LocationLease {
     /// Call from blocking host work. The stable parent must already exist.
     /// Acquiring ownership never creates or inspects the dedicated root.
     pub(crate) fn acquire(root: &Path) -> Result<Self> {
+        Self::acquire_detailed(root).map_err(LocationAcquireError::into_registry_error)
+    }
+
+    pub(crate) fn acquire_detailed(root: &Path) -> std::result::Result<Self, LocationAcquireError> {
         let name = root.file_name().ok_or_else(|| {
             RegistryError::InvalidInput("registry root must have a local directory name".into())
         })?;
         if !matches!(root.components().next_back(), Some(Component::Normal(_))) {
-            return Err(RegistryError::InvalidInput("invalid registry root".into()));
+            return Err(RegistryError::InvalidInput("invalid registry root".into()).into());
         }
         let parent = root
             .parent()
@@ -37,7 +70,8 @@ impl LocationLease {
             Ok(metadata) if !metadata.is_file() => {
                 return Err(RegistryError::RecoveryRequired(
                     "registry location lock is not a regular file".into(),
-                ));
+                )
+                .into());
             }
             Ok(_) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -49,9 +83,7 @@ impl LocationLease {
             .create(true)
             .truncate(false)
             .open(lock)?;
-        guard.try_lock().map_err(|error| {
-            RegistryError::Unavailable(format!("registry location already owned: {error}"))
-        })?;
+        guard.try_lock().map_err(classify_lock_error)?;
         Ok(Self {
             root: parent.join(name),
             guard: Arc::new(guard),
@@ -87,9 +119,34 @@ impl LocationLease {
     }
 }
 
+fn classify_lock_error(error: std::fs::TryLockError) -> LocationAcquireError {
+    match error {
+        std::fs::TryLockError::WouldBlock => LocationAcquireError::Contended,
+        std::fs::TryLockError::Error(error) => LocationAcquireError::LockFailed(error),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detailed_lock_errors_do_not_mislabel_io_failure_as_contention() {
+        assert!(matches!(
+            classify_lock_error(std::fs::TryLockError::WouldBlock),
+            LocationAcquireError::Contended
+        ));
+        let error = std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "injected lock failure",
+        );
+        match classify_lock_error(std::fs::TryLockError::Error(error)) {
+            LocationAcquireError::LockFailed(error) => {
+                assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied)
+            }
+            _ => panic!("expected lock I/O failure"),
+        }
+    }
 
     #[test]
     fn lease_precedes_root_detection_and_is_shared_until_last_owner() {

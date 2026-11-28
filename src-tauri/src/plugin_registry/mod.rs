@@ -1,4 +1,5 @@
 //! Internal persistent plugin records. No Tauri commands, installation or native authority.
+mod bootstrap;
 pub(crate) mod command_resource_settings;
 mod error;
 mod generation;
@@ -18,11 +19,12 @@ mod store;
 mod transitions;
 mod worker;
 
-// Application adapters are deliberately not wired in this foundation.
+// Internal host adapters remain disconnected from normal application startup.
 #[allow(unused_imports)]
 pub(crate) use self::{
+    bootstrap::{BootstrapFailure, SelectedRegistry, SelectedRegistryOpening},
     error::{RegistryError, Result},
-    location::LocationLease,
+    location::{LocationAcquireError, LocationLease},
     model::*,
     preparation::*,
     store::ArtifactTarget,
@@ -33,6 +35,7 @@ pub(crate) use self::{
             MaintenanceOutcome, MaintenanceRequest, RecoveryCause, RecoveryKind, RegistryControl,
             ServiceValidityObserver, StopReason,
         },
-        Registry, RegistryCapacity, RegistryHandle, RegistryOwner, RegistrySession,
+        OpeningCleanup, OpeningFailure, Registry, RegistryCapacity, RegistryHandle,
+        RegistryOpening, RegistryOwner, RegistrySession,
     },
 };

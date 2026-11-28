@@ -90,6 +90,111 @@ async fn stop(session: RegistrySession, owner: SettingsOwner) {
     session.owner.shutdown().await.unwrap();
 }
 
+#[test]
+fn closed_wakes_every_registered_waiter_and_the_validity_watcher() {
+    run(async {
+        let (_dir, session, owner) = fixture().await;
+        let association = owner.association();
+        // Let the validity watcher register before transport waiters do.
+        tokio::task::yield_now().await;
+        let mut waiters: Vec<_> = (0..64).map(|_| Box::pin(association.closed())).collect();
+        for waiter in &mut waiters {
+            pending(waiter.as_mut());
+        }
+        owner.close();
+        for waiter in waiters {
+            waiter.await;
+        }
+        owner.shutdown().await;
+        assert!(session.handle.is_service_valid());
+        association.closed().await;
+        session.owner.shutdown().await.unwrap();
+    });
+}
+
+#[test]
+fn closed_waiter_registration_races_do_not_miss_closure() {
+    run(async {
+        let (_dir, session, owner) = fixture().await;
+        let association = owner.association();
+        let barrier = Arc::new(std::sync::Barrier::new(2));
+        let closer = owner.shared.clone();
+        let other = barrier.clone();
+        let thread = std::thread::spawn(move || {
+            other.wait();
+            closer.close();
+        });
+        barrier.wait();
+        let mut tasks = Vec::new();
+        for _ in 0..64 {
+            let association = association.clone();
+            tasks.push(tokio::spawn(async move {
+                association.closed().await;
+            }));
+        }
+        for task in tasks {
+            task.await.unwrap();
+        }
+        thread.join().unwrap();
+        stop(session, owner).await;
+    });
+}
+
+#[test]
+fn closed_is_exact_to_settings_lifetime_even_with_healthy_registry_and_replacement() {
+    run(async {
+        let (_dir, session, owner) = fixture().await;
+        let old = owner.association();
+        drop(owner);
+        old.closed().await;
+        let replacement = SettingsOwner::start(session.handle.clone(), 2, 3)
+            .await
+            .unwrap();
+        let current = replacement.association();
+        old.closed().await;
+        let mut waiting = Box::pin(current.closed());
+        pending(waiting.as_mut());
+        replacement.shutdown().await;
+        waiting.await;
+        assert!(session.handle.is_service_valid());
+        session.owner.shutdown().await.unwrap();
+    });
+}
+
+#[test]
+fn closed_resolves_on_registry_shutdown_without_a_settings_operation() {
+    run(async {
+        let (_dir, session, owner) = fixture().await;
+        let association = owner.association();
+        let mut waiting = Box::pin(association.closed());
+        pending(waiting.as_mut());
+        session.owner.shutdown().await.unwrap();
+        waiting.await;
+        owner.shutdown().await;
+    });
+}
+
+#[test]
+fn closed_survives_settings_runtime_teardown() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    let (_dir, session, owner) = runtime.block_on(fixture());
+    let association = owner.association();
+    let mut waiting = Box::pin(association.closed());
+    pending(waiting.as_mut());
+    drop(runtime);
+    tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap()
+        .block_on(async {
+            waiting.await;
+            owner.shutdown().await;
+            assert!(session.handle.is_service_valid());
+            session.owner.shutdown().await.unwrap();
+        });
+}
+
 struct DropBomb {
     association: SettingsAssociation,
     dropped: Arc<AtomicUsize>,

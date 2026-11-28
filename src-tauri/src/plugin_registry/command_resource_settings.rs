@@ -105,7 +105,7 @@ impl Shared {
         // Wake before foreign cleanup. Destructors may reenter or panic. Drop
         // each subscriber separately so one panic cannot unwind through another.
         self.delivery.notify_one();
-        self.closed.notify_one();
+        self.closed.notify_waiters();
         for (_, subscriber) in removed {
             let _ = caught_panic(catch_unwind(AssertUnwindSafe(|| drop(subscriber))));
         }
@@ -443,6 +443,18 @@ impl SettingsOperations {
     }
 }
 impl SettingsAssociation {
+    /// Resolves for this exact settings-service lifetime, including settings-only
+    /// closure while the registry remains healthy. It does not await draining.
+    pub(crate) async fn closed(&self) {
+        let notified = self.shared.closed.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        if self.shared.lock().closed {
+            return;
+        }
+        notified.await;
+    }
+
     pub(crate) fn is_closed(&self) -> bool {
         let state = self.shared.lock();
         !self.shared.is_open(&state)
