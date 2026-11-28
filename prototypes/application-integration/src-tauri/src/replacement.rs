@@ -1,5 +1,5 @@
 use crate::{
-    campaign::{join_scheduler, opening_replacement, pause, until_stopped},
+    campaign::{drain_settings, join_scheduler, opening_replacement, pause, until_stopped},
     owned::OwnedParent,
     plugin_registry::command_resource_settings::{SettingsOwner, SettingsSnapshot},
     policy::{Host, Role},
@@ -280,8 +280,7 @@ pub(crate) async fn exercise(
     fresh.drain_attachments().await;
     let scheduler_clean = join_scheduler(scheduler).await;
     retired.stage("replacement-attachment-scheduler-joined", scheduler_clean);
-    settings.shutdown().await;
-    fresh.drain_results().await;
+    drain_settings(&fresh, settings).await;
     result.cleanup_complete = session.owner.shutdown().await.is_ok() && scheduler_clean;
     drop(location);
     let fresh_stages = fresh.lock().native_stages.clone();

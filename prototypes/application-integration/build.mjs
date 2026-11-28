@@ -16,6 +16,18 @@ export function assertManagerGraph(modules) {
 		);
 	}
 }
+export function assertShutdownGraph(modules) {
+	const ids = [...modules];
+	assertManagerGraph(ids);
+	for (const id of ids) {
+		assert(
+			!/\/frontend\/(?:ui|wire|manager(?:-model)?|workspace(?:-transport)?|probe)\.(?:mjs|html)(?:\?|$)|(?:^|\/)settings(?:[./-]|$)|command-resource-settings/.test(
+				id,
+			),
+			`Shutdown imports forbidden initialization module: ${id}`,
+		);
+	}
+}
 export async function buildFixture({ outDir = path.join(directory, 'dist'), write = true } = {}) {
 	const graphs = {};
 	const result = await build({
@@ -40,39 +52,44 @@ export async function buildFixture({ outDir = path.join(directory, 'dist'), writ
 							entry: output.facadeModuleId,
 						};
 					}
-					const entry = Object.keys(graphs).find((name) =>
-						graphs[name].entry?.endsWith('/manager.html'),
-					);
-					assert(entry, 'Missing manager entry');
-					const sourceIds = new Set();
-					const visitSource = (id) => {
-						if (sourceIds.has(id)) {
-							return;
-						}
-						sourceIds.add(id);
-						const info = this.getModuleInfo(id);
-						if (info) {
-							[...info.importedIds, ...info.dynamicallyImportedIds].forEach(visitSource);
-						}
-					};
-					visitSource(graphs[entry].entry);
-					assertManagerGraph(sourceIds);
-					this.emitFile({
-						type: 'asset',
-						fileName: 'manager-source-graph.json',
-						source: JSON.stringify([...sourceIds], null, 2),
-					});
-					const seen = new Set();
-					const visit = (name) => {
-						if (seen.has(name)) {
-							return;
-						}
-						seen.add(name);
-						assert(graphs[name], `Missing emitted import ${name}`);
-						assertManagerGraph(graphs[name].modules);
-						graphs[name].imports.forEach(visit);
-					};
-					visit(entry);
+					for (const [role, audit] of [
+						['manager', assertManagerGraph],
+						['shutdown', assertShutdownGraph],
+					]) {
+						const entry = Object.keys(graphs).find((name) =>
+							graphs[name].entry?.endsWith(`/${role}.html`),
+						);
+						assert(entry, `Missing ${role} entry`);
+						const sourceIds = new Set();
+						const visitSource = (id) => {
+							if (sourceIds.has(id)) {
+								return;
+							}
+							sourceIds.add(id);
+							const info = this.getModuleInfo(id);
+							if (info) {
+								[...info.importedIds, ...info.dynamicallyImportedIds].forEach(visitSource);
+							}
+						};
+						visitSource(graphs[entry].entry);
+						audit(sourceIds);
+						this.emitFile({
+							type: 'asset',
+							fileName: `${role}-source-graph.json`,
+							source: JSON.stringify([...sourceIds], null, 2),
+						});
+						const seen = new Set();
+						const visit = (name) => {
+							if (seen.has(name)) {
+								return;
+							}
+							seen.add(name);
+							assert(graphs[name], `Missing emitted import ${name}`);
+							audit(graphs[name].modules);
+							graphs[name].imports.forEach(visit);
+						};
+						visit(entry);
+					}
 					this.emitFile({
 						type: 'asset',
 						fileName: 'import-graph.json',
@@ -89,7 +106,7 @@ export async function buildFixture({ outDir = path.join(directory, 'dist'), writ
 			minify: false,
 			rollupOptions: {
 				input: Object.fromEntries(
-					['manager', 'workspace', 'probe'].map((role) => [
+					['manager', 'workspace', 'probe', 'shutdown'].map((role) => [
 						role,
 						path.join(directory, `frontend/${role}.html`),
 					]),

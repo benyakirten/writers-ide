@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-shutdown-connect"
+description = "Enables the shutdown_connect command without any pre-configured scope."
+commands.allow = ["shutdown_connect"]
+
+[[permission]]
+identifier = "deny-shutdown-connect"
+description = "Denies the shutdown_connect command without any pre-configured scope."
+commands.deny = ["shutdown_connect"]

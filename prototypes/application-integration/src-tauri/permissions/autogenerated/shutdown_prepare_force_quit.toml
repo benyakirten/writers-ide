@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-shutdown-prepare-force-quit"
+description = "Enables the shutdown_prepare_force_quit command without any pre-configured scope."
+commands.allow = ["shutdown_prepare_force_quit"]
+
+[[permission]]
+identifier = "deny-shutdown-prepare-force-quit"
+description = "Denies the shutdown_prepare_force_quit command without any pre-configured scope."
+commands.deny = ["shutdown_prepare_force_quit"]

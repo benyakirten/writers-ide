@@ -27,6 +27,13 @@ pub(crate) async fn pause(ms: u64) {
         let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(remaining)).await;
     }
 }
+/// Admission must already be closed. Wire-reserved saves retain their right to
+/// enter the settings coordinator until their native result has completed.
+pub(crate) async fn drain_settings(host: &Host, settings: SettingsOwner) {
+    host.drain_results().await;
+    settings.shutdown().await;
+}
+
 pub(crate) async fn join_scheduler(scheduler: std::thread::JoinHandle<()>) -> bool {
     scheduler_task_result(tauri::async_runtime::spawn_blocking(move || {
         scheduler.join()
@@ -305,6 +312,24 @@ pub fn run() {
     };
     let host = Host::new(settings.operations(), settings.association());
     let router = crate::router::HostRouter::new(host.clone());
+    let shutdown = Arc::new(crate::shutdown::ShutdownController::new());
+    let shutdown_authority = crate::shutdown_window::ShutdownWindowAuthority::new(shutdown.clone());
+    let force_parent = parent.clone();
+    let force_host = host.clone();
+    let force_shutdown = shutdown.clone();
+    let force_reporter = crate::shutdown_commands::ShutdownForceReporter::new(move |_| {
+        force_host.stage("shutdown-force-confirmed", true);
+        crate::shutdown_campaign::record(
+            &force_parent,
+            crate::shutdown_campaign::report(
+                &force_parent,
+                &force_host,
+                &force_shutdown,
+                false,
+                false,
+            ),
+        );
+    });
     host.stage("strict-schema2-owned-startup", true);
     host.stage(
         "native-inert-resource-requester-policy",
@@ -326,6 +351,9 @@ pub fn run() {
     let setup_owners = owners.clone();
     let app = tauri::Builder::default()
         .manage(router.clone())
+        .manage(shutdown.clone())
+        .manage(shutdown_authority)
+        .manage(force_reporter)
         .register_uri_scheme_protocol("fixture-resource", move |context, request| {
             route.respond(context.webview_label(), &request)
         })
@@ -341,7 +369,11 @@ pub fn run() {
             commands::settings_ack,
             commands::settings_renew,
             commands::settings_detach,
-            commands::fixture_report
+            commands::fixture_report,
+            crate::shutdown_commands::shutdown_connect,
+            crate::shutdown_commands::shutdown_prepare_force_quit,
+            crate::shutdown_commands::shutdown_cancel_force_quit,
+            crate::shutdown_commands::shutdown_confirm_force_quit
         ])
         .setup(move |app| {
             for (label, role) in [
@@ -387,8 +419,9 @@ pub fn run() {
     match app {
         Ok(app) => app.run(move |_, event| {
             if let RunEvent::ExitRequested { api, .. } = event {
-                if !cleaned.load(Ordering::Acquire) {
+                if !cleaned.load(Ordering::Acquire) && !shutdown.is_forced() {
                     api.prevent_exit();
+                    shutdown.begin();
                     requested.store(true, Ordering::Release);
                     event_router.stop_admission();
                 }
@@ -402,8 +435,7 @@ pub fn run() {
                     host.drain_attachments().await;
                     let joined = join_scheduler(scheduler).await;
                     host.stage("attachment-scheduler-joined", joined);
-                    settings.shutdown().await;
-                    host.drain_results().await;
+                    drain_settings(&host, settings).await;
                     let registry = session.owner.shutdown().await.is_ok();
                     drop(location);
                     joined && registry && resources.close_all()
@@ -683,12 +715,12 @@ async fn window_lifetime_campaign(
     }
 }
 
-struct CampaignWatchdog {
+pub(crate) struct CampaignWatchdog {
     stop: Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>,
     task: std::thread::JoinHandle<bool>,
 }
 impl CampaignWatchdog {
-    fn start() -> Self {
+    pub(crate) fn start() -> Self {
         let stop = Arc::new((std::sync::Mutex::new(false), std::sync::Condvar::new()));
         let signal = stop.clone();
         let task = std::thread::spawn(move || {
@@ -708,7 +740,7 @@ impl CampaignWatchdog {
         });
         Self { stop, task }
     }
-    fn finish(self) -> bool {
+    pub(crate) fn finish(self) -> bool {
         let (lock, wake) = &*self.stop;
         *lock.lock().unwrap_or_else(|e| e.into_inner()) = true;
         wake.notify_all();
@@ -728,6 +760,32 @@ async fn execute_campaign(
     cleaned: Arc<AtomicBool>,
     requested: Arc<AtomicBool>,
 ) {
+    let authority = app
+        .state::<Arc<crate::shutdown_window::ShutdownWindowAuthority>>()
+        .inner()
+        .clone();
+    let status_done = Arc::new(AtomicBool::new(false));
+    let status_task =
+        crate::shutdown_campaign::scheduler(app.clone(), authority.clone(), status_done.clone());
+    if parent.shutdown_scenario.is_some() {
+        crate::shutdown_campaign::execute(
+            app,
+            host,
+            resources,
+            parent,
+            settings,
+            session,
+            location,
+            scheduler,
+            cleaned,
+            requested,
+            status_done,
+            status_task,
+        )
+        .await;
+        return;
+    }
+    let shutdown = authority.controller();
     let start = Instant::now();
     let watchdog = CampaignWatchdog::start();
     let campaign = async {
@@ -1076,26 +1134,24 @@ async fn execute_campaign(
         .collect::<Vec<_>>();
     host.stop_admission();
     let cleanup_start = Instant::now();
-    let status_done = Arc::new(AtomicBool::new(false));
-    let status_flag = status_done.clone();
-    let status_app = app.clone();
-    let status_task = tauri::async_runtime::spawn(async move {
-        pause(2000).await;
-        if !status_flag.load(Ordering::Acquire) {
-            if let Some(w) = status_app.get_webview_window("manager") {
-                let _=w.eval("document.getElementById('status').textContent='Finalization is still running. Keep waiting. No automatic force quit.'");
-            }
-        }
-    });
+    if interrupted {
+        shutdown.begin();
+        shutdown.progress("attachments", "Draining attachments after interruption");
+    }
     host.drain_attachments().await;
     let scheduler_clean = join_scheduler(scheduler).await;
     host.stage("attachment-scheduler-joined", scheduler_clean);
-    settings.shutdown().await;
-    host.drain_results().await;
+    shutdown.progress("settings-results", "Draining settings and retained results");
+    drain_settings(&host, settings).await;
     host.stage("settings-and-attachments-awaited", true);
     let retired_registry = session.handle.clone();
+    shutdown.progress("registry", "Waiting for registry cleanup");
     let registry_clean = session.owner.shutdown().await.is_ok();
+    if !registry_clean {
+        shutdown.fail("Registry cleanup failed");
+    }
     host.stage("registry-shutdown-awaited", registry_clean);
+    shutdown.progress("ownership", "Releasing location ownership");
     drop(location);
     let resource_clean = resources.close_all();
     host.stage("inert-resources-released", resource_clean);
@@ -1146,23 +1202,34 @@ async fn execute_campaign(
         "packaged-cross-service-explicit-reattachment",
         replacement.frontend_reattached,
     );
-    let mut gaps = vec![
-        "Windows, Linux and minimum macOS remain unverified",
-        "Shutdown UI provides status and Keep waiting text only; no confirmed Force quit action is implemented",
-    ];
+    // Primary retirement/reopen/replacement above is internal verification, not
+    // final application shutdown. Closing the router earlier prevents replacement.
+    shutdown.begin();
+    router.stop_admission();
+    shutdown.progress(
+        "ownership",
+        "Final campaign owners have released their locations",
+    );
+    let mut gaps = vec!["Windows, Linux and minimum macOS remain unverified"];
     if !replacement.frontend_reattached {
         gaps.push("Cross-service frontend reattachment did not complete successfully in this run");
     }
-    status_done.store(true, Ordering::Release);
-    let _ = status_task.await;
-    host.stage("native-watchdog-not-expired", watchdog.finish());
-    let stages = host.lock().native_stages.clone();
-    let native_ok = stages.iter().all(|s| s["ok"] == true);
     let cleanup_complete = scheduler_clean
         && registry_clean
         && (interrupted || reopen_clean)
         && resource_clean
         && replacement.cleanup_complete;
+    if !crate::shutdown_campaign::claim_clean_exit(shutdown, cleanup_complete) {
+        // Force owns termination, or failed cleanup must remain available for
+        // manual force. Keep the status scheduler and runtime running in either case.
+        return;
+    }
+    host.stage("native-watchdog-not-expired", watchdog.finish());
+    let stages = host.lock().native_stages.clone();
+    let native_ok = stages.iter().all(|s| s["ok"] == true);
+    let _ = authority.close_if_complete(&app);
+    status_done.store(true, Ordering::Release);
+    let _ = status_task.await;
     let report = json!({"version":1,"ok":native_ok&&!requested.load(Ordering::Acquire),"runId":parent.run_id,"cleanupComplete":cleanup_complete,"nativeStages":stages,"cases":observations,"durationMs":start.elapsed().as_millis(),"cleanupMs":cleanup_start.elapsed().as_millis(),"platform":{"os":std::env::consts::OS,"arch":std::env::consts::ARCH,"webviewRuntime":tauri::webview_version().ok()},"fixture":{"crateVersion":env!("CARGO_PKG_VERSION"),"nativeSourceSha256":env!("FIXTURE_NATIVE_SHA256"),"frontendDistSha256":env!("FIXTURE_FRONTEND_SHA256"),"debugAssertions":cfg!(debug_assertions),"resourcePolicy":if parent.resource_denial_policy {"requester-denial"}else{"strict-baseline"},"resourceRequestStatuses":resource_requests,"preseededSchema":2,"replacement":replacement,"publicationAttempted":false,"retainedData":"runner-owned parent; no native deletion"},"gaps":gaps});
     // Evidence uses create_new outside registry storage; never overwrite previous evidence.
     let evidence = std::fs::OpenOptions::new()

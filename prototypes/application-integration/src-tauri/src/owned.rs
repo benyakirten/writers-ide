@@ -14,17 +14,24 @@ pub struct OwnedParent {
     pub run_id: String,
     pub inspect: bool,
     pub resource_denial_policy: bool,
+    pub shutdown_scenario: Option<ShutdownScenario>,
 }
 impl OwnedParent {
     pub fn arguments() -> Result<Self, String> {
         let mut args = std::env::args().skip(1);
         let (mut parent, mut run_id, mut inspect) = (None, None, false);
         let mut resource_denial_policy = false;
+        let mut shutdown_scenario = None;
         while let Some(arg) = args.next() {
             match arg.as_str() {
                 "--parent" if parent.is_none() => parent = args.next().map(PathBuf::from),
                 "--run-id" if run_id.is_none() => run_id = args.next(),
                 "--inspect-ownership" if !inspect => inspect = true,
+                "--shutdown-scenario" if shutdown_scenario.is_none() => {
+                    shutdown_scenario = Some(ShutdownScenario::parse(
+                        &args.next().ok_or("scenario required")?,
+                    )?);
+                }
                 "--resource-denial-policy" if !resource_denial_policy => {
                     resource_denial_policy = true
                 }
@@ -37,6 +44,10 @@ impl OwnedParent {
             inspect,
         )?;
         owned.resource_denial_policy = resource_denial_policy;
+        if shutdown_scenario.is_some() && (inspect || resource_denial_policy) {
+            return Err("shutdown scenarios require a separate ordinary disposable run".into());
+        }
+        owned.shutdown_scenario = shutdown_scenario;
         Ok(owned)
     }
     pub fn validate(parent: PathBuf, run_id: String, inspect: bool) -> Result<Self, String> {
@@ -65,6 +76,7 @@ impl OwnedParent {
             run_id,
             inspect,
             resource_denial_policy: false,
+            shutdown_scenario: None,
         })
     }
     pub fn root(&self) -> PathBuf {
@@ -72,6 +84,32 @@ impl OwnedParent {
     }
     pub fn replacement_root(&self) -> PathBuf {
         self.parent.join("replacement-registry")
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ShutdownScenario {
+    Slow,
+    Failure,
+    ActiveSave,
+    Force,
+}
+impl ShutdownScenario {
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "slow" => Ok(Self::Slow),
+            "failure" => Ok(Self::Failure),
+            "active-save" => Ok(Self::ActiveSave),
+            "force" => Ok(Self::Force),
+            _ => Err("unknown shutdown scenario".into()),
+        }
+    }
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Slow => "slow",
+            Self::Failure => "failure",
+            Self::ActiveSave => "active-save",
+            Self::Force => "force",
+        }
     }
 }
 pub fn marker(text: &str) -> bool {

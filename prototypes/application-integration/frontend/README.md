@@ -21,10 +21,12 @@ It writes these entries under `prototypes/application-integration/dist/`:
 - `manager.html` contains the eight-value settings form and save-result reconciliation.
 - `workspace.html` creates the existing opt-in application component host.
 - `probe.html` attempts unauthorized native operations and reports observations.
+- `shutdown.html` shows cleanup progress or failure and separate force confirmation. Rust creates it only when cleanup is slow or has failed.
 
 `import-graph.json` records emitted JavaScript imports and source attribution.
 `manager-source-graph.json` records the manager's resolved source dependencies.
-The build rejects editor, plugin, workspace-package and Svelte dependencies in the manager graph.
+`shutdown-source-graph.json` records the shutdown entry's resolved source dependencies.
+The build rejects editor, plugin, workspace-package and Svelte dependencies in the manager and shutdown graphs. Shutdown also excludes manager/settings initialization.
 The workspace uses the real rune-compiled host and existing settings client.
 No server is required to produce these static assets.
 
@@ -96,8 +98,13 @@ frames, forms, objects and workers. An HTML policy alone does not prove enforcem
 Native code sets up the verified inert asset and its resource associations. The requester-denial
 campaign requires HTTP 200 for both workspaces and 403 for manager/probe requests to that same asset.
 The frontend does not invent a resource URL or a resource-authority handshake field.
-The fixture displays Keep waiting status only; a native Force quit action is not implemented.
-Full production shutdown UX remains planned and must warn about unfinished or possibly committed work.
+The approved [shutdown interface](../../../docs/plugins/application-integration-plan.md#implemented-fixture-shutdown-interface) is implemented separately from ordinary shell sessions. `shutdown-model.mjs` mounts the controls; `shutdown.mjs` supplies Tauri invocation and channel construction. Rust owns its fixed entry, separate document lifetime and cleanup state. It appears after two seconds or immediately on failure. It initializes no settings, editor or plugin host.
+
+Only its actual WebView may call `shutdown_connect`, `shutdown_prepare_force_quit`, `shutdown_cancel_force_quit` and `shutdown_confirm_force_quit`. All use strict versioned 4 KiB JSON string payloads. Connect sends `{ version: 1 }` and one `events` channel. Rust supplies the session and attempt; later requests repeat both. Native retains one progress channel and one pending confirmation token, valid for 30 seconds. These markers do not authorize another WebView.
+
+Keep waiting has default focus. Force quit opens a separate panel with the exact warning: “Unfinished changes may not be saved. A transaction may already have committed without a delivered response.” Cancel receives focus in that panel. Cancel, Escape and panel closure discard confirmation and keep waiting. Native prevents status-window closure while finalization is unfinished. It never forces automatically. Native completion atomically gates normal reporting and exit, invalidates confirmation and closes the window. If force wins, no normal result is written. Real cleanup failure remains unfinished in this UI with manual Force quit available; there is no automatic exit. Native progress callback invocation and destruction are panic-isolated outside state locks. Confirmed force exit uses code `2`, native `ok: false` and `cleanupComplete: false`; the runner retains scratch. Passing that expected-force scenario is not successful cleanup or rollback.
+
+The runner also checks slow cleanup, a synthetic failure followed by real drains with its original warning preserved, and a save held before execution then drained after admission closes. The latter does not interrupt an executing SQLite transaction. Shared native cleanup awaits wire-admitted results before shutting down the settings coordinator on normal, setup-error and replacement paths. Four packaged reload stages verify native destruction/recreation, a fresh shutdown document lifetime and channel, Keep waiting focus, and old-session/token denial within the same attempt. The packaged dismissal check dispatches the dialog's `cancel` event through its real handler. It does not validate an OS-level Escape keystroke. Full production shutdown UX remains planned.
 No packaged PASS or platform compatibility claim follows from frontend tests or implemented stages.
 See the [consolidated changelog](../../../docs/plugins/change-log.md#consolidated-application-integration-design)
 for verified validation. Normal app data/startup remain untouched. There is no publication call

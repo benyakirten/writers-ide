@@ -115,10 +115,83 @@ export function parseReport(output, runId, policy) {
 	return report;
 }
 
+export const requiredShutdownStages = Object.freeze([
+	'shutdown-window-connected',
+	'shutdown-default-keep-waiting',
+	'shutdown-peer-authority-denied',
+	'shutdown-confirmation-cancelled',
+	'shutdown-no-automatic-force',
+	'shutdown-close-prevented',
+	'shutdown-settings-authority-denied',
+	'shutdown-exact-force-warning',
+	'shutdown-reload-new-lifetime',
+	'shutdown-reload-channel-connected',
+	'shutdown-reload-default-keep-waiting',
+	'shutdown-reload-stale-confirmation-denied',
+]);
+const shutdownScenarios = Object.freeze(['slow', 'failure', 'active-save', 'force']);
+
+export function parseShutdownReport(output, runId, scenario) {
+	const lines = output.split(/\r?\n/).filter((line) => line.startsWith(resultMarker));
+	if (lines.length !== 1 || Buffer.byteLength(lines[0]) > 128 * 1024) {
+		throw new Error('Expected one bounded native shutdown report');
+	}
+	const report = JSON.parse(lines[0].slice(resultMarker.length));
+	const forced = scenario === 'force';
+	if (
+		!shutdownScenarios.includes(scenario) ||
+		report?.version !== 1 ||
+		report.runId !== runId ||
+		report.shutdownScenario !== scenario ||
+		report.ok !== !forced ||
+		report.cleanupComplete !== !forced ||
+		report.shutdown?.version !== 1 ||
+		report.shutdown.phase !== (forced ? 'forced' : 'complete') ||
+		report.shutdown.failure !==
+			(scenario === 'failure' ? 'Simulated native finalization failure' : null) ||
+		report.fixture?.publicationAttempted !== false ||
+		!Array.isArray(report.nativeStages) ||
+		report.nativeStages.length > 128 ||
+		!report.nativeStages.every(
+			(stage) => stage !== null && typeof stage.name === 'string' && stage.ok === true,
+		)
+	) {
+		throw new Error('Native shutdown outcome failed or completion evidence is incomplete');
+	}
+	for (const key of ['nativeSourceSha256', 'frontendDistSha256']) {
+		if (typeof report.fixture[key] !== 'string' || !/^[a-f0-9]{64}$/.test(report.fixture[key])) {
+			throw new Error('Missing shutdown source/build attribution');
+		}
+	}
+	const required = [
+		...requiredShutdownStages,
+		...(forced
+			? ['shutdown-force-confirmed']
+			: [
+					'shutdown-cleanup-awaited',
+					'shutdown-status-scheduler-awaited',
+					'native-watchdog-not-expired',
+				]),
+		...(scenario === 'failure'
+			? ['shutdown-failure-immediate', 'shutdown-original-failure-preserved']
+			: []),
+		...(scenario === 'active-save'
+			? ['shutdown-active-save-admitted', 'shutdown-active-save-drained']
+			: []),
+	];
+	const stages = new Set(report.nativeStages.map((stage) => stage.name));
+	for (const name of required) {
+		if (!stages.has(name)) {
+			throw new Error(`Required native shutdown stage missing: ${name}`);
+		}
+	}
+	return report;
+}
+
 export async function execute(
 	command,
 	args,
-	{ cwd, env, timeout = 120_000, budget = 256 * 1024, log },
+	{ cwd, env, timeout = 120_000, budget = 256 * 1024, log, expectedCode = 0 },
 ) {
 	const output = await new Promise((resolve, reject) => {
 		const child = spawn(command, args, {
@@ -166,7 +239,7 @@ export async function execute(
 	if (log) {
 		await writeFile(log, output.output, { flag: 'wx' });
 	}
-	if (output.failure || output.code !== 0 || output.signal !== null) {
+	if (output.failure || output.code !== expectedCode || output.signal !== null) {
 		throw new Error(output.failure ?? `Child failed: code=${output.code}, signal=${output.signal}`);
 	}
 	return output.output;
@@ -244,15 +317,24 @@ async function main() {
 		result.seedSha256 = createHash('sha256')
 			.update(await readFile(path.join(target, 'debug/seed')))
 			.digest('hex');
-		for (const policy of ['strict-baseline', 'requester-denial']) {
+		const campaigns = [
+			...['strict-baseline', 'requester-denial'].map((policy) => ({ name: policy, policy })),
+			...shutdownScenarios.map((scenario) => ({ name: `shutdown-${scenario}`, scenario })),
+		];
+		for (const { name, policy, scenario } of campaigns) {
 			const runId = randomBytes(16).toString('hex');
-			const runDirectory = path.join(reports, policy);
+			const runDirectory = path.join(reports, name);
 			await mkdir(path.join(runDirectory, 'scratch'), { recursive: true });
 			const parent = await realpath(path.join(runDirectory, 'scratch'));
 			await writeFile(path.join(parent, ownerMarker), JSON.stringify({ schema: 1, runId }), {
 				flag: 'wx',
 			});
-			const run = { runId, policy, ok: false, scratchRetained: true };
+			const run = {
+				runId,
+				...(scenario ? { scenario, expectedForcedExit: scenario === 'force' } : { policy }),
+				ok: false,
+				scratchRetained: true,
+			};
 			result.runs.push(run);
 			try {
 				const args = ['--parent', parent, '--run-id', runId];
@@ -280,15 +362,22 @@ async function main() {
 				}
 				const output = await execute(
 					executable,
-					policy === 'requester-denial' ? [...args, '--resource-denial-policy'] : args,
+					scenario
+						? [...args, '--shutdown-scenario', scenario]
+						: policy === 'requester-denial'
+							? [...args, '--resource-denial-policy']
+							: args,
 					{
 						cwd: root,
 						env,
 						timeout: 120_000,
 						log: path.join(runDirectory, 'packaged.log'),
+						expectedCode: scenario === 'force' ? 2 : 0,
 					},
 				);
-				run.report = parseReport(output, runId, policy);
+				run.report = scenario
+					? parseShutdownReport(output, runId, scenario)
+					: parseReport(output, runId, policy);
 				const nativeEvidence = JSON.parse(
 					await readFile(path.join(parent, 'native-result.json'), 'utf8'),
 				);
@@ -300,15 +389,17 @@ async function main() {
 					JSON.stringify(nativeEvidence, null, 2) + '\n',
 					{ flag: 'wx' },
 				);
-				await verifyOwnership(parent, runId);
-				await rm(parent, { recursive: true });
-				run.scratchRetained = false;
+				if (scenario !== 'force') {
+					await verifyOwnership(parent, runId);
+					await rm(parent, { recursive: true });
+					run.scratchRetained = false;
+				}
 				run.ok = true;
 			} catch (error) {
 				run.error = error.message;
 			}
 		}
-		result.ok = result.runs.length === 2 && result.runs.every((run) => run.ok);
+		result.ok = result.runs.length === campaigns.length && result.runs.every((run) => run.ok);
 	} catch (error) {
 		result.error = error.message;
 	} finally {

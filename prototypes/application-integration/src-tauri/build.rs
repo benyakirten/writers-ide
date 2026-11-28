@@ -69,6 +69,10 @@ fn main() {
             "settings_renew",
             "settings_detach",
             "fixture_report",
+            "shutdown_connect",
+            "shutdown_prepare_force_quit",
+            "shutdown_cancel_force_quit",
+            "shutdown_confirm_force_quit",
         ]),
     ))
     .expect("build isolated fixture");

@@ -11,7 +11,8 @@
       "capabilities": [
         { "identifier": "manager", "windows": ["manager"], "permissions": ["shell", "manager"] },
         { "identifier": "workspaces", "windows": ["workspace-a", "workspace-b"], "permissions": ["shell", "workspace"] },
-        { "identifier": "probe", "windows": ["probe"], "permissions": ["shell"] }
+        { "identifier": "probe", "windows": ["probe"], "permissions": ["shell"] },
+        { "identifier": "shutdown", "windows": ["shutdown"], "permissions": ["shutdown"] }
       ]
     }
   },
