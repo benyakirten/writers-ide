@@ -14,6 +14,7 @@ import { createShortcuts } from '../plugins/shortcut.plugin';
 import { ActionUtilities } from './actions';
 import { schema } from './schema';
 import Editors from '../prose-mirror-editor.svelte';
+import { normalizePageIndexes } from './page-indexes';
 
 function createProseMirrorState(id: string, initialState: ProseMirrorNode) {
 	const plugins = ProseMirrorPlugins.pluginRegistryFunctions.map((fn) => fn(id));
@@ -68,7 +69,7 @@ export function createView(
 	viewport: HTMLElement = el,
 ): () => void {
 	let state = createProseMirrorState(id, initialState);
-	const indexed = indexPages(state.tr);
+	const indexed = normalizePageIndexes(state.tr);
 	if (indexed.docChanged) state = state.apply(indexed);
 	const view = new EditorView(el, {
 		state,
@@ -84,33 +85,25 @@ export const TransactionHandlerRegistry = new Registry<
 	(view: EditorView, tr: Transaction) => Transaction
 >();
 
-// Keep indexes in the model before rendering: mutating parsed data-index attributes
-// independently can feed back through ProseMirror's DOM observer.
-function indexPages(tr: Transaction): Transaction {
-	const { storedMarks } = tr;
-	tr.doc.forEach((node, offset, index) => {
-		if (node.type.name === 'page' && node.attrs.index !== index) {
-			tr.setNodeAttribute(offset, 'index', index);
-		}
-	});
-	// Index attribute steps must not discard the incoming transaction's typing marks.
-	if (storedMarks !== null) {
-		tr.setStoredMarks(storedMarks);
-	}
-	return tr;
-}
-
 function handleTransaction(id: string, view: EditorView, transaction: Transaction) {
 	for (const handler of TransactionHandlerRegistry.values()) {
 		transaction = handler(view, transaction);
 	}
 
-	if (transaction.docChanged) indexPages(transaction);
-	proseMirrorEventBus.update({
-		id,
-		event: { type: ProseMirrorEventBusEventType.PreUpdate, view, tr: transaction },
-	});
-
-	const newState = view.state.apply(transaction);
-	view.updateState(newState);
+	if (transaction.docChanged) {
+		normalizePageIndexes(transaction);
+	}
+	const applied = view.state.applyTransaction(transaction);
+	if (applied.transactions.length === 0) {
+		return;
+	}
+	// Appended transactions have their own before/doc coordinates. Notify for each
+	// accepted transaction while the old DOM is still available to invalidation.
+	for (const accepted of applied.transactions) {
+		proseMirrorEventBus.update({
+			id,
+			event: { type: ProseMirrorEventBusEventType.PreUpdate, view, tr: accepted },
+		});
+	}
+	view.updateState(applied.state);
 }

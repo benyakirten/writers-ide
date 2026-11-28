@@ -19,6 +19,14 @@ This project is about cooperation and creativity, not revenue. Forks, extensions
 
 Use `pnpm dev` for the browser frontend and `pnpm dev:tauri` for the desktop application. See `package.json` and the contributor guide for checks and other workflows.
 
+## Plugin foundation
+
+The private workspace SDK exports approved frontend context, command, identity, project and locale contracts. Its `/svelte` entry supplies presentation and frontend context types. Its `/native` entry supplies native service/data/error contracts and an error guard. These exports do not implement the services: the current bundled host still supplies its existing `PluginContext`, not `FrontendContext`. External loading, native authorization and persistent/native project services remain unimplemented. An [isolated internal dispatcher](docs/plugins/command-dispatcher.md) now implements typed shared-command execution and availability. An internal component lifecycle harness adds checked API/command publication, alias-based provider connections, endpoint identity, dependency activation and teardown. It also assembles managed tasks and UI locale from explicit host sources, but is not yet wired to the application's scheduler or locale source. It now also implements [in-memory project references and independent leases](docs/plugins/project-connections.md), without filesystem access or persistent registrations. Neither is connected to the bundled host or external loading. A curated external runtime-profile artifact has not shipped.
+
+The internal Rust [`plugin_manifest` module](docs/plugins/manifest-resolution.md) now validates manifest bytes and resolves static package/component dependencies. It checks declarations and compatibility without importing or activating code. It is not wired into the application and supplies no installation, enablement or native authority.
+
+The public [`@writers-ide/word-processing/structure` API](packages-js/word-processing/README.md#read-only-document-structure-helpers) now provides read-only block grouping for the current page model. Basic Menu uses it with feature-owned formatting helpers. Basic Menu remains bundled, not a separately packaged plugin. See the [plugin implementation checklist](docs/plugins/implementation-plan.md#foundation-slice-and-remaining-execution-checklist) for completed work and prerequisites.
+
 ## Cooperative editor work
 
 `src/lib/editor/state/work-queue.svelte.ts` exports `workQueue` and `WorkQueue`.

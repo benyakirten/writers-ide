@@ -1,0 +1,19 @@
+[[permission]]
+identifier = "shutdown"
+description = "Only progress and confirmed force termination for the native shutdown document."
+commands.allow = ["shutdown_connect", "shutdown_prepare_force_quit", "shutdown_cancel_force_quit", "shutdown_confirm_force_quit"]
+
+[[permission]]
+identifier = "shell"
+description = "Only lifetime handshake, bootstrap state and bounded observational reporting."
+commands.allow = ["session_handshake", "bootstrap_status", "fixture_report"]
+
+[[permission]]
+identifier = "manager"
+description = "Settings management from the Rust-owned manager only."
+commands.allow = ["settings_read", "settings_save", "settings_result", "settings_application_status"]
+
+[[permission]]
+identifier = "workspace"
+description = "Read-only settings attachment control for the actual workspace."
+commands.allow = ["settings_attach", "settings_attachment_read", "settings_ack", "settings_renew", "settings_detach"]

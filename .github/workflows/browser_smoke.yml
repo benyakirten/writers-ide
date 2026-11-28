@@ -34,6 +34,14 @@ jobs:
         run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - name: Smoke tests
         run: pnpm test:smoke --project=${{ matrix.browser }}
+      - name: Bundled worker and shared task tests
+        run: pnpm test:tasks --project=${{ matrix.browser }}
+      - name: Plugin providers and dependency management tests
+        run: pnpm test:plugins --project=${{ matrix.browser }}
+      - name: Separate plugin runtime-profile tests
+        run: pnpm test:plugin-profile --project=${{ matrix.browser }}
+      - name: Word-processing provider and independent formatting tests
+        run: pnpm test:word-processing --project=${{ matrix.browser }}
       - name: Upload browser report and failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4

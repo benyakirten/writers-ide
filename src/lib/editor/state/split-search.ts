@@ -1,5 +1,7 @@
 /** True means the offset fails to fit. Hybrid search requires false values before true values. */
-export type SplitFailurePredicate = (offset: number) => boolean;
+export interface SplitFailurePredicate {
+	(offset: number): boolean;
+}
 
 /** Search [0, end); return the first failing offset, or end without probing that sentinel. */
 export interface SplitSearchStrategy {

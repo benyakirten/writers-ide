@@ -4,11 +4,16 @@
 	import HorizontalBarState, { HorizontalBarPosition } from '../state/horizontal-bar-state.svelte';
 	import VerticalBarState, { VerticalBarPosition } from '../state/vertical-bar-state.svelte';
 
+	let { onplugins }: { onplugins?: (launcher: HTMLButtonElement) => void } = $props();
+
 	const _ = HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart);
 	TransferHandler.append(HorizontalBarPosition.WindowBlockStart, 0, 'basic-menu');
 </script>
 
 <div class="base-bar">
+	{#if onplugins}
+		<button onclick={(event) => onplugins?.(event.currentTarget)}>Plugins</button>
+	{/if}
 	<button onclick={() => HorizontalBarState.add({}, HorizontalBarPosition.WindowBlockStart)}
 		>Add horizontal bar
 	</button>

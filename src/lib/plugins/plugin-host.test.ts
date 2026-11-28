@@ -1,25 +1,23 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
+import type { Component } from 'svelte';
 import type {
 	BundledPlugin,
 	CommandContribution,
 	ContributionRegistry,
 	Dispose,
-	FormattingRequest,
-	FormattingService,
-	FormattingSnapshot,
 	PluginCapability,
 	PluginContext,
 	PluginManifest,
+	PluginInfo,
+	PluginManagementService,
 	ToolbarContribution,
 	ViewContribution,
 } from '@writers-ide/plugins';
-import type { SveltePlugin, SveltePresentation } from '@writers-ide/plugins/svelte';
+import { defineSveltePresentation, type SveltePlugin } from '@writers-ide/plugins/svelte';
 import { PluginHost } from './plugin-host';
 
 const allCapabilities: PluginCapability[] = [
-	'formatting.observe',
-	'formatting.execute',
 	'contributions.toolbar',
 	'contributions.view',
 	'contributions.command',
@@ -66,19 +64,9 @@ function setup() {
 	const toolbar = registry<ToolbarContribution<string>>();
 	const view = registry<ViewContribution<string>>();
 	const command = registry<CommandContribution>();
-	const listeners: ((snapshot: FormattingSnapshot | null) => void)[] = [];
-	const unsubscribe = vi.fn();
-	const formatting: FormattingService = {
-		subscribe: vi.fn((listener) => {
-			listeners.push(listener);
-			listener(null);
-			return unsubscribe;
-		}),
-		execute: vi.fn(() => true),
-	};
 	const registries = { toolbar, view, command };
-	const host = new PluginHost({ formatting, registries });
-	return { host, formatting, registries, listeners, unsubscribe };
+	const host = new PluginHost({ registries });
+	return { host, registries };
 }
 
 const toolbarContribution: ToolbarContribution<string> = {
@@ -87,14 +75,13 @@ const toolbarContribution: ToolbarContribution<string> = {
 	horizontal: { presentation: 'row', size: 3 },
 	vertical: { presentation: 'column', size: 2 },
 };
-const request: FormattingRequest = { viewId: 'view-1', revision: 7, command: 'bold' };
 
-// Type-only coverage of the optional Svelte adapter; no runtime Svelte dependency in the host.
-function sveltePlugin(component: SveltePresentation['component']): SveltePlugin {
+// Typed prop coverage of the optional adapter; no runtime Svelte dependency in the host.
+function sveltePlugin(component: Component<{ label: string }>): SveltePlugin {
 	return {
 		manifest: plugin('svelte').manifest,
 		activate(context) {
-			const presentation: SveltePresentation = { component, context };
+			const presentation = defineSveltePresentation(component, { label: 'Svelte view' });
 			context.contributions.view({ id: 'svelte-view', name: 'Svelte view', presentation });
 			context.contributions.toolbar({
 				id: 'svelte-toolbar',
@@ -108,6 +95,158 @@ function sveltePlugin(component: SveltePresentation['component']): SveltePlugin 
 void sveltePlugin;
 
 describe('PluginHost', () => {
+	it('publishes registration, transitions, contribution changes and cleanup errors', () => {
+		const { host } = setup();
+		const management: PluginManagementService = host;
+		const snapshots: (readonly PluginInfo[])[] = [];
+		const unsubscribe = management.subscribe((plugins) => snapshots.push(plugins));
+		expect(snapshots).toEqual([[]]);
+		let context!: PluginContext<string>;
+		host.register(
+			plugin('one', (value) => {
+				context = value;
+			}),
+		);
+		expect(snapshots.at(-1)?.[0].status).toBe('disabled');
+		host.activate('one');
+		expect(snapshots.map((snapshot) => snapshot[0]?.status)).toEqual([
+			undefined,
+			'disabled',
+			'activating',
+			'active',
+		]);
+		const release = context.contributions.toolbar(toolbarContribution);
+		expect(snapshots.at(-1)?.[0].contributions).toEqual([{ kind: 'toolbar', id: 'tools' }]);
+		release();
+		expect(snapshots.at(-1)?.[0].contributions).toEqual([]);
+		context.own(() => {
+			throw new Error('Cleanup needs attention');
+		})();
+		expect(snapshots.at(-1)?.[0].errors).toEqual([
+			{ phase: 'cleanup', message: 'Cleanup needs attention' },
+		]);
+		host.deactivate('one');
+		expect(snapshots.some((snapshot) => snapshot[0]?.status === 'deactivating')).toBe(true);
+		expect(snapshots.at(-1)?.[0].status).toBe('failed');
+		expect(Object.isFrozen(snapshots.at(-1))).toBe(true);
+		expect(Object.isFrozen(snapshots.at(-1)?.[0].errors[0])).toBe(true);
+		unsubscribe();
+		unsubscribe();
+		const count = snapshots.length;
+		host.activate('one');
+		expect(snapshots).toHaveLength(count);
+	});
+
+	it('isolates throwing observers and rejects notification-driven lifecycle resurrection', () => {
+		const { host, registries } = setup();
+		host.subscribe(() => {
+			throw new Error('Broken manager');
+		});
+		const observed = vi.fn();
+		host.subscribe(observed);
+		const attempts: (Error | undefined)[] = [];
+		host.subscribe((plugins) => {
+			if (plugins.length === 0) {
+				return;
+			}
+			for (const action of [
+				() => host.activate('one'),
+				() => host.deactivate('one'),
+				() => host.register(plugin('two')),
+			]) {
+				let failure: Error | undefined;
+				try {
+					action();
+				} catch (error) {
+					failure = error as Error;
+				}
+				attempts.push(failure);
+			}
+		});
+		host.register(
+			plugin('one', (context) => {
+				context.contributions.toolbar(toolbarContribution);
+				throw new Error('Activation failed');
+			}),
+		);
+		expect(host.activate('one').status).toBe('failed');
+		expect(host.get('one')?.contributions).toEqual([]);
+		expect(registries.toolbar.items.size).toBe(0);
+		expect(host.list()).toHaveLength(1);
+		expect(attempts.length).toBeGreaterThan(0);
+		for (const failure of attempts) {
+			expect(failure?.message).toContain('busy notifying');
+		}
+		expect(observed.mock.calls.at(-1)?.[0][0].errors).toEqual([
+			{ phase: 'activation', message: 'Activation failed' },
+		]);
+	});
+
+	it('cannot be resurrected by observers during successful deactivation', () => {
+		const { host } = setup();
+		let context!: PluginContext<string>;
+		const dispose = vi.fn();
+		host.register(
+			plugin('one', (value) => {
+				context = value;
+				value.contributions.toolbar(toolbarContribution);
+				return dispose;
+			}),
+		);
+		host.activate('one');
+		const attempted: string[] = [];
+		host.subscribe((plugins) => {
+			if (plugins[0].status === 'deactivating' || plugins[0].status === 'disabled') {
+				attempted.push(plugins[0].status);
+				host.activate('one');
+			}
+		});
+		expect(host.deactivate('one').status).toBe('disabled');
+		expect(host.get('one')?.contributions).toEqual([]);
+		expect(context.signal.aborted).toBe(true);
+		expect(dispose).toHaveBeenCalledOnce();
+		expect(attempted).toContain('deactivating');
+		expect(attempted).toContain('disabled');
+	});
+
+	it('keeps identical callbacks independently subscribed and honors removal during delivery', () => {
+		const { host } = setup();
+		const listener = vi.fn();
+		const first = host.subscribe(listener);
+		const second = host.subscribe(listener);
+		expect(listener).toHaveBeenCalledTimes(2);
+		first();
+		first();
+		host.register(plugin('one'));
+		expect(listener).toHaveBeenCalledTimes(3);
+		second();
+		let remove = () => {};
+		host.subscribe((plugins) => {
+			if (plugins[0]?.status === 'activating') {
+				remove();
+			}
+		});
+		remove = host.subscribe(listener);
+		listener.mockClear();
+		host.activate('one');
+		expect(listener).not.toHaveBeenCalled();
+	});
+
+	it('projects manifest metadata without carrying extra execution references', () => {
+		const { host } = setup();
+		const definition = plugin('one');
+		const manifest = { ...definition.manifest, execute: () => true, context: {} };
+		host.register({ ...definition, manifest });
+		expect(Object.keys(host.list()[0].manifest).sort()).toEqual([
+			'apiVersion',
+			'capabilities',
+			'description',
+			'id',
+			'name',
+			'version',
+		]);
+	});
+
 	it('registers explicitly without activating and returns immutable management snapshots', () => {
 		const { host } = setup();
 		const activate = vi.fn();
@@ -141,7 +280,7 @@ describe('PluginHost', () => {
 			bad({ ...plugin('one').manifest, capabilities: ['filesystem'] } as unknown as PluginManifest),
 		).toThrow('Unknown or duplicate');
 		expect(() =>
-			host.register(plugin('one', undefined, ['formatting.observe', 'formatting.observe'])),
+			host.register(plugin('one', undefined, ['contributions.toolbar', 'contributions.toolbar'])),
 		).toThrow('Unknown or duplicate');
 		expect(host.list()).toEqual([]);
 		host.register(plugin('one'));
@@ -214,8 +353,9 @@ describe('PluginHost', () => {
 		expect(registries.view.removed).toHaveBeenCalledOnce();
 	});
 
-	it('rolls back contributions and subscriptions on activation failure, aborting first', () => {
-		const { host, registries, unsubscribe } = setup();
+	it('rolls back contributions and owned resources on activation failure, aborting first', () => {
+		const { host, registries } = setup();
+		const unsubscribe = vi.fn();
 		let saved!: PluginContext<string>;
 		const dispose = vi.fn(() => {
 			expect(saved.signal.aborted).toBe(true);
@@ -224,7 +364,7 @@ describe('PluginHost', () => {
 			plugin('one', (context) => {
 				saved = context;
 				context.contributions.toolbar(toolbarContribution);
-				context.formatting.subscribe(() => {});
+				context.own(unsubscribe);
 				context.own(dispose);
 				throw new Error('startup failed');
 			}),
@@ -236,7 +376,7 @@ describe('PluginHost', () => {
 		expect(registries.toolbar.items.size).toBe(0);
 		expect(unsubscribe).toHaveBeenCalledOnce();
 		expect(dispose).toHaveBeenCalledOnce();
-		expect(saved.formatting.execute(request)).toBe(false);
+		expect(() => saved.contributions.toolbar(toolbarContribution)).toThrow('revoked');
 	});
 
 	it('cleans up in reverse order, idempotently, continuing after failures', () => {
@@ -288,31 +428,22 @@ describe('PluginHost', () => {
 		expect(registries.toolbar.removed).toHaveBeenCalledTimes(2);
 	});
 
-	it('revokes stale contexts, formatting callbacks and retained commands across re-enable', () => {
-		const { host, registries, formatting, listeners, unsubscribe } = setup();
+	it('revokes stale contexts and retained commands across re-enable', () => {
+		const { host, registries } = setup();
 		const contexts: PluginContext<string>[] = [];
-		const listener = vi.fn();
 		const execute = vi.fn(() => true);
 		host.register(
 			plugin('one', (context) => {
 				contexts.push(context);
-				context.formatting.subscribe(listener);
 				context.contributions.command({ id: 'run', name: 'Run', execute });
 			}),
 		);
 		host.activate('one');
 		const oldCommand = registries.command.items.get('run')!.contribution;
 		expect(oldCommand.execute()).toBe(true);
-		expect(contexts[0].formatting.execute(request)).toBe(true);
-		expect(formatting.execute).toHaveBeenCalledWith(request);
 		host.deactivate('one');
-		listeners[0](null);
-		expect(listener).toHaveBeenCalledTimes(1);
-		expect(unsubscribe).toHaveBeenCalledOnce();
 		expect(oldCommand.execute()).toBe(false);
 		expect(contexts[0].signal.aborted).toBe(true);
-		expect(contexts[0].formatting.execute(request)).toBe(false);
-		expect(() => contexts[0].formatting.subscribe(listener)).toThrow('revoked');
 		expect(() => contexts[0].contributions.toolbar(toolbarContribution)).toThrow('revoked');
 		const late = vi.fn();
 		const release = contexts[0].own(late);
@@ -325,14 +456,16 @@ describe('PluginHost', () => {
 		expect(execute).toHaveBeenCalledTimes(2);
 	});
 
-	it('revokes individually released commands and subscriptions before cleanup can throw', () => {
-		const { host, registries, listeners, unsubscribe } = setup();
-		unsubscribe.mockImplementation(() => {
-			throw new Error('unsubscribe failed');
-		});
+	it('revokes individually released commands before registry cleanup can throw', () => {
+		const { host, registries } = setup();
 		let releaseCommand!: Dispose;
-		let releaseSubscription!: Dispose;
-		const listener = vi.fn();
+		const cleanup = vi.fn(() => {
+			throw new Error('registry cleanup failed');
+		});
+		vi.mocked(registries.command.register).mockImplementationOnce((ownerId, contribution) => {
+			registries.command.items.set(contribution.id, { ownerId, contribution });
+			return cleanup;
+		});
 		host.register(
 			plugin('one', (context) => {
 				releaseCommand = context.contributions.command({
@@ -340,21 +473,19 @@ describe('PluginHost', () => {
 					name: 'Run',
 					execute: () => true,
 				});
-				releaseSubscription = context.formatting.subscribe(listener);
 			}),
 		);
 		host.activate('one');
 		const retained = registries.command.items.get('run')!.contribution;
 		releaseCommand();
-		releaseSubscription();
-		listeners[0](null);
 		expect(retained.execute()).toBe(false);
-		expect(listener).toHaveBeenCalledOnce();
-		expect(host.deactivate('one').errors[0].message).toBe('unsubscribe failed');
+		releaseCommand();
+		expect(cleanup).toHaveBeenCalledOnce();
+		expect(host.deactivate('one').errors[0].message).toBe('registry cleanup failed');
 	});
 
-	it('enforces capability declarations without touching injected services', () => {
-		const { host, formatting, registries } = setup();
+	it('enforces capability declarations before touching registries', () => {
+		const { host, registries } = setup();
 		let saved!: PluginContext<string>;
 		host.register(
 			plugin(
@@ -366,8 +497,6 @@ describe('PluginHost', () => {
 			),
 		);
 		host.activate('one');
-		expect(saved.formatting.execute(request)).toBe(false);
-		expect(() => saved.formatting.subscribe(() => {})).toThrow('formatting.observe');
 		expect(() => saved.contributions.toolbar(toolbarContribution)).toThrow('contributions.toolbar');
 		expect(() => saved.contributions.view({ id: 'v', name: 'V', presentation: 'v' })).toThrow(
 			'contributions.view',
@@ -375,9 +504,10 @@ describe('PluginHost', () => {
 		expect(() => saved.contributions.command({ id: 'c', name: 'C', execute: () => true })).toThrow(
 			'contributions.command',
 		);
-		expect(formatting.execute).not.toHaveBeenCalled();
-		expect(formatting.subscribe).not.toHaveBeenCalled();
 		expect(registries.toolbar.register).not.toHaveBeenCalled();
+		expect(registries.view.register).not.toHaveBeenCalled();
+		expect(registries.command.register).not.toHaveBeenCalled();
+		expect(Object.keys(saved).sort()).toEqual(['apis', 'contributions', 'own', 'signal', 'tasks']);
 	});
 
 	it('clears old errors on retry after activation or cleanup failure', () => {
@@ -453,70 +583,6 @@ describe('PluginHost', () => {
 		expect(retained.execute()).toBe(false);
 		expect(cleanup).toHaveBeenCalledOnce();
 		expect(host.activate('one').status).toBe('active');
-	});
-
-	it('copies formatting data and delegates request validation and results to the service', () => {
-		const { host, formatting, listeners } = setup();
-		let saved!: PluginContext<string>;
-		const received: (FormattingSnapshot | null)[] = [];
-		host.register(
-			plugin('one', (context) => {
-				saved = context;
-				context.formatting.subscribe((snapshot) => {
-					received.push(snapshot);
-				});
-			}),
-		);
-		host.activate('one');
-		const snapshot: FormattingSnapshot = {
-			viewId: 'view-1',
-			revision: 7,
-			marks: {
-				bold: 1,
-				italic: 0,
-				superscript: 0,
-				subscript: 0,
-				underline: 0,
-				overline: 0,
-				strikethrough: 0,
-			},
-			blocks: {
-				indent: 1,
-				dedent: 0,
-				'align-left': 1,
-				'align-center': 0,
-				'align-right': 0,
-				'align-justify': 0,
-			},
-			enabled: {
-				bold: true,
-				italic: true,
-				superscript: true,
-				subscript: true,
-				underline: true,
-				overline: true,
-				strikethrough: true,
-				indent: true,
-				dedent: false,
-				'align-left': true,
-				'align-center': true,
-				'align-right': true,
-				'align-justify': true,
-			},
-		};
-		listeners[0](snapshot);
-		expect(received).toEqual([null, snapshot]);
-		expect(received[1]).not.toBe(snapshot);
-		received[1]!.marks.bold = 99;
-		received[1]!.blocks.indent = 99;
-		received[1]!.enabled.bold = false;
-		expect(snapshot.marks.bold).toBe(1);
-		expect(snapshot.blocks.indent).toBe(1);
-		expect(snapshot.enabled.bold).toBe(true);
-		vi.mocked(formatting.execute).mockReturnValue(false);
-		expect(saved.formatting.execute(request)).toBe(false);
-		expect(vi.mocked(formatting.execute).mock.calls[0][0]).toEqual(request);
-		expect(vi.mocked(formatting.execute).mock.calls[0][0]).not.toBe(request);
 	});
 
 	it('disposes a registration whose adapter synchronously deactivates an active owner', () => {
@@ -632,70 +698,6 @@ describe('PluginHost', () => {
 		expect(Object.isFrozen(failed.errors[0])).toBe(true);
 		expect(() => Object.assign(failed.errors[0], { message: 'changed' })).toThrow(TypeError);
 		expect(host.get('failed')?.errors[0].message).toBe('failure');
-	});
-
-	it('unsubscribes when an immediate listener throws, even if unsubscribe also fails', () => {
-		const { host, listeners, unsubscribe } = setup();
-		const listener = vi.fn(() => {
-			throw new Error('listener failed');
-		});
-		unsubscribe.mockImplementationOnce(() => {
-			throw new Error('unsubscribe failed');
-		});
-		host.register(
-			plugin('one', (context) => {
-				context.formatting.subscribe(listener);
-			}),
-		);
-		const info = host.activate('one');
-		expect(info.status).toBe('failed');
-		expect(info.errors).toEqual([
-			{ phase: 'cleanup', message: 'unsubscribe failed' },
-			{ phase: 'activation', message: 'listener failed' },
-		]);
-		expect(unsubscribe).toHaveBeenCalledOnce();
-		listeners[0](null);
-		expect(listener).toHaveBeenCalledOnce();
-		host.deactivate('one');
-		expect(unsubscribe).toHaveBeenCalledOnce();
-	});
-
-	it('revokes callbacks retained by failed subscription setup while the plugin remains active', () => {
-		const { host, formatting } = setup();
-		let retained!: (snapshot: FormattingSnapshot | null) => void;
-		const listener = vi.fn();
-		vi.mocked(formatting.subscribe).mockImplementationOnce((callback) => {
-			retained = callback;
-			throw new Error('service setup failed');
-		});
-		host.register(
-			plugin('one', (context) => {
-				expect(() => context.formatting.subscribe(listener)).toThrow('service setup failed');
-			}),
-		);
-		expect(host.activate('one').status).toBe('active');
-		retained(null);
-		expect(listener).not.toHaveBeenCalled();
-	});
-
-	it('owns the subscription handle when an immediate callback deactivates its owner', () => {
-		const { host, listeners, unsubscribe } = setup();
-		let saved!: PluginContext<string>;
-		host.register(
-			plugin('one', (context) => {
-				saved = context;
-			}),
-		);
-		host.activate('one');
-		const listener = vi.fn(() => {
-			host.deactivate('one');
-		});
-		const release = saved.formatting.subscribe(listener);
-		release();
-		expect(host.get('one')?.status).toBe('disabled');
-		expect(unsubscribe).toHaveBeenCalledOnce();
-		listeners[0](null);
-		expect(listener).toHaveBeenCalledOnce();
 	});
 
 	it('rejects async activation and rolls back already-owned resources', () => {

@@ -4,7 +4,7 @@
 		FormattingCommand,
 		FormattingMark,
 		FormattingSnapshot,
-	} from '@writers-ide/plugins';
+	} from './contracts';
 	import { Icon, type IconSource } from '@steeze-ui/svelte-icon';
 	import {
 		TextB,
@@ -21,11 +21,10 @@
 		TextAlignJustify,
 	} from '@steeze-ui/phosphor-icons';
 
-	import IconButton from '$lib/components/IconButton.svelte';
+	import { IconButton, type TooltipData } from '@writers-ide/components';
 	import type { Internationalizator } from '$lib/editor/types';
 	import { capitalize } from '$lib/utils/strings';
 	import { TextOverline } from '$lib/icons';
-	import type { TooltipData } from '$lib/services/tooltip.svelte';
 
 	type TextMenuIcon = {
 		iconSrc: IconSource;

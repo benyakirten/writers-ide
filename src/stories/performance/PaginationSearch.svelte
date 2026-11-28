@@ -1,17 +1,17 @@
 <script module lang="ts">
-	export interface PaginationSearchArgs {
+	export type PaginationSearchArgs = {
 		repetitions?: number;
 		spanSize?: number;
 		linesToKeep?: number;
 		content?: 'plain' | 'unicode';
 		width?: number;
-	}
+	};
 
-	export interface PaginationSearchResult extends Record<string, number> {
+	export type PaginationSearchResult = Record<string, number> & {
 		splitOffset: number;
 		probes: number;
 		textLength: number;
-	}
+	};
 </script>
 
 <script lang="ts">

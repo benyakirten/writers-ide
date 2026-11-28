@@ -1,0 +1,26 @@
+{
+	"name": "portable-sdk-example",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"check": "svelte-check --tsconfig ./tsconfig.json",
+		"build": "vite build"
+	},
+	"dependencies": {
+		"@writers-ide/plugins": "0.1.0",
+		"@writers-ide/components": "0.1.0",
+		"@writers-ide/layout": "0.1.0",
+		"@writers-ide/tasks": "0.1.0",
+		"@writers-ide/word-processing": "0.1.0",
+		"svelte": "5.57.3",
+		"prosemirror-view": "1.42.9",
+		"prosemirror-commands": "1.7.2"
+	},
+	"devDependencies": {
+		"typescript": "6.0.3",
+		"svelte-check": "4.7.8",
+		"vite": "8.3.8",
+		"@sveltejs/vite-plugin-svelte": "7.3.1"
+	}
+}

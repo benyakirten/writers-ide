@@ -1,0 +1,33 @@
+{
+	"name": "@writers-ide/word-processing",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Live synchronous word-processing API and lifecycle-owned editor commands",
+	"license": "MIT",
+	"exports": {
+		".": {
+			"types": "./index.ts",
+			"svelte": "./index.ts",
+			"default": "./index.ts"
+		},
+		"./structure": {
+			"types": "./structure.ts",
+			"default": "./structure.ts"
+		},
+		"./svelte": {
+			"types": "./svelte.ts",
+			"svelte": "./svelte.ts",
+			"default": "./svelte.ts"
+		}
+	},
+	"dependencies": {
+		"@writers-ide/plugins": "workspace:*"
+	},
+	"peerDependencies": {
+		"prosemirror-model": "^1.25.13",
+		"prosemirror-state": "^1.4.4",
+		"prosemirror-view": "^1.42.9",
+		"svelte": "^5.57.3"
+	}
+}

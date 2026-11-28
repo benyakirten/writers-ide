@@ -8,7 +8,7 @@ import type {
 } from 'prosemirror-view';
 import { SvelteComponent, unmount } from 'svelte';
 
-export interface SvelteNodeViewProps<A extends Attrs> {
+export type SvelteNodeViewProps<A extends Attrs> = {
 	node: PMNode;
 	attrs: A;
 	contentDOM: (node: HTMLElement) => void;
@@ -17,7 +17,7 @@ export interface SvelteNodeViewProps<A extends Attrs> {
 	getPos: () => number | undefined;
 	decorations: readonly Decoration[];
 	innerDecorations: DecorationSource;
-}
+};
 
 // TODO: https://github.com/benyakirten/svelte-multimodal-editor/issues/18
 export class SvelteNodeView<A extends Attrs> implements NodeView {

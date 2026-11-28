@@ -4,15 +4,26 @@
 	"private": true,
 	"type": "module",
 	"license": "MIT",
+	"scripts": {
+		"test": "vitest run --root ../.. --config packages-js/plugins/vitest.config.ts",
+		"check": "tsc --project tsconfig.tests.json"
+	},
 	"exports": {
 		".": {
 			"types": "./index.ts",
 			"default": "./index.ts"
 		},
+		"./native": {
+			"types": "./native.ts",
+			"default": "./native.ts"
+		},
 		"./svelte": {
 			"types": "./svelte.ts",
 			"default": "./svelte.ts"
 		}
+	},
+	"dependencies": {
+		"@writers-ide/tasks": "workspace:*"
 	},
 	"peerDependencies": {
 		"svelte": "^5.0.0"

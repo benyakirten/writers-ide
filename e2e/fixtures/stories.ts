@@ -2,10 +2,10 @@ import type { ArgumentsArgs } from '../../src/stories/performance/Arguments.svel
 import type { PaginationSearchArgs } from '../../src/stories/performance/PaginationSearch.svelte';
 
 /** Explicit IDs keep display-title changes from breaking automation. */
-export interface StoryArgs {
+export type StoryArgs = {
 	'Performance/Pagination search/Paragraph': PaginationSearchArgs;
 	'Performance/Harness arguments/Echo': ArgumentsArgs;
-}
+};
 
 export type StoryName = keyof StoryArgs;
 

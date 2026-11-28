@@ -1,15 +1,14 @@
 <script lang="ts">
-	import type { FormattingCommand, FormattingSnapshot } from '@writers-ide/plugins';
-	import type { SveltePluginContext } from '@writers-ide/plugins/svelte';
+	import type { FormattingCommand, FormattingSnapshot, FormattingService } from './contracts';
 	import * as m from '$lib/paraglide/messages';
 	import { blockMarkButtons, textMarkButtons } from './Snippets.svelte';
 
-	let { context }: { context: SveltePluginContext } = $props();
+	let { formatting }: { formatting: FormattingService } = $props();
 	let snapshot = $state<FormattingSnapshot | null>(null);
 
 	$effect(() => {
 		snapshot = null;
-		return context.formatting.subscribe((value) => {
+		return formatting.subscribe((value) => {
 			snapshot = value;
 		});
 	});
@@ -19,7 +18,7 @@
 			return;
 		}
 
-		context.formatting.execute({ viewId: snapshot.viewId, revision: snapshot.revision, command });
+		formatting.execute({ viewId: snapshot.viewId, revision: snapshot.revision, command });
 	}
 </script>
 

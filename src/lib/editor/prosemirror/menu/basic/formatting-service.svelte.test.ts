@@ -3,11 +3,15 @@ import { flushSync } from 'svelte';
 import { Schema, type Node as ProseMirrorNode } from 'prosemirror-model';
 import { AllSelection, EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import type { FormattingCommand, FormattingSnapshot } from '@writers-ide/plugins';
+import type { FormattingCommand, FormattingSnapshot } from './contracts';
 
-import { FormattingService, type FormattingSources } from './formatting-service.svelte';
+import { FormattingService } from './formatting-service.svelte';
+import {
+	createWordProcessingService,
+	type WordProcessingSources,
+} from '@writers-ide/word-processing';
 import { INDENT_MAX } from '$lib/editor/prosemirror/view/constants';
-import PageLayout from '$lib/editor/state/page-layout.svelte';
+import * as structure from '@writers-ide/word-processing/structure';
 import { ActionUtilities } from '$lib/editor/prosemirror/view/actions';
 import { schema as productionSchema } from '$lib/editor/prosemirror/view/schema';
 import TabState from '$lib/editor/state/tab-state.svelte';
@@ -66,12 +70,20 @@ function createView(blocks: ProseMirrorNode[] = [paragraph()]) {
 
 function fixture(view: EditorView | null = createView()) {
 	let active = $state<string | null>('one');
-	let registry = $state.raw<Record<string, { view: EditorView }>>(view ? { one: { view } } : {});
+	let registry = $state.raw<Record<string, { view: EditorView; documentId?: string }>>(
+		view ? { one: { view } } : {},
+	);
 	const listeners = new Set<() => void>();
 	const unsubscribe = vi.fn();
-	const sources: FormattingSources = {
-		activeId: () => active,
-		getView: (id) => registry[id] ?? null,
+	const sources: WordProcessingSources = {
+		activeViewId: () => active,
+		listViews: () =>
+			Object.entries(registry).map(([viewId, entry]) => ({
+				viewId,
+				documentId: entry.documentId ?? `document-${viewId}`,
+				name: viewId,
+				view: entry.view,
+			})),
 		subscribe: vi.fn((listener) => {
 			listeners.add(listener);
 			return () => {
@@ -80,11 +92,14 @@ function fixture(view: EditorView | null = createView()) {
 			};
 		}),
 	};
-	const service = new FormattingService(sources);
+	const api = createWordProcessingService(sources);
+	cleanups.push(() => api.dispose());
+	const service = new FormattingService(api);
 	const emissions: (FormattingSnapshot | null)[] = [];
 	let latest: FormattingSnapshot | null = null;
 	return {
 		service,
+		api,
 		sources,
 		emissions,
 		listeners,
@@ -95,7 +110,7 @@ function fixture(view: EditorView | null = createView()) {
 		set active(id: string | null) {
 			active = id;
 		},
-		set registry(value: Record<string, { view: EditorView }>) {
+		set registry(value: Record<string, { view: EditorView; documentId?: string }>) {
 			registry = value;
 		},
 		listen() {
@@ -181,7 +196,12 @@ describe('default application sources', () => {
 		const secondView = createView();
 		const firstDispatch = vi.spyOn(firstView, 'dispatch');
 		const secondDispatch = vi.spyOn(secondView, 'dispatch');
-		const service = new FormattingService();
+		const api = createWordProcessingService({
+			listViews: () => Object.values(Editors.editors),
+			activeViewId: () => (TabState.active ? Editors.get(TabState.active)?.viewId : null),
+			subscribe: () => () => {},
+		});
+		const service = new FormattingService(api);
 		const listener = vi.fn<(snapshot: FormattingSnapshot | null) => void>();
 		let stop: (() => void) | undefined;
 		try {
@@ -233,6 +253,7 @@ describe('default application sources', () => {
 			expect(listener.mock.calls.at(-1)![0]!.viewId).toBe(firstViewId);
 		} finally {
 			stop?.();
+			api.dispose();
 			Editors.editors = previousEditors;
 			TabState.remove(firstDocumentId);
 			TabState.remove(secondDocumentId);
@@ -381,38 +402,46 @@ describe('FormattingService lifecycle and data boundary', () => {
 });
 
 describe('live request validation', () => {
-	it.each(['selection', 'text', 'active', 'replacement', 'destroyed', 'readonly'] as const)(
-		'rejects stale %s before a reactive flush or event',
-		(change) => {
-			const view = createView();
-			const f = fixture(view);
-			f.listen();
-			const request = f.request();
-			const focus = vi.spyOn(view, 'focus');
-			switch (change) {
-				case 'selection':
-					view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 3, 6)));
-					break;
-				case 'text':
-					view.dispatch(view.state.tr.insertText('new', 3));
-					break;
-				case 'active':
-					f.active = 'other';
-					break;
-				case 'replacement':
-					f.registry = { one: { view: createView() } };
-					break;
-				case 'destroyed':
-					view.destroy();
-					break;
-				case 'readonly':
-					view.setProps({ editable: () => false });
-					break;
-			}
-			expect(f.service.execute(request)).toBe(false);
-			expect(focus).not.toHaveBeenCalled();
-		},
-	);
+	it.each([
+		'selection',
+		'text',
+		'active',
+		'replacement',
+		'document',
+		'destroyed',
+		'readonly',
+	] as const)('rejects stale %s before a reactive flush or event', (change) => {
+		const view = createView();
+		const f = fixture(view);
+		f.listen();
+		const request = f.request();
+		const focus = vi.spyOn(view, 'focus');
+		switch (change) {
+			case 'selection':
+				view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 3, 6)));
+				break;
+			case 'text':
+				view.dispatch(view.state.tr.insertText('new', 3));
+				break;
+			case 'active':
+				f.active = 'other';
+				break;
+			case 'replacement':
+				f.registry = { one: { view: createView() } };
+				break;
+			case 'document':
+				f.registry = { one: { view, documentId: 'replacement-document' } };
+				break;
+			case 'destroyed':
+				view.destroy();
+				break;
+			case 'readonly':
+				view.setProps({ editable: () => false });
+				break;
+		}
+		expect(f.service.execute(request)).toBe(false);
+		expect(focus).not.toHaveBeenCalled();
+	});
 
 	it('observes selection/text updates and active switches without an editor event', () => {
 		const view = createView();
@@ -434,6 +463,24 @@ describe('live request validation', () => {
 		f.active = null;
 		flushSync();
 		expect(f.emissions.at(-1)).toBeNull();
+	});
+
+	it('uses synchronous inspection and provider-owned active, focused command execution', () => {
+		const f = fixture();
+		const inspect = vi.spyOn(f.api, 'inspect');
+		const runCommand = vi.spyOn(f.api, 'runCommand');
+		f.listen();
+		expect(inspect).toHaveBeenCalledWith(
+			expect.objectContaining({ viewId: 'one', documentId: 'document-one' }),
+			expect.any(Function),
+			{ requireActive: true },
+		);
+		expect(f.service.execute(f.request())).toBe(true);
+		expect(runCommand).toHaveBeenCalledExactlyOnceWith(
+			expect.objectContaining({ viewId: 'one', documentId: 'document-one' }),
+			expect.any(Function),
+			{ requireActive: true, focus: true },
+		);
 	});
 
 	it('rejects unknown commands, incorrect view IDs and revisions', () => {
@@ -459,7 +506,7 @@ describe('read-only availability queries', () => {
 		);
 		const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 		const transactions = vi.spyOn(EditorState.prototype, 'tr', 'get');
-		const groups = vi.spyOn(PageLayout, 'groupPeerParagraphs');
+		const groups = vi.spyOn(structure, 'groupSelectedBlocks');
 		const f = fixture(view);
 		f.listen();
 		flushSync();

@@ -1,5 +1,10 @@
 import type { EditorView } from 'prosemirror-view';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
+import {
+	groupSelectedBlocks,
+	identifyBlockGroup,
+	type SelectedBlockGroup,
+} from '@writers-ide/word-processing/structure';
 
 import { getLineHeight } from '$lib/utils/css';
 import {
@@ -11,7 +16,6 @@ import {
 	PROSEMIRROR_PARAGRAPH_CLASS,
 	PEERED_TRANSACTION_REUNITE_PEERS_META_VALUE,
 	PEERED_TRANSACTION_META_KEY,
-	PAGE_DEPTH,
 	BLOCK_DEPTH,
 } from '../prosemirror/view/constants';
 import { clamp } from '$lib/utils/numbers';
@@ -50,6 +54,12 @@ type NotPeerGroup = {
 	type: PeerSelection.NotPeered;
 	details: NodeDetails;
 };
+
+function peerIdentification(group: SelectedBlockGroup): PeerIdentification {
+	return group.kind === 'continuation'
+		? { type: PeerSelection.Peered, head: group.head, peer: group.continuation }
+		: { type: PeerSelection.NotPeered, details: group.block };
+}
 
 /** The first block whose rendered bottom extends beyond the page's content area. */
 type OverflowingDetails = {
@@ -1098,141 +1108,13 @@ export class PageLayoutManager {
 		return { splitOffset: pmOffset, shouldDedent };
 	}
 
-	/**
-	 * Helper method to identify whether the blocks in the selection are peered or not
-	 * on a per-block basis. This is for actions that affect block nodes. These methods
-	 * will not work on any other type of node since pages must contain block nodes.
-	 */
 	groupPeerParagraphs(state: EditorState): PeerIdentification[] {
-		const peerIdentifications: PeerIdentification[] = [];
-
-		const { from, to } = state.selection;
-		let pos = from;
-		while (pos < to || pos === from) {
-			const identification = this.identifyPeerGroup(state, pos);
-			if (!identification) {
-				break;
-			}
-
-			peerIdentifications.push(identification);
-			const nodeDetails =
-				identification.type === PeerSelection.Peered ? identification.peer : identification.details;
-			pos = nodeDetails.position + nodeDetails.node.nodeSize;
-			const resolvedEnd = state.doc.resolve(pos);
-			if (
-				resolvedEnd.depth === PAGE_DEPTH &&
-				resolvedEnd.index(PAGE_DEPTH) === resolvedEnd.parent.childCount
-			) {
-				pos = resolvedEnd.after(PAGE_DEPTH);
-			}
-		}
-
-		return peerIdentifications;
+		return groupSelectedBlocks(state).map(peerIdentification);
 	}
 
-	/** Resolve a page's direct block, including selections on leaf blocks and page boundaries. */
-	private getPeerGroupDetails(state: EditorState, pos: number) {
-		const resolvedPosition = state.doc.resolve(pos);
-		const pageIndex = resolvedPosition.index(0);
-		if (resolvedPosition.depth < PAGE_DEPTH) {
-			// AllSelection and traversal across pages start before a page; doc end has no next page.
-			const pageNode = state.doc.maybeChild(pageIndex);
-			const blockNode = pageNode?.firstChild;
-			if (!pageNode || !blockNode) {
-				return null;
-			}
-			const blockStart = pos + 1;
-			return {
-				pageNode,
-				pageIndex,
-				blockStart,
-				blockNode,
-				blockIndex: 0,
-				position: blockStart + blockNode.nodeSize,
-			};
-		}
-
-		const pageNode = resolvedPosition.node(PAGE_DEPTH);
-		const blockIndex = resolvedPosition.index(PAGE_DEPTH);
-		const blockNode = pageNode.maybeChild(blockIndex);
-		if (!blockNode) {
-			return null;
-		}
-		const blockStart =
-			resolvedPosition.depth >= BLOCK_DEPTH ? resolvedPosition.before(BLOCK_DEPTH) : pos;
-		return {
-			pageNode,
-			pageIndex,
-			blockStart,
-			blockNode,
-			blockIndex,
-			position: blockStart + blockNode.nodeSize,
-		};
-	}
-
-	/**
-	 * Given a position in the EditorState, identify whether it's a peered group or not.
-	 * If so, get the block node and its peer, otherwise just the block node.
-	 *
-	 * There are three possible situations:
-	 * 1. The position is at the peer paragraph. We must look back and find the head prior to it.
-	 * 2. The position is at the end of the page and the first block element of the next page is a peer.
-	 *   We must look forward and find the peer after it.
-	 * 3. The position is at a block element that is not peered. We just return the block element.
-	 */
 	identifyPeerGroup(state: EditorState, pos: number): PeerIdentification | null {
-		const groupDetails = this.getPeerGroupDetails(state, pos);
-
-		if (!groupDetails) {
-			return null;
-		}
-
-		const { pageNode, pageIndex, blockStart, blockNode, blockIndex, position } = groupDetails;
-
-		const blockDetails: NodeDetails = {
-			node: blockNode,
-			position: blockStart,
-		};
-
-		if (blockNode.attrs['peer']) {
-			const previousPage = state.doc.maybeChild(pageIndex - 1);
-			const headNode = previousPage?.lastChild;
-			if (headNode) {
-				const head: NodeDetails = {
-					node: headNode,
-					position: blockStart - headNode.nodeSize - 2,
-				};
-
-				return {
-					type: PeerSelection.Peered,
-					head,
-					peer: blockDetails,
-				};
-			}
-		}
-
-		if (blockIndex === pageNode.childCount - 1) {
-			// If the next page's first element is peered, return the peer group.
-			// Otherwise, return not peered
-			const nextPage = state.doc.maybeChild(pageIndex + 1);
-			const peerNode = nextPage?.firstChild;
-			if (peerNode?.attrs['peer']) {
-				const peer: NodeDetails = {
-					node: peerNode,
-					position: position + 2,
-				};
-				return {
-					type: PeerSelection.Peered,
-					head: blockDetails,
-					peer,
-				};
-			}
-		}
-
-		return {
-			type: PeerSelection.NotPeered,
-			details: blockDetails,
-		};
+		const group = identifyBlockGroup(state, pos);
+		return group ? peerIdentification(group) : null;
 	}
 
 	/**

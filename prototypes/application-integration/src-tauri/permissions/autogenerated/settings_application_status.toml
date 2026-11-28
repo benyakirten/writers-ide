@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-settings-application-status"
+description = "Enables the settings_application_status command without any pre-configured scope."
+commands.allow = ["settings_application_status"]
+
+[[permission]]
+identifier = "deny-settings-application-status"
+description = "Denies the settings_application_status command without any pre-configured scope."
+commands.deny = ["settings_application_status"]

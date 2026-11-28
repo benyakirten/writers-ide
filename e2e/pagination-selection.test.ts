@@ -64,6 +64,9 @@ for (const direction of ['forward', 'reverse'] as const) {
 		const text = prose.repeat(70);
 		await replaceDocument(page, editor, text);
 		await expect.poll(() => pages.count()).toBeGreaterThan(1);
+		// Replacing content leaves the caret near the end; fitting only visible pages
+		// does not establish that the offscreen first page has finished pagination.
+		await pages.first().scrollIntoViewIfNeeded();
 		await expectVisiblePagesToFit(viewport);
 		const initialBoundary = (await pages.first().textContent())!.length;
 		const from = 12;

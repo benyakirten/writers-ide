@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-settings-result"
+description = "Enables the settings_result command without any pre-configured scope."
+commands.allow = ["settings_result"]
+
+[[permission]]
+identifier = "deny-settings-result"
+description = "Denies the settings_result command without any pre-configured scope."
+commands.deny = ["settings_result"]

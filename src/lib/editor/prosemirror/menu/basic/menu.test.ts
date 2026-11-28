@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createTaskService, WorkQueue } from '@writers-ide/tasks';
 import { flushSync, mount, unmount } from 'svelte';
-import type { FormattingSnapshot } from '@writers-ide/plugins';
-import type { SveltePluginContext } from '@writers-ide/plugins/svelte';
+import type { FormattingService, FormattingSnapshot } from './contracts';
+import { defineSveltePresentation, type SveltePluginContext } from '@writers-ide/plugins/svelte';
 import BasicMenuHorizontal from './BasicMenuHorizontal.svelte';
 import BasicMenuVertical from './BasicMenuVertical.svelte';
-import { formattingPlugin } from './menu';
+import { createFormattingPlugin } from './menu';
+import {
+	createWordProcessingService,
+	WORD_PROCESSING_PLUGIN_ID,
+	wordProcessingApi,
+} from '@writers-ide/word-processing';
+import PluginPresentationFixture from '$lib/testing/PluginPresentationFixture.svelte';
 
 const components: ReturnType<typeof mount>[] = [];
 
@@ -58,28 +65,37 @@ function snapshot(): FormattingSnapshot {
 function setup() {
 	const listeners = new Set<(value: FormattingSnapshot | null) => void>();
 	const dispose = vi.fn();
+	const controller = new AbortController();
 	const context: SveltePluginContext = {
-		signal: new AbortController().signal,
+		signal: controller.signal,
+		apis: { provide: vi.fn(), get: vi.fn(() => null), subscribe: vi.fn(() => () => {}) },
+		tasks: createTaskService({
+			queue: new WorkQueue(),
+			ownerId: 'test.menu',
+			signal: controller.signal,
+		}),
 		own: (cleanup) => cleanup,
-		formatting: {
-			subscribe: vi.fn((listener) => {
-				listeners.add(listener);
-				listener(null);
-				return () => {
-					listeners.delete(listener);
-					dispose();
-				};
-			}),
-			execute: vi.fn(() => true),
-		},
+
 		contributions: {
 			toolbar: vi.fn(() => () => {}),
 			view: vi.fn(() => () => {}),
 			command: vi.fn(() => () => {}),
 		},
 	};
+	const formatting: FormattingService = {
+		subscribe: vi.fn((listener) => {
+			listeners.add(listener);
+			listener(null);
+			return () => {
+				listeners.delete(listener);
+				dispose();
+			};
+		}),
+		execute: vi.fn(() => true),
+	};
 	return {
 		context,
+		formatting,
 		listeners,
 		dispose,
 		emit(value: FormattingSnapshot | null) {
@@ -91,10 +107,13 @@ function setup() {
 	};
 }
 
-function render(Component: typeof BasicMenuHorizontal, context: SveltePluginContext) {
+function render(Component: typeof BasicMenuHorizontal, formatting: FormattingService) {
 	const target = document.createElement('div');
 	document.body.append(target);
-	const component = mount(Component, { target, props: { context } });
+	const component = mount(PluginPresentationFixture, {
+		target,
+		props: { presentation: defineSveltePresentation(Component, { formatting }) },
+	});
 	components.push(component);
 	flushSync();
 	return [...target.querySelectorAll('button')];
@@ -103,25 +122,52 @@ function render(Component: typeof BasicMenuHorizontal, context: SveltePluginCont
 describe('formatting plugin', () => {
 	it('registers the stable toolbar identity and both scoped presentation descriptors', () => {
 		const { context } = setup();
+		const api = createWordProcessingService({
+			listViews: () => [],
+			activeViewId: () => null,
+			subscribe: () => () => {},
+		});
+		vi.mocked(context.apis.get).mockReturnValue(api);
+		const formattingPlugin = createFormattingPlugin();
 		expect(formattingPlugin.manifest).toMatchObject({
 			id: 'writers-ide.formatting',
 			version: '0.1.0',
 			apiVersion: 1,
-			capabilities: ['formatting.observe', 'formatting.execute', 'contributions.toolbar'],
+			capabilities: ['contributions.toolbar'],
+			dependencies: [
+				{
+					provider: WORD_PROCESSING_PLUGIN_ID,
+					api: wordProcessingApi.id,
+					major: wordProcessingApi.major,
+				},
+			],
 		});
 		formattingPlugin.activate(context);
+		expect(context.apis.get).toHaveBeenCalledExactlyOnceWith(
+			WORD_PROCESSING_PLUGIN_ID,
+			wordProcessingApi,
+		);
+		api.dispose();
 		expect(context.contributions.toolbar).toHaveBeenCalledExactlyOnceWith({
 			id: 'basic-menu',
 			name: 'Basic Menu',
 			horizontal: {
-				presentation: { component: BasicMenuHorizontal, context },
+				presentation: { component: BasicMenuHorizontal, props: { formatting: expect.any(Object) } },
 				size: 2,
 			},
 			vertical: {
-				presentation: { component: BasicMenuVertical, context },
+				presentation: { component: BasicMenuVertical, props: { formatting: expect.any(Object) } },
 				size: 1,
 			},
 		});
+	});
+
+	it('fails activation without the required API instead of registering a disconnected toolbar', () => {
+		const { context } = setup();
+		expect(() => createFormattingPlugin().activate(context)).toThrow(
+			'Required word-processing API unavailable',
+		);
+		expect(context.contributions.toolbar).not.toHaveBeenCalled();
 	});
 
 	for (const [orientation, Component] of [
@@ -129,8 +175,8 @@ describe('formatting plugin', () => {
 		['vertical', BasicMenuVertical],
 	] as const) {
 		it(`${orientation}: renders availability and ratios and executes current revision-tagged commands`, () => {
-			const { context, emit } = setup();
-			const buttons = render(Component, context);
+			const { formatting, emit } = setup();
+			const buttons = render(Component, formatting);
 			expect(buttons).toHaveLength(13);
 			expect(buttons.every((button) => button.disabled)).toBe(true);
 			emit(snapshot());
@@ -143,30 +189,30 @@ describe('formatting plugin', () => {
 			expect(buttons[3].disabled).toBe(true);
 			expect(buttons[8].disabled).toBe(true);
 			buttons[0].click();
-			expect(context.formatting.execute).toHaveBeenLastCalledWith({
+			expect(formatting.execute).toHaveBeenLastCalledWith({
 				viewId: 'editor-one',
 				revision: 7,
 				command: 'bold',
 			});
 			emit({ ...snapshot(), viewId: 'editor-two', revision: 12 });
 			buttons[10].click();
-			expect(context.formatting.execute).toHaveBeenLastCalledWith({
+			expect(formatting.execute).toHaveBeenLastCalledWith({
 				viewId: 'editor-two',
 				revision: 12,
 				command: 'align-center',
 			});
 			buttons[3].click();
 			buttons[8].click();
-			expect(context.formatting.execute).toHaveBeenCalledTimes(2);
+			expect(formatting.execute).toHaveBeenCalledTimes(2);
 			emit(null);
 			expect(buttons.every((button) => button.disabled)).toBe(true);
 			buttons[0].click();
-			expect(context.formatting.execute).toHaveBeenCalledTimes(2);
+			expect(formatting.execute).toHaveBeenCalledTimes(2);
 		});
 
 		it(`${orientation}: releases its subscription on unmount`, async () => {
-			const { context, listeners, dispose } = setup();
-			render(Component, context);
+			const { formatting, listeners, dispose } = setup();
+			render(Component, formatting);
 			expect(listeners.size).toBe(1);
 			await unmount(components.pop()!);
 			expect(listeners.size).toBe(0);
@@ -177,8 +223,8 @@ describe('formatting plugin', () => {
 	it('does not share formatting snapshots between presentation instances', () => {
 		const first = setup();
 		const second = setup();
-		const firstButtons = render(BasicMenuHorizontal, first.context);
-		const secondButtons = render(BasicMenuVertical, second.context);
+		const firstButtons = render(BasicMenuHorizontal, first.formatting);
+		const secondButtons = render(BasicMenuVertical, second.formatting);
 		first.emit(snapshot());
 		expect(firstButtons[0].disabled).toBe(false);
 		expect(secondButtons.every((button) => button.disabled)).toBe(true);

@@ -1,0 +1,22 @@
+{
+	"name": "@writers-ide/tasks",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Shared cooperative scheduler and activation-owned task helpers",
+	"license": "MIT",
+	"exports": {
+		".": {
+			"types": "./index.ts",
+			"svelte": "./index.ts",
+			"default": "./index.ts"
+		},
+		"./worker": {
+			"types": "./worker.ts",
+			"default": "./worker.ts"
+		}
+	},
+	"peerDependencies": {
+		"svelte": "^5.57.3"
+	}
+}

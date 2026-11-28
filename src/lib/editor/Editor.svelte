@@ -39,6 +39,8 @@
 	import PageLayout from './state/page-layout.svelte';
 	import Paginator from '$lib/components/pagination/Paginator.svelte';
 
+	let { onplugins }: { onplugins?: (launcher: HTMLButtonElement) => void } = $props();
+
 	let active = $state<DockDragSource | null>(null);
 	let announcement = $state('');
 	let previewLabel = $state('');
@@ -324,7 +326,7 @@
 			style:--editor-y-padding={`${PageLayout.pageYMargin}${PageLayout.units}`}
 		>
 			{@render horizontalDock(HorizontalBarPosition.WindowBlockStart)}
-			<HorizontalBaseBar />
+			<HorizontalBaseBar {onplugins} />
 			{#each FloaterBarState.visibleBars as bar, index (bar.id)}
 				<FloaterBar {bar} {index} items={bar.data.items} />
 			{/each}

@@ -3,20 +3,20 @@ import type { BenchmarkOptions, BenchmarkReport } from '../../src/lib/testing/br
 import { stories, type StoryArgs, type StoryName } from './stories';
 import { storyUrl, type StoryArg } from './story-url';
 
-export interface VisitOptions {
+export type VisitOptions = {
 	timeout?: number;
 	/** Optional application-specific ready locator, in addition to the mounted story root. */
 	readySelector?: string;
-}
+};
 
-export type StorybookPage = Page & {
+export interface StorybookPage extends Page {
 	visit<Name extends StoryName>(
 		name: Name,
 		args?: StoryArgs[Name],
 		options?: VisitOptions,
 	): Promise<void>;
 	benchmark(options: BenchmarkOptions): Promise<BenchmarkReport>;
-};
+}
 
 export const test = base.extend<{ page: StorybookPage }>({
 	page: async ({ page, baseURL, browser }, use, testInfo) => {

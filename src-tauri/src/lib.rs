@@ -1,3 +1,19 @@
+// Internal foundation only; the installer and verified-byte loader are not wired yet.
+#[allow(dead_code)]
+mod plugin_integrity;
+
+// Pure declarations and static dependency analysis; no external execution is enabled.
+#[allow(dead_code)]
+mod plugin_manifest;
+
+// No runtime owner or resource routes are connected in this internal slice.
+#[allow(dead_code)]
+mod plugin_resources;
+
+// Persistent internal records only; no installer, credentials or application wiring.
+#[allow(dead_code)]
+mod plugin_registry;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {

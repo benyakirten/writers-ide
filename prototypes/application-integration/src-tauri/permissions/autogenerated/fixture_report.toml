@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-fixture-report"
+description = "Enables the fixture_report command without any pre-configured scope."
+commands.allow = ["fixture_report"]
+
+[[permission]]
+identifier = "deny-fixture-report"
+description = "Denies the fixture_report command without any pre-configured scope."
+commands.deny = ["fixture_report"]

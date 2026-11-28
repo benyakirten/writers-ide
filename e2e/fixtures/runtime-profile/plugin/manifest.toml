@@ -1,0 +1,31 @@
+manifest_version = 1
+[package]
+name = "runtime-profile-fixture"
+display_name = "Runtime profile fixture"
+version = "0.1.0"
+description = "Separate artifact browser experiment."
+[[components]]
+id = "plugin"
+display_name = "Profile presentation"
+description = "Shared runtime checks."
+kind = "frontend"
+entry = "entry.js"
+styles = []
+runtime_profile = "writers-ide.frontend/1"
+activation_scope = "application"
+capabilities = ["contributions.view"]
+[[components.provides]]
+id = "fixture.published"
+major = 1
+[[components.dependencies]]
+alias = "host"
+package = "runtime-profile-fixture"
+component = "host"
+[[components.dependencies.apis]]
+id = "fixture.probe"
+major = 1
+[[components.dependencies.commands]]
+alias = "double"
+id = "double"
+contract = "fixture.double"
+major = 1

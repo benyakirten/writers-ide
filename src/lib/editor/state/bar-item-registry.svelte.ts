@@ -1,4 +1,5 @@
 import type { SveltePresentation } from '@writers-ide/plugins/svelte';
+import { BarItemRegistry as LayoutRegistry } from '@writers-ide/layout';
 import { IdGenerator } from '$lib/services/ids';
 import type { ModularComponent } from './shared.types';
 
@@ -14,49 +15,44 @@ export type BarItem = {
 	horizontal: BarItemSection;
 };
 
-export class BarItemRegistry {
-	items = $state<Record<string, BarItem>>({});
-	#retainedSizes = $state<
-		Record<string, { horizontal: BarItemSection['size']; vertical: BarItemSection['size'] }>
-	>({});
+export class BarItemRegistry extends LayoutRegistry<BarItemSection> {
+	#visibility = $state<Record<string, { owner: symbol; visible: boolean }>>({});
 
-	register(item: BarItem, id: string = IdGenerator.generate()): [string, () => void] {
-		this.items[id] = item;
-		delete this.#retainedSizes[id];
-		return [id, () => this.deregister(id)];
+	constructor() {
+		super(() => IdGenerator.generate());
 	}
 
-	clear() {
-		this.items = {};
-		this.#retainedSizes = {};
+	override register(item: BarItem, id: string = IdGenerator.generate()): [string, () => void] {
+		delete this.#visibility[id];
+		return super.register(item, id);
 	}
 
-	deregister(id: string, preserveSize = false) {
-		const item = this.items[id];
-		if (preserveSize && item) {
-			// Disabled plugin placements keep their capacity without retaining presentation contexts.
-			this.#retainedSizes[id] = {
-				horizontal: item.horizontal.size,
-				vertical: item.vertical.size,
-			};
-		} else if (!preserveSize) {
-			delete this.#retainedSizes[id];
+	setVisibility(id: string, owner: symbol, visible: boolean): void {
+		if (this.#visibility[id]?.owner !== owner || this.#visibility[id]?.visible !== visible) {
+			this.#visibility[id] = { owner, visible };
 		}
-		delete this.items[id];
 	}
 
-	size(id: string | null, isVertical: boolean): 1 | 2 | 3 {
-		if (!id) {
-			return 1;
+	releaseVisibility(id: string, owner: symbol): void {
+		if (this.#visibility[id]?.owner === owner) {
+			delete this.#visibility[id];
 		}
+	}
 
-		const item = this.items[id];
-		if (item) {
-			return isVertical ? item.vertical.size : item.horizontal.size;
+	isVisible(id: string): boolean {
+		return this.#visibility[id]?.visible ?? true;
+	}
+
+	override deregister(id: string, preserveSize = false): void {
+		super.deregister(id, preserveSize);
+		if (!preserveSize) {
+			delete this.#visibility[id];
 		}
+	}
 
-		const retained = this.#retainedSizes[id];
-		return (isVertical ? retained?.vertical : retained?.horizontal) ?? 1;
+	override clear(): void {
+		super.clear();
+		this.#visibility = {};
 	}
 }
 

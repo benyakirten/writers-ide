@@ -45,49 +45,51 @@
 	const plugin = $derived(Registry.items[id]?.vertical.plugin);
 </script>
 
-<div class="renderer" style:--size={size}>
-	<DockDraggable
-		source={{ kind: 'item', location: position, barId, itemId: id }}
-		label={`Drag ${title}`}
-		style="height: 100%"
-	>
-		{#snippet children(handle)}
-			<ItemRendererMenu
-				{handle}
-				{moveDetails}
-				{title}
-				{onremove}
-				{position}
-				{onmove}
-				{onrelocate}
-			/>
-			<div class="component">
-				{#if plugin}
-					<PluginPresentation presentation={plugin} />
-				{:else if Component}
-					<Component
-						proseMirror={{
-							actions: ActionUtilities,
-							selections: SelectionUtilities,
-							eventBus: ProseMirrorEventBus,
-							schema,
-							editors: Editors,
-						}}
-						bars={{
-							vertical: VerticalBarState,
-							horizontal: HorizontalBarState,
-							floater: FloaterBarState,
-						}}
-						tabs={TabState}
-						locale={LocaleManager.locale}
-					/>
-				{:else}
-					<ErrorComponent />
-				{/if}
-			</div>
-		{/snippet}
-	</DockDraggable>
-</div>
+{#if Registry.isVisible(id)}
+	<div class="renderer" style:--size={size}>
+		<DockDraggable
+			source={{ kind: 'item', location: position, barId, itemId: id }}
+			label={`Drag ${title}`}
+			style="height: 100%"
+		>
+			{#snippet children(handle)}
+				<ItemRendererMenu
+					{handle}
+					{moveDetails}
+					{title}
+					{onremove}
+					{position}
+					{onmove}
+					{onrelocate}
+				/>
+				<div class="component">
+					{#if plugin}
+						<PluginPresentation presentation={plugin} />
+					{:else if Component}
+						<Component
+							proseMirror={{
+								actions: ActionUtilities,
+								selections: SelectionUtilities,
+								eventBus: ProseMirrorEventBus,
+								schema,
+								editors: Editors,
+							}}
+							bars={{
+								vertical: VerticalBarState,
+								horizontal: HorizontalBarState,
+								floater: FloaterBarState,
+							}}
+							tabs={TabState}
+							locale={LocaleManager.locale}
+						/>
+					{:else}
+						<ErrorComponent />
+					{/if}
+				</div>
+			{/snippet}
+		</DockDraggable>
+	</div>
+{/if}
 
 <style>
 	.renderer {

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-settings-ack"
+description = "Enables the settings_ack command without any pre-configured scope."
+commands.allow = ["settings_ack"]
+
+[[permission]]
+identifier = "deny-settings-ack"
+description = "Denies the settings_ack command without any pre-configured scope."
+commands.deny = ["settings_ack"]
